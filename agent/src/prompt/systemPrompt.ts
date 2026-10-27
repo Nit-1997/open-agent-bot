@@ -16,7 +16,8 @@ How to answer:
 - If a show_* tool returns a validation error, fix the listed fields and retry at most once; otherwise answer in text.
 - Never say a card, widget, or checklist is shown unless a show_*, weather, or flights tool succeeded in this turn.
 - Reports, printable pages, or when the user asks for a page or PDF: call create_artifact with a complete, self-contained HTML document (inline CSS, no external scripts), then say what it contains.
-- Keep chat replies short and scannable.`;
+- Search efficiently: one or two well-targeted searches (run them in parallel when independent), read at most a couple of pages, then answer. Don't keep searching for marginal gains.
+- Keep chat replies short and scannable. Don't narrate what you are about to do; just do it.`;
 
 export function buildSystemPrompt(ctx: UserContext | null): string {
   if (!ctx) {
@@ -34,5 +35,5 @@ User context (from their browser):
 - Language: ${ctx.locale}
 - Local time: ${ctx.localTime}
 
-Use this country's stores, sites, currency, and units (US → amazon.com/Best Buy, USD, °F; IN → amazon.in/Flipkart, INR, °C) unless the user names a specific site or region. Resolve relative dates ("this weekend", "tomorrow") against the local time. Only ask the user when the request is genuinely ambiguous even with this context.`;
+Use this country's stores, sites, currency, and units (US → amazon.com/Best Buy, USD, °F; IN → amazon.in/Flipkart, INR, °C) unless the user names a specific site or region. Resolve relative dates ("this weekend", "tomorrow") against the local time. The time zone tells you the country, not the city. If the answer depends on the city or neighborhood (weather, local stores, events, delivery) and the user hasn't said where they are, ask in one short question before searching. Otherwise only ask when the request is genuinely ambiguous.`;
 }

@@ -56,3 +56,12 @@ No hosted key was provided, so no scenario was rerun on a stronger model. Bigges
 
 Decision: default `chat-default` → `ollama_chat/qwen3.5:35b` with `think: false` (simple call 2.0s → 0.6–0.8s). Ollama upgraded 0.20.2 → 0.40.11 and runs as a brew service with `OLLAMA_MAX_LOADED_MODELS=1`.
 Open issue: the identical malformed-JSON error across two different models points at the pipeline (likely parallel tool calls merged into one argument string), not the model.
+
+## Round 3: tool-call merge bug, search budget, grounding (2026-10-27)
+
+| Area | Finding |
+|------|---------|
+| Merged tool calls | Root cause: LiteLLM 1.106.5 `ollama_chat/` streams parallel tool calls all at `index: 0`; pi merges by index → concatenated JSON args. Ollama's `/v1` endpoint indexes correctly. Fix: LiteLLM `openai/` provider → `http://host.docker.internal:11434/v1`. Live regression test `test/pi/parallelTools.int.test.ts` |
+| Latency | With merged-call fix + per-reply budget (4 searches, 4 reads, 2 flight searches), qwen3.5:35b thinking-off research turns went from 130–225s to 20–26s, 0 tool errors |
+| City | Prompt now says time zone gives the country, not the city; model asks for location/headcount before planning |
+| **Grounding (open)** | qwen3.5:35b invents prices and "in stock" claims in free text when only search snippets were read: thinking off → 3 invented prices + stock claims; thinking on → 12 invented prices, 305s turn. Product IDs were real. Prompt rules are not enough; needs a structural fix |

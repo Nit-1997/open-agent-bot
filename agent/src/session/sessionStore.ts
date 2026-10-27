@@ -6,6 +6,7 @@ export type SessionEntry = {
   busy: boolean;
   lastUsed: number;
   dispose: () => Promise<void>;
+  onRunStart?: () => void;
 };
 
 export class SessionStore {

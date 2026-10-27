@@ -18,6 +18,11 @@ model_list:
       model: openai/gemma4:latest
       api_base: os.environ/OLLAMA_OPENAI_BASE_URL
       api_key: ollama
+  - model_name: chat-qwen3.5-35b-think
+    litellm_params:
+      model: openai/qwen3.5:35b
+      api_base: os.environ/OLLAMA_OPENAI_BASE_URL
+      api_key: ollama
 
 litellm_settings:
   drop_params: true

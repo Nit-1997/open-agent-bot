@@ -61,6 +61,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   }
   if (signal.aborted) return;
   entry.busy = true;
+  entry.onRunStart?.();
 
   const queue: BaseEvent[] = [];
   let wake: (() => void) | undefined;

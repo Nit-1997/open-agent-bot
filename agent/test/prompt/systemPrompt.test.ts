@@ -15,6 +15,12 @@ describe("buildSystemPrompt", () => {
     expect(p).toContain("Currency: USD");
   });
 
+  it("says the time zone gives the country, not the city", () => {
+    const p = buildSystemPrompt({ timeZone: "America/Los_Angeles", locale: "en-IN", localTime: "2026-10-27T14:00" });
+    expect(p).toContain("not the city");
+    expect(p).not.toContain("Los Angeles weather");
+  });
+
   it("tells the model to ask when there is no context", () => {
     expect(buildSystemPrompt(null)).toContain("ask the user");
   });

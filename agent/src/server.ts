@@ -6,7 +6,8 @@ import { createPiSession } from "./pi/createPiSession.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { BrowserPool } from "./tools/browserPool.js";
-import { buildTools } from "./tools/index.js";
+import { ToolBudget } from "./tools/budget.js";
+import { buildTools, PER_REPLY_LIMITS } from "./tools/index.js";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 
@@ -17,15 +18,17 @@ const pool = new BrowserPool();
 const store = new SessionStore({
   idleMs: SESSION_IDLE_MS,
   create: async (threadId, userContext) => {
+    const budget = new ToolBudget(PER_REPLY_LIMITS);
     const handle = await createPiSession({
       cfg,
       systemPrompt: buildSystemPrompt(userContext),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget }),
     });
     return {
       session: handle.session,
       busy: false,
       lastUsed: Date.now(),
+      onRunStart: () => budget.reset(),
       dispose: async () => {
         await Promise.all([handle.dispose(), pool.close(threadId)]);
       },

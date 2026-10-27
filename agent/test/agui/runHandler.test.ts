@@ -13,15 +13,16 @@ const say: Script = async (emit) => {
 
 function setup(script: Script = say) {
   const session = fakeSession(script);
+  const runStarts = { count: 0 };
   const contexts: Array<UserContext | null> = [];
   const store = new SessionStore({
     idleMs: 60000,
     create: async (_t, ctx): Promise<SessionEntry> => {
       contexts.push(ctx);
-      return { session, busy: false, lastUsed: 0, dispose: async () => {} };
+      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++ };
     },
   });
-  return { session, store, contexts };
+  return { session, store, contexts, runStarts };
 }
 
 function input(over: Partial<RunAgentInput> = {}): RunAgentInput {
@@ -55,6 +56,13 @@ describe("handleRun", () => {
       EventType.RUN_FINISHED,
     ]);
     expect(session.prompts).toEqual(["hello"]);
+  });
+
+  it("calls onRunStart once per run so per-reply budgets reset", async () => {
+    const { store, runStarts } = setup();
+    await collect(handleRun(input(), store, new AbortController().signal));
+    await collect(handleRun(input({ runId: "r2", messages: [{ id: "m1", role: "user", content: "a" }, { id: "m2", role: "user", content: "b" }] as RunAgentInput["messages"] }), store, new AbortController().signal));
+    expect(runStarts.count).toBe(2);
   });
 
   it("expired thread yields SESSION_EXPIRED", async () => {
