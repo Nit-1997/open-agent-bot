@@ -52,21 +52,29 @@ A typical session: one goal, one fresh conversation, roughly 10–40 messages un
 │    (API route)           │                       │  - Custom tools                 │
 └──────────────────────────┘                       │  - Artifact store (disk)        │
                                                    └───────────────┬────────────────┘
+                                                                   │ OpenAI-compatible API
+                                                   ┌───────────────▼────────────────┐
+                                                   │ llm  (LiteLLM proxy)            │
+                                                   │  - model aliases from YAML      │
+                                                   │  - fallbacks, cost/usage logs   │
+                                                   └───────────────┬────────────────┘
                                                                    │
-                                     Ollama (host)  /  OpenRouter or Anthropic (optional)
+                                     Ollama (host)  /  hosted providers (later, via config)
 ```
 
 ### Decided
 
 - **No Python layer.** pi is TypeScript; the "proxy" is a Node service that embeds pi via its SDK (`@earendil-works/pi-coding-agent`, `createAgentSession()`, `session.subscribe()`), rather than spawning pi in RPC mode. This removes a process boundary and a language boundary.
-- **Two services** in Docker Compose: `web` and `agent`. Ollama runs on the host and is reached from the `agent` container.
+- **Three services** in Docker Compose: `web`, `agent`, and `llm`. Ollama runs on the host and is reached from the `llm` container.
+- **LiteLLM proxy as the single model gateway** (owner's decision). pi has exactly one provider configured: an OpenAI-compatible custom provider pointing at `http://llm:4000`. pi only ever sees stable aliases (e.g. `chat-default`, `chat-strong`); LiteLLM's `config.yaml` maps each alias to a real model (v1: `chat-default` → Ollama Qwen ~9B via `ollama_chat/` so tool calling works). Adding or swapping a model, adding a fallback chain, or moving to hosted APIs is a YAML + `.env` change with no code change. Provider API keys live only in the `llm` service's env (`deploy-config/.env-llm`); the agent holds just a LiteLLM key.
+- Known trade-off to watch: going through the OpenAI-compatible format can drop provider-specific features pi would otherwise use natively (e.g. Anthropic prompt caching, extended thinking). Acceptable for v1; record in findings if it bites.
 - **web**: Next.js + CopilotKit. The CopilotKit runtime lives in a Next.js API route and is configured with the agent server as an AG-UI HTTP agent.
 - **agent**: Small Node HTTP server exposing one AG-UI run endpoint. Responsibilities:
   - Map AG-UI `threadId` → a live pi session (in memory). New thread = new session.
   - Feed the latest user message into `session.prompt()`.
   - Translate pi events to AG-UI events: text deltas → `TEXT_MESSAGE_*`; tool execution → `TOOL_CALL_*`; run boundaries → `RUN_STARTED` / `RUN_FINISHED` / `RUN_ERROR`.
   - Serve artifact files (`GET /artifacts/:id`, `GET /artifacts/:id.pdf`).
-- **Models**: default is a ~9B Qwen via Ollama. Optional hosted model (OpenRouter or Anthropic) selected via env. Model choice is config, not code.
+- **Models**: default is a ~9B Qwen via Ollama, behind the `chat-default` alias. Which alias the agent uses is one env var (`AGENT_MODEL`); what the alias points to is LiteLLM config. Model choice is config, not code.
 - **Tools** (registered as pi custom tools):
   | Tool | Purpose |
   |------|---------|
@@ -84,13 +92,13 @@ A typical session: one goal, one fresh conversation, roughly 10–40 messages un
 - **Two output paths**:
   - **Widgets**: fixed set, agent sends data, React renders. v1 set: `weather_card`, `flight_list`, `product_comparison` (item, store, price, in-stock, link), `plan_checklist` (sections of items with quantities/notes). Delivered as an AG-UI tool call that CopilotKit renders with a registered React component.
   - **Artifacts**: agent writes full HTML via `create_artifact`; UI shows an artifact card that opens the HTML in a sandboxed iframe (`sandbox="allow-scripts"`, no `allow-same-origin`), with "Full screen" and "Download PDF". PDF is rendered server-side from the HTML with Playwright.
-- **Secrets/config** live in `deploy-config/`: `.env-nextjs` for web, `.env-agent` for the agent. All `.env*` files are gitignored; commit `.env.example` versions.
+- **Secrets/config** live in `deploy-config/`: `.env-nextjs` for web, `.env-agent` for the agent, `.env-llm` for LiteLLM (provider keys). All `.env*` files are gitignored; commit `.env.example` versions.
 - **Project conventions** (from the owner's standing instructions): every HTML element in the web app gets a unique `id`; avoid unnecessary comments; `npm run build` must pass before each commit; rebuild/restart containers after major changes.
 
 ## Deployment
 
 - **v1 (owner's decision):** localhost only, single user, everything in one Docker Compose, model running locally. No auth.
-- **Ollama placement (my call):** on macOS, Docker containers can't use the Apple GPU, so Ollama in a container is CPU-only and much slower. Default is Ollama on the host, reached via `host.docker.internal`. The compose file includes an optional `ollama` service behind a profile for Linux/GPU hosts and EC2.
+- **Ollama placement (my call):** on macOS, Docker containers can't use the Apple GPU, so Ollama in a container is CPU-only and much slower. Default is Ollama on the host, reached from the `llm` container via `host.docker.internal`. The compose file includes an optional `ollama` service behind a profile for Linux/GPU hosts and EC2.
 - **Later (not v1, but don't paint into a corner):** whole compose on EC2; or `web` on Vercel and `agent` on EC2; models via hosted API keys. Implications for v1: all URLs/hosts come from env, the agent's base URL is configurable, artifacts are served through `web` (proxied) so only `web` needs to be public, and the agent endpoint accepts an optional shared-secret header (off by default) so auth can be switched on later.
 - Hosted API keys: the owner will provision one if needed. The first experiment is local-only.
 
