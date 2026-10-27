@@ -6,11 +6,15 @@ import {
   useAgentContext,
   useCopilotKit,
   useDefaultRenderTool,
+  useRenderTool,
 } from "@copilotkit/react-core/v2";
 import { useCallback, useEffect, useState } from "react";
+import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ToolActivity } from "@/components/ToolActivity";
+import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import { classifyRunError, type RunErrorKind } from "@/lib/errors";
+import { passthrough } from "@/lib/passthroughSchema";
 import { getUserContext, type UserContext } from "@/lib/userContext";
 
 export const AGENT_ID = "openagent";
@@ -49,6 +53,47 @@ export function Chat() {
           parameters={parameters}
         />
       ),
+    },
+    [],
+  );
+
+  const locale = userContext?.locale ?? "en-US";
+
+  useRenderTool(
+    {
+      name: "show_widget",
+      parameters: passthrough<{ widget?: unknown }>(),
+      render: ({ toolCallId, status, parameters }) =>
+        status === "inProgress" ? null : (
+          <WidgetRenderer
+            toolCallId={toolCallId}
+            args={parameters}
+            locale={locale}
+          />
+        ),
+    },
+    [locale],
+  );
+
+  useRenderTool(
+    {
+      name: "create_artifact",
+      parameters: passthrough<{ title?: string; html?: string }>(),
+      render: ({ toolCallId, status, parameters, result }) =>
+        status === "complete" ? (
+          <ArtifactCard
+            toolCallId={toolCallId}
+            title={parameters.title ?? "Page"}
+            result={result}
+          />
+        ) : (
+          <ToolActivity
+            toolCallId={toolCallId}
+            name="create_artifact"
+            status={status}
+            parameters={parameters}
+          />
+        ),
     },
     [],
   );
