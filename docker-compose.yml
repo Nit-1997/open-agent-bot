@@ -1,0 +1,32 @@
+services:
+  llm:
+    image: ghcr.io/berriai/litellm:main-stable
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    env_file: deploy-config/.env-llm
+    volumes:
+      - ./deploy-config/litellm/config.yaml:/app/config.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+  search:
+    image: searxng/searxng:latest
+    env_file: deploy-config/.env-search
+    volumes:
+      - ./deploy-config/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  ollama-data:

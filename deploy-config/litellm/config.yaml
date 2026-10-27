@@ -1,0 +1,11 @@
+model_list:
+  - model_name: chat-default
+    litellm_params:
+      model: os.environ/OLLAMA_CHAT_MODEL
+      api_base: os.environ/OLLAMA_BASE_URL
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
