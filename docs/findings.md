@@ -43,3 +43,16 @@ No hosted key was provided, so no scenario was rerun on a stronger model. Bigges
 | Flight parsing | `en-IN` pages parsed 0 options | Google writes "6 hrs 17 min" in en-IN vs "6 hr" in en-US | Parser accepts hr/hrs, min/mins, am/pm in any case; fixtures for both variants |
 | Duplicate cards | gemma called `flights` twice (Nashville, then BNA) | Model behavior | Registry renders at most one card per data kind per reply |
 | Leaked tool notes | Model echoed "the flight card is shown automatically" | Tool result phrased as a statement | Phrased as "(Note for you, do not repeat to the user: …)" |
+
+## Model comparison (2026-10-27): same 5-turn Diwali conversation, replayed via the agent
+
+| | gemma4 (9.6 GB) | qwen2.5:32b (19 GB) | qwen3.5:35b MoE (22 GB, 31 GB resident) |
+|---|---|---|---|
+| Tool calls over 5 turns | 7 | 0 | 42 |
+| Cards / artifacts | 1 plan card | none | plan card, weather card, printable PDF guide |
+| "Build a cart" turn | generic aisle list | invented Target links (no tool call) | real Target/Amazon products + prices, every link traced to a tool result |
+| Research-turn latency (thinking on) | 25–45s | 30–80s | 130–225s |
+| Malformed tool args ("non-whitespace after JSON") | 3 | – | 7 |
+
+Decision: default `chat-default` → `ollama_chat/qwen3.5:35b` with `think: false` (simple call 2.0s → 0.6–0.8s). Ollama upgraded 0.20.2 → 0.40.11 and runs as a brew service with `OLLAMA_MAX_LOADED_MODELS=1`.
+Open issue: the identical malformed-JSON error across two different models points at the pipeline (likely parallel tool calls merged into one argument string), not the model.

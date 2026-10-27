@@ -13,7 +13,7 @@ web (Next.js + CopilotKit) → AG-UI → agent (Node + pi SDK) → llm (LiteLLM)
 
 ## Run
 
-1. Install Docker and Ollama, and pull the model named in `deploy-config/.env-llm.example` (default `gemma4:latest`): `ollama pull gemma4`
+1. Install Docker and Ollama, and pull the model named in `deploy-config/.env-llm.example` (default `qwen3.5:35b`, needs Ollama ≥ 0.19 and ~31 GB free memory): `ollama pull qwen3.5:35b`. Optional: `launchctl setenv OLLAMA_MAX_LOADED_MODELS 1` to keep one model in memory
 2. Create env files: `for f in llm agent nextjs search; do cp deploy-config/.env-$f.example deploy-config/.env-$f; done`
 3. `docker compose up -d --build`
 4. Open http://localhost:3000
@@ -35,7 +35,6 @@ To add a hosted model, e.g. Claude:
 
 Put `ANTHROPIC_API_KEY=...` in `deploy-config/.env-llm`, set `AGENT_MODEL=chat-strong` in `deploy-config/.env-agent`, then `docker compose up -d`.
 
-To use Qwen 3.5 9B locally: upgrade Ollama, `ollama pull qwen3.5:9b`, set `OLLAMA_CHAT_MODEL=ollama_chat/qwen3.5:9b` in `deploy-config/.env-llm`.
 
 ## Develop
 

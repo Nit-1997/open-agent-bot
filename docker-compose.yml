@@ -25,6 +25,8 @@ services:
       context: .
       dockerfile: agent/Dockerfile
     env_file: deploy-config/.env-agent
+    environment:
+      AGENT_MODEL: ${AGENT_MODEL:-chat-default}
     volumes:
       - artifacts-data:/data/artifacts
     ports:
