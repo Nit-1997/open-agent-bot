@@ -5,18 +5,31 @@ import { loadConfig } from "./config.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
+import { BrowserPool } from "./tools/browserPool.js";
 import { buildTools } from "./tools/index.js";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 
 const cfg = loadConfig(process.env);
 const artifacts = new ArtifactStore(cfg.artifactsDir);
+const pool = new BrowserPool();
 
 const store = new SessionStore({
   idleMs: SESSION_IDLE_MS,
-  create: async (_threadId, ctx) => {
-    const handle = await createPiSession({ cfg, systemPrompt: buildSystemPrompt(ctx), tools: buildTools({ cfg, artifacts }) });
-    return { session: handle.session, busy: false, lastUsed: Date.now(), dispose: handle.dispose };
+  create: async (threadId, userContext) => {
+    const handle = await createPiSession({
+      cfg,
+      systemPrompt: buildSystemPrompt(userContext),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext }),
+    });
+    return {
+      session: handle.session,
+      busy: false,
+      lastUsed: Date.now(),
+      dispose: async () => {
+        await Promise.all([handle.dispose(), pool.close(threadId)]);
+      },
+    };
   },
 });
 
@@ -29,6 +42,9 @@ serve({ fetch: app.fetch, port: cfg.port, hostname: "0.0.0.0" }, (info) => {
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
-    void Promise.all([store.disposeAll(), artifacts.close()]).finally(() => process.exit(0));
+    void store
+      .disposeAll()
+      .then(() => Promise.all([pool.closeAll(), artifacts.close()]))
+      .finally(() => process.exit(0));
   });
 }

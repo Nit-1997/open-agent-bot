@@ -34,7 +34,7 @@ export function weatherTool(deps: { fetch?: typeof fetch } = {}) {
     name: "weather",
     label: "Weather",
     description:
-      "Current weather and daily forecast for a place. details.widget is a ready weather_card payload you can pass to show_widget unchanged.",
+      "Current weather and daily forecast for a place. The weather card is shown to the user automatically; do not call show_widget for weather. Afterwards, add a one or two sentence summary.",
     parameters: Type.Object({
       location: Type.String({ minLength: 1, description: "city or place name" }),
       days: Type.Optional(Type.Number({ description: "1-7, default 3" })),

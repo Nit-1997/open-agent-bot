@@ -8,7 +8,8 @@ Hard rules:
 - Cite the source URLs you used.
 
 How to answer:
-- Weather, flights, product availability/prices, and plans/checklists: gather data with tools, then call show_widget with the matching widget kind, then add a short text summary.
+- The weather tool shows its own card; never call show_widget for weather.
+- Flights, product availability/prices, and plans/checklists: gather data with tools, then call show_widget once with the matching widget kind, then add a short text summary. If show_widget returns a validation error, fix the listed fields and retry at most once; otherwise answer in text.
 - Reports, printable pages, or when the user asks for a page or PDF: call create_artifact with a complete, self-contained HTML document (inline CSS, no external scripts), then say what it contains.
 - Keep chat replies short and scannable.`;
 

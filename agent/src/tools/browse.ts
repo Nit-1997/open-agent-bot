@@ -1,0 +1,118 @@
+import { defineTool } from "@earendil-works/pi-coding-agent";
+import type { Locator, Page } from "playwright";
+import { Type } from "typebox";
+import type { UserContext } from "../prompt/systemPrompt.js";
+import type { BrowserPool } from "./browserPool.js";
+import { type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "./browsePolicy.js";
+import { fail, ok, type ToolResult } from "./result.js";
+import { htmlToText, truncate } from "./text.js";
+
+export const MAX_ACTIONS = 10;
+const BOT_WALL = /(captcha|are you a robot|access denied|unusual traffic|verify you are human)/i;
+
+const ActionSchema = Type.Union([
+  Type.Object({ op: Type.Literal("goto"), url: Type.String() }),
+  Type.Object({ op: Type.Literal("click"), selector: Type.Optional(Type.String()), text: Type.Optional(Type.String()) }),
+  Type.Object({ op: Type.Literal("type"), selector: Type.String(), value: Type.String(), submit: Type.Optional(Type.Boolean()) }),
+  Type.Object({ op: Type.Literal("select"), selector: Type.String(), value: Type.String() }),
+  Type.Object({ op: Type.Literal("wait"), ms: Type.Number() }),
+  Type.Object({ op: Type.Literal("read") }),
+]);
+
+function locate(page: Page, a: BrowseAction): Locator | undefined {
+  if (a.op === "click") {
+    if (a.selector) return page.locator(a.selector).first();
+    if (a.text) return page.getByText(a.text, { exact: false }).first();
+  }
+  if (a.op === "type" || a.op === "select") return page.locator(a.selector).first();
+  return undefined;
+}
+
+async function targetInfo(loc: Locator): Promise<TargetInfo> {
+  return loc.evaluate((el) => ({
+    type: el.getAttribute("type") ?? undefined,
+    name: el.getAttribute("name") ?? el.getAttribute("aria-label") ?? el.getAttribute("placeholder") ?? undefined,
+    autocomplete: el.getAttribute("autocomplete") ?? undefined,
+    text: ((el as HTMLElement).innerText || (el as HTMLInputElement).value || "").slice(0, 200),
+  }));
+}
+
+const handoff = (reason: string, url: string) => ok(`stopped: ${reason}. Hand this link to the user: ${url}`, { stopped: true, url });
+
+async function settle(page: Page) {
+  await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
+}
+
+export function browseTool(deps: { pool: BrowserPool; threadId: string; userContext: UserContext | null }) {
+  return defineTool({
+    name: "browse",
+    label: "Browse",
+    description:
+      "Control a real browser as a guest to read pages that need JavaScript or interaction. Actions run in order on this chat's tab and the tab persists between calls: goto a URL, click (by CSS selector or visible text), type into a field (submit:true presses Enter), select an option, wait (ms ≤ 5000), read. Returns the final page text. Allowed: searching, filtering, entering a PIN/ZIP code, choosing dates or stores. It refuses checkout, cart, payment, login, sign-up, and booking steps and returns the link for the user instead.",
+    parameters: Type.Object({ actions: Type.Array(ActionSchema, { minItems: 1 }) }),
+    async execute(_id, params): Promise<ToolResult> {
+      const actions = params.actions as BrowseAction[];
+      if (actions.length > MAX_ACTIONS) return fail(`too many actions (max ${MAX_ACTIONS} per call)`);
+      const page = await deps.pool.page(deps.threadId, deps.userContext);
+      let lastStatus: number | undefined;
+
+      try {
+        for (const a of actions) {
+          const loc = locate(page, a);
+          const target = loc ? await targetInfo(loc) : undefined;
+          const verdict = checkAction(a, { url: page.url(), target });
+          if (!verdict.allowed) return handoff(verdict.reason, a.op === "goto" ? a.url : page.url());
+
+          switch (a.op) {
+            case "goto": {
+              const res = await page.goto(a.url, { waitUntil: "domcontentloaded", timeout: 20000 });
+              lastStatus = res?.status();
+              break;
+            }
+            case "click":
+              await loc!.click({ timeout: 10000 });
+              await settle(page);
+              break;
+            case "type":
+              await loc!.fill(a.value, { timeout: 10000 });
+              if (a.submit) {
+                await loc!.press("Enter");
+                await settle(page);
+              }
+              break;
+            case "select":
+              await loc!.selectOption(a.value, { timeout: 10000 });
+              await settle(page);
+              break;
+            case "wait":
+              await page.waitForTimeout(Math.min(Math.max(a.ms, 0), 5000));
+              break;
+            case "read":
+              break;
+          }
+          if (isBlockedUrl(page.url())) {
+            const url = page.url();
+            await page.goBack().catch(() => {});
+            return handoff("reached a login, cart, checkout, or payment page", url);
+          }
+        }
+
+        const url = page.url();
+        const host = (() => {
+          try {
+            return new URL(url).hostname;
+          } catch {
+            return url;
+          }
+        })();
+        const body = htmlToText(await page.content());
+        if ((lastStatus && [401, 403, 429, 503].includes(lastStatus)) || (BOT_WALL.test(body.slice(0, 2000)) && body.length < 3000)) {
+          return ok(`blocked by ${host}: ${url}`, { blocked: true, url });
+        }
+        return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${truncate(body)}`, { url });
+      } catch (err) {
+        return fail(`browse failed on ${page.url()}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+      }
+    },
+  });
+}

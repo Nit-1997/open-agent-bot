@@ -59,6 +59,28 @@ describe("createTranslator", () => {
     expect(out[0]).toMatchObject({ type: EventType.TOOL_CALL_RESULT, toolCallId: "call_1", content: "Sunny 28C", role: "tool" });
   });
 
+  it("a tool result carrying details.widget also emits a synthetic show_widget call", () => {
+    const widget = { kind: "weather_card", location: "Pune" };
+    const end = { ...toolEnd, result: { content: [{ type: "text", text: "Sunny" }], details: { widget } } } as unknown as PiEvent;
+    const out = run([assistantStart, assistantEnd, toolStart, end]);
+    const tail = out.slice(3);
+    expect(tail.map((e) => e.type)).toEqual([
+      EventType.TOOL_CALL_RESULT,
+      EventType.TOOL_CALL_START,
+      EventType.TOOL_CALL_ARGS,
+      EventType.TOOL_CALL_END,
+      EventType.TOOL_CALL_RESULT,
+    ]);
+    expect(tail[1]).toMatchObject({ toolCallId: "call_1-widget", toolCallName: "show_widget", parentMessageId: "id1" });
+    expect(JSON.parse((tail[2] as unknown as { delta: string }).delta)).toEqual({ widget });
+    expect(tail[4]).toMatchObject({ toolCallId: "call_1-widget", content: "rendered weather_card" });
+  });
+
+  it("errored tool results never emit a widget", () => {
+    const end = { ...toolEnd, isError: true, result: { content: [{ type: "text", text: "x" }], details: { widget: { kind: "weather_card" } } } } as unknown as PiEvent;
+    expect(run([end]).map((e) => e.type)).toEqual([EventType.TOOL_CALL_RESULT]);
+  });
+
   it("closes an open text message before a tool call starts", () => {
     const out = run([assistantStart, delta("a"), toolStart]);
     expect(out.map((e) => e.type)).toEqual([

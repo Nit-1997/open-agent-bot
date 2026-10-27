@@ -59,8 +59,8 @@ export function createTranslator(ids: Ids) {
           { type: EventType.TOOL_CALL_ARGS, toolCallId: e.toolCallId, delta: JSON.stringify(e.args ?? {}) } as BaseEvent,
           { type: EventType.TOOL_CALL_END, toolCallId: e.toolCallId } as BaseEvent,
         ];
-      case "tool_execution_end":
-        return [
+      case "tool_execution_end": {
+        const out: BaseEvent[] = [
           {
             type: EventType.TOOL_CALL_RESULT,
             messageId: ids.newId(),
@@ -69,6 +69,29 @@ export function createTranslator(ids: Ids) {
             role: "tool",
           } as BaseEvent,
         ];
+        const widget = (e.result as { details?: { widget?: { kind?: string } } } | undefined)?.details?.widget;
+        if (widget && !e.isError && e.toolName !== "show_widget") {
+          const id = `${e.toolCallId}-widget`;
+          out.push(
+            {
+              type: EventType.TOOL_CALL_START,
+              toolCallId: id,
+              toolCallName: "show_widget",
+              ...(assistantId ? { parentMessageId: assistantId } : {}),
+            } as BaseEvent,
+            { type: EventType.TOOL_CALL_ARGS, toolCallId: id, delta: JSON.stringify({ widget }) } as BaseEvent,
+            { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent,
+            {
+              type: EventType.TOOL_CALL_RESULT,
+              messageId: ids.newId(),
+              toolCallId: id,
+              content: `rendered ${widget.kind}`,
+              role: "tool",
+            } as BaseEvent,
+          );
+        }
+        return out;
+      }
       default:
         return [];
     }
