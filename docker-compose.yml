@@ -34,6 +34,17 @@ services:
       - search
     restart: unless-stopped
 
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    env_file: deploy-config/.env-nextjs
+    ports:
+      - "3000:3000"
+    depends_on:
+      - agent
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     profiles: ["ollama"]
