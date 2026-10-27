@@ -20,7 +20,7 @@ export const validWidgets: {
     to: "BLR",
     date: "2026-12-15",
     currency: "USD",
-    flights: [{ airline: "Air India", departTime: "21:00", arriveTime: "04:30+2", durationMin: 1200, stops: 0, price: 1100 }],
+    flights: [{ airline: "Air India", departTime: "21:00", arriveTime: "04:30+2", duration: "20h 0m", stops: 0, price: 1100 }],
     searchUrl: "https://www.google.com/travel/flights?q=SFO+BLR",
     source: "Google Flights",
   },

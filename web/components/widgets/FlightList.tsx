@@ -2,10 +2,6 @@ import type { FlightList as FlightListData } from "@shared/widgets";
 import { money } from "@/lib/format";
 import { Card, ExternalLink } from "./Card";
 
-function duration(min: number) {
-  return `${Math.floor(min / 60)}h ${min % 60}m`;
-}
-
 export function FlightList({ toolCallId, widget, locale }: { toolCallId: string; widget: FlightListData; locale: string }) {
   const id = `flight-list-${toolCallId}`;
   return (
@@ -23,7 +19,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
               </span>
               <span id={`${id}-flight-${i}-times`}>{`${f.departTime} – ${f.arriveTime}`}</span>
               <span id={`${id}-flight-${i}-meta`} className="text-neutral-500">
-                {`${duration(f.durationMin)} · ${f.stops === 0 ? "nonstop" : `${f.stops} stop${f.stops > 1 ? "s" : ""}`}`}
+                {`${f.duration} · ${f.stops === 0 ? "nonstop" : `${f.stops} stop${f.stops > 1 ? "s" : ""}`}`}
               </span>
               <span id={`${id}-flight-${i}-price`} className="font-semibold">
                 {money(f.price, widget.currency, locale) ?? "—"}

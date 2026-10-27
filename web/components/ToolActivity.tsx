@@ -37,6 +37,7 @@ export function ToolActivity(props: {
   status: "inProgress" | "executing" | "complete";
   parameters: unknown;
 }) {
+  if (props.name.startsWith("show_")) return null;
   const busy = props.status !== "complete";
   const id = `tool-activity-${props.toolCallId}`;
   return (

@@ -18,6 +18,11 @@ describe("ToolActivity", () => {
     expect(toolLabel("mystery", {})).toBe("mystery");
   });
 
+  it("renders nothing for show_* tools since the card is the visible result", () => {
+    const { container } = render(<ToolActivity toolCallId="c3" name="show_products" status="complete" parameters={{}} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("shows done state with unique ids", () => {
     const { container } = render(<ToolActivity toolCallId="c2" name="weather" status="complete" parameters={{ location: "Pune" }} />);
     expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "false");

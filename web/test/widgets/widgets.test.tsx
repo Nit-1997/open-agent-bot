@@ -34,6 +34,11 @@ describe("widgets", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
+  it("FlightList shows duration text as given", () => {
+    render(<FlightList toolCallId="f2" widget={validWidgets.flight_list} locale="en-US" />);
+    expect(screen.getByText("20h 0m · nonstop")).toBeInTheDocument();
+  });
+
   it("PlanChecklist renders sections and items", () => {
     render(<PlanChecklist toolCallId="c1" widget={validWidgets.plan_checklist} />);
     expect(screen.getByText("Sweets")).toBeInTheDocument();
