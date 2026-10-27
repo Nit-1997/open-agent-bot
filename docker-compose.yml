@@ -20,6 +20,20 @@ services:
       - "8081:8080"
     restart: unless-stopped
 
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    env_file: deploy-config/.env-agent
+    volumes:
+      - artifacts-data:/data/artifacts
+    ports:
+      - "8000:8000"
+    depends_on:
+      - llm
+      - search
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     profiles: ["ollama"]
@@ -29,4 +43,5 @@ services:
       - "11434:11434"
 
 volumes:
+  artifacts-data:
   ollama-data:
