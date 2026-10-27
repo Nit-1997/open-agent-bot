@@ -1,0 +1,62 @@
+import { randomBytes } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { type Browser, chromium } from "playwright";
+
+const ID_RE = /^[A-Za-z0-9_-]{12}$/;
+
+export class ArtifactStore {
+  private browser?: Promise<Browser>;
+
+  constructor(private readonly dir: string) {}
+
+  async save(title: string, html: string): Promise<{ id: string }> {
+    await mkdir(this.dir, { recursive: true });
+    const id = randomBytes(9).toString("base64url");
+    await writeFile(join(this.dir, `${id}.html`), html, "utf8");
+    await writeFile(join(this.dir, `${id}.json`), JSON.stringify({ title, createdAt: new Date().toISOString() }), "utf8");
+    return { id };
+  }
+
+  async get(id: string): Promise<{ title: string; html: string } | null> {
+    if (!ID_RE.test(id)) return null;
+    try {
+      const [html, meta] = await Promise.all([
+        readFile(join(this.dir, `${id}.html`), "utf8"),
+        readFile(join(this.dir, `${id}.json`), "utf8"),
+      ]);
+      return { title: JSON.parse(meta).title, html };
+    } catch {
+      return null;
+    }
+  }
+
+  async renderPdf(id: string): Promise<Buffer | null> {
+    const a = await this.get(id);
+    if (!a) return null;
+    this.browser ??= chromium.launch();
+    const context = await (await this.browser).newContext();
+    try {
+      const page = await context.newPage();
+      await page.setContent(a.html, { waitUntil: "load", timeout: 20000 });
+      return await page.pdf({ format: "A4", printBackground: true });
+    } finally {
+      await context.close();
+    }
+  }
+
+  async close(): Promise<void> {
+    if (this.browser) await (await this.browser).close();
+    this.browser = undefined;
+  }
+}
+
+export function slugify(title: string): string {
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "artifact"
+  );
+}

@@ -9,7 +9,18 @@
     "outDir": "dist",
     "rootDir": "..",
     "declaration": false,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "typebox": [
+        "./node_modules/typebox/build/index.d.mts"
+      ],
+      "typebox/value": [
+        "./node_modules/typebox/build/value/index.d.mts"
+      ]
+    }
   },
-  "include": ["src/**/*.ts", "../shared/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../shared/**/*.ts"
+  ]
 }
