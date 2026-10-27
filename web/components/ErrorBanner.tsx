@@ -1,7 +1,7 @@
 import type { RunErrorKind } from "@/lib/errors";
 
 const TEXT: Record<RunErrorKind, string> = {
-  SESSION_EXPIRED: "This chat's session ended (the agent restarted). Start a new chat to continue.",
+  SESSION_EXPIRED: "This chat's session ended (the agent restarted or the chat sat idle). Start a new chat to continue.",
   THREAD_BUSY: "Still working on the last message — wait for it to finish.",
   MODEL_ERROR: "The model hit an error.",
   UNKNOWN: "Something went wrong talking to the agent.",

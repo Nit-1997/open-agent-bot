@@ -1,3 +1,5 @@
+import { publicHttpUrlError } from "./net.js";
+
 export type BrowseAction =
   | { op: "goto"; url: string }
   | { op: "click"; selector?: string; text?: string }
@@ -8,15 +10,18 @@ export type BrowseAction =
 
 export type TargetInfo = { type?: string; name?: string; autocomplete?: string; text?: string };
 
+export type PolicyOptions = { allowPrivateHosts?: boolean };
+
 export type PolicyResult = { allowed: true } | { allowed: false; reason: string };
 
 const BLOCKED_URL_WORDS =
-  /(?:^|[^a-z0-9])(?:checkout|cart|basket|payment|payments|pay|billing|login|signin|sign-in|signup|sign-up|register|account|accounts|auth|oauth|wallet)(?:[^a-z0-9]|$)/i;
+  /(?:^|[^a-z0-9])(?:checkout|cart|basket|payment|payments|pay|billing|login|signin|sign-in|signup|sign-up|register|account|accounts|auth|oauth|wallet|book|booking|bookings|reserve|reservation|reservations|order|orders|purchase|passenger|passengers|traveler|travelers|traveller|travellers|guest-details)(?:[^a-z0-9]|$)/i;
 
 const BLOCKED_TARGET_TEXT =
   /(place (your )?order|buy now|\bpay\b|pay now|add to (cart|bag|basket)|proceed to (checkout|pay)|\bcheckout\b|sign in|log ?in|sign up|book now|confirm booking|reserve now|complete booking)/i;
 
-const BLOCKED_AUTOCOMPLETE = /cc-|current-password|new-password|one-time-code/i;
+const BLOCKED_AUTOCOMPLETE = /cc-|current-password|new-password|one-time-code|name|email|tel|street-address|address-line|bday|username/i;
+const BLOCKED_INPUT_TYPES = new Set(["password", "email", "tel"]);
 
 export function isBlockedUrl(url: string): boolean {
   try {
@@ -27,7 +32,11 @@ export function isBlockedUrl(url: string): boolean {
   }
 }
 
-export function checkAction(a: BrowseAction, page: { url: string; target?: TargetInfo }): PolicyResult {
+export function checkAction(a: BrowseAction, page: { url: string; target?: TargetInfo }, opts: PolicyOptions = {}): PolicyResult {
+  if (a.op === "goto") {
+    const err = publicHttpUrlError(a.url, opts);
+    if (err) return { allowed: false, reason: err };
+  }
   if (isBlockedUrl(page.url)) {
     return { allowed: false, reason: "current page is a login, cart, account, or payment page" };
   }
@@ -36,9 +45,11 @@ export function checkAction(a: BrowseAction, page: { url: string; target?: Targe
   }
   const t = page.target;
   if (t) {
-    if (t.type?.toLowerCase() === "password") return { allowed: false, reason: "won't type into password fields" };
-    if (t.autocomplete && BLOCKED_AUTOCOMPLETE.test(t.autocomplete)) {
-      return { allowed: false, reason: "won't fill payment or credential fields" };
+    if (a.op === "type" && t.type && BLOCKED_INPUT_TYPES.has(t.type.toLowerCase())) {
+      return { allowed: false, reason: "won't type passwords, emails, or phone numbers" };
+    }
+    if (a.op === "type" && t.autocomplete && BLOCKED_AUTOCOMPLETE.test(t.autocomplete)) {
+      return { allowed: false, reason: "won't fill payment, credential, or personal-detail fields" };
     }
     const label = [t.text, t.name].filter(Boolean).join(" ");
     if ((a.op === "click" || (a.op === "type" && a.submit)) && BLOCKED_TARGET_TEXT.test(label)) {

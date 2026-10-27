@@ -9,3 +9,15 @@ describe("classifyRunError", () => {
     expect(classifyRunError({ error: new Error("network down"), context: {} })).toBe("UNKNOWN");
   });
 });
+
+describe("classifyRunError (runtime wording)", () => {
+  it("maps the runtime's thread-locked rejection to THREAD_BUSY", () => {
+    expect(classifyRunError({ error: new Error("Thread already running"), context: {} })).toBe("THREAD_BUSY");
+  });
+
+  it("maps the agent's expiry message to SESSION_EXPIRED even without the code", () => {
+    expect(classifyRunError({ error: new Error("This chat's session ended (the agent restarted or the chat sat idle). Start a new chat."), context: {} })).toBe(
+      "SESSION_EXPIRED",
+    );
+  });
+});

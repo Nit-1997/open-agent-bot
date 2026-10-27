@@ -1,6 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fail, ok, type ToolResult } from "./result.js";
+import { publicHttpUrlError } from "./net.js";
 import { htmlToText, truncate } from "./text.js";
 
 const BLOCKING_STATUSES = new Set([401, 403, 429, 503]);
@@ -20,13 +21,9 @@ export function fetchPageTool(deps: { fetch?: typeof fetch } = {}) {
       "Fetch a URL and return its readable text. Fast; use for articles and simple pages. For pages that need JavaScript or interaction (stores, flight search), use browse.",
     parameters: Type.Object({ url: Type.String({ minLength: 1 }) }),
     async execute(_id, params, signal): Promise<ToolResult> {
-      let url: URL;
-      try {
-        url = new URL(params.url);
-      } catch {
-        return fail(`invalid url: ${params.url}`);
-      }
-      if (url.protocol !== "http:" && url.protocol !== "https:") return fail(`unsupported url scheme ${url.protocol}`);
+      const urlError = publicHttpUrlError(params.url);
+      if (urlError) return fail(urlError);
+      const url = new URL(params.url);
       try {
         const res = await f(url, {
           signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),

@@ -77,3 +77,57 @@ describe("isBlockedUrl", () => {
     }
   });
 });
+
+describe("network and personal-data guards", () => {
+  it("blocks non-http schemes", () => {
+    for (const url of ["file:///proc/self/environ", "chrome://settings", "data:text/html,hi", "javascript:alert(1)"]) {
+      expect(checkAction({ op: "goto", url }, { url: "about:blank" }).allowed, url).toBe(false);
+    }
+  });
+
+  it("blocks private and internal hosts", () => {
+    for (const url of [
+      "http://llm:4000/v1/models",
+      "http://search:8080/",
+      "http://localhost:3000/",
+      "http://127.0.0.1:8000/agui",
+      "http://192.168.1.1/",
+      "http://10.0.0.5/",
+      "http://172.20.0.3/",
+      "http://169.254.169.254/latest/meta-data",
+      "http://host.docker.internal:11434/",
+      "http://[::1]/",
+    ]) {
+      expect(checkAction({ op: "goto", url }, { url: "about:blank" }).allowed, url).toBe(false);
+    }
+  });
+
+  it("allows private hosts only when explicitly enabled", () => {
+    expect(checkAction({ op: "goto", url: "http://127.0.0.1:5000/" }, { url: "about:blank" }, { allowPrivateHosts: true })).toEqual({ allowed: true });
+  });
+
+  it("blocks booking, reservation and order flow urls", () => {
+    for (const url of [
+      "https://www.airline.com/booking/passengers",
+      "https://hotel.example.com/reservations/new",
+      "https://shop.example.com/order/review",
+      "https://shop.example.com/purchase",
+    ]) {
+      expect(isBlockedUrl(url), url).toBe(true);
+    }
+  });
+
+  it("blocks typing personal details", () => {
+    const page = (target: object) => ({ url: "https://www.airline.com/flights/select", target });
+    expect(checkAction({ op: "type", selector: "#e", value: "a@b.c" }, page({ type: "email" })).allowed).toBe(false);
+    expect(checkAction({ op: "type", selector: "#p", value: "555" }, page({ type: "tel" })).allowed).toBe(false);
+    expect(checkAction({ op: "type", selector: "#n", value: "Jo" }, page({ autocomplete: "given-name" })).allowed).toBe(false);
+    expect(checkAction({ op: "type", selector: "#a", value: "1 Main" }, page({ autocomplete: "street-address" })).allowed).toBe(false);
+  });
+
+  it("still allows postal code entry", () => {
+    expect(
+      checkAction({ op: "type", selector: "#pin", value: "411001" }, { url: "https://www.amazon.in/dp/x", target: { type: "text", autocomplete: "postal-code" } }),
+    ).toEqual({ allowed: true });
+  });
+});

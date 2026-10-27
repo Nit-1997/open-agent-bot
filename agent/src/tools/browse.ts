@@ -5,6 +5,7 @@ import type { UserContext } from "../prompt/systemPrompt.js";
 import type { BrowserPool } from "./browserPool.js";
 import { type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "./browsePolicy.js";
 import { fail, ok, type ToolResult } from "./result.js";
+import { publicHttpUrlError } from "./net.js";
 import { htmlToText, truncate } from "./text.js";
 
 export const MAX_ACTIONS = 10;
@@ -43,7 +44,7 @@ async function settle(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
 }
 
-export function browseTool(deps: { pool: BrowserPool; threadId: string; userContext: UserContext | null }) {
+export function browseTool(deps: { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean }) {
   return defineTool({
     name: "browse",
     label: "Browse",
@@ -60,7 +61,7 @@ export function browseTool(deps: { pool: BrowserPool; threadId: string; userCont
         for (const a of actions) {
           const loc = locate(page, a);
           const target = loc ? await targetInfo(loc) : undefined;
-          const verdict = checkAction(a, { url: page.url(), target });
+          const verdict = checkAction(a, { url: page.url(), target }, { allowPrivateHosts: deps.allowPrivateHosts });
           if (!verdict.allowed) return handoff(verdict.reason, a.op === "goto" ? a.url : page.url());
 
           switch (a.op) {
@@ -89,6 +90,11 @@ export function browseTool(deps: { pool: BrowserPool; threadId: string; userCont
               break;
             case "read":
               break;
+          }
+          const landedError = publicHttpUrlError(page.url(), { allowPrivateHosts: deps.allowPrivateHosts });
+          if (landedError && page.url() !== "about:blank") {
+            await page.goto("about:blank").catch(() => {});
+            return fail(`stopped: ${landedError}`);
           }
           if (isBlockedUrl(page.url())) {
             const url = page.url();

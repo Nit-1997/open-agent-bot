@@ -99,6 +99,33 @@ describe("handleRun", () => {
     expect(store.get("t1")?.busy).toBe(false);
   });
 
+  it("consumer cancellation aborts pi and keeps the thread busy until the prompt settles", async () => {
+    let settled = false;
+    const { store, session } = setup(async (emit) => {
+      emit(ev.assistantStart);
+      emit(ev.delta("partial"));
+      await session.waitForAbort();
+      await new Promise((r) => setTimeout(r, 30));
+      settled = true;
+    });
+    const gen = handleRun(input(), store, new AbortController().signal)[Symbol.asyncIterator]();
+    await gen.next();
+    await gen.next();
+    await gen.return?.(undefined);
+    expect(session.abortCalls).toBe(1);
+    expect(settled).toBe(true);
+    expect(store.get("t1")?.busy).toBe(false);
+  });
+
+  it("an already-aborted signal stops the run before prompting", async () => {
+    const { store, session } = setup();
+    const ac = new AbortController();
+    ac.abort();
+    await collect(handleRun(input(), store, ac.signal));
+    expect(session.prompts).toEqual([]);
+    expect(store.get("t1")?.busy).toBe(false);
+  });
+
   it("model error yields MODEL_ERROR and frees thread", async () => {
     const { store } = setup(async (emit) => {
       emit(ev.assistantStart);

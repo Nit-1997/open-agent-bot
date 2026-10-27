@@ -4,7 +4,7 @@ import type { UserContext } from "../prompt/systemPrompt.js";
 import type { SessionStore } from "../session/sessionStore.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
-export const SESSION_EXPIRED_MESSAGE = "This chat's session ended (the agent restarted). Start a new chat.";
+export const SESSION_EXPIRED_MESSAGE = "This chat's session ended (the agent restarted or the chat sat idle). Start a new chat.";
 
 function messageText(m: Message): string {
   const c = (m as { content?: unknown }).content;
@@ -56,6 +56,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     yield runError("THREAD_BUSY", "Still working on the last message.");
     return;
   }
+  if (signal.aborted) return;
   entry.busy = true;
 
   const queue: BaseEvent[] = [];
@@ -105,6 +106,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     if (modelError) yield runError("MODEL_ERROR", modelError);
     else yield { type: EventType.RUN_FINISHED, threadId, runId } as BaseEvent;
   } finally {
+    if (!done) await entry.session.abort().catch(() => {});
+    await running;
     signal.removeEventListener("abort", onAbort);
     unsubscribe();
     entry.busy = false;

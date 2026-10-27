@@ -38,7 +38,7 @@ afterAll(async () => {
 
 const text = (r: { content: Array<{ text?: string }> }) => r.content[0].text ?? "";
 const run = (threadId: string, actions: unknown[]) =>
-  browseTool({ pool, threadId, userContext: null }).execute("c", { actions } as never, undefined, undefined, {} as never);
+  browseTool({ pool, threadId, userContext: null, allowPrivateHosts: true }).execute("c", { actions } as never, undefined, undefined, {} as never);
 
 describe("browse (real Chromium)", () => {
   it("types into search and reads results", async () => {

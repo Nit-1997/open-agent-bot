@@ -37,3 +37,14 @@ describe("fetch_page", () => {
     expect(r.isError).toBe(true);
   });
 });
+
+describe("fetch_page network guard", () => {
+  it("refuses internal hosts", async () => {
+    const f = fakeFetch([[/.*/, () => html("secret")]]);
+    for (const url of ["http://llm:4000/v1/models", "http://127.0.0.1:8000/", "http://169.254.169.254/"]) {
+      const r = await call(f, url);
+      expect(r.isError, url).toBe(true);
+    }
+    expect(f.calls).toEqual([]);
+  });
+});
