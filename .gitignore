@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+deploy-config/.env*
+!deploy-config/*.example
+*.pem
+*.key
+node_modules/
+.next/
+dist/
+artifacts-data/
+.DS_Store
