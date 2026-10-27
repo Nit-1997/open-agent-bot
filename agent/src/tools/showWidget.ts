@@ -1,7 +1,6 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { type TSchema, Type } from "typebox";
 import {
-  FlightListSchema,
   PlanChecklistSchema,
   ProductComparisonSchema,
   validateWidget,
@@ -29,14 +28,6 @@ export const showProductsTool = () =>
     "product_comparison",
     ProductComparisonSchema,
     "Show the user a product comparison card: one row per store with price, availability (in_stock, out_of_stock, unknown, or blocked when the site refused access) and the product URL. Only use prices and availability that tools returned.",
-  );
-
-export const showFlightsTool = () =>
-  flatWidgetTool(
-    "show_flights",
-    "flight_list",
-    FlightListSchema,
-    "Show the user a flight options card. Copy searchUrl from the flights tool result. Copy times, duration, and prices exactly as the page shows them; stops is a number. Only include flights the flights tool returned.",
   );
 
 export const showPlanTool = () =>

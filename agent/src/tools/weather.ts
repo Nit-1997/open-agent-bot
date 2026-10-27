@@ -1,6 +1,6 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { WeatherCard } from "../../../shared/widgets.js";
+import type { WeatherData } from "./data.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 export function wmoCondition(code: number): string {
@@ -66,8 +66,8 @@ export function weatherTool(deps: { fetch?: typeof fetch } = {}) {
         if (!res.ok) return fail(`weather service error: HTTP ${res.status}`);
         const fc = (await res.json()) as Forecast;
 
-        const widget: WeatherCard = {
-          kind: "weather_card",
+        const data: WeatherData = {
+          kind: "weather",
           location: [place.name, place.country].filter(Boolean).join(", "),
           units,
           current: { temp: fc.current.temperature_2m, condition: wmoCondition(fc.current.weather_code) },
@@ -82,12 +82,12 @@ export function weatherTool(deps: { fetch?: typeof fetch } = {}) {
         };
         const deg = units === "imperial" ? "°F" : "°C";
         const summary = [
-          `${widget.location}: now ${widget.current.temp}${deg}, ${widget.current.condition}`,
-          ...widget.days.map(
+          `${data.location}: now ${data.current.temp}${deg}, ${data.current.condition}`,
+          ...data.days.map(
             (d) => `${d.date}: ${d.low}–${d.high}${deg}, ${d.condition}${d.precipChance != null ? `, ${d.precipChance}% rain` : ""}`,
           ),
         ].join("\n");
-        return ok(summary, { widget });
+        return ok(summary, { data });
       } catch (err) {
         return fail(`weather lookup failed: ${err instanceof Error ? err.message : String(err)}`);
       }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
+import { renderData } from "../../src/render/registry.js";
 import { weatherTool, wmoCondition } from "../../src/tools/weather.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";
 
@@ -27,10 +28,12 @@ describe("weather", () => {
     expect(wmoCondition(0)).toBe("Clear");
   });
 
-  it("weather details validate as weather_card", async () => {
+  it("weather data renders as a valid weather_card", async () => {
     const f = routes();
     const r = await weatherTool({ fetch: f }).execute("c", { location: "Pune", days: 2 }, undefined, undefined, {} as never);
-    const widget = (r.details as { widget: unknown }).widget;
+    const data = (r.details as { data: { kind: string } }).data;
+    expect(data.kind).toBe("weather");
+    const widget = renderData(data);
     expect(validateWidget(widget)).toMatchObject({ ok: true });
     expect(widget).toMatchObject({ location: "Pune, India", units: "metric", current: { temp: 27.4 }, days: [{ condition: "Rain", precipChance: 60 }, {}] });
     const fc = new URL(f.calls[1]);

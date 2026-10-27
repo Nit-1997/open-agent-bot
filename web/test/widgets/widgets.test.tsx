@@ -36,7 +36,21 @@ describe("widgets", () => {
 
   it("FlightList shows duration text as given", () => {
     render(<FlightList toolCallId="f2" widget={validWidgets.flight_list} locale="en-US" />);
-    expect(screen.getByText("20h 0m · nonstop")).toBeInTheDocument();
+    expect(screen.getByText("20h 0m · Nonstop")).toBeInTheDocument();
+  });
+
+  it("FlightList badges the cheapest option", () => {
+    const f = validWidgets.flight_list;
+    const widget = {
+      ...f,
+      flights: [
+        { ...f.flights[0], airline: "Delta", price: 177 },
+        { ...f.flights[0], airline: "Frontier", price: 133 },
+      ],
+    };
+    render(<FlightList toolCallId="f3" widget={widget} locale="en-US" />);
+    const badge = screen.getByText("Cheapest");
+    expect(badge.closest("li")).toHaveTextContent("Frontier");
   });
 
   it("PlanChecklist renders sections and items", () => {

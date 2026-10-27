@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
-import { showFlightsTool, showPlanTool, showProductsTool } from "../../src/tools/showWidget.js";
+import { showPlanTool, showProductsTool } from "../../src/tools/showWidget.js";
 import { validWidgets } from "../fixtures/widgets.js";
 
 const strip = ({ kind: _k, ...rest }: Record<string, unknown>) => rest;
@@ -28,7 +28,6 @@ describe("validateWidget", () => {
 describe("flat show_* tools", () => {
   const cases = [
     ["show_products", showProductsTool(), validWidgets.product_comparison],
-    ["show_flights", showFlightsTool(), validWidgets.flight_list],
     ["show_plan", showPlanTool(), validWidgets.plan_checklist],
   ] as const;
 

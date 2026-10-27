@@ -2,9 +2,12 @@ import { EventType } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { createTranslator, type PiEvent } from "../../src/agui/translate.js";
 
+const renderStub = (data: unknown) =>
+  (data as { kind?: string } | undefined)?.kind === "weather" ? ({ kind: "weather_card", location: "Pune" } as never) : null;
+
 function ids() {
   let n = 0;
-  return { newId: () => `id${++n}` };
+  return { newId: () => `id${++n}`, render: renderStub };
 }
 
 const assistantStart = { type: "message_start", message: { role: "assistant" } } as unknown as PiEvent;
@@ -59,9 +62,9 @@ describe("createTranslator", () => {
     expect(out[0]).toMatchObject({ type: EventType.TOOL_CALL_RESULT, toolCallId: "call_1", content: "Sunny 28C", role: "tool" });
   });
 
-  it("a tool result carrying details.widget also emits a synthetic show_widget call", () => {
+  it("a data tool result is rendered by the registry into a synthetic show_widget call", () => {
     const widget = { kind: "weather_card", location: "Pune" };
-    const end = { ...toolEnd, result: { content: [{ type: "text", text: "Sunny" }], details: { widget } } } as unknown as PiEvent;
+    const end = { ...toolEnd, result: { content: [{ type: "text", text: "Sunny" }], details: { data: { kind: "weather" } } } } as unknown as PiEvent;
     const out = run([assistantStart, assistantEnd, toolStart, end]);
     const tail = out.slice(3);
     expect(tail.map((e) => e.type)).toEqual([
@@ -76,8 +79,28 @@ describe("createTranslator", () => {
     expect(tail[4]).toMatchObject({ toolCallId: "call_1-widget", content: "rendered weather_card" });
   });
 
+  it("render tools that return details.widget are shown as-is", () => {
+    const widget = { kind: "plan_checklist", title: "x", sections: [] };
+    const end = { ...toolEnd, toolName: "show_plan", result: { content: [{ type: "text", text: "ok" }], details: { widget } } } as unknown as PiEvent;
+    const out = run([end]);
+    expect(out.map((e) => e.type)).toContain(EventType.TOOL_CALL_START);
+    expect(JSON.parse((out[2] as unknown as { delta: string }).delta)).toEqual({ widget });
+  });
+
+  it("renders at most one card per data kind in a run", () => {
+    const end = (id: string) =>
+      ({ ...toolEnd, toolCallId: id, result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } } }) as unknown as PiEvent;
+    const starts = run([end("a"), end("b")]).filter((e) => e.type === EventType.TOOL_CALL_START);
+    expect(starts).toHaveLength(1);
+  });
+
+  it("data the registry can't render emits nothing extra", () => {
+    const end = { ...toolEnd, result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "search_results" } } } } as unknown as PiEvent;
+    expect(run([end]).map((e) => e.type)).toEqual([EventType.TOOL_CALL_RESULT]);
+  });
+
   it("errored tool results never emit a widget", () => {
-    const end = { ...toolEnd, isError: true, result: { content: [{ type: "text", text: "x" }], details: { widget: { kind: "weather_card" } } } } as unknown as PiEvent;
+    const end = { ...toolEnd, isError: true, result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } } } as unknown as PiEvent;
     expect(run([end]).map((e) => e.type)).toEqual([EventType.TOOL_CALL_RESULT]);
   });
 

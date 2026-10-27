@@ -33,3 +33,13 @@ What we assumed about the stack, what turned out to be true, and how we worked a
 | 5 | Heat pumps vs furnaces research | Pass | Streamed answer with source links from one search |
 
 No hosted key was provided, so no scenario was rerun on a stronger model. Biggest local-model gaps: it rarely chooses `browse` over search snippets for stock checks, and occasionally repeats a show_* call.
+
+## Round 2 (owner testing, 2026-10-27)
+
+| Area | Problem seen | Root cause | Fix |
+|------|--------------|------------|-----|
+| Currency | US user got rupees for SFO→Nashville | Browser language is `en-IN` while time zone is `America/Los_Angeles`; currency was derived from the language region | `regionFor()` derives country/currency from the time zone first, language second; system prompt states Country/Currency explicitly |
+| Flight card | Plain text answer, no card | Card depended on the model making a second `show_flights` call after `flights`; gemma often skipped it | Split data tools from rendering: data tools return typed `details.data`; `render/registry.ts` turns data into widgets deterministically. Model-called render tools remain only for synthesized content (`show_products`, `show_plan`) |
+| Flight parsing | `en-IN` pages parsed 0 options | Google writes "6 hrs 17 min" in en-IN vs "6 hr" in en-US | Parser accepts hr/hrs, min/mins, am/pm in any case; fixtures for both variants |
+| Duplicate cards | gemma called `flights` twice (Nashville, then BNA) | Model behavior | Registry renders at most one card per data kind per reply |
+| Leaked tool notes | Model echoed "the flight card is shown automatically" | Tool result phrased as a statement | Phrased as "(Note for you, do not repeat to the user: …)" |

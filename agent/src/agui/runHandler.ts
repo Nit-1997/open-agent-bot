@@ -45,9 +45,12 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     return;
   }
 
+  const userContext = readUserContext(input);
+  console.log(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(messageText(last).slice(0, 200))}`);
+
   let entry;
   try {
-    entry = await store.getOrCreate(threadId, readUserContext(input));
+    entry = await store.getOrCreate(threadId, userContext);
   } catch (err) {
     yield runError("MODEL_ERROR", err instanceof Error ? err.message : String(err));
     return;
@@ -71,6 +74,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
 
   const translator = createTranslator({ newId: randomUUID });
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {
+    if (e.type === "tool_execution_start") console.log(`[run] thread=${threadId} tool=${e.toolName} args=${JSON.stringify(e.args).slice(0, 300)}`);
+    if (e.type === "tool_execution_end") console.log(`[run] thread=${threadId} tool=${e.toolName} error=${e.isError} result=${JSON.stringify(e.result?.content?.[0]?.text ?? "").slice(0, 200)}`);
     if (e.type === "message_end") {
       const m = e.message as { role?: string; stopReason?: string; errorMessage?: string };
       if (m.role === "assistant" && m.stopReason === "error") modelError = m.errorMessage ?? "The model returned an error.";
@@ -103,6 +108,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     await running;
     for (const e of translator.finish()) yield e;
     if (signal.aborted) return;
+    console.log(`[run] thread=${threadId} done error=${modelError ?? "none"}`);
     if (modelError) yield runError("MODEL_ERROR", modelError);
     else yield { type: EventType.RUN_FINISHED, threadId, runId } as BaseEvent;
   } finally {

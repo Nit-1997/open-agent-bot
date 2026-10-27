@@ -1,9 +1,10 @@
 import { type BaseEvent, EventType } from "@ag-ui/core";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { renderData } from "../render/registry.js";
 
 export type PiEvent = AgentSessionEvent;
 
-type Ids = { newId: () => string };
+type Deps = { newId: () => string; render?: (data: unknown) => { kind: string } | null };
 
 export function resultText(result: unknown): string {
   const content = (result as { content?: Array<{ type: string; text?: string }> } | undefined)?.content;
@@ -14,9 +15,11 @@ export function resultText(result: unknown): string {
     .join("");
 }
 
-export function createTranslator(ids: Ids) {
+export function createTranslator(ids: Deps) {
+  const render = ids.render ?? renderData;
   let assistantId: string | undefined;
   let textOpen = false;
+  const renderedKinds = new Set<string>();
 
   const closeText = (): BaseEvent[] => {
     if (!textOpen || !assistantId) return [];
@@ -69,8 +72,11 @@ export function createTranslator(ids: Ids) {
             role: "tool",
           } as BaseEvent,
         ];
-        const widget = (e.result as { details?: { widget?: { kind?: string } } } | undefined)?.details?.widget;
-        if (widget && !e.isError && e.toolName !== "show_widget") {
+        const details = (e.result as { details?: { widget?: { kind: string }; data?: unknown } } | undefined)?.details;
+        const fromData = !details?.widget;
+        const widget = e.isError ? null : (details?.widget ?? (details?.data ? render(details.data) : null));
+        if (widget && !(fromData && renderedKinds.has(widget.kind))) {
+          if (fromData) renderedKinds.add(widget.kind);
           const id = `${e.toolCallId}-widget`;
           out.push(
             {
