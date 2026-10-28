@@ -6,6 +6,7 @@ export type AgentConfig = {
   llmApiKey?: string;
   model: string;
   searxngUrl: string;
+  braveApiKey?: string;
   artifactsDir: string;
   sharedSecret?: string;
   dataDir: string;
@@ -29,6 +30,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
     llmApiKey: env.LLM_API_KEY || undefined,
     model,
     searxngUrl: env.SEARXNG_URL ?? "http://search:8080",
+    braveApiKey: env.BRAVE_SEARCH_API_KEY || undefined,
     artifactsDir: env.ARTIFACTS_DIR ?? "/data/artifacts",
     sharedSecret: env.AGENT_SHARED_SECRET || undefined,
     dataDir: env.AGENT_DATA_DIR ?? "/data/agent",

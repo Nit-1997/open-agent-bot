@@ -9,6 +9,7 @@ describe("loadConfig", () => {
       llmApiKey: "k",
       model: "chat-default",
       searxngUrl: "http://search:8080",
+      braveApiKey: undefined,
       artifactsDir: "/data/artifacts",
       sharedSecret: undefined,
       dataDir: "/data/agent",
@@ -18,6 +19,11 @@ describe("loadConfig", () => {
 
   it("treats LLM_API_KEY as optional, since providers can be added in the app", () => {
     expect(loadConfig({}).llmApiKey).toBeUndefined();
+  });
+
+  it("reads the optional Brave Search API key", () => {
+    expect(loadConfig({ BRAVE_SEARCH_API_KEY: "b1" }).braveApiKey).toBe("b1");
+    expect(loadConfig({ BRAVE_SEARCH_API_KEY: "" }).braveApiKey).toBeUndefined();
   });
 
   it("parses AGENT_PORT", () => {

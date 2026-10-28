@@ -3,7 +3,7 @@
 import type { UiBlock, UiWidget } from "@shared/widgets";
 import { useState } from "react";
 import { ExternalLink } from "./Card";
-import { ProductRow } from "./ProductRow";
+import { CardRow, ImageBlock } from "./CardRow";
 
 const VISIBLE_ITEMS = 5;
 
@@ -174,8 +174,10 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
           </Collapsible>
         </div>
       );
-    case "products":
-      return <ProductRow id={id} label={label} items={block.items} m={m} />;
+    case "cards":
+      return <CardRow id={id} label={label} block={block} m={m} />;
+    case "image":
+      return <ImageBlock id={id} block={block} m={m} />;
     case "checklist":
       return (
         <div id={id} className="mt-2">

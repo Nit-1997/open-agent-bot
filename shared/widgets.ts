@@ -89,21 +89,26 @@ export const UiBlockSchemas = {
       { minItems: 1, maxItems: 10 },
     ),
   }),
-  products: Type.Object({
-    type: Type.Literal("products"),
+  cards: Type.Object({
+    type: Type.Literal("cards"),
+    shape: Type.Optional(Type.Enum(["square", "wide"])),
     items: Type.Array(
       Type.Object({
         title: S(60),
-        price: Type.Optional(S(20)),
+        subtitle: Type.Optional(S(60)),
         image: Type.Optional(Url),
         url: Type.Optional(Url),
-        store: Type.Optional(S(30)),
+        price: Type.Optional(S(20)),
+        rating: Type.Optional(S(12)),
+        source: Type.Optional(S(30)),
+        place: Type.Optional(S(100)),
         note: Type.Optional(S(60)),
         badge: Type.Optional(S(16)),
       }),
       { minItems: 1, maxItems: 10 },
     ),
   }),
+  image: Type.Object({ type: Type.Literal("image"), url: Url, caption: Type.Optional(S(100)), source: Type.Optional(S(30)) }),
   checklist: Type.Object({
     type: Type.Literal("checklist"),
     title: Type.Optional(S(40)),
@@ -115,7 +120,7 @@ export const UiBlockSchemas = {
 
 export const UI_BLOCK_TYPES = Object.keys(UiBlockSchemas) as UiBlockType[];
 const B = UiBlockSchemas;
-export const UiBlockSchema = Type.Union([B.heading, B.text, B.stats, B.table, B.list, B.products, B.checklist, B.links, B.callout]);
+export const UiBlockSchema = Type.Union([B.heading, B.text, B.stats, B.table, B.list, B.cards, B.image, B.checklist, B.links, B.callout]);
 
 export const UiSchema = Type.Object({
   kind: Type.Literal("ui"),

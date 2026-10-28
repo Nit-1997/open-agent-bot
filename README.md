@@ -36,6 +36,13 @@ Sign in with ChatGPT redirects to `127.0.0.1:1455`, which compose publishes to l
 
 There's no app login yet: anyone who can reach port 3000 can change keys. Keep ports bound to localhost until a settings password exists.
 
+## Search and pictures
+
+- Web search goes through SearXNG. Some engines rate-limit or CAPTCHA a home IP; Yahoo, Bing, Google, Qwant, Mojeek and Startpage are enabled so one working engine is enough.
+- Optional fallback: set `BRAVE_SEARCH_API_KEY` in `deploy-config/.env-agent` (free tier at brave.com/search/api) and it is used whenever SearXNG returns nothing.
+- Pictures come from the pages the agent reads (`images:` section), `image_search` (SearXNG images), `music` (iTunes Search: album and song art, Apple Music links) and `wikipedia` (places, people, topics). No keys needed.
+- Cards show an image or link only if a tool returned it; otherwise the image is dropped and a placeholder is shown.
+
 ## Develop
 
 - Agent: `cd agent && npm test && npm run build` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test`)

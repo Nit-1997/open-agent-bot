@@ -51,10 +51,17 @@ describe("card length limits", () => {
     if (!tooManyItems.ok) expect(tooManyItems.errors[0]).toContain("/blocks/0/items");
   });
 
-  it("accepts a products block and caps it at 10 items", () => {
-    const item = { title: "Mercurial Vapor 17 Academy TF", price: "$100", image: "https://static.nike.com/a/vapor.png", url: "https://www.nike.com/t/vapor", store: "Nike" };
-    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "products", items: [item] }] }).ok).toBe(true);
-    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "products", items: Array.from({ length: 11 }, () => item) }] }).ok).toBe(false);
+  it("accepts picture cards in square and wide shapes, capped at 10", () => {
+    const item = { title: "Mercurial Vapor 17 Academy TF", price: "$100", image: "https://static.nike.com/a/vapor.png", url: "https://www.nike.com/t/vapor", source: "Nike" };
+    const hotel = { title: "Memmo Alfama", subtitle: "Boutique hotel", rating: "4.7", price: "$310/night", place: "Memmo Alfama, Lisbon", image: "https://img.com/m.jpg" };
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", items: [item] }] }).ok).toBe(true);
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", shape: "wide", items: [hotel] }] }).ok).toBe(true);
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", shape: "round", items: [item] }] }).ok).toBe(false);
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", items: Array.from({ length: 11 }, () => item) }] }).ok).toBe(false);
+  });
+
+  it("accepts a single image with a caption", () => {
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "image", url: "https://upload.wikimedia.org/x.jpg", caption: "Belém Tower", source: "Wikipedia" }] }).ok).toBe(true);
   });
 
   it("keeps titles short", () => {
@@ -63,8 +70,10 @@ describe("card length limits", () => {
 });
 
 describe("show_ui", () => {
-  it("tells the model to use products with images for things to buy", () => {
-    expect(showUiTool().description).toMatch(/\{type:"products", items:\[\{title, price\?, image\?, url\?, store\?, note\?, badge\?\}\]\}/);
+  it("describes picture cards and images to the model", () => {
+    const d = showUiTool().description;
+    expect(d).toContain('{type:"cards", shape?:"square"|"wide", items:[{title, subtitle?, image?, url?, price?, rating?, source?, place?, note?, badge?}]}');
+    expect(d).toContain('{type:"image", url, caption?, source?}');
   });
 
   it("takes title and blocks and returns a valid ui widget", async () => {

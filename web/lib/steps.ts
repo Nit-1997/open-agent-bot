@@ -2,6 +2,18 @@ import { hostOf } from "./sources";
 
 export type StepArgs = Record<string, unknown>;
 
+function list(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string") {
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {}
+    return v ? [v] : [];
+  }
+  return [];
+}
+
 export const RENDER_TOOLS = new Set(["show_ui", "show_widget", "ask_user"]);
 
 export function stepLabel(name: string, args: StepArgs, done = true): string {
@@ -9,6 +21,19 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
   switch (name) {
     case "web_search":
       return `${done ? "Searched" : "Searching"} “${String(args.query ?? "")}”`;
+    case "image_search": {
+      const many = list(args.queries);
+      return `${done ? "Found" : "Finding"} pictures of ${many.length > 1 ? `${many.length} things` : `“${String(many[0] ?? args.query ?? "")}”`}`;
+    }
+    case "music": {
+      const n = list(args.queries).length;
+      const what = args.kind === "song" ? "song" : "album";
+      return `${done ? "Looked up" : "Looking up"} ${n} ${n === 1 ? what : `${what}s`}`;
+    }
+    case "wikipedia": {
+      const many = list(args.queries);
+      return `${done ? "Read" : "Reading"} Wikipedia on ${many.length === 1 ? many[0] : `${many.length} topics`}`;
+    }
     case "fetch_page":
       return `${done ? "Read" : "Reading"} ${host(args.url)}`;
     case "browse": {
@@ -28,7 +53,8 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
 }
 
 export function stepKind(name: string): "search" | "read" | "weather" | "flight" | "write" | "other" {
-  if (name === "web_search") return "search";
+  if (name === "web_search" || name === "image_search") return "search";
+  if (name === "music" || name === "wikipedia") return "read";
   if (name === "fetch_page" || name === "browse") return "read";
   if (name === "weather") return "weather";
   if (name === "flights") return "flight";

@@ -19,7 +19,7 @@ export function groundUi(widget: UiWidget, evidence: Evidence): UiWidget {
       });
       return [{ ...b, items }];
     }
-    if (b.type === "products") {
+    if (b.type === "cards") {
       const items = b.items.map(({ url, image, ...rest }) => {
         const item: typeof rest & { url?: string; image?: string } = { ...rest };
         if (image !== undefined && evidence.hasUrl(image)) item.image = image;
@@ -31,6 +31,7 @@ export function groundUi(widget: UiWidget, evidence: Evidence): UiWidget {
       });
       return [{ ...b, items }];
     }
+    if (b.type === "image") return evidence.hasUrl(b.url) ? [b] : [];
     if (b.type === "links") {
       const items = b.items.filter((i) => evidence.hasUrl(i.url));
       removed += b.items.length - items.length;

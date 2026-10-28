@@ -1,5 +1,7 @@
 "use client";
 
+import { airlineHost } from "@/lib/airlines";
+import { Favicon } from "../chat/Favicon";
 import { type FlightPrefs, LAYOVER_OPTIONS, type LayoverPref, matchesPrefs, rankAirports, TIME_OPTIONS, type TimeBucket } from "@shared/flights";
 import type { FlightList as FlightListData } from "@shared/widgets";
 import { useMemo, useState } from "react";
@@ -241,7 +243,8 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                   {money(f.price, widget.currency, locale) ?? "—"}
                 </span>
                 <div id={`${fid}-meta`} className="flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
-                  <span id={`${fid}-airline`} className="font-medium text-text-secondary">
+                  <span id={`${fid}-airline`} className="inline-flex items-center gap-1.5 font-medium text-text-secondary">
+                    {airlineHost(f.airline) && <Favicon id={`${fid}-logo`} host={airlineHost(f.airline)!} size={16} className="ring-0" />}
                     {f.airline}
                   </span>
                   <span id={`${fid}-duration`}>{f.duration}</span>

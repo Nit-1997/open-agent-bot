@@ -14,7 +14,8 @@ import type { ToolResult } from "./result.js";
 import { askUserTool } from "./askUser.js";
 import { showUiTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
-import { webSearchTool } from "./webSearch.js";
+import { imageSearchTool, webSearchTool } from "./webSearch.js";
+import { musicTool, wikipediaTool } from "./lookup.js";
 
 export type ToolDeps = {
   cfg: AgentConfig;
@@ -25,7 +26,7 @@ export type ToolDeps = {
   budget: ToolBudget;
 };
 
-export const PER_REPLY_LIMITS = { search: 4, read: 4, flights: 2 };
+export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2 };
 
 function memo<T>(fn: () => Promise<T>): () => Promise<T> {
   let p: Promise<T> | undefined;
@@ -47,9 +48,13 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         return drives.get(code)!;
       }
     : undefined;
+  const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
   const browse = browseTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext });
   return [
-    withBudget(webSearchTool({ searxngUrl: deps.cfg.searxngUrl }), deps.budget, "search"),
+    withBudget(webSearchTool(search), deps.budget, "search"),
+    withBudget(imageSearchTool(search), deps.budget, "images"),
+    withBudget(musicTool({ country: regionFor(deps.userContext).country }), deps.budget, "lookup"),
+    withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browse, deps.budget, "read"),
     weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),

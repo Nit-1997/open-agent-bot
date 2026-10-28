@@ -78,6 +78,13 @@ describe("sources", () => {
 describe("steps", () => {
   it("labels steps in plain words", () => {
     expect(stepLabel("web_search", { query: "diyas" })).toBe("Searched “diyas”");
+    expect(stepLabel("image_search", { query: "Abbey Road cover" })).toBe("Found pictures of “Abbey Road cover”");
+    expect(stepLabel("image_search", { query: "Abbey Road cover" }, false)).toBe("Finding pictures of “Abbey Road cover”");
+    expect(stepLabel("image_search", { queries: ["Rumours", "Abbey Road", "Blue"] })).toBe("Found pictures of 3 things");
+    expect(stepLabel("music", { queries: ["Rumours", "Abbey Road"] })).toBe("Looked up 2 albums");
+    expect(stepLabel("music", { queries: ["Hey Jude"], kind: "song" }, false)).toBe("Looking up 1 song");
+    expect(stepLabel("wikipedia", { queries: ["Kinkaku-ji"] })).toBe("Read Wikipedia on Kinkaku-ji");
+    expect(stepLabel("wikipedia", { queries: ["Kinkaku-ji", "Ryoan-ji"] }, false)).toBe("Reading Wikipedia on 2 topics");
     expect(stepLabel("fetch_page", { url: "https://www.target.com/x" })).toBe("Read target.com");
     expect(stepLabel("weather", { location: "Pune" })).toBe("Checked weather in Pune");
   });
