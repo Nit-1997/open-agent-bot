@@ -13,6 +13,7 @@ export function ProfileDrawer(props: {
   onClose: () => void;
   onRestart: () => void;
   onClear: () => void;
+  onManageModels?: () => void;
 }) {
   const [draft, setDraft] = useState<Profile>(props.profile);
   const [confirming, setConfirming] = useState(false);
@@ -56,9 +57,16 @@ export function ProfileDrawer(props: {
             <InterestsField id="profile-interests" value={draft} onChange={setDraft} />
           </section>
           <section id="profile-model" className="space-y-3">
-            <h3 id="profile-model-title" className="eyebrow">
-              Default model for new chats
-            </h3>
+            <div id="profile-model-head" className="flex items-center justify-between">
+              <h3 id="profile-model-title" className="eyebrow">
+                Default model for new chats
+              </h3>
+              {props.onManageModels && (
+                <button id="profile-manage-models" type="button" onClick={props.onManageModels} className="text-xs text-mist-600 underline underline-offset-2">
+                  Manage models
+                </button>
+              )}
+            </div>
             <ModelOptions id="profile-model-options" models={props.models} value={draft.defaultModel} onChange={(id) => setDraft({ ...draft, defaultModel: id })} />
           </section>
           <p id="profile-drawer-note" className="text-xs leading-relaxed text-text-muted">

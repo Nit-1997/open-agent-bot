@@ -5,6 +5,7 @@ import { Moon, Plus, Sun, User } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ChatSession } from "@/components/chat/ChatSession";
 import { ModelMenu } from "@/components/profile/ModelMenu";
+import { ModelsPanel } from "@/components/profile/ModelsPanel";
 import { Onboarding } from "@/components/profile/Onboarding";
 import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
 import { useModels } from "@/lib/models";
@@ -40,7 +41,8 @@ function ThemeToggle() {
 
 export function Chat() {
   const profile = useProfile();
-  const models = useModels();
+  const { list: models, reload: reloadModels } = useModels();
+  const [modelsPanel, setModelsPanel] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<UserContext | null>(null);
   const [chatModel, setChatModel] = useState<string | undefined>(undefined);
@@ -77,7 +79,7 @@ export function Chat() {
             </h1>
           </div>
           <div id="chat-actions" className="flex items-center gap-1.5">
-            <ModelMenu models={models} value={model} onChange={setChatModel} />
+            <ModelMenu models={models} value={model} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
             <ThemeToggle />
             <button
               id="chat-profile-button"
@@ -124,8 +126,13 @@ export function Chat() {
             clearProfile();
             setDrawer(false);
           }}
+          onManageModels={() => {
+            setDrawer(false);
+            setModelsPanel(true);
+          }}
         />
       )}
+      {modelsPanel && <ModelsPanel onClose={() => setModelsPanel(false)} onChanged={reloadModels} />}
     </div>
   );
 }

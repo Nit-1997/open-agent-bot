@@ -23,7 +23,7 @@ export function Onboarding({ models, onDone }: { models: ModelList | null; onDon
       name: draft.name.trim(),
       home: draft.home.trim(),
       notes: draft.notes.trim(),
-      ...((draft.defaultModel ?? models?.default) && { defaultModel: draft.defaultModel ?? models?.default }),
+      ...((draft.defaultModel ?? models?.default) && { defaultModel: (draft.defaultModel ?? models?.default) as string }),
       onboarded: true,
     });
 

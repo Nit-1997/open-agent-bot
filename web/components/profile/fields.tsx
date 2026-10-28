@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import type { ModelList } from "@/lib/models";
+import { type ModelList, normalizeRef } from "@/lib/models";
 import { INTERESTS, type Profile } from "@/lib/profile";
 
 const input =
@@ -82,7 +82,7 @@ export function ModelOptions({ id, models, value, onChange }: { id: string; mode
       </p>
     );
   }
-  const selected = value ?? models.default;
+  const selected = normalizeRef(value) ?? models.default;
   return (
     <div id={id} role="radiogroup" aria-label="Default model" className="space-y-2">
       {models.models.map((m, n) => {
@@ -98,9 +98,9 @@ export function ModelOptions({ id, models, value, onChange }: { id: string; mode
               <span id={`${id}-option-${n}-label`} className="block text-[15px] font-medium text-text-primary">
                 {m.label}
               </span>
-              {m.note && (
+              {(m.provider || m.note) && (
                 <span id={`${id}-option-${n}-note`} className="mt-0.5 block text-[13px] text-text-muted">
-                  {m.note}
+                  {[m.provider, m.note].filter(Boolean).join(" · ")}
                 </span>
               )}
             </span>

@@ -6,10 +6,11 @@ import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
 import { EMPTY_PROFILE } from "@/lib/profile";
 
 const models = {
-  default: "chat-default",
+  default: "litellm/chat-default",
   models: [
-    { id: "chat-default", label: "Qwen 3.5 (local)", note: "Free and private" },
-    { id: "chat-sonnet-5.5", label: "Sonnet 5.5", note: "Best quality" },
+    { id: "litellm/chat-default", label: "Qwen 3.5 (local)", provider: "LiteLLM gateway", note: "Free and private" },
+    { id: "litellm/chat-sonnet-5.5", label: "Sonnet 5.5", provider: "LiteLLM gateway", note: "Best quality" },
+    { id: "groq/llama-3.3-70b-versatile", label: "Llama 3.3 70B", provider: "Groq" },
   ],
 };
 
@@ -34,7 +35,7 @@ describe("Onboarding", () => {
       home: "Sunnyvale, CA 94087",
       interests: ["Has pets"],
       notes: "Two cats",
-      defaultModel: "chat-sonnet-5.5",
+      defaultModel: "litellm/chat-sonnet-5.5",
       onboarded: true,
     });
   });
@@ -55,7 +56,7 @@ describe("Onboarding", () => {
 });
 
 describe("ProfileDrawer", () => {
-  const profile = { ...EMPTY_PROFILE, name: "Nitin", home: "94087", onboarded: true, defaultModel: "chat-default" };
+  const profile = { ...EMPTY_PROFILE, name: "Nitin", home: "94087", onboarded: true, defaultModel: "litellm/chat-default" };
 
   it("saves edits", () => {
     const onSave = vi.fn();
@@ -64,7 +65,7 @@ describe("ProfileDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Vegetarian" }));
     fireEvent.click(screen.getByRole("radio", { name: /Sonnet 5.5/ }));
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
-    expect(onSave).toHaveBeenCalledWith({ ...profile, name: "Nitin B", interests: ["Vegetarian"], defaultModel: "chat-sonnet-5.5" });
+    expect(onSave).toHaveBeenCalledWith({ ...profile, name: "Nitin B", interests: ["Vegetarian"], defaultModel: "litellm/chat-sonnet-5.5" });
   });
 
   it("asks before clearing the profile", () => {
@@ -85,17 +86,31 @@ describe("ProfileDrawer", () => {
 });
 
 describe("ModelMenu", () => {
-  it("shows the chat's model and switches it", () => {
+  it("shows the chat's model, grouped by provider, and switches it", () => {
     const onChange = vi.fn();
-    render(<ModelMenu models={models} value="chat-default" onChange={onChange} />);
+    render(<ModelMenu models={models} value="litellm/chat-default" onChange={onChange} onManage={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: /Qwen 3.5/ }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: /Sonnet 5.5/ }));
-    expect(onChange).toHaveBeenCalledWith("chat-sonnet-5.5");
+    expect(screen.getAllByRole("group").map((g) => g.getAttribute("aria-label"))).toEqual(["LiteLLM gateway", "Groq"]);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /Llama 3.3 70B/ }));
+    expect(onChange).toHaveBeenCalledWith("groq/llama-3.3-70b-versatile");
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
+  it("understands old saved model names without a provider", () => {
+    render(<ModelMenu models={models} value="chat-sonnet-5.5" onChange={() => {}} onManage={() => {}} />);
+    expect(screen.getByRole("button", { name: /Sonnet 5.5/ })).toBeInTheDocument();
+  });
+
+  it("opens model management from the menu", () => {
+    const onManage = vi.fn();
+    render(<ModelMenu models={models} value={undefined} onChange={() => {}} onManage={onManage} />);
+    fireEvent.click(screen.getByRole("button", { name: /Qwen 3.5/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Manage models/ }));
+    expect(onManage).toHaveBeenCalled();
+  });
+
   it("renders nothing until models load", () => {
-    const { container } = render(<ModelMenu models={null} value={undefined} onChange={() => {}} />);
+    const { container } = render(<ModelMenu models={null} value={undefined} onChange={() => {}} onManage={() => {}} />);
     expect(container).toBeEmptyDOMElement();
   });
 });
