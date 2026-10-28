@@ -9,8 +9,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "vitest run",
+    "lint": "biome lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/agent/src/server.js"
   },
@@ -27,6 +28,7 @@
     "typebox": "^1.4.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.3",
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

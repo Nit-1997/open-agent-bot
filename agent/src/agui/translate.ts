@@ -45,7 +45,7 @@ export function createTranslator(ids: Deps) {
     textOpen = false;
     const out: BaseEvent[] = [{ type: EventType.TEXT_MESSAGE_END, messageId: assistantId } as BaseEvent];
     const claims = evidence.unverified(text).filter((c) => !notedClaims.has(c));
-    claims.forEach((c) => notedClaims.add(c));
+    for (const c of claims) notedClaims.add(c);
     if (claims.length) out.push(...widgetCall(`${assistantId}-widget`, { kind: "grounding_note", claims } as Widget));
     return out;
   };

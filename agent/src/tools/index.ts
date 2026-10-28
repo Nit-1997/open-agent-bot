@@ -4,7 +4,7 @@ import type { AgentConfig } from "../config.js";
 import { regionFor } from "../prompt/region.js";
 import type { UserContext } from "../prompt/systemPrompt.js";
 import { browseTool, runBrowse } from "./browse.js";
-import { ToolBudget, withBudget } from "./budget.js";
+import { type ToolBudget, withBudget } from "./budget.js";
 import type { BrowserPool } from "./browserPool.js";
 import { createArtifactTool } from "./createArtifact.js";
 import { fetchPageTool } from "./fetchPage.js";

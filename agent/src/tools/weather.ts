@@ -49,6 +49,8 @@ const shiftYear = (iso: string, years: number) => {
   const md = iso.slice(5);
   return `${y}-${md === "02-29" && !isLeap(y) ? "02-28" : md}`;
 };
+const latestIso = (...dates: string[]) => [...dates].sort().at(-1)!;
+const earliestIso = (...dates: string[]) => [...dates].sort()[0];
 const isIso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(toDate(v).getTime());
 
 function mode<T>(xs: T[]): T {
@@ -164,8 +166,8 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
         u.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max");
         u.searchParams.set("timezone", "auto");
         if (range) {
-          u.searchParams.set("start_date", range.start < today() ? today() : range.start);
-          u.searchParams.set("end_date", range.end > lastForecastDay ? lastForecastDay : range.end);
+          u.searchParams.set("start_date", latestIso(range.start, today()));
+          u.searchParams.set("end_date", earliestIso(range.end, lastForecastDay));
         } else {
           u.searchParams.set("forecast_days", String(Math.min(Math.max(Math.floor(params.days ?? 3), 1), 7)));
         }

@@ -22,7 +22,7 @@ CI runs these on every pull request. Run them before you push:
 
 | Package | Commands |
 | --- | --- |
-| `agent` | `npm run typecheck && npm test && npm run build` |
+| `agent` | `npm run lint && npm run typecheck && npm test && npm run build` |
 | `web` | `npm run lint && npm run typecheck && npm test && npm run build` |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set.

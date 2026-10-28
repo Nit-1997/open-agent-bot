@@ -52,7 +52,7 @@ function absolute(src: string | null | undefined, base: string): string | null {
 }
 
 function ldProducts(v: unknown, out: Array<{ name?: string; image?: unknown }> = []): Array<{ name?: string; image?: unknown }> {
-  if (Array.isArray(v)) v.forEach((x) => ldProducts(x, out));
+  if (Array.isArray(v)) for (const x of v) ldProducts(x, out);
   else if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     const type = o["@type"];

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
 import type { UserContext, UserProfile } from "../prompt/systemPrompt.js";
-import type { SessionStore } from "../session/sessionStore.js";
+import type { SessionEntry, SessionStore } from "../session/sessionStore.js";
 import type { CartEdits } from "../shop/cart.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
@@ -85,7 +85,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   const userContext = readUserContext(input);
   console.log(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(messageText(last).slice(0, 200))}`);
 
-  let entry;
+  let entry: SessionEntry;
   try {
     entry = await store.getOrCreate(threadId, userContext);
   } catch (err) {

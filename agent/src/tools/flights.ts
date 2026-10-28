@@ -60,7 +60,7 @@ export function parseGoogleFlights(text: string): FlightOption[] {
     const price = Number(priceText.replace(/,/g, ""));
     const stops = /nonstop/i.test(stopsText) ? 0 : Number.parseInt(stopsText, 10);
     const lines = m[0].split("\n");
-    const after = lines[lines.findIndex((l) => l === stopsText) + 1];
+    const after = lines[lines.indexOf(stopsText) + 1];
     out.push({
       airline: airline.replace(/Operated by.*$/i, "").trim(),
       departTime,

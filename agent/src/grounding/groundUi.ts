@@ -3,7 +3,7 @@ import type { Evidence } from "./evidence.js";
 
 function strings(v: unknown, out: string[] = []): string[] {
   if (typeof v === "string") out.push(v);
-  else if (Array.isArray(v)) v.forEach((x) => strings(x, out));
+  else if (Array.isArray(v)) for (const x of v) strings(x, out);
   else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) if (k !== "url" && k !== "image" && k !== "type" && k !== "tone") strings(x, out);
   return out;
 }

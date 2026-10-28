@@ -137,7 +137,7 @@ export class ProviderHub {
 
   private cloud(id: string): CatalogEntry {
     const e = catalogEntry(id);
-    if (!e || e.kind !== "cloud") throw new Error(`provider ${id} is not supported`);
+    if (e?.kind !== "cloud") throw new Error(`provider ${id} is not supported`);
     return e;
   }
 

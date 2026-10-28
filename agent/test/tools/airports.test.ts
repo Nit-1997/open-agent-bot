@@ -60,7 +60,7 @@ describe("flights across nearby airports", () => {
     return (pages[code].shift() ?? (() => fail("no more")))();
   };
 
-  it("searches each airport once (retrying a failure once) and returns one card with rides and preferences", async () => {
+  it("searches each airport once, in parallel (retrying a failure once), and returns one card with rides and preferences", async () => {
     const drives: Record<string, { miles: number; minutes: number }> = { SJC: { miles: 7.5, minutes: 14 }, SFO: { miles: 33, minutes: 38 } };
     const tool = flightsTool({
       locale: "en-US",
@@ -75,7 +75,7 @@ describe("flights across nearby airports", () => {
       undefined,
       {} as never,
     );
-    expect(calls).toEqual(["SJC", "SJC", "SFO", "OAK", "OAK"]);
+    expect([...calls].sort()).toEqual(["OAK", "OAK", "SFO", "SJC", "SJC"]);
     const data = (r.details as { data: Record<string, any> }).data;
     expect(data.airports).toEqual([
       { code: "SJC", name: "San Jose", miles: 7.5, driveMinutes: 14, rideOneWay: 26, status: "ok", searchUrl: expect.any(String) },

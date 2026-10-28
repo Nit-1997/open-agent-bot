@@ -23,7 +23,10 @@ export class FrameBus {
 
   publish(f: Frame): void {
     const wait = this.last + this.intervalMs - Date.now();
-    if (wait <= 0) return this.send(f);
+    if (wait <= 0) {
+      this.send(f);
+      return;
+    }
     this.pending = f;
     this.timer ??= setTimeout(() => {
       this.timer = undefined;

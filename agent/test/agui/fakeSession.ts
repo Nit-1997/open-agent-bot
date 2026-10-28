@@ -17,7 +17,9 @@ export function fakeSession(script: Script) {
     async prompt(text: string) {
       fake.prompts.push(text);
       aborted = false;
-      await script((e) => listeners.forEach((l) => l(e)), { aborted: () => aborted });
+      await script((e) => {
+        for (const l of listeners) l(e);
+      }, { aborted: () => aborted });
     },
     async abort() {
       fake.abortCalls++;
