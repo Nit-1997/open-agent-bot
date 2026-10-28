@@ -23,6 +23,10 @@ const routes = () =>
   ]);
 
 describe("weather", () => {
+  it("says when to use it, so incidental checks don't add a card", () => {
+    expect(weatherTool().description).toMatch(/only when the user asks about weather or the plan depends on being outdoors/i);
+  });
+
   it('weather maps WMO code 61 to "Rain"', () => {
     expect(wmoCondition(61)).toBe("Rain");
     expect(wmoCondition(0)).toBe("Clear");
