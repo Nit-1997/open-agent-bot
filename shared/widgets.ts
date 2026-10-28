@@ -36,8 +36,28 @@ export const FlightListSchema = Type.Object({
       duration: Type.String({ description: "as shown on the page, e.g. 28h 25m" }),
       stops: Type.Number(),
       price: Type.Optional(Type.Number()),
+      origin: Type.Optional(Type.String()),
     }),
   ),
+  airports: Type.Optional(
+    Type.Array(
+      Type.Object({
+        code: Type.String(),
+        name: Type.Optional(Type.String()),
+        miles: Type.Optional(Type.Number()),
+        ground: Type.Optional(Type.Number({ description: "estimated round-trip rideshare from home" })),
+        bestFare: Type.Optional(Type.Number()),
+        total: Type.Optional(Type.Number()),
+        status: Type.Enum(["ok", "failed"]),
+        searchUrl: Url,
+        closest: Type.Optional(Type.Boolean()),
+        cheapest: Type.Optional(Type.Boolean()),
+        recommended: Type.Optional(Type.Boolean()),
+      }),
+    ),
+  ),
+  returnDate: Type.Optional(Type.String()),
+  priceNote: Type.Optional(Type.String()),
   searchUrl: Url,
   source: Type.String(),
 });

@@ -9,15 +9,33 @@ export type WeatherData = {
   source: string;
 };
 
-export type FlightOption = { airline: string; departTime: string; arriveTime: string; duration: string; stops: number; price?: number };
+export type FlightOption = { airline: string; departTime: string; arriveTime: string; duration: string; stops: number; price?: number; origin?: string };
+
+export type AirportResult = {
+  code: string;
+  name?: string;
+  miles?: number;
+  ground?: number;
+  bestFare?: number;
+  total?: number;
+  options: number;
+  searchUrl: string;
+  status: "ok" | "failed";
+  closest?: boolean;
+  cheapest?: boolean;
+  recommended?: boolean;
+};
 
 export type FlightsData = {
   kind: "flights";
   from: string;
   to: string;
   date: string;
+  returnDate?: string;
   currency: string;
   options: FlightOption[];
+  airports: AirportResult[];
+  priceNote?: string;
   searchUrl: string;
   source: string;
 };
