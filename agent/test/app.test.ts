@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ProviderHub } from "../src/providers/hub.js";
+import { LoginFlows } from "../src/providers/logins.js";
 import { SessionStore } from "../src/session/sessionStore.js";
 import { fakeFetch, json } from "./fixtures/fakeFetch.js";
 
@@ -38,7 +39,11 @@ describe("createApp", () => {
         litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey!, models: cfg.models },
         fetch: f,
       });
-      const app = createApp({ cfg, store: store(), hub });
+      const logins = new LoginFlows(async (_id, ui) => {
+        ui.notify({ type: "auth_url", url: "https://auth.openai.com/authorize?x=1" });
+        await ui.prompt({ type: "manual_code", message: "Paste the final redirect URL" });
+      });
+      const app = createApp({ cfg, store: store(), hub, logins });
       const call = (path: string, init: RequestInit = {}) =>
         app.request(path, { ...init, headers: { "x-agent-secret": "s3", "content-type": "application/json", ...(init.headers ?? {}) } });
       return { app, call };
@@ -82,6 +87,29 @@ describe("createApp", () => {
       const added = await call("/providers/local", { method: "POST", body: JSON.stringify({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" }) });
       expect(await added.json()).toMatchObject({ provider: { id: "ollama", configured: true } });
       expect((await call("/providers/ollama", { method: "DELETE" })).status).toBe(200);
+    });
+
+    it("runs a sign-in as a flow the browser polls and answers", async () => {
+      const { call } = await setup();
+      const started = (await (await call("/providers/openai/login", { method: "POST" })).json()) as { flow: string };
+      await new Promise((r) => setTimeout(r, 0));
+      expect(await (await call(`/providers/logins/${started.flow}`)).json()).toMatchObject({
+        status: "running",
+        authUrl: "https://auth.openai.com/authorize?x=1",
+        prompt: { message: "Paste the final redirect URL" },
+      });
+      const answered = await call(`/providers/logins/${started.flow}/answer`, { method: "POST", body: JSON.stringify({ value: "http://127.0.0.1:1455/auth/callback?code=c" }) });
+      expect(answered.status).toBe(200);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(await (await call(`/providers/logins/${started.flow}`)).json()).toMatchObject({ status: "done" });
+      expect((await call("/providers/logins/unknown")).status).toBe(404);
+    });
+
+    it("refuses sign-in for providers without an allowed sign-in option", async () => {
+      const { call } = await setup();
+      const res = await call("/providers/anthropic/login", { method: "POST" });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Anthropic has no sign-in option here" });
     });
 
     it("turns bad requests into readable 400s", async () => {

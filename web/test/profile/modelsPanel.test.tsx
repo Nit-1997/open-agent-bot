@@ -17,6 +17,7 @@ const base = (over: Partial<ProviderView>): ProviderView => ({
 
 let providers: ProviderView[];
 let calls: Array<{ url: string; method: string; body?: unknown }>;
+let loginState: Record<string, unknown>;
 
 beforeEach(() => {
   providers = [
@@ -25,6 +26,12 @@ beforeEach(() => {
     base({ id: "ollama", label: "Ollama", kind: "local", site: "ollama.com", methods: [], defaultBaseUrl: "http://host.docker.internal:11434/v1", modelCount: 0 }),
   ];
   calls = [];
+  loginState = {
+    status: "running",
+    providerId: "openai",
+    authUrl: "https://auth.openai.com/authorize?x=1",
+    prompt: { type: "manual_code", message: "Paste the final redirect URL", placeholder: "http://127.0.0.1:1455/auth/callback" },
+  };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init: RequestInit = {}) => {
@@ -51,6 +58,13 @@ beforeEach(() => {
         providers[1] = { ...providers[1], configured: false, source: undefined, enabled: [] };
         return ok({ ok: true });
       }
+      if (url === "/api/providers/openai/login") return ok({ flow: "11111111-2222-3333-4444-555555555555" });
+      if (url === "/api/providers/logins/11111111-2222-3333-4444-555555555555/answer") {
+        loginState = { status: "done", providerId: "openai" };
+        providers[0] = { ...providers[0], configured: true, source: "signin", enabled: ["gpt-5.5"] };
+        return ok({ ok: true });
+      }
+      if (url === "/api/providers/logins/11111111-2222-3333-4444-555555555555") return ok(loginState);
       if (url === "/api/providers/local") {
         providers[2] = { ...providers[2], configured: true, source: "server", baseUrl: body.baseUrl, enabled: ["qwen3.5:35b"], modelCount: 1 };
         return ok({ provider: providers[2] });
@@ -129,6 +143,21 @@ describe("ModelsPanel", () => {
     fireEvent.click(within(row("Ollama")).getByRole("button", { name: "Connect server" }));
     await waitFor(() => expect(row("Ollama")).toHaveTextContent("http://host.docker.internal:11434/v1"));
     expect(calls.find((c) => c.url === "/api/providers/local")?.body).toEqual({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" });
+  });
+
+  it("signs in with ChatGPT: opens OpenAI's page, accepts a pasted redirect, then shows signed in", async () => {
+    const onChanged = vi.fn();
+    render(<ModelsPanel onClose={() => {}} onChanged={onChanged} pollMs={5} />);
+    fireEvent.click(within(await screen.findByRole("listitem", { name: "OpenAI" })).getByRole("button", { name: "Sign in with ChatGPT" }));
+    const open = await within(row("OpenAI")).findByRole("link", { name: /Open ChatGPT sign-in/ });
+    expect(open).toHaveAttribute("href", "https://auth.openai.com/authorize?x=1");
+    expect(open).toHaveAttribute("target", "_blank");
+    const paste = within(row("OpenAI")).getByLabelText("Paste the final redirect URL");
+    fireEvent.change(paste, { target: { value: "http://127.0.0.1:1455/auth/callback?code=c" } });
+    fireEvent.click(within(row("OpenAI")).getByRole("button", { name: "Finish sign-in" }));
+    await waitFor(() => expect(row("OpenAI")).toHaveTextContent("Connected · signed in"));
+    expect(calls.find((c) => c.url.endsWith("/answer"))?.body).toEqual({ value: "http://127.0.0.1:1455/auth/callback?code=c" });
+    expect(onChanged).toHaveBeenCalled();
   });
 
   it("gives every element a unique id", async () => {

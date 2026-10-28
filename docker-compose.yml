@@ -27,11 +27,13 @@ services:
     env_file: deploy-config/.env-agent
     environment:
       AGENT_MODEL: ${AGENT_MODEL:-chat-default}
+      PI_OAUTH_CALLBACK_HOST: 0.0.0.0
     volumes:
       - artifacts-data:/data/artifacts
       - agent-data:/data/agent
     ports:
       - "127.0.0.1:8000:8000"
+      - "127.0.0.1:1455:1455"
     depends_on:
       - llm
       - search

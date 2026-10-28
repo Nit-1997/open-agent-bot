@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AssistantMessage, Context, Model } from "@earendil-works/pi-ai";
@@ -151,7 +152,8 @@ export class ProviderHub {
 
   async login(id: string, interaction: Parameters<ModelRuntime["login"]>[2]): Promise<void> {
     if (!this.cloud(id).oauthLabel) throw new Error(`${id} has no sign-in option here`);
-    await this.rt.login(id, "oauth", interaction, { agentName: "Open Agent" });
+    const deviceId = await this.deviceId();
+    await this.rt.login(id, "oauth", interaction, { agentName: "Open Agent", getDeviceId: () => deviceId });
     this.signedIn.set(id, "signin");
     await this.lockAuthFile();
   }
@@ -270,6 +272,15 @@ export class ProviderHub {
     } catch (err) {
       return { ok: false, toolCall: false, latencyMs: Date.now() - started, error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  async deviceId(): Promise<string> {
+    const path = join(this.dir, "device-id");
+    const existing = (await readFile(path, "utf8").catch(() => "")).trim();
+    if (existing) return existing;
+    const id = randomUUID();
+    await writeFile(path, id, { mode: 0o600 });
+    return id;
   }
 
   private async lockAuthFile(): Promise<void> {

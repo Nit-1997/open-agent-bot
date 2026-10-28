@@ -3,7 +3,7 @@
 import { Check, ChevronDown, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Favicon } from "@/components/chat/Favicon";
-import { contextLabel, type ProviderModel, type ProviderView, providersApi, type TestResult } from "@/lib/providers";
+import { contextLabel, type LoginState, type ProviderModel, type ProviderView, providersApi, type TestResult } from "@/lib/providers";
 
 const input =
   "w-full rounded-xl border border-border bg-paper px-3 py-2 text-sm text-text-primary outline-none transition placeholder:text-text-faint focus:border-mist-300";
@@ -11,7 +11,7 @@ const ghost = "rounded-full border border-border px-3 py-1 text-[12px] font-medi
 const solid = "rounded-full bg-charcoal px-3.5 py-1.5 text-[12px] font-medium text-on-charcoal transition hover:opacity-85 disabled:opacity-40";
 const SEARCH_AFTER = 12;
 
-type Mode = null | "key" | "connect" | "models" | "confirm";
+type Mode = null | "key" | "connect" | "models" | "confirm" | "signin";
 
 function status(p: ProviderView): string {
   if (!p.configured) return "Not connected";
@@ -96,7 +96,107 @@ function ModelPicker({ p, onSaved }: { p: ProviderView; onSaved: () => void }) {
   );
 }
 
-function ProviderRow({ p, refresh, onChanged }: { p: ProviderView; refresh: () => Promise<void>; onChanged: () => void }) {
+function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollMs: number; onDone: () => void; onCancel: () => void }) {
+  const id = `provider-${p.id}-signin`;
+  const [flow, setFlow] = useState<string | null>(null);
+  const [state, setState] = useState<LoginState | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    providersApi
+      .startLogin(p.id)
+      .then((f) => alive && setFlow(f))
+      .catch((e: Error) => alive && setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [p.id]);
+
+  useEffect(() => {
+    if (!flow) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const s = await providersApi.loginState(flow);
+        if (!alive) return;
+        setState(s);
+        if (s.status === "done") onDone();
+        else if (s.status === "running") timer = setTimeout(poll, pollMs);
+      } catch (e) {
+        if (alive) setError((e as Error).message);
+      }
+    };
+    let timer = setTimeout(poll, 0);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [flow, pollMs, onDone]);
+
+  const cancel = () => {
+    if (flow && state?.status === "running") void providersApi.cancelLogin(flow).catch(() => {});
+    onCancel();
+  };
+
+  const failure = error ?? (state?.status === "error" ? state.error : null);
+  return (
+    <div id={id} className="mt-3 space-y-2.5 rounded-xl bg-surface p-3">
+      {!state?.authUrl && !failure && (
+        <p id={`${id}-starting`} className="text-xs text-text-muted">
+          Starting sign-in…
+        </p>
+      )}
+      {state?.authUrl && (
+        <div id={`${id}-open`} className="space-y-1.5">
+          <a id={`${id}-link`} href={state.authUrl} target="_blank" rel="noopener noreferrer" className={`${solid} inline-block`}>
+            Open ChatGPT sign-in ↗
+          </a>
+          <p id={`${id}-hint`} className="text-[11px] text-text-muted">
+            Sign in on OpenAI&apos;s page. It uses your ChatGPT plan&apos;s included usage. This usually finishes on its own.
+          </p>
+        </div>
+      )}
+      {state?.prompt && (
+        <form
+          id={`${id}-answer-form`}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!flow) return;
+            providersApi.answerLogin(flow, answer).catch((err: Error) => setError(err.message));
+          }}
+          className="space-y-1.5"
+        >
+          <label id={`${id}-answer-label`} htmlFor={`${id}-answer`} className="block text-[11px] text-text-muted">
+            {state.prompt.message}
+          </label>
+          <div id={`${id}-answer-row`} className="flex gap-2">
+            <input id={`${id}-answer`} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={state.prompt.placeholder} className={input} />
+            <button id={`${id}-answer-submit`} type="submit" disabled={!answer.trim()} className={solid}>
+              Finish sign-in
+            </button>
+          </div>
+        </form>
+      )}
+      {state?.progress && !failure && (
+        <p id={`${id}-progress`} className="text-[11px] text-text-muted">
+          {state.progress}
+        </p>
+      )}
+      {failure && (
+        <p id={`${id}-error`} role="alert" className="text-xs text-danger-fg">
+          {failure}
+        </p>
+      )}
+      <button id={`${id}-cancel`} type="button" onClick={cancel} className="text-[11px] text-text-muted underline underline-offset-2">
+        {failure ? "Close" : "Cancel"}
+      </button>
+    </div>
+  );
+}
+
+function ProviderRow({ p, refresh, onChanged, pollMs }: { p: ProviderView; refresh: () => Promise<void>; onChanged: () => void; pollMs: number }) {
   const id = `provider-${p.id}`;
   const [mode, setMode] = useState<Mode>(null);
   const [key, setKey] = useState("");
@@ -124,6 +224,13 @@ function ProviderRow({ p, refresh, onChanged }: { p: ProviderView; refresh: () =
     }
   };
 
+  const signedIn = useCallback(() => {
+    void refresh().then(() => {
+      onChanged();
+      setMode(null);
+    });
+  }, [refresh, onChanged]);
+
   const runTest = async () => {
     setBusy(true);
     setTest(null);
@@ -150,6 +257,11 @@ function ProviderRow({ p, refresh, onChanged }: { p: ProviderView; refresh: () =
           </p>
         </div>
         <div id={`${id}-actions`} className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          {!p.configured && p.methods.includes("oauth") && p.oauthLabel && (
+            <button id={`${id}-signin`} type="button" onClick={() => setMode(mode === "signin" ? null : "signin")} className={solid}>
+              {p.oauthLabel}
+            </button>
+          )}
           {!p.configured && p.kind === "cloud" && (
             <button id={`${id}-add-key`} type="button" onClick={() => setMode(mode === "key" ? null : "key")} className={ghost}>
               Add key
@@ -256,6 +368,8 @@ function ProviderRow({ p, refresh, onChanged }: { p: ProviderView; refresh: () =
 
       {mode === "models" && p.configured && <ModelPicker p={p} onSaved={() => void refresh().then(onChanged)} />}
 
+      {mode === "signin" && !p.configured && <SignIn p={p} pollMs={pollMs} onDone={signedIn} onCancel={() => setMode(null)} />}
+
       {test && (
         <p id={`${id}-test-result`} className={`mt-2 inline-flex items-center gap-1.5 text-xs ${test.ok ? "text-success-fg" : "text-danger-fg"}`}>
           {test.ok && <Check id={`${id}-test-icon`} aria-hidden="true" size={12} />}
@@ -271,7 +385,7 @@ function ProviderRow({ p, refresh, onChanged }: { p: ProviderView; refresh: () =
   );
 }
 
-export function ModelsPanel({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: () => void; onChanged: () => void; pollMs?: number }) {
   const [providers, setProviders] = useState<ProviderView[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -298,7 +412,7 @@ export function ModelsPanel({ onClose, onChanged }: { onClose: () => void; onCha
         {(providers ?? [])
           .filter((p) => p.kind === kind)
           .map((p) => (
-            <ProviderRow key={p.id} p={p} refresh={refresh} onChanged={onChanged} />
+            <ProviderRow key={p.id} p={p} refresh={refresh} onChanged={onChanged} pollMs={pollMs} />
           ))}
       </ul>
     </section>

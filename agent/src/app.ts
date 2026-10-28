@@ -5,6 +5,7 @@ import { handleRun } from "./agui/runHandler.js";
 import { type ArtifactStore, slugify } from "./artifacts/store.js";
 import type { AgentConfig } from "./config.js";
 import type { ProviderHub } from "./providers/hub.js";
+import type { LoginFlows } from "./providers/logins.js";
 import type { SessionStore } from "./session/sessionStore.js";
 
 function isRunInput(x: unknown): x is RunAgentInput {
@@ -18,7 +19,7 @@ export function defaultModelRef(cfg: AgentConfig, hub: ProviderHub): string | nu
   return hub.enabledModels()[0]?.id ?? null;
 }
 
-export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifacts?: ArtifactStore; hub?: ProviderHub }) {
+export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifacts?: ArtifactStore; hub?: ProviderHub; logins?: LoginFlows }) {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ ok: true }));
@@ -84,6 +85,42 @@ export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifac
   app.post(
     "/providers/test",
     safe(async (c) => c.json(await hub().test(String((await body(c)).model ?? "")))),
+  );
+  const logins = () => {
+    if (!deps.logins) throw new Error("sign-in is not available");
+    return deps.logins;
+  };
+  app.get(
+    "/providers/logins/:flow",
+    safe((c) => {
+      const state = logins().get(c.req.param("flow") ?? "");
+      return state ? c.json(state) : c.json({ error: "This sign-in expired. Start it again." }, 404);
+    }),
+  );
+  app.post(
+    "/providers/logins/:flow/answer",
+    safe(async (c) => {
+      const b = await body(c);
+      logins().answer(c.req.param("flow") ?? "", typeof b.value === "string" ? b.value : "");
+      return c.json({ ok: true });
+    }),
+  );
+  app.delete(
+    "/providers/logins/:flow",
+    safe((c) => {
+      logins().cancel(c.req.param("flow") ?? "");
+      return c.json({ ok: true });
+    }),
+  );
+  app.post(
+    "/providers/:id/login",
+    safe((c) => {
+      const id = c.req.param("id") ?? "";
+      const provider = hub().list().find((p) => p.id === id);
+      if (!provider) throw new Error(`provider ${id} is not supported`);
+      if (!provider.methods.includes("oauth")) throw new Error(`${provider.label} has no sign-in option here`);
+      return c.json({ flow: logins().start(id) });
+    }),
   );
   app.post(
     "/providers/:id/key",

@@ -102,6 +102,15 @@ describe("ProviderHub", () => {
     expect(await hub.test("litellm/chat-default")).toMatchObject({ ok: false, toolCall: false });
   });
 
+  it("keeps one device ID per installation for sign-in flows", async () => {
+    const { hub, dir } = await make();
+    const id = await hub.deviceId();
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(await hub.deviceId()).toBe(id);
+    const { hub: again } = await make(dir);
+    expect(await again.deviceId()).toBe(id);
+  });
+
   it("stores the enabled models in a non-secret settings file", async () => {
     const { hub, dir } = await make();
     await hub.setEnabled("openai", ["gpt-4.1"]);

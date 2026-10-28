@@ -16,6 +16,15 @@ export type ProviderView = {
 
 export type ProviderModel = { id: string; label: string; contextWindow: number; note?: string; enabled: boolean };
 export type TestResult = { ok: boolean; toolCall: boolean; latencyMs: number; cost?: number; error?: string };
+export type LoginState = {
+  status: "running" | "done" | "error";
+  authUrl?: string;
+  instructions?: string;
+  deviceCode?: { userCode: string; verificationUri: string };
+  progress?: string;
+  prompt?: { type: string; message: string; placeholder?: string };
+  error?: string;
+};
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`/api/providers${path}`, { ...init, headers: { "content-type": "application/json" } });
@@ -33,6 +42,10 @@ export const providersApi = {
   models: (id: string) => call<{ models: ProviderModel[] }>(`/${id}/models`).then((r) => r.models),
   setEnabled: (id: string, enabled: string[]) => call(`/${id}/models`, { method: "PUT", body: JSON.stringify({ enabled }) }),
   test: (model: string) => call<TestResult>("/test", { method: "POST", body: JSON.stringify({ model }) }),
+  startLogin: (id: string) => call<{ flow: string }>(`/${id}/login`, { method: "POST" }).then((r) => r.flow),
+  loginState: (flow: string) => call<LoginState>(`/logins/${flow}`),
+  answerLogin: (flow: string, value: string) => call(`/logins/${flow}/answer`, { method: "POST", body: JSON.stringify({ value }) }),
+  cancelLogin: (flow: string) => call(`/logins/${flow}`, { method: "DELETE" }),
 };
 
 export function contextLabel(tokens: number): string {

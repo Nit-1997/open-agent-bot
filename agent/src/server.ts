@@ -5,6 +5,7 @@ import { loadConfig } from "./config.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { ProviderHub } from "./providers/hub.js";
+import { LoginFlows } from "./providers/logins.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { BrowserPool } from "./tools/browserPool.js";
@@ -59,7 +60,8 @@ const store = new SessionStore({
 
 setInterval(() => void store.sweep(), 60_000).unref();
 
-const app = createApp({ cfg, store, artifacts, hub });
+const logins = new LoginFlows((id, ui) => hub.login(id, ui));
+const app = createApp({ cfg, store, artifacts, hub, logins });
 serve({ fetch: app.fetch, port: cfg.port, hostname: "0.0.0.0" }, (info) => {
   console.log(`agent listening on :${info.port}`);
 });

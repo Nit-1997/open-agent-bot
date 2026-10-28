@@ -22,17 +22,19 @@ Ports: web 3000, agent 8000, LiteLLM 4000, SearXNG 8081.
 
 ## Models
 
-All model calls go through LiteLLM. The agent asks for an alias (`AGENT_MODEL`, default `chat-default`); `deploy-config/litellm/config.yaml` maps aliases to real models.
+Manage models in the app: header model menu → **Manage models…** (or Profile → Manage models).
 
-`chat-sonnet-5.5` (Claude Sonnet 5.5) is already defined; put `ANTHROPIC_API_KEY=...` in `deploy-config/.env-llm` to use it.
+- **Cloud providers:** OpenAI, Anthropic, OpenRouter, Together AI, Groq and Google Gemini. Paste an API key, or use **Sign in with ChatGPT** for OpenAI, which uses your ChatGPT plan. Claude Pro/Max sign-in is not offered, because Anthropic's terms allow it only in Claude Code and Claude.ai.
+- **Local servers:** Ollama, llama.cpp, LM Studio, or any OpenAI-compatible URL. Their models are discovered automatically. Use `host.docker.internal` for servers on this machine.
+- **Choosing models:** each provider has a model picker, which controls what appears in the header menu, and a **Test** button that runs one tool call and shows its cost.
 
-Users pick models in the app (a default during onboarding, and per chat from the header menu). The agent only offers the aliases listed in `AGENT_MODELS` in `deploy-config/.env-agent`, as `alias=Label=note` entries separated by `|`:
+Keys are stored by the agent in `/data/agent` (the `agent-data` volume, owner-only) and are never sent back to the browser. pi's model runtime handles the provider calls; see `docs/superpowers/specs/2026-10-27-model-providers-design.md`.
 
-```
-AGENT_MODELS=chat-sonnet-5.5=Sonnet 5.5=Best quality, about 5 cents a turn|chat-default=Qwen 3.5 (local)=Free and private; slower and weaker at cards
-```
+The existing LiteLLM gateway still works as a provider named `litellm`, seeded from `LLM_BASE_URL`, `LLM_API_KEY` and `AGENT_MODELS` in `deploy-config/.env-agent`. `AGENT_MODEL` is the fallback default.
 
-`AGENT_MODEL` stays the fallback when the browser doesn't ask for one. Avoid `$` in these values; Compose expands it.
+Sign in with ChatGPT redirects to `127.0.0.1:1455`, which compose publishes to localhost only. If the page doesn't finish on its own, paste the final URL from your browser into the panel.
+
+There's no app login yet: anyone who can reach port 3000 can change keys. Keep ports bound to localhost until a settings password exists.
 
 ## Develop
 
