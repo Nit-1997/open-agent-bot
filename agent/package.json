@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Open Agent backend: AG-UI server, pi agent sessions, and research tools",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"

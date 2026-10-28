@@ -54,3 +54,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, how to add a tool, a
 
 - The browser tool works as a guest. Code refuses checkout, cart, payment, login, sign-up and booking steps and hands back the link.
 - Artifacts are served with `Content-Security-Policy: sandbox allow-scripts` and shown in a sandboxed iframe.
+
+## License
+
+[MIT](LICENSE)
