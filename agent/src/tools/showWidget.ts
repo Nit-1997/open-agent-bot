@@ -9,6 +9,7 @@ const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at most 8 blo
 - {type:"stats", items:[{label, value, note?}]} for a few key numbers
 - {type:"table", columns:[...], rows:[[...]]} for comparisons; every cell is text
 - {type:"list", items:[{title, subtitle?, value?, badge?, url?}]} for products, places, options (up to 10; subtitle a few words)
+- {type:"products", items:[{title, price?, image?, url?, store?, note?, badge?}]} for things to buy: a row of picture cards. Use the image URLs listed under "images:" in the pages you read or the search results; leave image out rather than guess one
 - {type:"checklist", title?, items:[{text, note?}]} for to-dos, shopping lists, menus
 - {type:"links", items:[{label, url}]}
 - {type:"callout", tone:"info"|"warning"|"success", text} (one short sentence, only if it changes a decision)`;

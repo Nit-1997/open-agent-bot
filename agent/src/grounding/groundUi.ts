@@ -4,7 +4,7 @@ import type { Evidence } from "./evidence.js";
 function strings(v: unknown, out: string[] = []): string[] {
   if (typeof v === "string") out.push(v);
   else if (Array.isArray(v)) v.forEach((x) => strings(x, out));
-  else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) if (k !== "url" && k !== "type" && k !== "tone") strings(x, out);
+  else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) if (k !== "url" && k !== "image" && k !== "type" && k !== "tone") strings(x, out);
   return out;
 }
 
@@ -16,6 +16,18 @@ export function groundUi(widget: UiWidget, evidence: Evidence): UiWidget {
         if (url === undefined || evidence.hasUrl(url)) return url === undefined ? rest : { ...rest, url };
         removed++;
         return rest;
+      });
+      return [{ ...b, items }];
+    }
+    if (b.type === "products") {
+      const items = b.items.map(({ url, image, ...rest }) => {
+        const item: typeof rest & { url?: string; image?: string } = { ...rest };
+        if (image !== undefined && evidence.hasUrl(image)) item.image = image;
+        if (url !== undefined) {
+          if (evidence.hasUrl(url)) item.url = url;
+          else removed++;
+        }
+        return item;
       });
       return [{ ...b, items }];
     }

@@ -6,7 +6,7 @@ import type { BrowserPool } from "./browserPool.js";
 import { type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "./browsePolicy.js";
 import { fail, ok, type ToolResult } from "./result.js";
 import { publicHttpUrlError } from "./net.js";
-import { htmlToText, truncate } from "./text.js";
+import { htmlToText, imagesText, truncate } from "./text.js";
 
 export const MAX_ACTIONS = 10;
 const BOT_WALL = /(captcha|are you a robot|access denied|unusual traffic|verify you are human)/i;
@@ -111,11 +111,13 @@ export function browseTool(deps: { pool: BrowserPool; threadId: string; userCont
             return url;
           }
         })();
-        const body = htmlToText(await page.content());
+        const html = await page.content();
+        const body = htmlToText(html);
         if ((lastStatus && [401, 403, 429, 503].includes(lastStatus)) || (BOT_WALL.test(body.slice(0, 2000)) && body.length < 3000)) {
           return ok(`blocked by ${host}: ${url}`, { blocked: true, url });
         }
-        return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${truncate(body)}`, { url });
+        const shown = truncate(body);
+        return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${shown}${imagesText(html, url, shown)}`, { url });
       } catch (err) {
         return fail(`browse failed on ${page.url()}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
       }

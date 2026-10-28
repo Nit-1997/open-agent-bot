@@ -39,6 +39,30 @@ describe("groundUi", () => {
     expect(g.removedLinks).toBe(3);
   });
 
+  it("drops product images and links that no source contained, keeping the item", () => {
+    const e = evidence();
+    e.add("img: Diya 12ct — https://target.scene7.com/is/image/Target/diya?wid=400");
+    const w = card([
+      {
+        type: "products",
+        items: [
+          { title: "Diya 12ct", price: "$6.99", image: "https://target.scene7.com/is/image/Target/diya?wid=800", url: "https://www.target.com/p/diya/-/A-84311898" },
+          { title: "Lantern", price: "$5.99", image: "https://cdn.fake.example/lantern.jpg", url: "https://www.target.com/p/fake/-/A-2" },
+        ],
+      },
+    ]);
+    const g = groundUi(w, e);
+    expect(g.blocks[0]).toEqual({
+      type: "products",
+      items: [
+        { title: "Diya 12ct", price: "$6.99", image: "https://target.scene7.com/is/image/Target/diya?wid=800", url: "https://www.target.com/p/diya/-/A-84311898" },
+        { title: "Lantern", price: "$5.99" },
+      ],
+    });
+    expect(g.removedLinks).toBe(1);
+    expect(g.unverified).toEqual(["$5.99"]);
+  });
+
   it("does not trust claims the card itself would add to evidence", () => {
     const e = evidence();
     groundUi(card([{ type: "text", text: "$9.99" }]), e);

@@ -2,7 +2,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fail, ok, type ToolResult } from "./result.js";
 import { publicHttpUrlError } from "./net.js";
-import { htmlToText, truncate } from "./text.js";
+import { htmlToText, imagesText, truncate } from "./text.js";
 
 const BLOCKING_STATUSES = new Set([401, 403, 429, 503]);
 
@@ -33,7 +33,10 @@ export function fetchPageTool(deps: { fetch?: typeof fetch } = {}) {
         if (!res.ok) return fail(httpErrorText(res.status, url.host));
         const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
         if (type === "text/html" || type === "application/xhtml+xml") {
-          return ok(`url: ${res.url || url.href}\n\n${truncate(htmlToText(await res.text()))}`);
+          const page = await res.text();
+          const at = res.url || url.href;
+          const body = truncate(htmlToText(page));
+          return ok(`url: ${at}\n\n${body}${imagesText(page, at, body)}`);
         }
         if (type === "text/plain" || type === "application/json" || type.endsWith("+json")) {
           return ok(`url: ${res.url || url.href}\n\n${truncate(await res.text())}`);

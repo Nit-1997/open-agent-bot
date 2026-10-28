@@ -23,6 +23,12 @@ describe("web_search", () => {
     expect(u.searchParams.get("format")).toBe("json");
   });
 
+  it("includes a result's image when the engine has one", async () => {
+    const f = fakeFetch([[/search/, () => json({ results: [{ title: "Boot", url: "https://s.com/b", content: "TF", thumbnail: "https://img.s.com/b.jpg" }] })]]);
+    const r = await webSearchTool({ searxngUrl: "http://search.local", fetch: f }).execute("c", { query: "boot" }, undefined, undefined, {} as never);
+    expect((r.content[0] as { text: string }).text).toBe("1. Boot — https://s.com/b\n   TF\n   image: https://img.s.com/b.jpg");
+  });
+
   it("defaults to 8 results", async () => {
     const f = fakeFetch([[/search/, () => json({ results })]]);
     const r = await webSearchTool({ searxngUrl: "http://search.local", fetch: f }).execute("c", { query: "x" }, undefined, undefined, {} as never);

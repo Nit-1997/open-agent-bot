@@ -94,6 +94,44 @@ describe("widgets", () => {
     expect(screen.getByRole("button", { name: "Show 3 more" })).toBeInTheDocument();
   });
 
+  it("UiCard shows products as a row of picture cards", () => {
+    const widget = {
+      kind: "ui" as const,
+      title: "Turf boots under $150",
+      unverified: ["$95"],
+      blocks: [
+        {
+          type: "products" as const,
+          items: [
+            { title: "Mercurial Vapor 17 Academy TF", price: "$100", image: "https://static.nike.com/vapor.png", url: "https://www.nike.com/t/vapor", store: "Nike", badge: "Best pick" },
+            { title: "Tiempo Maestro Academy TF", price: "$95", store: "Nike", note: "Touch and control" },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<UiCard toolCallId="p1" widget={widget} />);
+    const row = screen.getByRole("list", { name: "Turf boots under $150" });
+    expect(row.className).toMatch(/overflow-x-auto/);
+    const cards = screen.getAllByRole("listitem");
+    expect(cards).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /Mercurial Vapor 17 Academy TF/ })).toHaveAttribute("href", "https://www.nike.com/t/vapor");
+    expect(screen.getByRole("img", { name: "Mercurial Vapor 17 Academy TF" })).toHaveAttribute("src", "https://static.nike.com/vapor.png");
+    expect(cards[0]).toHaveTextContent("Best pick");
+    expect(cards[1]).toHaveTextContent("Touch and control");
+    expect(screen.getByTitle("Not found in the sources I read")).toHaveTextContent("$95");
+    expect(cards[1].querySelector("img")).toBeNull();
+    const ids = [...container.querySelectorAll("[id]")].map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("UiCard falls back to a placeholder when a product image fails to load", () => {
+    const widget = { kind: "ui" as const, title: "Boots", blocks: [{ type: "products" as const, items: [{ title: "Phantom 6 Low", image: "https://x.com/broken.png" }] }] };
+    render(<UiCard toolCallId="p2" widget={widget} />);
+    fireEvent.error(screen.getByRole("img", { name: "Phantom 6 Low" }));
+    expect(screen.queryByRole("img", { name: "Phantom 6 Low" })).toBeNull();
+    expect(screen.getByText("P")).toBeInTheDocument();
+  });
+
   it("GroundingNote lists the claims", () => {
     render(<WidgetRenderer toolCallId="g1" args={{ widget: validWidgets.grounding_note }} locale="en-US" />);
     expect(screen.getByText(/\$7\.49, In Stock/)).toBeInTheDocument();

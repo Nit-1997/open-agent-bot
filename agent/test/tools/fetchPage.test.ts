@@ -32,6 +32,12 @@ describe("fetch_page", () => {
     expect(text(r)).toContain("Body text here.");
   });
 
+  it("lists the page's product images after the text", async () => {
+    const f = fakeFetch([[/shop/, () => html('<article><h1>Boots</h1><p>Turf boots for every budget.</p><p>Tiempo Academy TF $95</p><img src="/b.jpg" alt="Tiempo Academy TF"></article>')]]);
+    const t = text(await call(f, "https://example.com/shop"));
+    expect(t).toContain("images:\n- Tiempo Academy TF — https://example.com/b.jpg");
+  });
+
   it("rejects non-http urls", async () => {
     const r = await call(fakeFetch([]), "file:///etc/passwd");
     expect(r.isError).toBe(true);

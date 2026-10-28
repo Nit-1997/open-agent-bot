@@ -51,12 +51,22 @@ describe("card length limits", () => {
     if (!tooManyItems.ok) expect(tooManyItems.errors[0]).toContain("/blocks/0/items");
   });
 
+  it("accepts a products block and caps it at 10 items", () => {
+    const item = { title: "Mercurial Vapor 17 Academy TF", price: "$100", image: "https://static.nike.com/a/vapor.png", url: "https://www.nike.com/t/vapor", store: "Nike" };
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "products", items: [item] }] }).ok).toBe(true);
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "products", items: Array.from({ length: 11 }, () => item) }] }).ok).toBe(false);
+  });
+
   it("keeps titles short", () => {
     expect(validateWidget({ ...validWidgets.ui, title: "t".repeat(61) }).ok).toBe(false);
   });
 });
 
 describe("show_ui", () => {
+  it("tells the model to use products with images for things to buy", () => {
+    expect(showUiTool().description).toMatch(/\{type:"products", items:\[\{title, price\?, image\?, url\?, store\?, note\?, badge\?\}\]\}/);
+  });
+
   it("takes title and blocks and returns a valid ui widget", async () => {
     const res = await exec(uiParams);
     expect(res.isError).toBeFalsy();

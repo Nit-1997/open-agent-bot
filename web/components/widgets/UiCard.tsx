@@ -3,6 +3,7 @@
 import type { UiBlock, UiWidget } from "@shared/widgets";
 import { useState } from "react";
 import { ExternalLink } from "./Card";
+import { ProductRow } from "./ProductRow";
 
 const VISIBLE_ITEMS = 5;
 
@@ -59,7 +60,7 @@ function Marked({ id, text, flags }: { id: string; text: string; flags: string[]
   );
 }
 
-function Block({ id, block, flags }: { id: string; block: UiBlock; flags: string[] }) {
+function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags: string[]; label: string }) {
   const m = (sid: string, text: string | undefined) => (text ? <Marked id={sid} text={text} flags={flags} /> : null);
   switch (block.type) {
     case "heading":
@@ -173,6 +174,8 @@ function Block({ id, block, flags }: { id: string; block: UiBlock; flags: string
           </Collapsible>
         </div>
       );
+    case "products":
+      return <ProductRow id={id} label={label} items={block.items} m={m} />;
     case "checklist":
       return (
         <div id={id} className="mt-2">
@@ -245,7 +248,7 @@ export function UiCard({ toolCallId, widget }: { toolCallId: string; widget: UiW
         )}
       </header>
       {widget.blocks.map((b, i) => (
-        <Block key={i} id={`${id}-b${i}`} block={b} flags={flags} />
+        <Block key={i} id={`${id}-b${i}`} block={b} flags={flags} label={widget.title} />
       ))}
       {(flags.length > 0 || removed > 0) && (
         <footer id={`${id}-grounding`} className="mt-3 border-t border-border pt-2 text-xs text-warn-fg">

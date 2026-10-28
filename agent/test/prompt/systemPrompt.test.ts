@@ -4,7 +4,7 @@ import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 describe("buildSystemPrompt", () => {
   it("includes user context and the core rules", () => {
     const p = buildSystemPrompt({ timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T14:00" });
-    for (const s of ["Asia/Kolkata", "en-IN", "2026-10-27T14:00", "checkout", "show_ui", "unverified", "create_artifact", "ask_user", "start_date", "typical", "nearby airports", "Don't offer driving", "max_layover", "depart_times", "Compare nearby airports?", "Lead with the answer in one sentence", "Only check the weather when", "never mention that you can't buy"]) {
+    for (const s of ["Asia/Kolkata", "en-IN", "2026-10-27T14:00", "checkout", "show_ui", "unverified", "create_artifact", "ask_user", "start_date", "typical", "nearby airports", "Don't offer driving", "max_layover", "depart_times", "Compare nearby airports?", "Lead with the answer in one sentence", "Only check the weather when", "never mention that you can't buy", "Products to buy go in a products block", "even when some have no image"]) {
       expect(p).toContain(s);
     }
   });
