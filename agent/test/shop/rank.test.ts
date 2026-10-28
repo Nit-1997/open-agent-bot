@@ -21,6 +21,11 @@ describe("rankTiles", () => {
     ]);
   });
 
+  it("requires the main noun, the query's last key word, so thighs don't pass for breast", () => {
+    const ranked = rankTiles("boneless skinless chicken breast", [tile("Boneless Skinless Chicken Thighs", 6.99), tile("Boneless Skinless Chicken Breasts 2 lb", 8.99)]);
+    expect(ranked.map((t) => t.title)).toEqual(["Boneless Skinless Chicken Breasts 2 lb"]);
+  });
+
   it("keeps the store's order among equally priced matches and puts unpriced ones last", () => {
     const ranked = rankTiles("chicken breast", [tile("Boneless Chicken Breast", undefined), tile("Chicken Breast Tenderloins", 7.99), tile("Organic Chicken Breast", 7.99)]);
     expect(ranked.map((t) => t.title)).toEqual(["Chicken Breast Tenderloins", "Organic Chicken Breast", "Boneless Chicken Breast"]);

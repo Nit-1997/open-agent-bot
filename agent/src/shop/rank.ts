@@ -9,6 +9,8 @@ export function matches(query: string, title: string): boolean {
   const want = [...new Set(keyWords(query))];
   if (!want.length) return false;
   const have = new Set(keyWords(title));
+  const words = keyWords(query);
+  if (!have.has(words[words.length - 1])) return false;
   return want.filter((w) => have.has(w)).length >= Math.max(1, Math.ceil(want.length * 0.6));
 }
 

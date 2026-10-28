@@ -33,6 +33,12 @@ export class BrowserPool {
     return t.then(async (x) => (x.page.isClosed() ? await x.context.newPage() : x.page));
   }
 
+  async tab(threadId: string, ctx: UserContext | null): Promise<Page> {
+    await this.page(threadId, ctx);
+    const { context } = await this.threads.get(threadId)!;
+    return context.newPage();
+  }
+
   async close(threadId: string): Promise<void> {
     const t = this.threads.get(threadId);
     this.threads.delete(threadId);

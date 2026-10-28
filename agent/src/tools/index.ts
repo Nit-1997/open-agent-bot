@@ -17,6 +17,7 @@ import { showUiTool, suggestRepliesTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
 import { imageSearchTool, matchingImage, search as runSearch, webSearchTool } from "./webSearch.js";
 import { musicTool, wikipediaTool } from "./lookup.js";
+import { shopTool } from "./shop.js";
 
 export type ToolDeps = {
   cfg: AgentConfig;
@@ -28,7 +29,7 @@ export type ToolDeps = {
   evidence?: Evidence;
 };
 
-export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2 };
+export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2, shop: 2 };
 
 function memo<T>(fn: () => Promise<T>): () => Promise<T> {
   let p: Promise<T> | undefined;
@@ -59,6 +60,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browse, deps.budget, "read"),
+    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext }), deps.budget, "shop"),
     weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),
     withBudget(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
