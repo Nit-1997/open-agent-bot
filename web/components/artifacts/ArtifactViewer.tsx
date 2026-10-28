@@ -1,5 +1,6 @@
 "use client";
 
+import { ARTIFACT_SANDBOX } from "@shared/artifacts";
 import { useEffect } from "react";
 
 export function ArtifactViewer({ artifactId, title, onClose }: { artifactId: string; title: string; onClose: () => void }) {
@@ -24,7 +25,7 @@ export function ArtifactViewer({ artifactId, title, onClose }: { artifactId: str
           </button>
         </div>
       </div>
-      <iframe id={`${id}-frame`} title={title} sandbox="allow-scripts" src={`/api/artifacts/${artifactId}`} className="min-h-0 w-full flex-1 bg-white" />
+      <iframe id={`${id}-frame`} title={title} sandbox={ARTIFACT_SANDBOX} src={`/api/artifacts/${artifactId}`} className="min-h-0 w-full flex-1 bg-white" />
     </div>
   );
 }

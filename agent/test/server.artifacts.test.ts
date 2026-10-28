@@ -28,7 +28,7 @@ describe("artifact routes", () => {
   it("artifact route sets sandbox CSP", async () => {
     const res = await app.request(`/artifacts/${id}`);
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-security-policy")).toBe("sandbox allow-scripts");
+    expect(res.headers.get("content-security-policy")).toBe("sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox");
     expect(res.headers.get("content-type")).toMatch(/text\/html/);
     expect(await res.text()).toContain("<h1>Plan</h1>");
   });

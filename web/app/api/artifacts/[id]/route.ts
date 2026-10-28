@@ -1,3 +1,4 @@
+import { ARTIFACT_CSP } from "@shared/artifacts";
 import { agentHeaders, agentUrl } from "@/lib/agentServer";
 
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
@@ -24,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return new Response(upstream.body, {
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "content-security-policy": "sandbox allow-scripts",
+      "content-security-policy": ARTIFACT_CSP,
       "x-content-type-options": "nosniff",
     },
   });

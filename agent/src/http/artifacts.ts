@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ARTIFACT_CSP } from "../../../shared/artifacts.js";
 import { type ArtifactStore, slugify } from "../artifacts/store.js";
 
 export function artifactRoutes(artifacts?: ArtifactStore) {
@@ -23,7 +24,7 @@ export function artifactRoutes(artifacts?: ArtifactStore) {
     const a = await artifacts.get(id);
     if (!a) return c.notFound();
     return new Response(a.html, {
-      headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": "sandbox allow-scripts" },
+      headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": ARTIFACT_CSP },
     });
   });
 

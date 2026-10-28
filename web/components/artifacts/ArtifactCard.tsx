@@ -1,5 +1,7 @@
 "use client";
 
+import { ARTIFACT_SANDBOX } from "@shared/artifacts";
+import { Download, ExternalLink, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { ArtifactViewer } from "./ArtifactViewer";
 
@@ -8,8 +10,11 @@ export function parseArtifactId(result: string | undefined): string | null {
   return m ? m[1] : null;
 }
 
+const action =
+  "flex h-8 w-8 items-center justify-center rounded-full text-text-secondary transition hover:bg-surface hover:text-text-primary";
+
 export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string; title: string; result: string | undefined }) {
-  const [open, setOpen] = useState(false);
+  const [fullScreen, setFullScreen] = useState(false);
   const artifactId = parseArtifactId(result);
   const id = `artifact-card-${toolCallId}`;
   if (!artifactId) {
@@ -19,28 +24,40 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
       </p>
     );
   }
+  const src = `/api/artifacts/${artifactId}`;
   return (
-    <div id={id} className="flex items-center gap-3 rounded-2xl border border-border bg-paper p-3 transition hover:border-border-strong">
-      <span id={`${id}-thumb`} aria-hidden="true" style={{ background: "var(--accent-gradient)" }} className="flex h-12 w-10 shrink-0 items-center justify-center rounded-lg border border-border font-display text-lg italic text-mist-600">
-        Aa
-      </span>
-      <div id={`${id}-text`} className="min-w-0 flex-1">
-        <p id={`${id}-title`} className="truncate text-[15px] font-medium text-text-primary">
-          {title}
-        </p>
-        <p id={`${id}-kind`} className="eyebrow mt-1">
-          Page · PDF ready
-        </p>
-      </div>
-      <div id={`${id}-actions`} className="flex shrink-0 gap-1.5">
-        <a id={`${id}-pdf`} aria-label="Download PDF" href={`/api/artifacts/${artifactId}?format=pdf`} className="rounded-full border border-border px-3.5 py-1.5 text-[13px] font-medium text-text-secondary transition hover:border-border-strong">
-          PDF
-        </a>
-        <button id={`${id}-open`} type="button" onClick={() => setOpen(true)} className="rounded-full bg-charcoal px-3.5 py-1.5 text-[13px] font-medium text-on-charcoal transition hover:opacity-85">
-          Open
-        </button>
-      </div>
-      {open && <ArtifactViewer artifactId={artifactId} title={title} onClose={() => setOpen(false)} />}
-    </div>
+    <section id={id} aria-label={title} className="my-2 overflow-hidden rounded-2xl border border-border bg-paper">
+      <header id={`${id}-bar`} className="flex items-center gap-3 border-b border-border px-3 py-2">
+        <span
+          id={`${id}-thumb`}
+          aria-hidden="true"
+          style={{ background: "var(--accent-gradient)" }}
+          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-md border border-border font-display text-base italic text-mist-600"
+        >
+          Aa
+        </span>
+        <div id={`${id}-text`} className="min-w-0 flex-1">
+          <p id={`${id}-title`} className="truncate text-[15px] font-medium text-text-primary">
+            {title}
+          </p>
+          <p id={`${id}-kind`} className="eyebrow mt-0.5">
+            Report · scroll to read
+          </p>
+        </div>
+        <div id={`${id}-actions`} className="flex shrink-0 items-center gap-0.5">
+          <button id={`${id}-fullscreen`} type="button" aria-label="Open full screen" title="Full screen" onClick={() => setFullScreen(true)} className={action}>
+            <Maximize2 id={`${id}-fullscreen-icon`} aria-hidden="true" size={15} />
+          </button>
+          <a id={`${id}-new-tab`} aria-label="Open in new tab" title="Open in new tab" href={src} target="_blank" rel="noopener noreferrer" className={action}>
+            <ExternalLink id={`${id}-new-tab-icon`} aria-hidden="true" size={15} />
+          </a>
+          <a id={`${id}-pdf`} aria-label="Download PDF" title="Download PDF" href={`${src}?format=pdf`} className={action}>
+            <Download id={`${id}-pdf-icon`} aria-hidden="true" size={15} />
+          </a>
+        </div>
+      </header>
+      <iframe id={`${id}-frame`} title={title} sandbox={ARTIFACT_SANDBOX} src={src} loading="lazy" className="block h-[min(70vh,640px)] min-h-[360px] w-full bg-white" />
+      {fullScreen && <ArtifactViewer artifactId={artifactId} title={title} onClose={() => setFullScreen(false)} />}
+    </section>
   );
 }

@@ -13,7 +13,7 @@ describe("artifacts route", () => {
     vi.stubGlobal("fetch", fetchMock);
     const res = await call("abcdefghijkl");
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-security-policy")).toBe("sandbox allow-scripts");
+    expect(res.headers.get("content-security-policy")).toBe("sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox");
     expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toMatch(/\/artifacts\/abcdefghijkl$/);
   });
 
@@ -42,15 +42,20 @@ describe("ArtifactCard", () => {
     expect(parseArtifactId("html too large")).toBeNull();
   });
 
-  it("opens a sandboxed viewer and links the pdf", () => {
+  it("shows the report inline in a sandboxed, scrollable frame with new tab, full screen and PDF", () => {
     render(<ArtifactCard toolCallId="a1" title="Diwali plan" result="artifact abcdefghijkl created: Diwali plan" />);
+    const inline = screen.getByTitle("Diwali plan");
+    expect(inline.tagName).toBe("IFRAME");
+    expect(inline).toHaveAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    expect(inline).toHaveAttribute("src", "/api/artifacts/abcdefghijkl");
+    expect(screen.getByRole("link", { name: "Open in new tab" })).toHaveAttribute("href", "/api/artifacts/abcdefghijkl");
+    expect(screen.getByRole("link", { name: "Open in new tab" })).toHaveAttribute("target", "_blank");
     expect(screen.getByRole("link", { name: "Download PDF" })).toHaveAttribute("href", "/api/artifacts/abcdefghijkl?format=pdf");
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
-    const frame = screen.getByTitle("Diwali plan");
-    expect(frame.tagName).toBe("IFRAME");
-    expect(frame).toHaveAttribute("sandbox", "allow-scripts");
-    expect(frame).toHaveAttribute("src", "/api/artifacts/abcdefghijkl");
+    fireEvent.click(screen.getByRole("button", { name: "Open full screen" }));
+    expect(screen.getByRole("dialog", { name: "Diwali plan" })).toBeInTheDocument();
+    expect(screen.getAllByTitle("Diwali plan")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.queryByTitle("Diwali plan")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getAllByTitle("Diwali plan")).toHaveLength(1);
   });
 });

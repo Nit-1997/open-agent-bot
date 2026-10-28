@@ -44,7 +44,9 @@ export function TurnView(props: {
             if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} answered={props.answered} onAnswer={props.onAnswer} staleCart={item.id !== props.latestCart} onCartEdit={props.onCartEdit} />;
             if (item.result === undefined) {
               return (
-                <div id={`${id}-artifact-pending-${item.id}`} key={item.id} className="h-16 animate-pulse rounded-2xl border border-border bg-surface" aria-label="Writing page" />
+                <div id={`${id}-artifact-pending-${item.id}`} key={item.id} role="status" aria-label="Writing the report" className="flex h-[min(70vh,640px)] min-h-[360px] animate-pulse items-center justify-center rounded-2xl border border-border bg-surface text-sm text-text-muted">
+                  Writing the report…
+                </div>
               );
             }
             return <ArtifactCard key={item.id} toolCallId={item.id} title={item.title} result={item.result} />;
