@@ -1,8 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
-import { loadConfig } from "../../src/config.js";
-import { createPiSession } from "../../src/pi/createPiSession.js";
+import { liveSession } from "./liveSession.js";
 
 const live = !!process.env.LLM_BASE_URL;
 
@@ -20,7 +19,7 @@ describe.skipIf(!live)("parallel tool calls through LiteLLM (live)", () => {
       },
     });
     const errors: string[] = [];
-    const handle = await createPiSession({ cfg: loadConfig(process.env), systemPrompt: "You call tools exactly as asked.", tools: [search] });
+    const handle = await liveSession("You call tools exactly as asked.", [search]);
     handle.session.subscribe((e) => {
       if (e.type === "tool_execution_end" && e.isError) errors.push(JSON.stringify(e.result).slice(0, 200));
     });

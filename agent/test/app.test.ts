@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ProviderHub } from "../src/providers/hub.js";
 import { SessionStore } from "../src/session/sessionStore.js";
+import { fakeFetch, json } from "./fixtures/fakeFetch.js";
 
 const store = () => new SessionStore({ idleMs: 1000, create: async () => { throw new Error("unused"); } });
 
@@ -24,17 +29,67 @@ describe("createApp", () => {
     expect(res.status).toBe(400);
   });
 
-  it("lists the models users can pick, behind the shared secret", async () => {
-    const cfg = loadConfig({ LLM_API_KEY: "k", AGENT_MODEL: "chat-default", AGENT_MODELS: "chat-sonnet-5.5=Sonnet 5.5", AGENT_SHARED_SECRET: "s3" });
-    const app = createApp({ cfg, store: store() });
-    expect((await app.request("/models")).status).toBe(401);
-    const res = await app.request("/models", { headers: { "x-agent-secret": "s3" } });
-    expect(await res.json()).toEqual({
-      default: "chat-default",
-      models: [
-        { id: "chat-default", label: "chat-default" },
-        { id: "chat-sonnet-5.5", label: "Sonnet 5.5" },
-      ],
+  describe("models and providers", () => {
+    const setup = async () => {
+      const cfg = loadConfig({ LLM_API_KEY: "k", AGENT_MODEL: "chat-default", AGENT_MODELS: "chat-sonnet-5.5=Sonnet 5.5", AGENT_SHARED_SECRET: "s3" });
+      const f = fakeFetch([[/host\.docker\.internal:11434\/v1\/models$/, () => json({ data: [{ id: "qwen3.5:35b" }] })]]);
+      const hub = await ProviderHub.create({
+        dataDir: mkdtempSync(join(tmpdir(), "app-")),
+        litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey!, models: cfg.models },
+        fetch: f,
+      });
+      const app = createApp({ cfg, store: store(), hub });
+      const call = (path: string, init: RequestInit = {}) =>
+        app.request(path, { ...init, headers: { "x-agent-secret": "s3", "content-type": "application/json", ...(init.headers ?? {}) } });
+      return { app, call };
+    };
+
+    it("keeps every model and provider route behind the shared secret", async () => {
+      const { app } = await setup();
+      for (const [method, path] of [["GET", "/models"], ["GET", "/providers"], ["POST", "/providers/groq/key"], ["DELETE", "/providers/groq"]]) {
+        expect((await app.request(path, { method })).status).toBe(401);
+      }
+    });
+
+    it("lists the enabled models by provider/model reference with the default", async () => {
+      const { call } = await setup();
+      expect(await (await call("/models")).json()).toEqual({
+        default: "litellm/chat-default",
+        models: [
+          { id: "litellm/chat-default", label: "chat-default", provider: "LiteLLM gateway" },
+          { id: "litellm/chat-sonnet-5.5", label: "Sonnet 5.5", provider: "LiteLLM gateway" },
+        ],
+      });
+    });
+
+    it("saves a key without ever echoing it, then lists and enables that provider's models", async () => {
+      const { call } = await setup();
+      const saved = await call("/providers/groq/key", { method: "POST", body: JSON.stringify({ apiKey: "gsk-secret" }) });
+      expect(saved.status).toBe(200);
+      const body = JSON.stringify(await (await call("/providers")).json());
+      expect(body).not.toContain("gsk-secret");
+      expect(JSON.parse(body).providers.find((p: { id: string }) => p.id === "groq")).toMatchObject({ configured: true, source: "key" });
+      const models = (await (await call("/providers/groq/models")).json()) as { models: Array<{ id: string }> };
+      expect(models.models.length).toBeGreaterThan(0);
+      const put = await call("/providers/groq/models", { method: "PUT", body: JSON.stringify({ enabled: [models.models[0].id] }) });
+      expect(put.status).toBe(200);
+      const all = (await (await call("/models")).json()) as { models: Array<{ id: string }> };
+      expect(all.models.map((m) => m.id)).toContain(`groq/${models.models[0].id}`);
+    });
+
+    it("adds a local server and removes providers", async () => {
+      const { call } = await setup();
+      const added = await call("/providers/local", { method: "POST", body: JSON.stringify({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" }) });
+      expect(await added.json()).toMatchObject({ provider: { id: "ollama", configured: true } });
+      expect((await call("/providers/ollama", { method: "DELETE" })).status).toBe(200);
+    });
+
+    it("turns bad requests into readable 400s", async () => {
+      const { call } = await setup();
+      const res = await call("/providers/groq/key", { method: "POST", body: JSON.stringify({ apiKey: " " }) });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "the key is empty" });
+      expect((await call("/providers/amazon-bedrock/key", { method: "POST", body: JSON.stringify({ apiKey: "x" }) })).status).toBe(400);
     });
   });
 });

@@ -11,12 +11,13 @@ describe("loadConfig", () => {
       searxngUrl: "http://search:8080",
       artifactsDir: "/data/artifacts",
       sharedSecret: undefined,
+      dataDir: "/data/agent",
       models: [{ id: "chat-default", label: "chat-default" }],
     });
   });
 
-  it("requires LLM_API_KEY", () => {
-    expect(() => loadConfig({})).toThrow(/LLM_API_KEY/);
+  it("treats LLM_API_KEY as optional, since providers can be added in the app", () => {
+    expect(loadConfig({}).llmApiKey).toBeUndefined();
   });
 
   it("parses AGENT_PORT", () => {

@@ -29,6 +29,7 @@ services:
       AGENT_MODEL: ${AGENT_MODEL:-chat-default}
     volumes:
       - artifacts-data:/data/artifacts
+      - agent-data:/data/agent
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -57,4 +58,5 @@ services:
 
 volumes:
   artifacts-data:
+  agent-data:
   ollama-data:

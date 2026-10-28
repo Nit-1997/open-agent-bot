@@ -1,43 +1,32 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
   createAgentSession,
   DefaultResourceLoader,
-  ModelRuntime,
+  type ModelRuntime,
   SessionManager,
   SettingsManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentConfig } from "../config.js";
-import { LITELLM_PROVIDER, registerLitellm } from "./litellmProvider.js";
 
 export type PiSession = AgentSession;
 
 export type PiSessionHandle = {
   session: PiSession;
-  setModel: (id: string) => Promise<void>;
+  setModel: (model: Model<any>) => Promise<void>;
   dispose: () => Promise<void>;
 };
 
 export async function createPiSession(opts: {
-  cfg: AgentConfig;
+  runtime: ModelRuntime;
+  model: Model<any>;
   systemPrompt: string;
   tools: ToolDefinition<any, any, any>[];
-  modelId?: string;
 }): Promise<PiSessionHandle> {
   const dir = await mkdtemp(join(tmpdir(), "pi-session-"));
-  const modelRuntime = await ModelRuntime.create({
-    authPath: join(dir, "auth.json"),
-    modelsPath: null,
-    refreshOnCreate: false,
-  });
-  registerLitellm(modelRuntime, opts.cfg);
-  const modelId = opts.modelId ?? opts.cfg.model;
-  const model = modelRuntime.getModel(LITELLM_PROVIDER, modelId);
-  if (!model) throw new Error(`model ${modelId} not registered`);
-
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
     cwd: dir,
@@ -55,8 +44,8 @@ export async function createPiSession(opts: {
   const { session } = await createAgentSession({
     cwd: dir,
     agentDir: dir,
-    modelRuntime,
-    model,
+    modelRuntime: opts.runtime,
+    model: opts.model,
     thinkingLevel: "off",
     noTools: "builtin",
     customTools: opts.tools,
@@ -67,11 +56,9 @@ export async function createPiSession(opts: {
 
   return {
     session,
-    setModel: async (id: string) => {
-      if (session.model?.id === id) return;
-      const next = modelRuntime.getModel(LITELLM_PROVIDER, id);
-      if (!next) throw new Error(`model ${id} is not available`);
-      await session.setModel(next);
+    setModel: async (model) => {
+      if (session.model?.provider === model.provider && session.model?.id === model.id) return;
+      await session.setModel(model);
     },
     dispose: async () => {
       session.dispose();

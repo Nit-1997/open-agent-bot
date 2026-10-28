@@ -1,9 +1,10 @@
 import type { RunAgentInput } from "@ag-ui/core";
 import { EventEncoder } from "@ag-ui/encoder";
-import { Hono } from "hono";
+import { type Context, type Handler, Hono, type MiddlewareHandler } from "hono";
 import { handleRun } from "./agui/runHandler.js";
 import { type ArtifactStore, slugify } from "./artifacts/store.js";
 import type { AgentConfig } from "./config.js";
+import type { ProviderHub } from "./providers/hub.js";
 import type { SessionStore } from "./session/sessionStore.js";
 
 function isRunInput(x: unknown): x is RunAgentInput {
@@ -11,7 +12,13 @@ function isRunInput(x: unknown): x is RunAgentInput {
   return !!v && typeof v.threadId === "string" && typeof v.runId === "string" && Array.isArray(v.messages);
 }
 
-export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifacts?: ArtifactStore }) {
+export function defaultModelRef(cfg: AgentConfig, hub: ProviderHub): string | null {
+  const preferred = cfg.model.includes("/") ? cfg.model : `litellm/${cfg.model}`;
+  if (hub.resolve(preferred)) return preferred;
+  return hub.enabledModels()[0]?.id ?? null;
+}
+
+export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifacts?: ArtifactStore; hub?: ProviderHub }) {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ ok: true }));
@@ -41,10 +48,67 @@ export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifac
 
   const authorized = (secret: string | undefined) => !deps.cfg.sharedSecret || secret === deps.cfg.sharedSecret;
 
-  app.get("/models", (c) => {
+  const guard: MiddlewareHandler = async (c, next) => {
     if (!authorized(c.req.header("x-agent-secret"))) return c.json({ error: "unauthorized" }, 401);
-    return c.json({ default: deps.cfg.model, models: deps.cfg.models });
-  });
+    if (!deps.hub) return c.json({ error: "providers are not available" }, 503);
+    await next();
+  };
+  for (const path of ["/models", "/providers", "/providers/*"]) app.use(path, guard);
+  const safe =
+    (handler: (c: Context) => Promise<Response> | Response): Handler =>
+    async (c) => {
+      try {
+        return await handler(c);
+      } catch (err) {
+        return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+      }
+    };
+  const body = async (c: Context) => ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+  const hub = () => deps.hub!;
+
+  app.get("/models", safe((c) => c.json({ default: defaultModelRef(deps.cfg, hub()), models: hub().enabledModels() })));
+  app.get("/providers", safe((c) => c.json({ providers: hub().list() })));
+  app.post(
+    "/providers/local",
+    safe(async (c) => {
+      const b = await body(c);
+      const provider = await hub().addLocal({
+        kind: String(b.kind ?? ""),
+        baseUrl: String(b.baseUrl ?? ""),
+        ...(typeof b.apiKey === "string" && { apiKey: b.apiKey }),
+        ...(typeof b.label === "string" && { label: b.label }),
+      });
+      return c.json({ provider });
+    }),
+  );
+  app.post(
+    "/providers/test",
+    safe(async (c) => c.json(await hub().test(String((await body(c)).model ?? "")))),
+  );
+  app.post(
+    "/providers/:id/key",
+    safe(async (c) => {
+      const b = await body(c);
+      await hub().setKey((c.req.param("id") ?? ""), typeof b.apiKey === "string" ? b.apiKey : "");
+      return c.json({ ok: true });
+    }),
+  );
+  app.delete(
+    "/providers/:id",
+    safe(async (c) => {
+      await hub().remove((c.req.param("id") ?? ""));
+      return c.json({ ok: true });
+    }),
+  );
+  app.get("/providers/:id/models", safe((c) => c.json({ models: hub().models((c.req.param("id") ?? "")) })));
+  app.put(
+    "/providers/:id/models",
+    safe(async (c) => {
+      const b = await body(c);
+      await hub().setEnabled((c.req.param("id") ?? ""), Array.isArray(b.enabled) ? b.enabled.map(String) : []);
+      return c.json({ ok: true });
+    }),
+  );
 
   app.post("/agui", async (c) => {
     if (!authorized(c.req.header("x-agent-secret"))) {

@@ -1,9 +1,10 @@
 import { serve } from "@hono/node-server";
-import { createApp } from "./app.js";
+import { createApp, defaultModelRef } from "./app.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig } from "./config.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
+import { ProviderHub } from "./providers/hub.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { BrowserPool } from "./tools/browserPool.js";
@@ -15,16 +16,27 @@ const SESSION_IDLE_MS = 30 * 60 * 1000;
 const cfg = loadConfig(process.env);
 const artifacts = new ArtifactStore(cfg.artifactsDir);
 const pool = new BrowserPool();
+const hub = await ProviderHub.create({
+  dataDir: cfg.dataDir,
+  ...(cfg.llmApiKey && { litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey, models: cfg.models } }),
+});
+
+function modelFor(ref: string | undefined) {
+  const fallback = defaultModelRef(cfg, hub);
+  const model = (ref && hub.resolve(ref)) || (fallback && hub.resolve(fallback));
+  if (!model) throw new Error("No model is set up yet. Add a provider in Settings → Models.");
+  return model;
+}
 
 const store = new SessionStore({
   idleMs: SESSION_IDLE_MS,
   create: async (threadId, userContext) => {
     const budget = new ToolBudget(PER_REPLY_LIMITS);
     const handle = await createPiSession({
-      cfg,
+      runtime: hub.runtime,
+      model: modelFor(userContext?.model),
       systemPrompt: buildSystemPrompt(userContext),
       tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget }),
-      modelId: cfg.models.some((m) => m.id === userContext?.model) ? userContext?.model : cfg.model,
     });
     return {
       session: handle.session,
@@ -32,10 +44,11 @@ const store = new SessionStore({
       lastUsed: Date.now(),
       onRunStart: () => budget.reset(),
       evidence: new Evidence(),
-      setModel: async (id: string) => {
-        if (!cfg.models.some((m) => m.id === id)) throw new Error(`model ${id} is not available`);
-        await handle.setModel(id);
-        console.log(`[run] thread=${threadId} model=${id}`);
+      setModel: async (ref: string) => {
+        const model = hub.resolve(ref);
+        if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);
+        await handle.setModel(model);
+        console.log(`[run] thread=${threadId} model=${ref}`);
       },
       dispose: async () => {
         await Promise.all([handle.dispose(), pool.close(threadId)]);
@@ -46,7 +59,7 @@ const store = new SessionStore({
 
 setInterval(() => void store.sweep(), 60_000).unref();
 
-const app = createApp({ cfg, store, artifacts });
+const app = createApp({ cfg, store, artifacts, hub });
 serve({ fetch: app.fetch, port: cfg.port, hostname: "0.0.0.0" }, (info) => {
   console.log(`agent listening on :${info.port}`);
 });
