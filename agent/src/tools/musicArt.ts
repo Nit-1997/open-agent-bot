@@ -57,7 +57,21 @@ export function confidentAlbum(results: ITunesAlbum[], name: string): ITunesAlbu
   return bestHits >= need ? best : undefined;
 }
 
+export function coverQueries(name: string): string[] {
+  const clean = name.replace(/\([^)]*\)|\[[^\]]*\]/g, " ").replace(/[^\p{L}\p{N}' ]+/gu, " ").replace(/\s+/g, " ").trim();
+  const key = [...words(clean)];
+  return [...new Set([clean, key.slice(0, 3).join(" "), key.slice(0, 2).join(" "), key[0] ?? ""].filter(Boolean))];
+}
+
 async function appleCover(name: string, country: string, f: typeof fetch): Promise<string | undefined> {
+  for (const q of coverQueries(name)) {
+    const hit = await appleSearch(q, country, f);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+async function appleSearch(name: string, country: string, f: typeof fetch): Promise<string | undefined> {
   const url = new URL("https://itunes.apple.com/search");
   url.searchParams.set("term", name);
   url.searchParams.set("entity", "album");

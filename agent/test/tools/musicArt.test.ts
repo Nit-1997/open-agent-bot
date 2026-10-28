@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confidentAlbum, musicCover, spotifyItemUrl } from "../../src/tools/musicArt.js";
+import { confidentAlbum, coverQueries, musicCover, spotifyItemUrl } from "../../src/tools/musicArt.js";
 import { showUiTool } from "../../src/tools/showWidget.js";
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
@@ -37,6 +37,10 @@ describe("music cover art", () => {
   it("falls back to a confidently matched Apple Music album", async () => {
     const cover = await musicCover({ country: "US", fetch: fakeFetch([]) })({ title: "Bollywood Diwali Hits playlist" });
     expect(cover).toBe("https://is1.mzstatic.com/diwali/600x600bb.jpg");
+  });
+
+  it("searches with a cleaned name, then just the core words", () => {
+    expect(coverQueries("Happy Diwali! Bollywood Party Songs (Spotify editorial)")).toEqual(["Happy Diwali Bollywood Party Songs", "happy diwali bollywood", "happy diwali", "happy"]);
   });
 
   it("gives no picture rather than a weak match", () => {
