@@ -8,6 +8,7 @@ import { classifyRunError, type RunErrorKind } from "@/lib/errors";
 import { buildTurns, type ChatMessage } from "@/lib/turns";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
+import type { BrowserFrame } from "./LiveBrowser";
 import { TurnView } from "./TurnView";
 
 export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string; onNewChat: () => void }) {
@@ -25,9 +26,16 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   const turns = useMemo(() => buildTurns(agent.messages as readonly ChatMessage[]), [agent.messages]);
   const running = sending || agent.isRunning;
   const lastId = turns.at(-1)?.id;
+  const lastRef = useRef(lastId);
+  lastRef.current = lastId;
+  const [frames, setFrames] = useState<Record<string, BrowserFrame>>({});
 
   useEffect(() => {
     const sub = agent.subscribe({
+      onCustomEvent: ({ event }) => {
+        const id = lastRef.current;
+        if (event.name === "browser_frame" && id) setFrames((f) => ({ ...f, [id]: event.value as BrowserFrame }));
+      },
       onRunErrorEvent: ({ event }) => {
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
         setError({ kind: classifyRunError({ error: new Error(message) }), message: event.message });
@@ -122,6 +130,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
                   now={now}
                   answered={t.id !== lastId || running}
                   onAnswer={send}
+                  frame={frames[t.id]}
                 />
               </div>
             ))}

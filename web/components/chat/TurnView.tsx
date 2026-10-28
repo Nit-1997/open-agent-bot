@@ -3,6 +3,7 @@ import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import type { Turn } from "@/lib/turns";
 import { ActivitySteps } from "./ActivitySteps";
 import { Followups } from "./Followups";
+import { type BrowserFrame, LiveBrowser } from "./LiveBrowser";
 import { Markdown } from "./Markdown";
 import { SourcesRow } from "./SourcesRow";
 
@@ -15,6 +16,7 @@ export function TurnView(props: {
   now: number;
   answered: boolean;
   onAnswer: (text: string) => void;
+  frame?: BrowserFrame;
 }) {
   const { turn, running } = props;
   const id = `turn-${turn.id}`;
@@ -31,6 +33,7 @@ export function TurnView(props: {
       )}
       <div id={`${id}-agent`} className="mt-5">
         <ActivitySteps id={`${id}-steps`} steps={turn.steps} running={running} startedAt={props.startedAt} endedAt={props.endedAt} now={props.now} />
+        {props.frame && <LiveBrowser id={`${id}-browser`} frame={props.frame} live={running} />}
         <div id={`${id}-body`} className="space-y-3">
           {turn.items.map((item) => {
             if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
