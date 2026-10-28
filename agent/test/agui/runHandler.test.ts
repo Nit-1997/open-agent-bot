@@ -1,6 +1,7 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { handleRun, readUserContext } from "../../src/agui/runHandler.js";
+import { FrameBus } from "../../src/browser/frames.js";
 import { Evidence } from "../../src/grounding/evidence.js";
 import type { UserContext } from "../../src/prompt/systemPrompt.js";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
@@ -12,7 +13,7 @@ const say: Script = async (emit) => {
   emit(ev.assistantEnd());
 };
 
-function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string) => Promise<void>) {
+function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string) => Promise<void>, frames?: FrameBus) {
   const session = fakeSession(script);
   const runStarts = { count: 0 };
   const contexts: Array<UserContext | null> = [];
@@ -20,7 +21,7 @@ function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string
     idleMs: 60000,
     create: async (_t, ctx): Promise<SessionEntry> => {
       contexts.push(ctx);
-      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence, setModel };
+      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence, setModel, frames };
     },
   });
   return { session, store, contexts, runStarts };
@@ -46,6 +47,21 @@ async function collect(it: AsyncIterable<BaseEvent>) {
 }
 
 describe("handleRun", () => {
+  it("forwards browser frames published during the run as CUSTOM events, and none after", async () => {
+    const frames = new FrameBus(0);
+    const script: Script = async (emit) => {
+      emit(ev.assistantStart);
+      frames.publish({ url: "https://www.shipt.com/x", data: "abc" });
+      emit(ev.assistantEnd());
+    };
+    const { store } = setup(script, undefined, undefined, frames);
+    const out = await collect(handleRun(input(), store, new AbortController().signal));
+    const custom = out.filter((e) => e.type === EventType.CUSTOM) as unknown as Array<{ name: string; value: unknown }>;
+    expect(custom).toEqual([{ type: EventType.CUSTOM, name: "browser_frame", value: { url: "https://www.shipt.com/x", data: "abc" } }]);
+    expect(frames.size).toBe(0);
+    expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
+  });
+
   it("streams RUN_STARTED, text events, RUN_FINISHED", async () => {
     const { store, session } = setup();
     const out = await collect(handleRun(input(), store, new AbortController().signal));

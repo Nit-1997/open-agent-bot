@@ -12,6 +12,7 @@ import { flightsTool } from "./flights.js";
 import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon } from "./geo.js";
 import type { ToolResult } from "./result.js";
 import type { Evidence } from "../grounding/evidence.js";
+import type { FrameBus } from "../browser/frames.js";
 import { askUserTool } from "./askUser.js";
 import { showUiTool, suggestRepliesTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
@@ -27,6 +28,7 @@ export type ToolDeps = {
   userContext: UserContext | null;
   budget: ToolBudget;
   evidence?: Evidence;
+  frames?: FrameBus;
 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2, shop: 2 };
@@ -52,7 +54,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       }
     : undefined;
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
-  const browse = browseTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext });
+  const browse = browseTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames });
   return [
     withBudget(webSearchTool(search), deps.budget, "search"),
     withBudget(imageSearchTool(search), deps.budget, "images"),
@@ -60,7 +62,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browse, deps.budget, "read"),
-    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext }), deps.budget, "shop"),
+    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames }), deps.budget, "shop"),
     weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),
     withBudget(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",

@@ -115,6 +115,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     push(translator.translate(e));
   });
 
+  const unwatch = entry.frames?.subscribe((value) => push([{ type: EventType.CUSTOM, name: "browser_frame", value } as BaseEvent]));
+
   const onAbort = () => {
     void entry.session.abort();
   };
@@ -148,6 +150,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     await running;
     signal.removeEventListener("abort", onAbort);
     unsubscribe();
+    unwatch?.();
     entry.busy = false;
     store.touch(threadId);
   }

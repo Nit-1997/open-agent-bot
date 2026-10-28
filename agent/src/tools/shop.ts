@@ -5,6 +5,7 @@ import type { UserContext } from "../prompt/systemPrompt.js";
 import { extractTiles, type Tile } from "../shop/extract.js";
 import { bestValue, rankTiles, type StoreResult } from "../shop/rank.js";
 import { type Store, storeFor as defaultStoreFor } from "../shop/stores.js";
+import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "./browserPool.js";
 import { isBlockedUrl } from "./browsePolicy.js";
 import { publicHttpUrlError } from "./net.js";
@@ -26,7 +27,7 @@ type Deps = {
   userContext: UserContext | null;
   allowPrivateHosts?: boolean;
   storeFor?: (name: string) => Store | undefined;
-  onPage?: (page: Page) => () => void;
+  frames?: FrameBus;
 };
 
 function list<T>(v: unknown): T[] {
@@ -86,20 +87,20 @@ async function runJob(page: Page, job: Job, allowPrivateHosts?: boolean): Promis
 async function runAll(deps: Deps, jobs: Job[]): Promise<JobResult[]> {
   const results: JobResult[] = new Array(jobs.length);
   let next = 0;
-  const worker = async () => {
+  const worker = async (n: number) => {
     const page = await deps.pool.tab(deps.threadId, deps.userContext);
-    const stop = deps.onPage?.(page);
+    const stop = n === 0 && deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
     try {
       while (next < jobs.length) {
         const i = next++;
         results[i] = await runJob(page, jobs[i], deps.allowPrivateHosts);
       }
     } finally {
-      stop?.();
+      await stop?.();
       await page.close().catch(() => {});
     }
   };
-  await Promise.all(Array.from({ length: Math.min(TABS, jobs.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(TABS, jobs.length) }, (_, n) => worker(n)));
   return results;
 }
 

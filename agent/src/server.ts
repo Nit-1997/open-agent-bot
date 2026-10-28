@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { createApp, defaultModelRef } from "./app.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig } from "./config.js";
+import { FrameBus } from "./browser/frames.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { ProviderHub } from "./providers/hub.js";
@@ -34,11 +35,12 @@ const store = new SessionStore({
   create: async (threadId, userContext) => {
     const budget = new ToolBudget(PER_REPLY_LIMITS);
     const evidence = new Evidence();
+    const frames = new FrameBus();
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: modelFor(userContext?.model),
       systemPrompt: buildSystemPrompt(userContext),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames }),
     });
     return {
       session: handle.session,
@@ -46,6 +48,7 @@ const store = new SessionStore({
       lastUsed: Date.now(),
       onRunStart: () => budget.reset(),
       evidence,
+      frames,
       setModel: async (ref: string) => {
         const model = hub.resolve(ref);
         if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);

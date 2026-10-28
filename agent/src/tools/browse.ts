@@ -2,6 +2,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { Locator, Page } from "playwright";
 import { Type } from "typebox";
 import type { UserContext } from "../prompt/systemPrompt.js";
+import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "./browserPool.js";
 import { type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "./browsePolicy.js";
 import { fail, ok, type ToolResult } from "./result.js";
@@ -44,7 +45,7 @@ async function settle(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
 }
 
-export function browseTool(deps: { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean }) {
+export function browseTool(deps: { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean; frames?: FrameBus }) {
   return defineTool({
     name: "browse",
     label: "Browse",
@@ -55,6 +56,7 @@ export function browseTool(deps: { pool: BrowserPool; threadId: string; userCont
       const actions = params.actions as BrowseAction[];
       if (actions.length > MAX_ACTIONS) return fail(`too many actions (max ${MAX_ACTIONS} per call)`);
       const page = await deps.pool.page(deps.threadId, deps.userContext);
+      const stopWatch = deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
       let lastStatus: number | undefined;
 
       try {
@@ -120,6 +122,8 @@ export function browseTool(deps: { pool: BrowserPool; threadId: string; userCont
         return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${shown}${imagesText(html, url, shown)}`, { url });
       } catch (err) {
         return fail(`browse failed on ${page.url()}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+      } finally {
+        await stopWatch?.();
       }
     },
   });
