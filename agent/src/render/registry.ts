@@ -6,9 +6,11 @@ const MAX_FLIGHTS = 8;
 const renderers: Record<string, (data: any) => unknown> = {
   weather: (d: WeatherData) => ({
     kind: "weather_card",
+    mode: d.mode,
+    ...(d.basis && { basis: d.basis }),
     location: d.location,
     units: d.units,
-    current: d.current,
+    ...(d.current && { current: d.current }),
     days: d.days,
     source: d.source,
   }),

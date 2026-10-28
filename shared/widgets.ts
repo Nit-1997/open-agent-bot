@@ -5,9 +5,11 @@ const Url = Type.String({ minLength: 1 });
 
 export const WeatherCardSchema = Type.Object({
   kind: Type.Literal("weather_card"),
+  mode: Type.Optional(Type.Enum(["forecast", "typical"])),
+  basis: Type.Optional(Type.String({ description: "years averaged for typical weather, e.g. 2023–2025" })),
   location: Type.String(),
   units: Type.Enum(["metric", "imperial"]),
-  current: Type.Object({ temp: Type.Number(), condition: Type.String() }),
+  current: Type.Optional(Type.Object({ temp: Type.Number(), condition: Type.String() })),
   days: Type.Array(
     Type.Object({
       date: Type.String(),
@@ -79,6 +81,37 @@ export const UiSchema = Type.Object({
   removedLinks: Type.Optional(Type.Number()),
 });
 
+const IsoDate = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "YYYY-MM-DD" });
+
+export const AskFieldSchemas = {
+  date_range: Type.Object({ type: Type.Literal("date_range"), label: Str, start: IsoDate, end: IsoDate }),
+  number: Type.Object({
+    type: Type.Literal("number"),
+    label: Str,
+    value: Type.Optional(Type.Number()),
+    min: Type.Optional(Type.Number()),
+    max: Type.Optional(Type.Number()),
+  }),
+  choice: Type.Object({
+    type: Type.Literal("choice"),
+    label: Str,
+    options: Type.Array(Str, { minItems: 2, maxItems: 8 }),
+    value: Type.Optional(Str),
+  }),
+  text: Type.Object({ type: Type.Literal("text"), label: Str, value: Type.Optional(Str), placeholder: Type.Optional(Str) }),
+} as const;
+
+export const ASK_FIELD_TYPES = Object.keys(AskFieldSchemas) as AskFieldType[];
+const A = AskFieldSchemas;
+export const AskFieldSchema = Type.Union([A.date_range, A.number, A.choice, A.text]);
+
+export const AskSchema = Type.Object({
+  kind: Type.Literal("ask"),
+  question: Str,
+  fields: Type.Array(Type.Unknown(), { minItems: 1, maxItems: 6 }),
+  submitLabel: Type.Optional(Str),
+});
+
 export const GroundingNoteSchema = Type.Object({
   kind: Type.Literal("grounding_note"),
   claims: Type.Array(Str, { minItems: 1 }),
@@ -89,6 +122,7 @@ export const WidgetSchemas = {
   flight_list: FlightListSchema,
   ui: UiSchema,
   grounding_note: GroundingNoteSchema,
+  ask: AskSchema,
 } as const;
 
 export type WeatherCard = Static<typeof WeatherCardSchema>;
@@ -97,7 +131,10 @@ export type UiBlockType = keyof typeof UiBlockSchemas;
 export type UiBlock = Static<typeof UiBlockSchema>;
 export type UiWidget = Omit<Static<typeof UiSchema>, "blocks"> & { blocks: UiBlock[] };
 export type GroundingNote = Static<typeof GroundingNoteSchema>;
-export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote;
+export type AskFieldType = keyof typeof AskFieldSchemas;
+export type AskField = Static<typeof AskFieldSchema>;
+export type AskWidget = Omit<Static<typeof AskSchema>, "fields"> & { fields: AskField[] };
+export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget;
 export type WidgetKind = WidgetPayload["kind"];
 
 export const WIDGET_KINDS = Object.keys(WidgetSchemas) as WidgetKind[];
@@ -114,12 +151,16 @@ function schemaErrors(schema: TSchema, x: unknown, prefix = ""): string[] {
   return errors;
 }
 
-function blockErrors(blocks: unknown[]): string[] {
-  return blocks.flatMap((b, i) => {
+function itemErrors(items: unknown[], schemas: Record<string, TSchema>, path: string): string[] {
+  return items.flatMap((b, i) => {
     const type = (b as { type?: unknown } | null)?.type;
-    if (typeof type !== "string" || !(type in UiBlockSchemas)) return [`/blocks/${i}/type: must be one of ${UI_BLOCK_TYPES.join(", ")}`];
-    return schemaErrors(UiBlockSchemas[type as UiBlockType], b, `/blocks/${i}`);
+    if (typeof type !== "string" || !(type in schemas)) return [`/${path}/${i}/type: must be one of ${Object.keys(schemas).join(", ")}`];
+    return schemaErrors(schemas[type], b, `/${path}/${i}`);
   });
+}
+
+function rangeErrors(fields: AskField[]): string[] {
+  return fields.flatMap((f, i) => (f.type === "date_range" && f.end < f.start ? [`/fields/${i}/end: must not be before start`] : []));
 }
 
 export function validateWidget(x: unknown): { ok: true; value: WidgetPayload } | { ok: false; errors: string[] } {
@@ -129,6 +170,11 @@ export function validateWidget(x: unknown): { ok: true; value: WidgetPayload } |
   }
   const schema = WidgetSchemas[kind as WidgetKind];
   const errors = schemaErrors(schema, x);
-  if (!errors.length && kind === "ui") errors.push(...blockErrors((x as { blocks: unknown[] }).blocks));
+  if (!errors.length && kind === "ui") errors.push(...itemErrors((x as { blocks: unknown[] }).blocks, UiBlockSchemas, "blocks"));
+  if (!errors.length && kind === "ask") {
+    const fields = (x as { fields: unknown[] }).fields;
+    errors.push(...itemErrors(fields, AskFieldSchemas, "fields"));
+    if (!errors.length) errors.push(...rangeErrors(fields as AskField[]));
+  }
   return errors.length ? { ok: false, errors } : { ok: true, value: x as WidgetPayload };
 }

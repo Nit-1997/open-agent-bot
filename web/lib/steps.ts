@@ -2,7 +2,7 @@ import { hostOf } from "./sources";
 
 export type StepArgs = Record<string, unknown>;
 
-export const RENDER_TOOLS = new Set(["show_ui", "show_widget"]);
+export const RENDER_TOOLS = new Set(["show_ui", "show_widget", "ask_user"]);
 
 export function stepLabel(name: string, args: StepArgs, done = true): string {
   const host = (u: unknown) => hostOf(String(u ?? "")) ?? "a page";

@@ -59,4 +59,54 @@ describe("weather", () => {
     expect(r.isError).toBe(true);
     expect((r.content[0] as { text: string }).text).toBe('no location found for "Atlantis"');
   });
+
+  describe("specific dates", () => {
+    const today = () => "2026-10-27";
+    const exec = (f: typeof fetch, params: Record<string, unknown>) =>
+      weatherTool({ fetch: f, today, defaultUnits: "imperial" }).execute("c", { location: "Las Vegas", ...params } as never, undefined, undefined, {} as never);
+
+    it("asks the forecast for exactly those dates when they are within 16 days", async () => {
+      const f = routes();
+      await exec(f, { start_date: "2026-11-05", end_date: "2026-11-07" });
+      const fc = new URL(f.calls[1]);
+      expect(fc.searchParams.get("start_date")).toBe("2026-11-05");
+      expect(fc.searchParams.get("end_date")).toBe("2026-11-07");
+      expect(fc.searchParams.get("forecast_days")).toBeNull();
+    });
+
+    it("returns typical weather from the last three years when the dates are too far out", async () => {
+      const year = (y: number, hi: number, rain: number, code: number) =>
+        json({
+          daily: {
+            time: [`${y}-11-25`, `${y}-11-26`],
+            temperature_2m_max: [hi, hi + 2],
+            temperature_2m_min: [hi - 20, hi - 18],
+            precipitation_sum: [rain, 0],
+            weather_code: [code, 0],
+          },
+        });
+      const f = fakeFetch([
+        [/geocoding-api/, () => geo.clone()],
+        [/archive-api.*start_date=2025/, () => year(2025, 60, 0.2, 61)],
+        [/archive-api.*start_date=2024/, () => year(2024, 62, 0, 0)],
+        [/archive-api.*start_date=2023/, () => year(2023, 64, 0.1, 61)],
+      ]);
+      const r = await exec(f, { start_date: "2026-11-25", end_date: "2026-11-26" });
+      expect(f.calls.some((c) => c.includes("/v1/forecast"))).toBe(false);
+      const data = (r.details as { data: Record<string, unknown> }).data;
+      expect(data).toMatchObject({ mode: "typical", basis: "2023–2025", units: "imperial" });
+      expect(data.current).toBeUndefined();
+      expect(data.days).toEqual([
+        { date: "2026-11-25", high: 62, low: 42, condition: "Rain", precipChance: 67 },
+        { date: "2026-11-26", high: 64, low: 44, condition: "Clear", precipChance: 0 },
+      ]);
+      expect((r.content[0] as { text: string }).text).toMatch(/^Typical weather \(not a forecast\)/);
+      expect(validateWidget(renderData(data as never))).toMatchObject({ ok: true });
+    });
+
+    it("rejects a range that ends before it starts or runs longer than 14 days", async () => {
+      expect((await exec(routes(), { start_date: "2026-11-10", end_date: "2026-11-01" })).isError).toBe(true);
+      expect((await exec(routes(), { start_date: "2026-11-01", end_date: "2026-12-01" })).isError).toBe(true);
+    });
+  });
 });

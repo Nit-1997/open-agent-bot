@@ -156,6 +156,12 @@ describe("grounding", () => {
     ]);
   });
 
+  it("a form the agent shows is not evidence for its own claims", () => {
+    const ask = { ...toolEnd, toolCallId: "q1", toolName: "ask_user", result: { content: [{ type: "text", text: "budget $250" }], details: {} } } as unknown as PiEvent;
+    const out = run([ask, assistantStart, delta("Flights from $250."), assistantEnd]);
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$250"] }]);
+  });
+
   it("evidence persists across runs of the same session", () => {
     const evidence = new Evidence();
     run([searchEnd], evidence);

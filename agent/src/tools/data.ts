@@ -1,8 +1,10 @@
 export type WeatherData = {
   kind: "weather";
+  mode: "forecast" | "typical";
+  basis?: string;
   location: string;
   units: "metric" | "imperial";
-  current: { temp: number; condition: string };
+  current?: { temp: number; condition: string };
   days: Array<{ date: string; high: number; low: number; condition: string; precipChance?: number }>;
   source: string;
 };

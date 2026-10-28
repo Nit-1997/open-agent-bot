@@ -28,22 +28,59 @@ type Forecast = {
   };
 };
 
-export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric" | "imperial" } = {}) {
+type Archive = {
+  daily: { time: string[]; temperature_2m_max: number[]; temperature_2m_min: number[]; precipitation_sum: number[]; weather_code: number[] };
+};
+
+const FORECAST_DAYS = 16;
+const MAX_RANGE_DAYS = 14;
+const TYPICAL_YEARS = 3;
+
+const DAY = 86_400_000;
+const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
+const toIso = (d: Date) => d.toISOString().slice(0, 10);
+const addDays = (iso: string, n: number) => toIso(new Date(toDate(iso).getTime() + n * DAY));
+const daysBetween = (a: string, b: string) => Math.round((toDate(b).getTime() - toDate(a).getTime()) / DAY);
+const shiftYear = (iso: string, years: number) => `${Number(iso.slice(0, 4)) - years}${iso.slice(4)}`;
+const isIso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(toDate(v).getTime());
+
+function mode<T>(xs: T[]): T {
+  const counts = new Map<T, number>();
+  for (const x of xs) counts.set(x, (counts.get(x) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+const avg = (xs: number[]) => Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+
+export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric" | "imperial"; today?: () => string } = {}) {
   const f = deps.fetch ?? fetch;
+  const today = deps.today ?? (() => toIso(new Date()));
   return defineTool({
     name: "weather",
     label: "Weather",
-    description:
-      "Current weather and daily forecast for a place. The weather card is shown to the user automatically. Afterwards, add a one or two sentence summary.",
+    description: `Weather for a place. Without dates: current conditions and the next few days. With start_date/end_date (YYYY-MM-DD, up to ${MAX_RANGE_DAYS} days): the forecast for those dates if they are within ${FORECAST_DAYS} days, otherwise typical weather for those dates averaged over the last ${TYPICAL_YEARS} years (not a forecast; say so). The weather card is shown to the user automatically. Afterwards, add a one or two sentence summary.`,
     parameters: Type.Object({
       location: Type.String({ minLength: 1, description: "city or place name" }),
-      days: Type.Optional(Type.Number({ description: "1-7, default 3" })),
+      days: Type.Optional(Type.Number({ description: "1-7, default 3; ignored when dates are given" })),
+      start_date: Type.Optional(Type.String({ description: "YYYY-MM-DD" })),
+      end_date: Type.Optional(Type.String({ description: "YYYY-MM-DD, defaults to start_date" })),
       units: Type.Optional(Type.Enum(["metric", "imperial"])),
     }),
     async execute(_id, params, signal): Promise<ToolResult> {
-      const days = Math.min(Math.max(Math.floor(params.days ?? 3), 1), 7);
       const units = params.units ?? deps.defaultUnits ?? "metric";
+      const deg = units === "imperial" ? "°F" : "°C";
       const opts = { signal: signal ?? AbortSignal.timeout(15000) };
+
+      let range: { start: string; end: string } | undefined;
+      if (params.start_date !== undefined) {
+        const start = params.start_date;
+        const end = params.end_date ?? start;
+        if (!isIso(start) || !isIso(end)) return fail("start_date and end_date must be YYYY-MM-DD");
+        if (daysBetween(start, end) < 0) return fail("end_date is before start_date");
+        if (daysBetween(start, end) >= MAX_RANGE_DAYS) return fail(`ask for at most ${MAX_RANGE_DAYS} days at a time`);
+        range = { start, end };
+      }
+
       try {
         const g = new URL("https://geocoding-api.open-meteo.com/v1/search");
         g.searchParams.set("name", params.location);
@@ -53,6 +90,59 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
         };
         const place = geo.results?.[0];
         if (!place) return fail(`no location found for "${params.location}"`);
+        const location = [place.name, place.country].filter(Boolean).join(", ");
+
+        const lastForecastDay = addDays(today(), FORECAST_DAYS - 1);
+        if (range && range.start > lastForecastDay) {
+          const years = Array.from({ length: TYPICAL_YEARS }, (_, i) => i + 1);
+          const archives = await Promise.all(
+            years.map(async (back) => {
+              const u = new URL("https://archive-api.open-meteo.com/v1/archive");
+              u.searchParams.set("latitude", String(place.latitude));
+              u.searchParams.set("longitude", String(place.longitude));
+              u.searchParams.set("start_date", shiftYear(range.start, back));
+              u.searchParams.set("end_date", shiftYear(range.end, back));
+              u.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code");
+              u.searchParams.set("timezone", "auto");
+              if (units === "imperial") {
+                u.searchParams.set("temperature_unit", "fahrenheit");
+                u.searchParams.set("precipitation_unit", "inch");
+              }
+              const res = await f(u, opts);
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return (await res.json()) as Archive;
+            }),
+          );
+          const span = daysBetween(range.start, range.end) + 1;
+          const data: WeatherData = {
+            kind: "weather",
+            mode: "typical",
+            basis: `${Number(range.start.slice(0, 4)) - TYPICAL_YEARS}–${Number(range.start.slice(0, 4)) - 1}`,
+            location,
+            units,
+            days: Array.from({ length: span }, (_, i) => {
+              const at = archives.map((a) => ({
+                hi: a.daily.temperature_2m_max[i],
+                lo: a.daily.temperature_2m_min[i],
+                rain: a.daily.precipitation_sum[i],
+                code: a.daily.weather_code[i],
+              }));
+              return {
+                date: addDays(range.start, i),
+                high: avg(at.map((x) => x.hi)),
+                low: avg(at.map((x) => x.lo)),
+                condition: mode(at.map((x) => wmoCondition(x.code))),
+                precipChance: Math.round((100 * at.filter((x) => x.rain > 0).length) / at.length),
+              };
+            }),
+            source: "https://open-meteo.com",
+          };
+          const summary = [
+            `Typical weather (not a forecast) for ${location}, ${range.start} to ${range.end}, averaged over ${data.basis}. A real forecast is only available within ${FORECAST_DAYS} days.`,
+            ...data.days.map((d) => `${d.date}: ${d.low}–${d.high}${deg}, usually ${d.condition}, rain in ${d.precipChance}% of past years`),
+          ].join("\n");
+          return ok(summary, { data });
+        }
 
         const u = new URL("https://api.open-meteo.com/v1/forecast");
         u.searchParams.set("latitude", String(place.latitude));
@@ -60,7 +150,12 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
         u.searchParams.set("current", "temperature_2m,weather_code");
         u.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max");
         u.searchParams.set("timezone", "auto");
-        u.searchParams.set("forecast_days", String(days));
+        if (range) {
+          u.searchParams.set("start_date", range.start < today() ? today() : range.start);
+          u.searchParams.set("end_date", range.end > lastForecastDay ? lastForecastDay : range.end);
+        } else {
+          u.searchParams.set("forecast_days", String(Math.min(Math.max(Math.floor(params.days ?? 3), 1), 7)));
+        }
         if (units === "imperial") u.searchParams.set("temperature_unit", "fahrenheit");
         const res = await f(u, opts);
         if (!res.ok) return fail(`weather service error: HTTP ${res.status}`);
@@ -68,7 +163,8 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
 
         const data: WeatherData = {
           kind: "weather",
-          location: [place.name, place.country].filter(Boolean).join(", "),
+          mode: "forecast",
+          location,
           units,
           current: { temp: fc.current.temperature_2m, condition: wmoCondition(fc.current.weather_code) },
           days: fc.daily.time.map((date, i) => ({
@@ -80,9 +176,8 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
           })),
           source: "https://open-meteo.com",
         };
-        const deg = units === "imperial" ? "°F" : "°C";
         const summary = [
-          `${data.location}: now ${data.current.temp}${deg}, ${data.current.condition}`,
+          `${data.location}: now ${data.current!.temp}${deg}, ${data.current!.condition}`,
           ...data.days.map(
             (d) => `${d.date}: ${d.low}–${d.high}${deg}, ${d.condition}${d.precipChance != null ? `, ${d.precipChance}% rain` : ""}`,
           ),

@@ -5,7 +5,16 @@ import { ActivitySteps } from "./ActivitySteps";
 import { Markdown } from "./Markdown";
 import { SourcesRow } from "./SourcesRow";
 
-export function TurnView(props: { turn: Turn; running: boolean; locale: string; startedAt?: number; endedAt?: number; now: number }) {
+export function TurnView(props: {
+  turn: Turn;
+  running: boolean;
+  locale: string;
+  startedAt?: number;
+  endedAt?: number;
+  now: number;
+  answered: boolean;
+  onAnswer: (text: string) => void;
+}) {
   const { turn, running } = props;
   const id = `turn-${turn.id}`;
   return (
@@ -22,7 +31,7 @@ export function TurnView(props: { turn: Turn; running: boolean; locale: string; 
         <div id={`${id}-body`} className="space-y-3">
           {turn.items.map((item) => {
             if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
-            if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} />;
+            if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} answered={props.answered} onAnswer={props.onAnswer} />;
             if (item.result === undefined) {
               return (
                 <div id={`${id}-artifact-pending-${item.id}`} key={item.id} className="h-16 animate-pulse rounded-2xl border border-border bg-surface" aria-label="Writing page" />

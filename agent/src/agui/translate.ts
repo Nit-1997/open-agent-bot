@@ -93,7 +93,7 @@ export function createTranslator(ids: Deps) {
           { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: e.toolCallId, content, role: "tool" } as BaseEvent,
         ];
         const details = (e.result as { details?: { widget?: Widget; data?: unknown } } | undefined)?.details;
-        if (!e.toolName.startsWith("show_")) {
+        if (!e.toolName.startsWith("show_") && e.toolName !== "ask_user") {
           evidence.add(content);
           if (details?.data) evidence.add(JSON.stringify(details.data));
         }

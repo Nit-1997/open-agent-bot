@@ -101,6 +101,8 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
                 startedAt={timing[t.id]?.start}
                 endedAt={timing[t.id]?.end}
                 now={now}
+                answered={t.id !== lastId || running}
+                onAnswer={send}
               />
             ))}
           </div>
