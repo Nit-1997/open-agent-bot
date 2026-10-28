@@ -2,6 +2,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { Page } from "playwright";
 import { Type } from "typebox";
 import type { UserContext } from "../prompt/systemPrompt.js";
+import { ActiveCart, type CartItem } from "../shop/cart.js";
 import { extractTiles, type Tile } from "../shop/extract.js";
 import { bestValue, rankTiles, type StoreResult } from "../shop/rank.js";
 import { type Store, storeFor as defaultStoreFor } from "../shop/stores.js";
@@ -15,6 +16,7 @@ const MAX_STORES = 3;
 const MAX_ITEMS = 12;
 const TABS = 4;
 const PICKS = 3;
+const SCOPE = 3;
 const BOT_WALL = /(robot or human|are you a robot|captcha|access denied|unusual traffic|verify you are human|press and hold|sorry! something went wrong)/i;
 
 type Item = { query: string; qty: number };
@@ -28,6 +30,7 @@ type Deps = {
   allowPrivateHosts?: boolean;
   storeFor?: (name: string) => Store | undefined;
   frames?: FrameBus;
+  cart?: ActiveCart;
 };
 
 function list<T>(v: unknown): T[] {
@@ -173,29 +176,57 @@ function render(stores: StoreResult[], results: JobResult[], wanted: Item[]): { 
 
 export function shopTool(deps: Deps) {
   const resolve = deps.storeFor ?? defaultStoreFor;
+  const fallbackCart = new ActiveCart();
   return defineTool({
     name: "shop",
     label: "Shop",
     description:
-      "Search stores' real catalogs in a browser, as a guest, for a list of products. Returns, per store, the best matching catalog products (title, price, size, rating, product link, catalog image), items not found, and the best-value store. Stores: shipt (compares every nearby store it carries, such as Target, Safeway, Sprouts), amazon, target, walmart, costco, bestbuy, kroger, safeway, or any store's domain. Some stores block automated browsers; they come back as blocked with a link.",
+      "Build and update the user's shopping cart from stores' real catalogs, browsing as a guest. The chat has one active cart: the first call searches every item at the stores you pass and keeps the best-value stores; later calls add items to that same cart and search only the new items at those same stores (pass just the new items, no stores). Pass stores again only when the user wants different stores (the whole list is re-checked there), remove to drop items, and new_cart:true only when the user starts an unrelated list. Returns the full cart per store: best matching catalog products (title, price, size, rating, product link, catalog image), items not found, and the best-value store. Stores: shipt (compares the nearby stores it carries, such as Target, Safeway, Sprouts), amazon, target, walmart, costco, bestbuy, kroger, safeway, or any store's domain. Stores that block automated browsers come back as blocked with a link.",
     parameters: Type.Object({
-      stores: Type.Union([Type.Array(Type.String()), Type.String()], { description: "1-3 stores, e.g. [\"shipt\"] or [\"amazon\", \"bestbuy\"]" }),
-      items: Type.Union([Type.Array(Type.Object({ query: Type.String(), qty: Type.Optional(Type.Number()) })), Type.String()], {
-        description: "products to find, up to 12, each a short catalog search like \"black beans 15 oz\" with qty",
-      }),
+      stores: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "1-3 stores for a new cart or to switch stores, e.g. [\"shipt\"] or [\"amazon\", \"bestbuy\"]" })),
+      items: Type.Optional(
+        Type.Union([Type.Array(Type.Object({ query: Type.String(), qty: Type.Optional(Type.Number()) })), Type.String()], {
+          description: "products to add, up to 12, each a short catalog search like \"black beans 15 oz\" with qty",
+        }),
+      ),
+      remove: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "item queries to drop from the cart" })),
+      new_cart: Type.Optional(Type.Boolean({ description: "start a new, unrelated cart" })),
     }),
     async execute(_id, params): Promise<ToolResult> {
-      const wanted = items(params.items);
-      const stores = list<string>(params.stores)
-        .map((s) => resolve(String(s)))
-        .filter((s): s is Store => !!s)
-        .slice(0, MAX_STORES);
-      if (!wanted.length || !stores.length) return fail("pass stores and items");
-      const jobs = stores.flatMap((store) => wanted.map((item) => ({ store, item })));
-      const results = await runAll(deps, jobs);
-      const grouped = storeResults(results, wanted);
-      const { text, summary } = render(grouped, results, wanted);
-      return ok(text || "No products read from any store.", { data: { kind: "shop", stores: grouped, summary } });
+      const cart = deps.cart ?? fallbackCart;
+      const asked = items(params.items);
+      const picked = list<string>(params.stores).map((x) => resolve(String(x))).filter((x): x is Store => !!x).slice(0, MAX_STORES);
+      const ids = picked.map((x) => x.id);
+      if (params.remove) cart.remove(list<string>(params.remove).map(String));
+      const switching = ids.length > 0 && !(ids.length === cart.stores.length && ids.every((id) => cart.stores.includes(id)));
+      let added: CartItem[];
+      let search: CartItem[];
+      let fresh = false;
+      if (params.new_cart || !cart.stores.length) {
+        if (!picked.length || !asked.length) return fail("pass stores and items");
+        cart.start(ids, asked);
+        added = cart.items;
+        search = cart.items;
+        fresh = true;
+      } else if (switching) {
+        added = cart.add(asked);
+        cart.start(ids, cart.items.map((i) => ({ ...i })));
+        search = cart.items;
+        fresh = true;
+      } else {
+        added = cart.add(asked);
+        search = added;
+      }
+      if (!cart.items.length) return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
+      const stores = cart.stores.map((id) => resolve(id)).filter((x): x is Store => !!x);
+      const results = search.length ? await runAll(deps, stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
+      cart.addResults(storeResults(results, search));
+      if (fresh) cart.scopeTo(bestValue(cart.view()).filter((x) => x.found > 0).slice(0, SCOPE).map((x) => x.store));
+      const view = cart.view();
+      const { text, summary } = render(view, results, cart.items);
+      const n = cart.items.length;
+      const head = `Cart: ${n} ${n === 1 ? "item" : "items"} at ${cart.scope.join(", ") || stores.map((x) => x.label).join(", ")}.${added.length && !fresh ? ` Added: ${added.map((i) => i.query).join(", ")}.` : ""} Later additions stay at these stores.`;
+      return ok(`${head}\n${text || "No products read from any store."}`, { data: { kind: "shop", stores: view, summary } });
     },
   });
 }

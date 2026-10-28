@@ -26,6 +26,12 @@ describe("shop data renders a cart", () => {
     expect(w.stores[0].items[1].qty).toBe(2);
   });
 
+  it("renders a cart that grew past one search's 12 items", () => {
+    const items = Array.from({ length: 14 }, (_, i) => ({ query: `item ${i}`, qty: 1, picks: [pick(`Item ${i}`, 1)] }));
+    const big = { kind: "shop", stores: [{ store: "Target (Shipt)", home: "https://www.shipt.com/", items }], summary: [{ store: "Target (Shipt)", found: 14, missing: [], total: 14 }] };
+    expect((renderData(big) as unknown as { stores: Array<{ items: unknown[] }> }).stores[0].items).toHaveLength(14);
+  });
+
   it("renders nothing when no store had any item", () => {
     expect(renderData({ ...data, summary: [] })).toBeNull();
   });

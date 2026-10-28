@@ -2,27 +2,57 @@
 
 import type { Cart } from "@shared/widgets";
 import { Minus, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Picture } from "./CardRow";
 
 type Line = { qty: number; choice: number; removed: boolean };
-type Store = Cart["stores"][number];
+type Shared = Record<string, { qty: number; removed: boolean }>;
+export type CartEdits = { removed: string[]; qty: Record<string, number>; picks: Record<string, Record<string, string>> };
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 const portalOf = (name: string) => name.match(/\(([^)]+)\)\s*$/)?.[1] ?? name;
 
-function initial(store: Store): Line[] {
-  return store.items.map((i) => ({ qty: i.qty, choice: 0, removed: false }));
-}
-
-export function CartCard({ toolCallId, widget }: { toolCallId: string; widget: Cart }) {
+export function CartCard({ toolCallId, widget, onEdit, stale = false }: { toolCallId: string; widget: Cart; onEdit?: (e: CartEdits) => void; stale?: boolean }) {
   const id = `cart-${toolCallId}`;
   const [active, setActive] = useState(0);
-  const [lines, setLines] = useState<Record<number, Line[]>>({});
+  const [shared, setShared] = useState<Shared>({});
+  const [choices, setChoices] = useState<Record<string, Record<string, number>>>({});
   const [swapping, setSwapping] = useState<number | null>(null);
   const store = widget.stores[active];
-  const current = lines[active] ?? initial(store);
-  const update = (i: number, patch: Partial<Line>) => setLines((all) => ({ ...all, [active]: current.map((l, n) => (n === i ? { ...l, ...patch } : l)) }));
+  const current: Line[] = store.items.map((i) => ({
+    qty: shared[i.query]?.qty ?? i.qty,
+    removed: shared[i.query]?.removed ?? false,
+    choice: choices[store.name]?.[i.query] ?? 0,
+  }));
+  const update = (i: number, patch: Partial<Line>) => {
+    const q = store.items[i].query;
+    if (patch.choice !== undefined) setChoices((c) => ({ ...c, [store.name]: { ...c[store.name], [q]: patch.choice! } }));
+    if (patch.qty !== undefined || patch.removed !== undefined) {
+      setShared((s) => ({ ...s, [q]: { qty: patch.qty ?? current[i].qty, removed: patch.removed ?? current[i].removed } }));
+    }
+  };
+
+  const report = useRef(onEdit);
+  report.current = onEdit;
+  const touched = useRef(false);
+  useEffect(() => {
+    if (!touched.current) {
+      touched.current = true;
+      return;
+    }
+    const first = widget.stores[0].items;
+    const edits: CartEdits = {
+      removed: Object.entries(shared).filter(([, v]) => v.removed).map(([q]) => q),
+      qty: Object.fromEntries(Object.entries(shared).filter(([q, v]) => !v.removed && v.qty !== first.find((i) => i.query === q)?.qty).map(([q, v]) => [q, v.qty])),
+      picks: Object.fromEntries(
+        Object.entries(choices).map(([name, m]) => {
+          const s = widget.stores.find((x) => x.name === name)!;
+          return [name, Object.fromEntries(Object.entries(m).filter(([, n]) => n > 0).map(([q, n]) => [q, s.items.find((i) => i.query === q)!.picks[n].title]))];
+        }),
+      ),
+    };
+    report.current?.(edits);
+  }, [shared, choices, widget]);
 
   const inCart = store.items.map((item, i) => ({ item, line: current[i], pick: item.picks[current[i].choice], i })).filter((x) => x.pick);
   const kept = inCart.filter((x) => !x.line.removed);
@@ -32,13 +62,13 @@ export function CartCard({ toolCallId, widget }: { toolCallId: string; widget: C
   const portal = portalOf(store.name);
 
   return (
-    <section id={id} className="my-2 w-full rounded-2xl border border-border bg-paper p-4">
+    <section id={id} className={`my-2 w-full rounded-2xl border border-border bg-paper p-4 ${stale ? "opacity-70" : ""}`}>
       <header id={`${id}-header`} className="flex items-baseline justify-between gap-2">
         <h3 id={`${id}-title`} className="text-base font-semibold">
           Cart
         </h3>
         <span id={`${id}-count`} className="text-xs text-text-muted">
-          {kept.length} {kept.length === 1 ? "item" : "items"}
+          {stale ? "Updated cart below" : `${kept.length} ${kept.length === 1 ? "item" : "items"}`}
         </span>
       </header>
 
@@ -93,7 +123,7 @@ export function CartCard({ toolCallId, widget }: { toolCallId: string; widget: C
                           {pick.size && <span id={`${rid}-size`}> · {pick.size}</span>}
                           {pick.sponsored && <span id={`${rid}-ad`}> · Sponsored</span>}
                         </p>
-                        {item.picks.length > 1 && (
+                        {item.picks.length > 1 && !stale && (
                           <button
                             id={`${rid}-swap`}
                             type="button"
@@ -106,17 +136,17 @@ export function CartCard({ toolCallId, widget }: { toolCallId: string; widget: C
                       </div>
                       <div id={`${rid}-controls`} className="flex shrink-0 flex-col items-end gap-2">
                         <div id={`${rid}-qty`} className="flex items-center rounded-full border border-border">
-                          <button id={`${rid}-dec`} type="button" aria-label="Decrease quantity" disabled={line.qty <= 1} onClick={() => update(i, { qty: line.qty - 1 })} className="p-1.5 text-text-secondary disabled:opacity-30">
+                          <button id={`${rid}-dec`} type="button" aria-label="Decrease quantity" disabled={stale || line.qty <= 1} onClick={() => update(i, { qty: line.qty - 1 })} className="p-1.5 text-text-secondary disabled:opacity-30">
                             <Minus size={12} />
                           </button>
                           <span id={`${rid}-qty-n`} className="w-5 text-center text-sm">
                             {line.qty}
                           </span>
-                          <button id={`${rid}-inc`} type="button" aria-label="Increase quantity" onClick={() => update(i, { qty: line.qty + 1 })} className="p-1.5 text-text-secondary">
+                          <button id={`${rid}-inc`} type="button" aria-label="Increase quantity" disabled={stale} onClick={() => update(i, { qty: line.qty + 1 })} className="p-1.5 text-text-secondary disabled:opacity-30">
                             <Plus size={12} />
                           </button>
                         </div>
-                        <button id={`${rid}-remove`} type="button" aria-label="Remove" onClick={() => update(i, { removed: true })} className="rounded-full bg-surface p-1.5 text-text-secondary hover:text-text-primary">
+                        <button id={`${rid}-remove`} type="button" aria-label="Remove" disabled={stale} onClick={() => update(i, { removed: true })} className="rounded-full bg-surface p-1.5 text-text-secondary hover:text-text-primary">
                           <Trash2 size={13} />
                         </button>
                       </div>

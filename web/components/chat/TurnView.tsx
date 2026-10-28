@@ -4,6 +4,7 @@ import type { Turn } from "@/lib/turns";
 import { ActivitySteps } from "./ActivitySteps";
 import { Followups } from "./Followups";
 import { type BrowserFrame, LiveBrowser } from "./LiveBrowser";
+import type { CartEdits } from "@/components/widgets/CartCard";
 import { Markdown } from "./Markdown";
 import { SourcesRow } from "./SourcesRow";
 
@@ -17,6 +18,8 @@ export function TurnView(props: {
   answered: boolean;
   onAnswer: (text: string) => void;
   frame?: BrowserFrame;
+  latestCart?: string;
+  onCartEdit?: (e: CartEdits) => void;
 }) {
   const { turn, running } = props;
   const id = `turn-${turn.id}`;
@@ -38,7 +41,7 @@ export function TurnView(props: {
           {turn.items.map((item) => {
             if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
             if (item.kind === "widget" && isFollowups(item.widget)) return null;
-            if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} answered={props.answered} onAnswer={props.onAnswer} />;
+            if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} answered={props.answered} onAnswer={props.onAnswer} staleCart={item.id !== props.latestCart} onCartEdit={props.onCartEdit} />;
             if (item.result === undefined) {
               return (
                 <div id={`${id}-artifact-pending-${item.id}`} key={item.id} className="h-16 animate-pulse rounded-2xl border border-border bg-surface" aria-label="Writing page" />

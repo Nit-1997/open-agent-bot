@@ -26,6 +26,19 @@ describe("rankTiles", () => {
     expect(ranked.map((t) => t.title)).toEqual(["Boneless Skinless Chicken Breasts 2 lb"]);
   });
 
+  it("ranks a different form of the product (chips, mix, flavored) after the product itself", () => {
+    const pico = rankTiles("pico de gallo", [tile("Pico de Gallo Flavored Tortilla Chips", 2.5), tile("Grillo's Pickle de Gallo", 6.69), tile("Fresh Pico de Gallo 16 oz", 8.59)]);
+    expect(pico[0].title).toBe("Fresh Pico de Gallo 16 oz");
+    const rice = rankTiles("long grain white rice", [tile("Rice-A-Roni Long Grain & Wild Rice Mix", 1.5), tile("Sunny Select Long Grain White Rice 2 lb", 2.09)]);
+    expect(rice[0].title).toBe("Sunny Select Long Grain White Rice 2 lb");
+    expect(rankTiles("tortilla chips", [tile("Tortilla Chips", 3), tile("Flour Tortillas", 2)])[0].title).toBe("Tortilla Chips");
+  });
+
+  it("drops a different product form that only partly matches, even when it's the only result", () => {
+    expect(rankTiles("pico de gallo", [tile("Grillo's Pickles Mild Pickle de Gallo 16 oz", 6.69)])).toEqual([]);
+    expect(rankTiles("pico de gallo", [tile("Pico de Gallo Flavored Tortilla Chips", 2.5)])).toHaveLength(1);
+  });
+
   it("keeps the store's order among equally priced matches and puts unpriced ones last", () => {
     const ranked = rankTiles("chicken breast", [tile("Boneless Chicken Breast", undefined), tile("Chicken Breast Tenderloins", 7.99), tile("Organic Chicken Breast", 7.99)]);
     expect(ranked.map((t) => t.title)).toEqual(["Chicken Breast Tenderloins", "Organic Chicken Breast", "Boneless Chicken Breast"]);

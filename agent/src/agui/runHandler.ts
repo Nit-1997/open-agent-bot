@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
 import type { UserContext, UserProfile } from "../prompt/systemPrompt.js";
 import type { SessionStore } from "../session/sessionStore.js";
+import type { CartEdits } from "../shop/cart.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
 export const SESSION_EXPIRED_MESSAGE = "This chat's session ended (the agent restarted or the chat sat idle). Start a new chat.";
@@ -42,6 +43,23 @@ export function readUserContext(input: RunAgentInput): UserContext | null {
     }
   } catch {}
   return null;
+}
+
+export function readCartEdits(input: RunAgentInput): CartEdits | null {
+  const item = input.context?.find((c) => c.description === "cart_edits");
+  if (!item?.value) return null;
+  try {
+    const v = typeof item.value === "string" ? JSON.parse(item.value) : item.value;
+    if (!v || typeof v !== "object") return null;
+    const strings = (x: unknown) => (Array.isArray(x) ? x.filter((s): s is string => typeof s === "string").slice(0, 50) : undefined);
+    return {
+      removed: strings(v.removed),
+      qty: v.qty && typeof v.qty === "object" ? (v.qty as Record<string, number>) : undefined,
+      picks: v.picks && typeof v.picks === "object" ? (v.picks as Record<string, Record<string, string>>) : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function runError(code: string, message: string): BaseEvent {
@@ -102,6 +120,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     }
   }
 
+  const edits = readCartEdits(input);
+  if (edits) entry.cart?.applyEdits(edits);
   entry.evidence?.add(messageText(last));
   const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {

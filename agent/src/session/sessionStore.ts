@@ -1,5 +1,6 @@
 import type { FrameBus } from "../browser/frames.js";
 import type { Evidence } from "../grounding/evidence.js";
+import type { ActiveCart } from "../shop/cart.js";
 import type { PiSession } from "../pi/createPiSession.js";
 import type { UserContext } from "../prompt/systemPrompt.js";
 
@@ -12,6 +13,7 @@ export type SessionEntry = {
   evidence?: Evidence;
   setModel?: (id: string) => Promise<void>;
   frames?: FrameBus;
+  cart?: ActiveCart;
 };
 
 export class SessionStore {

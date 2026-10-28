@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Cart } from "@shared/widgets";
 import { CartCard } from "@/components/widgets/CartCard";
 
@@ -66,5 +66,32 @@ describe("CartCard", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Safeway/ }));
     expect(screen.getByRole("link", { name: "Signature Rice 2 lb" })).toBeInTheDocument();
     expect(subtotal()).toBe("$3.50");
+  });
+});
+
+describe("CartCard edits", () => {
+  it("treats the list as one cart: quantities and removals carry across store tabs", () => {
+    render(<CartCard toolCallId="c5" widget={cart} />);
+    fireEvent.click(within(screen.getByRole("listitem", { name: "rice" })).getByRole("button", { name: "Increase quantity" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Safeway/ }));
+    expect(within(screen.getByRole("listitem", { name: "rice" })).getByText("2")).toBeInTheDocument();
+    expect(subtotal()).toBe("$7.00");
+  });
+
+  it("reports the user's edits so the next message can carry them", () => {
+    const onEdit = vi.fn();
+    render(<CartCard toolCallId="c6" widget={cart} onEdit={onEdit} />);
+    fireEvent.click(within(screen.getByRole("listitem", { name: "black beans" })).getByRole("button", { name: "Remove" }));
+    const rice = screen.getByRole("listitem", { name: "rice" });
+    fireEvent.click(within(rice).getByRole("button", { name: "Increase quantity" }));
+    fireEvent.click(within(rice).getByRole("button", { name: "Swap" }));
+    fireEvent.click(within(rice).getByRole("button", { name: /Instant Rice 14oz/ }));
+    expect(onEdit).toHaveBeenLastCalledWith({ removed: ["black beans"], qty: { rice: 2 }, picks: { "Target (Shipt)": { rice: "Instant Rice 14oz" } } });
+  });
+
+  it("marks an older cart as replaced and locks it", () => {
+    render(<CartCard toolCallId="c7" widget={cart} stale />);
+    expect(screen.getByText("Updated cart below")).toBeInTheDocument();
+    expect(within(screen.getByRole("listitem", { name: "rice" })).getByRole("button", { name: "Increase quantity" })).toBeDisabled();
   });
 });

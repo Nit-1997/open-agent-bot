@@ -186,7 +186,7 @@ export const CartSchema = Type.Object({
       total: Type.Number(),
       url: Url,
       missing: Type.Array(Str),
-      items: Type.Array(Type.Object({ query: Str, qty: Type.Number(), picks: Type.Array(CartPickSchema, { maxItems: 3 }) }), { minItems: 1, maxItems: 12 }),
+      items: Type.Array(Type.Object({ query: Str, qty: Type.Number(), picks: Type.Array(CartPickSchema, { maxItems: 3 }) }), { minItems: 1, maxItems: 40 }),
     }),
     { minItems: 1, maxItems: 6 },
   ),

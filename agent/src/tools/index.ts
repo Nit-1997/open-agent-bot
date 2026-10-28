@@ -13,6 +13,7 @@ import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon } from "./geo.js
 import type { ToolResult } from "./result.js";
 import type { Evidence } from "../grounding/evidence.js";
 import type { FrameBus } from "../browser/frames.js";
+import type { ActiveCart } from "../shop/cart.js";
 import { askUserTool } from "./askUser.js";
 import { showUiTool, suggestRepliesTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
@@ -29,6 +30,7 @@ export type ToolDeps = {
   budget: ToolBudget;
   evidence?: Evidence;
   frames?: FrameBus;
+  cart?: ActiveCart;
 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2, shop: 2 };
@@ -62,7 +64,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browse, deps.budget, "read"),
-    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames }), deps.budget, "shop"),
+    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart }), deps.budget, "shop"),
     weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),
     withBudget(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",

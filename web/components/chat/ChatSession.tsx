@@ -1,6 +1,6 @@
 "use client";
 
-import { useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
+import { useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -8,6 +8,7 @@ import { classifyRunError, type RunErrorKind } from "@/lib/errors";
 import { buildTurns, type ChatMessage } from "@/lib/turns";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
+import type { CartEdits } from "@/components/widgets/CartCard";
 import type { BrowserFrame } from "./LiveBrowser";
 import { TurnView } from "./TurnView";
 
@@ -29,6 +30,13 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   const lastRef = useRef(lastId);
   lastRef.current = lastId;
   const [frames, setFrames] = useState<Record<string, BrowserFrame>>({});
+  const [cartEdits, setCartEdits] = useState<CartEdits | null>(null);
+  const latestCart = useMemo(() => {
+    for (const t of [...turns].reverse())
+      for (const it of [...t.items].reverse()) if (it.kind === "widget" && (it.widget as { kind?: string } | null)?.kind === "cart") return it.id;
+    return undefined;
+  }, [turns]);
+  useAgentContext({ description: "cart_edits", value: cartEdits ? JSON.stringify(cartEdits) : "" });
 
   useEffect(() => {
     const sub = agent.subscribe({
@@ -83,6 +91,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
     setSending(true);
     try {
       await copilotkit.runAgent({ agent });
+      setCartEdits(null);
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
@@ -131,6 +140,8 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
                   answered={t.id !== lastId || running}
                   onAnswer={send}
                   frame={frames[t.id]}
+                  latestCart={latestCart}
+                  onCartEdit={setCartEdits}
                 />
               </div>
             ))}

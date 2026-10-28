@@ -1,12 +1,12 @@
 import { validateWidget } from "@shared/widgets";
 import { AskCard } from "./AskCard";
-import { CartCard } from "./CartCard";
+import { type CartEdits, CartCard } from "./CartCard";
 import { FlightList } from "./FlightList";
 import { GroundingNote } from "./GroundingNote";
 import { UiCard } from "./UiCard";
 import { WeatherCard } from "./WeatherCard";
 
-export function WidgetRenderer(props: { toolCallId: string; args: unknown; locale: string; answered?: boolean; onAnswer?: (text: string) => void }) {
+export function WidgetRenderer(props: { toolCallId: string; args: unknown; locale: string; answered?: boolean; onAnswer?: (text: string) => void; staleCart?: boolean; onCartEdit?: (e: CartEdits) => void }) {
   const { toolCallId, args, locale } = props;
   const r = validateWidget((args as { widget?: unknown } | undefined)?.widget);
   if (!r.ok) return null;
@@ -25,6 +25,6 @@ export function WidgetRenderer(props: { toolCallId: string; args: unknown; local
     case "followups":
       return null;
     case "cart":
-      return <CartCard toolCallId={toolCallId} widget={w} />;
+      return <CartCard toolCallId={toolCallId} widget={w} stale={props.staleCart} onEdit={props.staleCart ? undefined : props.onCartEdit} />;
   }
 }

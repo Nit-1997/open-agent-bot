@@ -14,12 +14,25 @@ export function matches(query: string, title: string): boolean {
   return want.filter((w) => have.has(w)).length >= Math.max(1, Math.ceil(want.length * 0.6));
 }
 
+const DERIVED = ["chip", "crisp", "flavor", "flavored", "flavour", "seasoning", "mix", "sauce", "dip", "snack", "candy", "cracker", "dressing", "pickle", "kit", "bar", "cereal", "soup", "drink", "juice", "spray", "powder", "wild"];
+
+function fullMatch(query: string, title: string): boolean {
+  const have = new Set(keyWords(title));
+  return keyWords(query).every((w) => have.has(w));
+}
+
+function derived(query: string, title: string): boolean {
+  const asked = new Set(keyWords(query));
+  return keyWords(title).some((w) => DERIVED.includes(w) && !asked.has(w));
+}
+
 export function rankTiles(query: string, tiles: Tile[]): Tile[] {
   const price = (t: Tile) => t.price ?? Number.POSITIVE_INFINITY;
+  const form = (t: Tile) => Number(derived(query, t.title));
   return tiles
-    .filter((t) => matches(query, t.title))
+    .filter((t) => matches(query, t.title) && !(derived(query, t.title) && !fullMatch(query, t.title)))
     .map((t, i) => ({ t, i }))
-    .sort((a, b) => Number(a.t.sponsored) - Number(b.t.sponsored) || price(a.t) - price(b.t) || a.i - b.i)
+    .sort((a, b) => form(a.t) - form(b.t) || Number(a.t.sponsored) - Number(b.t.sponsored) || price(a.t) - price(b.t) || a.i - b.i)
     .map(({ t }) => t);
 }
 

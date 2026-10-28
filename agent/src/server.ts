@@ -3,6 +3,7 @@ import { createApp, defaultModelRef } from "./app.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig } from "./config.js";
 import { FrameBus } from "./browser/frames.js";
+import { ActiveCart } from "./shop/cart.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { ProviderHub } from "./providers/hub.js";
@@ -36,11 +37,12 @@ const store = new SessionStore({
     const budget = new ToolBudget(PER_REPLY_LIMITS);
     const evidence = new Evidence();
     const frames = new FrameBus();
+    const cart = new ActiveCart();
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: modelFor(userContext?.model),
       systemPrompt: buildSystemPrompt(userContext),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart }),
     });
     return {
       session: handle.session,
@@ -49,6 +51,7 @@ const store = new SessionStore({
       onRunStart: () => budget.reset(),
       evidence,
       frames,
+      cart,
       setModel: async (ref: string) => {
         const model = hub.resolve(ref);
         if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);
