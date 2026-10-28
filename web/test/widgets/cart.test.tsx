@@ -95,3 +95,15 @@ describe("CartCard edits", () => {
     expect(within(screen.getByRole("listitem", { name: "rice" })).getByRole("button", { name: "Increase quantity" })).toBeDisabled();
   });
 });
+
+describe("CartCard currency", () => {
+  it("shows totals in the store's currency", () => {
+    const inr: Cart = {
+      kind: "cart",
+      stores: [{ name: "Amazon", total: 350, currency: "INR", url: "https://www.amazon.in/", missing: [], items: [{ query: "rice", qty: 1, picks: [{ title: "Rice 1kg", price: 350, priceText: "₹350", url: "https://www.amazon.in/r" }] }] }],
+    };
+    render(<CartCard toolCallId="inr" widget={inr} locale="en-IN" />);
+    expect(screen.getAllByRole("tab")[0].textContent).toContain("₹350.00");
+    expect(screen.getByTestId("cart-subtotal").textContent).toBe("₹350.00");
+  });
+});

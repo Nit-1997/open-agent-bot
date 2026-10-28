@@ -3,22 +3,23 @@
 import type { Cart } from "@shared/widgets";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { money as formatMoney } from "@/lib/format";
 import { Picture } from "./CardRow";
 
 type Line = { qty: number; choice: number; removed: boolean };
 type Shared = Record<string, { qty: number; removed: boolean }>;
 export type CartEdits = { removed: string[]; qty: Record<string, number>; picks: Record<string, Record<string, string>> };
 
-const money = (n: number) => `$${n.toFixed(2)}`;
 const portalOf = (name: string) => name.match(/\(([^)]+)\)\s*$/)?.[1] ?? name;
 
-export function CartCard({ toolCallId, widget, onEdit, stale = false }: { toolCallId: string; widget: Cart; onEdit?: (e: CartEdits) => void; stale?: boolean }) {
+export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale = false }: { toolCallId: string; widget: Cart; locale?: string; onEdit?: (e: CartEdits) => void; stale?: boolean }) {
   const id = `cart-${toolCallId}`;
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState<Shared>({});
   const [choices, setChoices] = useState<Record<string, Record<string, number>>>({});
   const [swapping, setSwapping] = useState<number | null>(null);
   const store = widget.stores[active];
+  const money = (n: number, currency = store.currency) => formatMoney(n, currency ?? "USD", locale);
   const current: Line[] = store.items.map((i) => ({
     qty: shared[i.query]?.qty ?? i.qty,
     removed: shared[i.query]?.removed ?? false,
@@ -87,7 +88,7 @@ export function CartCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
           >
             <span id={`${id}-tab-${n}-name`}>{s.name}</span>
             <span id={`${id}-tab-${n}-total`} className="font-semibold">
-              {money(s.total)}
+              {money(s.total, s.currency)}
             </span>
             {n === 0 && widget.stores.length > 1 && (
               <span id={`${id}-tab-${n}-best`} className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${n === active ? "bg-paper/20" : "bg-success-bg text-success-fg"}`}>

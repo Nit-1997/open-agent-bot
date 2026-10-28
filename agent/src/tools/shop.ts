@@ -4,6 +4,7 @@ import { Type } from "typebox";
 import type { UserContext } from "../prompt/systemPrompt.js";
 import { ActiveCart, type CartItem } from "../shop/cart.js";
 import { extractTiles, type Tile } from "../shop/extract.js";
+import { currencyOf, formatMoney } from "../shop/currency.js";
 import { bestValue, rankTiles, type StoreResult } from "../shop/rank.js";
 import { type Store, storeFor as defaultStoreFor } from "../shop/stores.js";
 import { type FrameBus, watch } from "../browser/frames.js";
@@ -118,46 +119,62 @@ function storeResults(results: JobResult[], wanted: Item[]): StoreResult[] {
   return [...byStore.values()];
 }
 
-const money = (n: number) => `$${n.toFixed(2)}`;
+type Summary = ReturnType<typeof bestValue>;
 
 function describeTile(t: Tile, n: number): string {
   const meta = [t.priceText ?? "price not shown", t.size, t.rating && `${t.rating}★`, t.sponsored && "sponsored"].filter(Boolean).join(" · ");
   return `  ${n}. ${t.title} — ${meta}\n     link: ${t.url}${t.image ? `\n     image: ${t.image}` : ""}`;
 }
 
-function render(stores: StoreResult[], results: JobResult[], wanted: Item[]): { text: string; summary: ReturnType<typeof bestValue> } {
-  const summary = bestValue(stores).filter((s) => s.found > 0);
-  const lines: string[] = [];
+function summaryLines(summary: Summary, stores: StoreResult[], wanted: number): string[] {
+  const currency = new Map(stores.map((s) => [s.store, currencyOf(s.items)]));
+  const of = (s: Summary[number]) =>
+    `${s.found} of ${wanted} items, ${formatMoney(s.total, currency.get(s.store))}${s.missing.length ? ` (missing: ${s.missing.join(", ")})` : ""}`;
   const [best, ...rest] = summary;
-  const of = (s: (typeof summary)[number]) => `${s.found} of ${wanted.length} items, ${money(s.total)}${s.missing.length ? ` (missing: ${s.missing.join(", ")})` : ""}`;
-  if (best) lines.push(`Best value: ${best.store} — ${of(best)}`);
-  if (rest.length) lines.push(`Others: ${rest.slice(0, 5).map((s) => `${s.store} ${of(s)}`).join("; ")}`);
-  const seen = new Set<string>();
+  return [
+    ...(best ? [`Best value: ${best.store} — ${of(best)}`] : []),
+    ...(rest.length ? [`Others: ${rest.slice(0, 5).map((s) => `${s.store} ${of(s)}`).join("; ")}`] : []),
+  ];
+}
+
+function problemLines(results: JobResult[], firstQuery: string): string[] {
+  const lines: string[] = [];
+  const reported = new Set<string>();
   for (const r of results) {
-    if (seen.has(r.store.id)) continue;
-    if (r.blocked) {
-      seen.add(r.store.id);
+    if (r.blocked && !reported.has(r.store.id)) {
+      reported.add(r.store.id);
       lines.push(`${r.store.label}: blocked by a bot check. Link for the user: ${r.blocked}`);
     }
   }
   for (const r of results) {
-    if (seen.has(r.store.id) || r.blocked) continue;
-    const ok = results.filter((x) => x.store.id === r.store.id && !x.error && x.tiles.length);
-    if (!ok.length) {
-      seen.add(r.store.id);
-      const err = results.find((x) => x.store.id === r.store.id && x.error)?.error;
-      lines.push(`${r.store.label}: no products read${err ? ` (${err})` : " (the store showed no results to the agent's browser)"}. Link for the user: ${r.store.searchUrl?.(wanted[0].query) ?? r.store.home}`);
-    }
+    if (reported.has(r.store.id)) continue;
+    const mine = results.filter((x) => x.store.id === r.store.id);
+    if (mine.some((x) => !x.error && x.tiles.length)) continue;
+    reported.add(r.store.id);
+    const err = mine.find((x) => x.error)?.error;
+    lines.push(`${r.store.label}: no products read${err ? ` (${err})` : " (the store showed no results to the agent's browser)"}. Link for the user: ${r.store.searchUrl?.(firstQuery) ?? r.store.home}`);
   }
+  return lines;
+}
+
+function storeLines(stores: StoreResult[], summary: Summary): string[] {
   const shown = summary.slice(0, 3).map((s) => s.store);
-  for (const s of stores.filter((x) => shown.includes(x.store)).sort((a, b) => shown.indexOf(a.store) - shown.indexOf(b.store))) {
-    const full = s.store === best?.store;
-    lines.push(`\n${s.store}:`);
-    for (const i of s.items) {
-      lines.push(`- ${i.query}${i.qty > 1 ? ` ×${i.qty}` : ""}:${i.picks.length ? "" : " not found"}`);
-      i.picks.slice(0, full ? PICKS : 1).forEach((t, n) => lines.push(describeTile(t, n + 1)));
-    }
-  }
+  const best = shown[0];
+  return stores
+    .filter((x) => shown.includes(x.store))
+    .sort((a, b) => shown.indexOf(a.store) - shown.indexOf(b.store))
+    .flatMap((s) => [
+      `\n${s.store}:`,
+      ...s.items.flatMap((i) => [
+        `- ${i.query}${i.qty > 1 ? ` ×${i.qty}` : ""}:${i.picks.length ? "" : " not found"}`,
+        ...i.picks.slice(0, s.store === best ? PICKS : 1).map((t, n) => describeTile(t, n + 1)),
+      ]),
+    ]);
+}
+
+function render(stores: StoreResult[], results: JobResult[], wanted: Item[]): { text: string; summary: Summary } {
+  const summary = bestValue(stores).filter((s) => s.found > 0);
+  const lines = [...summaryLines(summary, stores, wanted.length), ...problemLines(results, wanted[0].query), ...storeLines(stores, summary)];
   return { text: lines.join("\n").trim(), summary };
 }
 

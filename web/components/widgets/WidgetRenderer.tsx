@@ -25,6 +25,6 @@ export function WidgetRenderer(props: { toolCallId: string; args: unknown; local
     case "followups":
       return null;
     case "cart":
-      return <CartCard toolCallId={toolCallId} widget={w} stale={props.staleCart} onEdit={props.staleCart ? undefined : props.onCartEdit} />;
+      return <CartCard toolCallId={toolCallId} widget={w} locale={locale} stale={props.staleCart} onEdit={props.staleCart ? undefined : props.onCartEdit} />;
   }
 }
