@@ -1,11 +1,11 @@
 export function Card(props: { id: string; title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section id={props.id} className="w-full rounded-2xl border border-border bg-paper p-4">
+    <section id={props.id} className="w-full rounded-2xl border border-border bg-paper p-3 sm:p-4">
       <h3 id={`${props.id}-title`} className="text-[17px] font-medium text-text-primary">
         {props.title}
       </h3>
       {props.subtitle && (
-        <p id={`${props.id}-subtitle`} className="text-[13px] sm:text-xs text-text-muted">
+        <p id={`${props.id}-subtitle`} className="text-xs text-text-muted">
           {props.subtitle}
         </p>
       )}

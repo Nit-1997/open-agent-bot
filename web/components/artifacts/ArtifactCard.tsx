@@ -56,7 +56,7 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
           </a>
         </div>
       </header>
-      <iframe id={`${id}-frame`} title={title} sandbox={ARTIFACT_SANDBOX} src={src} loading="lazy" className="block h-[min(70vh,640px)] min-h-[360px] w-full bg-white" />
+      <iframe id={`${id}-frame`} title={title} sandbox={ARTIFACT_SANDBOX} src={src} loading="lazy" className="block h-[min(58vh,520px)] min-h-[280px] sm:h-[min(70vh,640px)] sm:min-h-[360px] w-full bg-white" />
       {fullScreen && <ArtifactViewer artifactId={artifactId} title={title} onClose={() => setFullScreen(false)} />}
     </section>
   );

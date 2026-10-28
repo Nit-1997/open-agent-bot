@@ -18,7 +18,7 @@ function Collapsible<T>({ id, items, children }: { id: string; items: T[]; child
           id={`${id}-more`}
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="mt-1 text-[14px] sm:text-[13px] font-medium text-text-secondary underline-offset-4 transition hover:text-text-primary hover:underline"
+          className="mt-1 text-[13px] font-medium text-text-secondary underline-offset-4 transition hover:text-text-primary hover:underline"
         >
           {open ? "Show less" : `Show ${hidden} more`}
         </button>
@@ -80,14 +80,14 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
         <dl id={id} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {block.items.map((s, i) => (
             <div id={`${id}-${i}`} key={i} className="rounded-lg bg-surface px-3 py-2">
-              <dt id={`${id}-${i}-label`} className="text-[13px] sm:text-xs text-text-muted">
+              <dt id={`${id}-${i}-label`} className="text-xs text-text-muted">
                 {m(`${id}-${i}-label`, s.label)}
               </dt>
               <dd id={`${id}-${i}-value`} className="text-lg font-semibold">
                 {m(`${id}-${i}-value`, s.value)}
               </dd>
               {s.note && (
-                <dd id={`${id}-${i}-note`} className="text-[13px] sm:text-xs text-text-muted">
+                <dd id={`${id}-${i}-note`} className="text-xs text-text-muted">
                   {m(`${id}-${i}-note`, s.note)}
                 </dd>
               )}
@@ -102,7 +102,7 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
             {(rows) => (
               <div id={`${id}-scroll`} className="overflow-x-auto rounded-lg border border-border">
                 <table id={`${id}-table`} className="w-full text-left text-sm">
-                  <thead id={`${id}-head`} className="bg-surface text-[13px] sm:text-xs text-text-muted">
+                  <thead id={`${id}-head`} className="bg-surface text-xs text-text-muted">
                     <tr id={`${id}-head-row`}>
                       {block.columns.map((c, i) => (
                         <th id={`${id}-h${i}`} key={i} scope="col" className="px-3 py-2 font-medium">
@@ -149,7 +149,7 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
                           </span>
                         )}
                         {it.subtitle && (
-                          <p id={`${iid}-subtitle`} className="line-clamp-2 text-[13px] sm:text-xs text-text-muted">
+                          <p id={`${iid}-subtitle`} className="line-clamp-2 text-xs text-text-muted">
                             {m(`${iid}-subtitle`, it.subtitle)}
                           </p>
                         )}
@@ -161,7 +161,7 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
                           </span>
                         )}
                         {it.badge && (
-                          <span id={`${iid}-badge`} className="rounded-full bg-surface px-2 py-0.5 text-[12px] sm:text-[10px] font-semibold text-text-secondary">
+                          <span id={`${iid}-badge`} className="rounded-full bg-surface px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-text-secondary">
                             {m(`${iid}-badge`, it.badge)}
                           </span>
                         )}
@@ -196,7 +196,7 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
                         <span id={`${id}-${i}-text`}>
                           {m(`${id}-${i}-text`, it.text)}
                           {it.note && (
-                            <span id={`${id}-${i}-note`} className="ml-1 text-[13px] sm:text-xs text-text-muted">
+                            <span id={`${id}-${i}-note`} className="ml-1 text-xs text-text-muted">
                               {m(`${id}-${i}-note`, it.note)}
                             </span>
                           )}
@@ -238,13 +238,13 @@ export function UiCard({ toolCallId, widget }: { toolCallId: string; widget: UiW
   const flags = widget.unverified ?? [];
   const removed = widget.removedLinks ?? 0;
   return (
-    <section id={id} className="my-2 w-full rounded-2xl border border-border bg-paper p-4">
+    <section id={id} className="my-2 w-full rounded-2xl border border-border bg-paper p-3 sm:p-4">
       <header id={`${id}-header`}>
         <h3 id={`${id}-title`} className="text-base font-semibold">
           <Marked id={`${id}-title`} text={widget.title} flags={flags} />
         </h3>
         {widget.subtitle && (
-          <p id={`${id}-subtitle`} className="text-[13px] sm:text-xs text-text-muted">
+          <p id={`${id}-subtitle`} className="text-xs text-text-muted">
             <Marked id={`${id}-subtitle`} text={widget.subtitle} flags={flags} />
           </p>
         )}
@@ -253,7 +253,7 @@ export function UiCard({ toolCallId, widget }: { toolCallId: string; widget: UiW
         <Block key={i} id={`${id}-b${i}`} block={b} flags={flags} label={widget.title} />
       ))}
       {(flags.length > 0 || removed > 0) && (
-        <footer id={`${id}-grounding`} className="mt-3 border-t border-border pt-2 text-[13px] sm:text-xs text-warn-fg">
+        <footer id={`${id}-grounding`} className="mt-3 border-t border-border pt-2 text-xs text-warn-fg">
           {flags.length > 0 && (
             <p id={`${id}-grounding-unverified`}>Values marked with ? weren&apos;t found in the sources I read. Check the store before relying on them.</p>
           )}

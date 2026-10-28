@@ -10,7 +10,9 @@ import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import type { CartEdits } from "@/components/widgets/CartCard";
 import type { BrowserFrame } from "./LiveBrowser";
-import { TurnView } from "./TurnView";
+import { QUIET_ANSWER, TurnView } from "./TurnView";
+
+const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string; onNewChat: () => void }) {
   const { agent } = useAgent({ agentId: `chat-${props.threadId}`, runtimeAgentId: props.agentId, threadId: props.threadId });
@@ -20,8 +22,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   const [timing, setTiming] = useState<Record<string, { start: number; end?: number }>>({});
   const [now, setNow] = useState(() => Date.now());
   const scroller = useRef<HTMLDivElement>(null);
-  const anchor = useRef<string | null>(null);
-  const [viewport, setViewport] = useState(0);
+  const reveal = useRef<string | null>(null);
   const [below, setBelow] = useState(false);
 
   const turns = useMemo(() => buildTurns(agent.messages as readonly ChatMessage[]), [agent.messages]);
@@ -60,26 +61,17 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
     return () => clearInterval(t);
   }, [running]);
 
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setViewport(el.clientHeight));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   const measure = useCallback(() => {
     const el = scroller.current;
     if (el) setBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 120);
   }, []);
 
   useLayoutEffect(() => {
-    const el = scroller.current;
-    const id = anchor.current;
-    const turn = id ? document.getElementById(`turn-${id}`) : null;
-    if (el && turn) {
-      anchor.current = null;
-      el.scrollTo({ top: turn.offsetTop - 16, behavior: "smooth" });
+    const id = reveal.current;
+    const mine = id ? document.getElementById(`turn-${id}-user`) : null;
+    if (mine) {
+      reveal.current = null;
+      mine.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
     }
     measure();
   }, [turns, measure]);
@@ -100,10 +92,10 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   }, [agent, copilotkit]);
 
   const send = useCallback(
-    (text: string) => {
+    (text: string, quiet = false) => {
       setError(null);
-      const id = crypto.randomUUID();
-      anchor.current = id;
+      const id = `${quiet ? QUIET_ANSWER : ""}${crypto.randomUUID()}`;
+      if (!quiet) reveal.current = id;
       setTiming((t) => ({ ...t, [id]: { start: Date.now() } }));
       agent.addMessage({ id, role: "user", content: text });
       void run();
@@ -126,9 +118,9 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
         {turns.length === 0 ? (
           <EmptyState name={props.name?.trim().split(/\s+/)[0]} onPick={send} />
         ) : (
-          <div id="chat-turns" className="mx-auto w-full max-w-[720px] space-y-10 px-4 pb-8 pt-6">
+          <div id="chat-turns" className="mx-auto w-full max-w-[720px] space-y-6 px-3 pb-6 pt-4 sm:space-y-10 sm:px-4 sm:pb-8 sm:pt-6">
             {turns.map((t) => (
-              <div id={`turn-wrap-${t.id}`} key={t.id} style={t.id === lastId && viewport ? { minHeight: viewport - 48 } : undefined}>
+              <div id={`turn-wrap-${t.id}`} key={t.id}>
                 <TurnView
                   turn={t}
                   running={running && t.id === lastId}
@@ -147,16 +139,16 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
           </div>
         )}
       </div>
-      <div id="chat-footer" className="relative mx-auto w-full max-w-[720px] px-4 pb-4">
+      <div id="chat-footer" className="relative mx-auto w-full max-w-[720px] px-3 pb-3 sm:px-4 sm:pb-4">
         {below && (
           <button
             id="chat-jump-bottom"
             type="button"
-            aria-label="Scroll to the latest"
-            onClick={() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" })}
-            className="absolute -top-12 left-1/2 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-paper text-text-secondary shadow-float transition hover:text-text-primary"
+            onClick={() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: prefersReducedMotion() ? "auto" : "smooth" })}
+            className="absolute -top-11 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-paper px-3 text-[12px] font-medium text-text-secondary shadow-float transition hover:text-text-primary focus-visible:outline-2 focus-visible:outline-mist-500"
           >
-            <ArrowDown id="chat-jump-bottom-icon" aria-hidden="true" size={16} />
+            <ArrowDown id="chat-jump-bottom-icon" aria-hidden="true" size={14} />
+            <span id="chat-jump-bottom-text">{running ? "Reply loading below" : "Latest below"}</span>
           </button>
         )}
         {error && (
@@ -172,7 +164,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
           />
         )}
         <Composer running={running} onSend={send} onStop={stop} autoFocus />
-        <p id="chat-disclaimer" className="mt-2 text-center text-[13px] sm:text-[11px] text-text-faint">
+        <p id="chat-disclaimer" className="mt-1.5 text-center text-[11px] text-text-muted">
           Read-only: I look things up and plan, but never buy, book, or sign in for you.
         </p>
       </div>

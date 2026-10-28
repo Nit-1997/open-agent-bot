@@ -33,3 +33,12 @@ describe("follow-up pills", () => {
     expect(screen.queryByRole("button", { name: "Make it high protein" })).toBeNull();
   });
 });
+
+describe("quick-check answers", () => {
+  it("shows a small line instead of a chat bubble", () => {
+    const quiet: Turn = { ...turn, id: "answer-1", user: { id: "answer-1", text: "Travelers: 2\nBudget: Saver" }, items: [] };
+    render(<TurnView turn={quiet} running={false} locale="en-US" now={0} answered={false} onAnswer={() => {}} />);
+    expect(screen.getByText("Sent your answers")).toBeInTheDocument();
+    expect(document.querySelector("#turn-answer-1-user-text")?.closest("details")).not.toHaveAttribute("open");
+  });
+});

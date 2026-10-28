@@ -25,7 +25,9 @@ describe("LiveBrowser", () => {
     render(<LiveBrowser id="lb3" frame={frame} live />);
     fireEvent.click(screen.getByRole("button", { name: "Expand browser view" }));
     expect(screen.getByRole("dialog", { name: "Browser view of shipt.com" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close browser view" })).toHaveFocus();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Expand browser view" })).toHaveFocus();
   });
 });

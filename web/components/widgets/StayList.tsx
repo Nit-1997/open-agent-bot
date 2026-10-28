@@ -47,17 +47,17 @@ function StayCard({ id, stay, currency, locale, showSource, folded }: { id: stri
         <span id={`${id}-media`} className="relative block aspect-[16/10] w-full overflow-hidden bg-surface">
           <Picture id={`${id}-img`} src={stay.image} alt={stay.title} fallback={stay.title} className="h-full w-full object-cover" />
           {stay.badge && (
-            <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[12px] sm:text-[10px] font-semibold text-on-charcoal">
+            <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-on-charcoal">
               {stay.badge}
             </span>
           )}
         </span>
         <span id={`${id}-text`} className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
-          <span id={`${id}-title`} className="line-clamp-2 text-[14px] sm:text-[13px] font-medium leading-snug text-text-primary">
+          <span id={`${id}-title`} className="line-clamp-2 text-[13px] font-medium leading-snug text-text-primary">
             {stay.title}
           </span>
           {details && (
-            <span id={`${id}-details`} className="line-clamp-1 text-[13px] sm:text-xs text-text-secondary">
+            <span id={`${id}-details`} className="line-clamp-1 text-xs text-text-secondary">
               {details}
             </span>
           )}
@@ -67,23 +67,23 @@ function StayCard({ id, stay, currency, locale, showSource, folded }: { id: stri
             {nightly ? (
               <span id={`${id}-nightly`} className="text-sm font-semibold text-text-primary">
                 {nightly}
-                <span id={`${id}-per-night`} className="text-[13px] sm:text-[11px] font-normal text-text-muted">
+                <span id={`${id}-per-night`} className="text-[12px] sm:text-[11px] font-normal text-text-muted">
                   {" "}
                   / night
                 </span>
               </span>
             ) : (
-              <span id={`${id}-no-price`} className="text-[13px] sm:text-xs text-text-muted">
+              <span id={`${id}-no-price`} className="text-xs text-text-muted">
                 Price not shown
               </span>
             )}
             {total && (
-              <span id={`${id}-total`} className="text-[13px] sm:text-[11px] text-text-muted">
+              <span id={`${id}-total`} className="text-[12px] sm:text-[11px] text-text-muted">
                 {total} total
               </span>
             )}
           </span>
-          <span id={`${id}-meta`} className="flex flex-col items-end gap-0.5 text-[13px] sm:text-[11px] text-text-muted">
+          <span id={`${id}-meta`} className="flex flex-col items-end gap-0.5 text-[12px] sm:text-[11px] text-text-muted">
             {rating && (
               <span id={`${id}-rating`} className="inline-flex items-center gap-0.5 font-medium text-text-secondary">
                 <Star id={`${id}-star`} aria-hidden="true" size={11} className="fill-current" />
@@ -120,12 +120,12 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
   const tabs = [...(read.length > 1 ? [{ id: ALL, label: "All · lowest price" }] : []), ...read.map((s) => ({ id: s.id, label: s.label }))];
 
   return (
-    <section id={id} className="my-2 w-full rounded-2xl border border-border bg-paper p-4">
+    <section id={id} className="my-2 w-full rounded-2xl border border-border bg-paper p-3 sm:p-4">
       <header id={`${id}-header`}>
         <h3 id={`${id}-title`} className="text-base font-semibold text-text-primary">
           Stays in {widget.location}
         </h3>
-        <p id={`${id}-subtitle`} className="text-[13px] sm:text-xs text-text-muted">
+        <p id={`${id}-subtitle`} className="text-xs text-text-muted">
           {`${dateRange(widget.checkin, widget.checkout, locale)} · ${nights} · ${guests}${budget}`}
         </p>
       </header>
@@ -140,7 +140,7 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`shrink-0 rounded-full border px-3 py-1 text-[14px] sm:text-[13px] transition ${tab === t.id ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"}`}
+              className={`shrink-0 rounded-full border px-3 py-1 text-[13px] transition ${tab === t.id ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"}`}
             >
               {t.label}
             </button>
@@ -167,7 +167,7 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
       )}
 
       {others.length > 0 && (
-        <footer id={`${id}-others`} className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[13px] sm:text-xs text-text-muted">
+        <footer id={`${id}-others`} className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-text-muted">
           {others.map((s) => (
             <a
               id={`${id}-other-${s.id}`}

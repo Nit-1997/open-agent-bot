@@ -47,7 +47,8 @@ describe("AskCard", () => {
     render(<AskCard toolCallId="q4" widget={widget} locale="en-US" answered />);
     expect(screen.getByLabelText("Flying from")).toBeDisabled();
     expect(screen.queryByRole("button", { name: /looks good/i })).toBeNull();
-    expect(screen.getByText("Answered")).toBeInTheDocument();
+    expect(screen.getByText("Quick check answered")).toBeInTheDocument();
+    expect(screen.queryByText("Which dates should I plan around?")).toBeNull();
   });
 
   it("formats a single-day range without nights", () => {

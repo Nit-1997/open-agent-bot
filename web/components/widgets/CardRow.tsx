@@ -36,22 +36,22 @@ function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide:
           className={wide ? "h-full w-full object-cover" : "h-full w-full object-contain p-2 mix-blend-multiply"}
         />
         {item.badge && (
-          <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[12px] sm:text-[10px] font-semibold text-on-charcoal">
+          <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-on-charcoal">
             {m(`${id}-badge`, item.badge)}
           </span>
         )}
       </div>
       <span id={`${id}-text`} className="flex flex-col gap-0.5 px-3 pt-2">
-        <span id={`${id}-title`} className="line-clamp-2 text-[14px] sm:text-[13px] font-medium leading-snug text-text-primary">
+        <span id={`${id}-title`} className="line-clamp-2 text-[13px] font-medium leading-snug text-text-primary">
           {m(`${id}-title`, item.title)}
         </span>
         {item.subtitle && (
-          <span id={`${id}-subtitle`} className="line-clamp-1 text-[13px] sm:text-xs text-text-secondary">
+          <span id={`${id}-subtitle`} className="line-clamp-1 text-xs text-text-secondary">
             {m(`${id}-subtitle`, item.subtitle)}
           </span>
         )}
         {item.note && (
-          <span id={`${id}-note`} className="line-clamp-1 text-[13px] sm:text-xs text-text-muted">
+          <span id={`${id}-note`} className="line-clamp-1 text-xs text-text-muted">
             {m(`${id}-note`, item.note)}
           </span>
         )}
@@ -68,7 +68,7 @@ function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide:
         ) : (
           head
         )}
-        <span id={`${id}-foot`} className="mt-auto flex items-center gap-2 px-3 pb-2 pt-1.5 text-[13px] sm:text-[11px] text-text-muted">
+        <span id={`${id}-foot`} className="mt-auto flex items-center gap-2 px-3 pb-2 pt-1.5 text-[12px] sm:text-[11px] text-text-muted">
           {item.price && (
             <span id={`${id}-price`} className="text-sm font-semibold text-text-primary">
               {m(`${id}-price`, item.price)}
@@ -165,7 +165,7 @@ export function ImageBlock({ id, block, m }: { id: string; block: Extract<UiBloc
         className="max-h-72 w-full object-cover"
       />
       {(block.caption || block.source) && (
-        <figcaption id={`${id}-caption`} className="flex items-baseline gap-2 px-3 py-1.5 text-[13px] sm:text-xs text-text-muted">
+        <figcaption id={`${id}-caption`} className="flex items-baseline gap-2 px-3 py-1.5 text-xs text-text-muted">
           <span id={`${id}-caption-text`} className="flex-1">
             {m(`${id}-caption-text`, block.caption)}
           </span>

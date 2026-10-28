@@ -12,8 +12,8 @@
   --border-strong: #d8d5cf;
   --text-primary: #111111;
   --text-secondary: #555555;
-  --text-muted: #888888;
-  --text-faint: #aaaaaa;
+  --text-muted: #6b6b6b;
+  --text-faint: #8a8a8a;
   --charcoal: #111111;
   --on-charcoal: #ffffff;
   --mist-50: #eef3f4;
@@ -225,7 +225,19 @@ html.dark {
 }
 @media (max-width: 639px) {
   .md {
-    font-size: 16.5px;
+    font-size: 14.5px;
+    line-height: 1.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 .md > * + * {

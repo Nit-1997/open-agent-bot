@@ -62,12 +62,12 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
   const portal = portalOf(store.name);
 
   return (
-    <section id={id} className={`my-2 w-full rounded-2xl border border-border bg-paper p-4 ${stale ? "opacity-70" : ""}`}>
+    <section id={id} className={`my-2 w-full rounded-2xl border border-border bg-paper p-3 sm:p-4 ${stale ? "opacity-70" : ""}`}>
       <header id={`${id}-header`} className="flex items-baseline justify-between gap-2">
         <h3 id={`${id}-title`} className="text-base font-semibold">
           Cart
         </h3>
-        <span id={`${id}-count`} className="text-[13px] sm:text-xs text-text-muted">
+        <span id={`${id}-count`} className="text-xs text-text-muted">
           {stale ? "Updated cart below" : `${kept.length} ${kept.length === 1 ? "item" : "items"}`}
         </span>
       </header>
@@ -84,14 +84,14 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
               setActive(n);
               setSwapping(null);
             }}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[14px] sm:text-[13px] transition ${n === active ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"}`}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] transition ${n === active ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"}`}
           >
             <span id={`${id}-tab-${n}-name`}>{s.name}</span>
             <span id={`${id}-tab-${n}-total`} className="font-semibold">
               {money(s.total, s.currency)}
             </span>
             {n === 0 && widget.stores.length > 1 && (
-              <span id={`${id}-tab-${n}-best`} className={`rounded-full px-1.5 py-0.5 text-[12px] sm:text-[10px] font-semibold ${n === active ? "bg-paper/20" : "bg-success-bg text-success-fg"}`}>
+              <span id={`${id}-tab-${n}-best`} className={`rounded-full px-1.5 py-0.5 text-[11px] sm:text-[10px] font-semibold ${n === active ? "bg-paper/20" : "bg-success-bg text-success-fg"}`}>
                 Best value
               </span>
             )}
@@ -116,7 +116,7 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                         <a id={`${rid}-link`} href={pick.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium text-text-primary hover:underline">
                           {pick.title}
                         </a>
-                        <p id={`${rid}-meta`} className="mt-0.5 text-[13px] sm:text-xs text-text-muted">
+                        <p id={`${rid}-meta`} className="mt-0.5 text-xs text-text-muted">
                           <span id={`${rid}-price`} className="font-semibold text-text-primary">
                             {pick.priceText ?? "Price not shown"}
                           </span>
@@ -128,7 +128,7 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                             id={`${rid}-swap`}
                             type="button"
                             onClick={() => setSwapping(swapping === i ? null : i)}
-                            className="mt-1 text-[13px] sm:text-xs font-medium text-text-secondary underline underline-offset-4 hover:text-text-primary"
+                            className="mt-1 text-xs font-medium text-text-secondary underline underline-offset-4 hover:text-text-primary"
                           >
                             Swap
                           </button>
@@ -163,7 +163,7 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                                 update(i, { choice: n });
                                 setSwapping(null);
                               }}
-                              className="flex w-full items-center gap-2 rounded-lg border border-border px-2 py-1 text-left text-[13px] sm:text-xs hover:border-border-strong"
+                              className="flex w-full items-center gap-2 rounded-lg border border-border px-2 py-1 text-left text-xs hover:border-border-strong"
                             >
                               <span id={`${rid}-alt-${n}-media`} className="h-8 w-8 shrink-0 overflow-hidden rounded bg-white">
                                 <Picture id={`${rid}-alt-${n}-img`} src={alt.image} alt="" fallback={alt.title} className="h-full w-full object-contain" />
@@ -183,13 +183,13 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                 );
               })}
             {missing.map((item) => (
-              <li id={`${id}-s${active}-missing-${store.items.indexOf(item)}`} key={`m-${item.query}`} aria-label={item.query} className="py-2 text-[13px] sm:text-xs text-warn-fg">
+              <li id={`${id}-s${active}-missing-${store.items.indexOf(item)}`} key={`m-${item.query}`} aria-label={item.query} className="py-2 text-xs text-warn-fg">
                 Not found: {item.query}
               </li>
             ))}
           </ul>
           {inCart.some((x) => x.line.removed) && (
-            <div id={`${id}-removed`} className="mt-2 flex flex-wrap gap-2 text-[13px] sm:text-xs text-text-muted">
+            <div id={`${id}-removed`} className="mt-2 flex flex-wrap gap-2 text-xs text-text-muted">
               {inCart
                 .filter((x) => x.line.removed)
                 .map(({ item, i }) => (
@@ -218,7 +218,7 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
             </span>
           </div>
           {unpriced > 0 && (
-            <p id={`${id}-unpriced`} className="mt-1 text-[13px] sm:text-xs text-text-muted">
+            <p id={`${id}-unpriced`} className="mt-1 text-xs text-text-muted">
               Plus {unpriced} without a listed price
             </p>
           )}
@@ -231,7 +231,7 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
           >
             Continue on {portal} ↗
           </a>
-          <p id={`${id}-handoff-note`} className="mt-2 text-center text-[13px] sm:text-[11px] leading-snug text-text-muted">
+          <p id={`${id}-handoff-note`} className="mt-2 text-center text-[12px] sm:text-[11px] leading-snug text-text-muted">
             Guest prices for your area. You sign in and check out on {portal}.
           </p>
         </aside>
