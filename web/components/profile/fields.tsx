@@ -3,7 +3,7 @@ import type { ModelList } from "@/lib/models";
 import { INTERESTS, type Profile } from "@/lib/profile";
 
 const input =
-  "w-full rounded-xl border border-border bg-paper px-3.5 py-2.5 text-[15px] text-text-primary outline-none transition placeholder:text-text-faint focus:border-cortex-300";
+  "w-full rounded-xl border border-border bg-paper px-3.5 py-2.5 text-[15px] text-text-primary outline-none transition placeholder:text-text-faint focus:border-mist-300";
 
 type FieldProps = { id: string; value: Profile; onChange: (p: Profile) => void };
 
@@ -48,7 +48,7 @@ export function InterestsField({ id, value, onChange }: FieldProps) {
               aria-pressed={on}
               onClick={() => toggle(i)}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition ${
-                on ? "border-cortex-300 bg-cortex-50 text-cortex-600" : "border-border bg-paper text-text-secondary hover:border-border-strong"
+                on ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"
               }`}
             >
               {on && <Check id={`${id}-chip-${n}-check`} aria-hidden="true" size={12} />}
@@ -91,9 +91,9 @@ export function ModelOptions({ id, models, value, onChange }: { id: string; mode
           <label
             id={`${id}-option-${n}`}
             key={m.id}
-            className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition ${on ? "border-cortex-300 bg-cortex-50" : "border-border bg-paper hover:border-border-strong"}`}
+            className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition ${on ? "border-charcoal bg-paper shadow-float" : "border-border bg-paper hover:border-border-strong"}`}
           >
-            <input id={`${id}-option-${n}-input`} type="radio" name={id} checked={on} onChange={() => onChange(m.id)} className="mt-1 accent-cortex-500" />
+            <input id={`${id}-option-${n}-input`} type="radio" name={id} checked={on} onChange={() => onChange(m.id)} className="mt-1 accent-mist-500" />
             <span id={`${id}-option-${n}-text`} className="min-w-0">
               <span id={`${id}-option-${n}-label`} className="block text-[15px] font-medium text-text-primary">
                 {m.label}

@@ -36,7 +36,7 @@ export function formatAnswers(fields: AskField[], values: string[], locale: stri
 }
 
 const control =
-  "rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none transition focus:border-cortex-300 disabled:opacity-60";
+  "rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none transition focus:border-mist-300 disabled:opacity-60";
 
 export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: string; answered?: boolean; onAnswer?: (text: string) => void }) {
   const { widget, answered } = props;
@@ -46,7 +46,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
   const invalid = widget.fields.some((f, i) => f.type === "date_range" && nights(...(values[i].split("|") as [string, string])) < 0);
 
   return (
-    <section id={id} className="w-full rounded-2xl border border-cortex-300 bg-paper p-4">
+    <section id={id} className="w-full rounded-2xl border border-border-strong bg-paper p-4 shadow-float">
       <p id={`${id}-eyebrow`} className="eyebrow">
         Quick check
       </p>
@@ -70,7 +70,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
                     →
                   </span>
                   <input id={`${fid}-end`} type="date" aria-label={`${f.label} to`} min={start} value={end} onChange={(e) => set(i, `${start}|${e.target.value}`)} className={control} />
-                  <span id={`${fid}-nights`} className={`rounded-full px-2.5 py-1 font-mono text-[11px] ${n < 0 ? "bg-danger-bg text-danger-fg" : "bg-cortex-50 text-cortex-600"}`}>
+                  <span id={`${fid}-nights`} className={`rounded-full px-2.5 py-1 font-mono text-[11px] ${n < 0 ? "bg-danger-bg text-danger-fg" : "bg-surface text-text-secondary"}`}>
                     {n < 0 ? "End is before start" : n === 0 ? "Same day" : `${n} night${n === 1 ? "" : "s"}`}
                   </span>
                 </div>
@@ -127,8 +127,8 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
                       <label
                         id={`${fid}-o${j}`}
                         key={o}
-                        className={`cursor-pointer rounded-full border px-3 py-1.5 text-[13px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-cortex-500 ${
-                          on ? "border-cortex-300 bg-cortex-50 text-cortex-600" : "border-border bg-bg text-text-secondary hover:border-border-strong"
+                        className={`cursor-pointer rounded-full border px-3 py-1.5 text-[13px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-mist-500 ${
+                          on ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-bg text-text-secondary hover:border-border-strong"
                         }`}
                       >
                         <input id={`${fid}-o${j}-input`} type="radio" name={fid} value={o} checked={on} onChange={() => set(i, o)} className="sr-only" />

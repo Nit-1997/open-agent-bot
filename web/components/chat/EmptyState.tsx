@@ -36,7 +36,7 @@ export function EmptyState({ name, onPick }: { name?: string; onPick: (text: str
               onClick={() => onPick(s.text)}
               className="group flex h-full w-full items-start gap-3 rounded-2xl border border-border bg-paper p-3.5 text-left transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-float"
             >
-              <span id={`empty-suggestion-${i}-icon`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cortex-50 text-cortex-600">
+              <span id={`empty-suggestion-${i}-icon`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface text-text-primary">
                 <s.icon id={`empty-suggestion-${i}-svg`} aria-hidden="true" size={16} />
               </span>
               <span id={`empty-suggestion-${i}-text`} className="min-w-0">

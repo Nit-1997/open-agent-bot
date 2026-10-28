@@ -105,7 +105,7 @@ function Block({ id, block, flags }: { id: string; block: UiBlock; flags: string
               <li id={iid} key={i} className="flex items-start justify-between gap-3 py-2">
                 <div id={`${iid}-main`} className="min-w-0">
                   {it.url ? (
-                    <ExternalLink id={`${iid}-title`} href={it.url} className="font-medium text-cortex-600 hover:underline">
+                    <ExternalLink id={`${iid}-title`} href={it.url} className="font-medium text-mist-600 hover:underline">
                       {m(`${iid}-title`, it.title)}
                     </ExternalLink>
                   ) : (
@@ -148,7 +148,7 @@ function Block({ id, block, flags }: { id: string; block: UiBlock; flags: string
             {block.items.map((it, i) => (
               <li id={`${id}-${i}`} key={i}>
                 <label id={`${id}-${i}-label`} className="flex items-start gap-2 text-sm">
-                  <input id={`${id}-${i}-check`} type="checkbox" className="mt-0.5 accent-cortex-500" />
+                  <input id={`${id}-${i}-check`} type="checkbox" className="mt-0.5 accent-mist-500" />
                   <span id={`${id}-${i}-text`}>
                     {m(`${id}-${i}-text`, it.text)}
                     {it.note && (

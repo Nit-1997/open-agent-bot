@@ -31,7 +31,7 @@ function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
-      className="flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition hover:bg-surface hover:text-text-primary"
+      className="glass-pill flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition hover:bg-paper hover:text-text-primary"
     >
       <Icon id="theme-toggle-icon" aria-hidden="true" size={16} />
     </button>
@@ -67,44 +67,46 @@ export function Chat() {
   if (!profile.onboarded) return <Onboarding models={models} onDone={saveProfile} />;
 
   return (
-    <div id="chat-shell" className="flex h-dvh w-full flex-col bg-bg">
-      <header id="chat-header" className="flex items-center justify-between gap-2 px-4 py-3 sm:px-6">
-        <div id="chat-brand" className="flex items-center gap-2.5">
-          <span id="chat-brand-orb" aria-hidden="true" className="orb h-6 w-6" />
-          <h1 id="chat-title" className="hidden font-display text-[22px] leading-none text-text-primary sm:block">
-            Open Agent
-          </h1>
-        </div>
-        <div id="chat-actions" className="flex items-center gap-1">
-          <ModelMenu models={models} value={model} onChange={setChatModel} />
-          <ThemeToggle />
-          <button
-            id="chat-profile-button"
-            type="button"
-            onClick={() => setDrawer(true)}
-            aria-label="Open profile"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-cortex-100 text-[13px] font-medium text-cortex-600 transition hover:ring-2 hover:ring-cortex-300"
-          >
-            {initials(profile.name) || <User id="chat-profile-icon" aria-hidden="true" size={15} />}
-          </button>
-          <button
-            id="chat-new-button"
-            type="button"
-            onClick={startNewChat}
-            className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-charcoal px-3.5 py-2 text-[13px] font-medium text-on-charcoal transition hover:opacity-85"
-          >
-            <Plus id="chat-new-icon" aria-hidden="true" size={14} />
-            <span id="chat-new-label" className="hidden sm:inline">
-              New chat
-            </span>
-          </button>
-        </div>
-      </header>
-      <main id="chat-main" className="flex min-h-0 flex-1 flex-col">
-        {threadId && (
-          <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext?.locale ?? "en-US"} name={profile.name} onNewChat={startNewChat} />
-        )}
-      </main>
+    <div id="chat-shell" className="flex h-dvh w-full justify-center p-2 sm:p-4">
+      <div id="chat-frame" className="glass flex w-full max-w-[920px] flex-col rounded-[28px] p-1.5 sm:p-2">
+        <header id="chat-header" className="flex items-center justify-between gap-2 px-3 py-2">
+          <div id="chat-brand" className="flex items-center gap-2.5">
+            <span id="chat-brand-orb" aria-hidden="true" className="orb h-6 w-6 shadow-float" />
+            <h1 id="chat-title" className="hidden font-display text-[24px] leading-none text-text-primary sm:block">
+              Open Agent
+            </h1>
+          </div>
+          <div id="chat-actions" className="flex items-center gap-1.5">
+            <ModelMenu models={models} value={model} onChange={setChatModel} />
+            <ThemeToggle />
+            <button
+              id="chat-profile-button"
+              type="button"
+              onClick={() => setDrawer(true)}
+              aria-label="Open profile"
+              className="glass-pill flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-medium text-text-primary transition hover:bg-paper"
+            >
+              {initials(profile.name) || <User id="chat-profile-icon" aria-hidden="true" size={15} />}
+            </button>
+            <button
+              id="chat-new-button"
+              type="button"
+              onClick={startNewChat}
+              className="inline-flex items-center gap-1.5 rounded-full bg-charcoal px-3.5 py-2 text-[13px] font-medium text-on-charcoal shadow-float transition hover:opacity-85"
+            >
+              <Plus id="chat-new-icon" aria-hidden="true" size={14} />
+              <span id="chat-new-label" className="hidden sm:inline">
+                New chat
+              </span>
+            </button>
+          </div>
+        </header>
+        <main id="chat-main" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-bg">
+          {threadId && (
+            <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext?.locale ?? "en-US"} name={profile.name} onNewChat={startNewChat} />
+          )}
+        </main>
+      </div>
       {drawer && (
         <ProfileDrawer
           profile={profile}

@@ -33,8 +33,8 @@ function Filters({ id, prefs, onChange }: { id: string; prefs: FlightPrefs; onCh
   const layover = prefs.maxLayover ?? "any";
   const times = prefs.times ?? [];
   const chip = (on: boolean) =>
-    `cursor-pointer rounded-full border px-2.5 py-1 text-[12px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-cortex-500 ${
-      on ? "border-cortex-300 bg-cortex-50 text-cortex-600" : "border-border bg-paper text-text-secondary hover:border-border-strong"
+    `cursor-pointer rounded-full border px-2.5 py-1 text-[12px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-mist-500 ${
+      on ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"
     }`;
   return (
     <div id={id} className="space-y-2 border-b border-border px-4 py-3">
@@ -81,7 +81,7 @@ function Filters({ id, prefs, onChange }: { id: string; prefs: FlightPrefs; onCh
 }
 
 function Badge({ id, tone, children }: { id: string; tone: "agent" | "good" | "plain"; children: React.ReactNode }) {
-  const cls = tone === "agent" ? "bg-cortex-100 text-cortex-600" : tone === "good" ? "bg-success-bg text-success-fg" : "bg-surface-accent text-text-secondary";
+  const cls = tone === "agent" ? "bg-charcoal text-on-charcoal" : tone === "good" ? "bg-success-bg text-success-fg" : "bg-surface-accent text-text-secondary";
   return (
     <span id={id} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
       {children}
@@ -143,7 +143,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                     <span id={`${aid}-code`} className="font-mono font-medium">
                       {a.code}
                     </span>
-                    <ExternalLink id={`${aid}-link`} href={a.searchUrl} className="text-xs text-cortex-600 underline underline-offset-2">
+                    <ExternalLink id={`${aid}-link`} href={a.searchUrl} className="text-xs text-mist-600 underline underline-offset-2">
                       Couldn&apos;t load · open on Google Flights
                     </ExternalLink>
                   </li>
@@ -153,7 +153,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                 <li
                   id={aid}
                   key={a.code}
-                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 ${a.bestValue ? "bg-cortex-50 ring-1 ring-cortex-300" : "bg-surface"}`}
+                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 ${a.bestValue ? "bg-paper shadow-float ring-1 ring-charcoal/15" : "bg-surface"}`}
                 >
                   <div id={`${aid}-main`} className="min-w-0">
                     <div id={`${aid}-head`} className="flex flex-wrap items-center gap-1.5">

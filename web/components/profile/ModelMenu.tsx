@@ -31,9 +31,9 @@ export function ModelMenu({ models, value, onChange }: { models: ModelList | nul
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-paper px-3 py-1.5 text-[13px] text-text-secondary transition hover:border-border-strong hover:text-text-primary"
+        className="glass-pill inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] text-text-primary transition hover:bg-paper"
       >
-        <span id="model-menu-dot" aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-cortex-500" />
+        <span id="model-menu-dot" aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-mist-500" />
         <span id="model-menu-label" className="max-w-[140px] truncate">
           {modelLabel(models, current)}
         </span>
@@ -57,9 +57,9 @@ export function ModelMenu({ models, value, onChange }: { models: ModelList | nul
                   onChange(m.id);
                   setOpen(false);
                 }}
-                className={`flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition ${on ? "bg-cortex-50" : "hover:bg-surface"}`}
+                className={`flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition ${on ? "bg-surface" : "hover:bg-surface"}`}
               >
-                <span id={`model-menu-item-${n}-check`} className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-cortex-600">
+                <span id={`model-menu-item-${n}-check`} className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-text-primary">
                   {on && <Check id={`model-menu-item-${n}-icon`} aria-hidden="true" size={14} />}
                 </span>
                 <span id={`model-menu-item-${n}-text`} className="min-w-0">

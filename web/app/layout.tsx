@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head id="root-head">
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body id="root-body" className="h-full bg-bg text-text-primary">
+      <body id="root-body" className="h-full text-text-primary">
         <Providers>{children}</Providers>
       </body>
     </html>

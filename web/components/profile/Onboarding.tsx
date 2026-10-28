@@ -28,57 +28,59 @@ export function Onboarding({ models, onDone }: { models: ModelList | null; onDon
     });
 
   return (
-    <div id="onboarding" className="flex h-dvh w-full items-center justify-center bg-bg px-4">
-      <div id="onboarding-card" key={step} className="w-full max-w-[520px] animate-rise">
-        <div id="onboarding-top" className="flex items-center justify-between">
-          <span id="onboarding-orb" aria-hidden="true" className="orb h-9 w-9 animate-breathe" />
-          <span id="onboarding-step" className="eyebrow">{`Step ${String(step + 1).padStart(2, "0")} / ${String(STEPS.length).padStart(2, "0")}`}</span>
-        </div>
-        <h1 id="onboarding-title" className="mt-8 font-display text-[40px] leading-[1.08] text-text-primary">
-          {STEPS[step].title}
-        </h1>
-        <p id="onboarding-sub" className="mt-2 text-[15px] leading-relaxed text-text-secondary">
-          {STEPS[step].sub}
-        </p>
-        <div id="onboarding-body" className="mt-8">
-          {step === 0 && <NameField id="onboarding-name" value={draft} onChange={setDraft} autoFocus />}
-          {step === 1 && <HomeField id="onboarding-home" value={draft} onChange={setDraft} autoFocus />}
-          {step === 2 && <InterestsField id="onboarding-interests" value={draft} onChange={setDraft} />}
-          {step === 3 && <ModelOptions id="onboarding-model" models={models} value={draft.defaultModel} onChange={(id) => setDraft({ ...draft, defaultModel: id })} />}
-        </div>
-        <div id="onboarding-progress" className="mt-10 flex gap-1.5" aria-hidden="true">
-          {STEPS.map((_, i) => (
-            <span id={`onboarding-progress-${i}`} key={i} className={`h-1 flex-1 rounded-full transition ${i <= step ? "bg-cortex-500" : "bg-surface-accent"}`} />
-          ))}
-        </div>
-        <div id="onboarding-actions" className="mt-6 flex items-center justify-between">
-          <button
-            id="onboarding-skip"
-            type="button"
-            onClick={() => onDone({ ...EMPTY_PROFILE, onboarded: true })}
-            className="text-sm text-text-muted transition hover:text-text-primary"
-          >
-            Skip setup
-          </button>
-          <div id="onboarding-nav" className="flex gap-2">
-            {step > 0 && (
-              <button
-                id="onboarding-back"
-                type="button"
-                onClick={() => setStep(step - 1)}
-                className="rounded-full border border-border px-4 py-2 text-sm font-medium text-text-secondary transition hover:border-border-strong"
-              >
-                Back
-              </button>
-            )}
+    <div id="onboarding" className="flex h-dvh w-full items-center justify-center px-4">
+      <div id="onboarding-frame" className="glass w-full max-w-[580px] rounded-[28px] p-2">
+        <div id="onboarding-card" key={step} className="w-full animate-rise rounded-[22px] border border-border bg-bg p-6 sm:p-8">
+          <div id="onboarding-top" className="flex items-center justify-between">
+            <span id="onboarding-orb" aria-hidden="true" className="orb h-9 w-9 animate-breathe" />
+            <span id="onboarding-step" className="eyebrow">{`Step ${String(step + 1).padStart(2, "0")} / ${String(STEPS.length).padStart(2, "0")}`}</span>
+          </div>
+          <h1 id="onboarding-title" className="mt-8 font-display text-[40px] leading-[1.08] text-text-primary">
+            {STEPS[step].title}
+          </h1>
+          <p id="onboarding-sub" className="mt-2 text-[15px] leading-relaxed text-text-secondary">
+            {STEPS[step].sub}
+          </p>
+          <div id="onboarding-body" className="mt-8">
+            {step === 0 && <NameField id="onboarding-name" value={draft} onChange={setDraft} autoFocus />}
+            {step === 1 && <HomeField id="onboarding-home" value={draft} onChange={setDraft} autoFocus />}
+            {step === 2 && <InterestsField id="onboarding-interests" value={draft} onChange={setDraft} />}
+            {step === 3 && <ModelOptions id="onboarding-model" models={models} value={draft.defaultModel} onChange={(id) => setDraft({ ...draft, defaultModel: id })} />}
+          </div>
+          <div id="onboarding-progress" className="mt-10 flex gap-1.5" aria-hidden="true">
+            {STEPS.map((_, i) => (
+              <span id={`onboarding-progress-${i}`} key={i} className={`h-1 flex-1 rounded-full transition ${i <= step ? "bg-charcoal" : "bg-surface-accent"}`} />
+            ))}
+          </div>
+          <div id="onboarding-actions" className="mt-6 flex items-center justify-between">
             <button
-              id="onboarding-next"
+              id="onboarding-skip"
               type="button"
-              onClick={() => (last ? finish() : setStep(step + 1))}
-              className="rounded-full bg-charcoal px-5 py-2 text-sm font-medium text-on-charcoal transition hover:opacity-85"
+              onClick={() => onDone({ ...EMPTY_PROFILE, onboarded: true })}
+              className="text-sm text-text-muted transition hover:text-text-primary"
             >
-              {last ? "Start chatting" : "Continue"}
+              Skip setup
             </button>
+            <div id="onboarding-nav" className="flex gap-2">
+              {step > 0 && (
+                <button
+                  id="onboarding-back"
+                  type="button"
+                  onClick={() => setStep(step - 1)}
+                  className="rounded-full border border-border px-4 py-2 text-sm font-medium text-text-secondary transition hover:border-border-strong"
+                >
+                  Back
+                </button>
+              )}
+              <button
+                id="onboarding-next"
+                type="button"
+                onClick={() => (last ? finish() : setStep(step + 1))}
+                className="rounded-full bg-charcoal px-5 py-2 text-sm font-medium text-on-charcoal transition hover:opacity-85"
+              >
+                {last ? "Start chatting" : "Continue"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

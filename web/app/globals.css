@@ -16,12 +16,12 @@
   --text-faint: #aaaaaa;
   --charcoal: #111111;
   --on-charcoal: #ffffff;
-  --cortex-50: #f1eefb;
-  --cortex-100: #e7e2ff;
-  --cortex-300: #b9b0e8;
-  --cortex-500: #7a6bd9;
-  --cortex-600: #5e4fae;
-  --cortex-900: #2e2350;
+  --mist-50: #eef3f4;
+  --mist-100: #dce7e9;
+  --mist-300: #a3bec3;
+  --mist-500: #4d7f87;
+  --mist-600: #36646c;
+  --mist-900: #183a40;
   --status-success-bg: #ecfdf5;
   --status-success-fg: #047857;
   --status-info-bg: #eff6ff;
@@ -30,8 +30,13 @@
   --status-warn-fg: #b45309;
   --status-danger-bg: #fef2f2;
   --status-danger-fg: #dc2626;
-  --accent-gradient: linear-gradient(180deg, #c5d0f5 0%, #dae2fa 40%, #ebf0fc 70%, #f2f4fc 100%);
-  --orb: radial-gradient(circle at 30% 30%, #e7e2ff 0%, #b9b0e8 40%, #5e4fae 75%, #2e2350 100%);
+  --accent-gradient: linear-gradient(180deg, #dce7e9 0%, #eef3f4 55%, #f7f9f9 100%);
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #d5e3e5 32%, #6f9aa1 70%, #23474d 100%);
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --glass-pill: rgba(255, 255, 255, 0.6);
+  --backdrop-wash: linear-gradient(180deg, rgba(250, 249, 247, 0.1) 0%, rgba(250, 249, 247, 0) 60%);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -49,12 +54,12 @@ html.dark {
   --text-faint: #8f9094;
   --charcoal: #e8e6e2;
   --on-charcoal: #111111;
-  --cortex-50: color-mix(in srgb, #7a6bd9 22%, #2c2f36);
-  --cortex-100: color-mix(in srgb, #7a6bd9 38%, #2c2f36);
-  --cortex-300: #a89cea;
-  --cortex-500: #b9b0e8;
-  --cortex-600: #cfc5f4;
-  --cortex-900: #e7e2ff;
+  --mist-50: color-mix(in srgb, #4d7f87 20%, #2c2f36);
+  --mist-100: color-mix(in srgb, #4d7f87 35%, #2c2f36);
+  --mist-300: #7fa6ac;
+  --mist-500: #a3c4c9;
+  --mist-600: #c3dade;
+  --mist-900: #e3eff1;
   --status-success-bg: color-mix(in srgb, #047857 25%, #1a1c21);
   --status-success-fg: #6ee7b7;
   --status-info-bg: color-mix(in srgb, #1d4ed8 25%, #1a1c21);
@@ -63,7 +68,13 @@ html.dark {
   --status-warn-fg: #fcd34d;
   --status-danger-bg: color-mix(in srgb, #dc2626 25%, #1a1c21);
   --status-danger-fg: #fca5a5;
-  --accent-gradient: linear-gradient(180deg, #2e2350 0%, #23262d 100%);
+  --accent-gradient: linear-gradient(180deg, #24363b 0%, #23262d 100%);
+  --orb: radial-gradient(circle at 30% 28%, #e3eff1 0%, #a3c4c9 35%, #4d7f87 72%, #183a40 100%);
+  --glass-bg: rgba(12, 14, 16, 0.3);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --glass-pill: rgba(44, 47, 54, 0.65);
+  --backdrop-wash: linear-gradient(180deg, rgba(8, 10, 12, 0.55) 0%, rgba(8, 10, 12, 0.72) 100%);
 }
 
 @theme {
@@ -79,12 +90,12 @@ html.dark {
   --color-text-faint: var(--text-faint);
   --color-charcoal: var(--charcoal);
   --color-on-charcoal: var(--on-charcoal);
-  --color-cortex-50: var(--cortex-50);
-  --color-cortex-100: var(--cortex-100);
-  --color-cortex-300: var(--cortex-300);
-  --color-cortex-500: var(--cortex-500);
-  --color-cortex-600: var(--cortex-600);
-  --color-cortex-900: var(--cortex-900);
+  --color-mist-50: var(--mist-50);
+  --color-mist-100: var(--mist-100);
+  --color-mist-300: var(--mist-300);
+  --color-mist-500: var(--mist-500);
+  --color-mist-600: var(--mist-600);
+  --color-mist-900: var(--mist-900);
   --color-success-bg: var(--status-success-bg);
   --color-success-fg: var(--status-success-fg);
   --color-info-bg: var(--status-info-bg);
@@ -147,6 +158,14 @@ html.dark {
     color: var(--text-primary);
   }
 
+  html {
+    background: var(--backdrop-wash), url("/backdrop.jpg") center / cover no-repeat fixed, #6f9aa1;
+  }
+
+  body {
+    background: transparent;
+  }
+
   body {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -158,7 +177,7 @@ html.dark {
   }
 
   *:focus-visible {
-    outline: 2px solid var(--cortex-500);
+    outline: 2px solid var(--mist-500);
     outline-offset: 2px;
   }
 }
@@ -168,8 +187,22 @@ html.dark {
   border-radius: 9999px;
 }
 
+@utility glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(24px) saturate(1.2);
+}
+
+@utility glass-pill {
+  background: var(--glass-pill);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
 @utility shimmer-text {
-  background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 40%, var(--cortex-500) 50%, var(--text-muted) 60%, var(--text-muted) 100%);
+  background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 40%, var(--mist-500) 50%, var(--text-muted) 60%, var(--text-muted) 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -218,13 +251,13 @@ html.dark {
   font-weight: 600;
 }
 .md a {
-  color: var(--cortex-600);
+  color: var(--mist-600);
   text-decoration: underline;
-  text-decoration-color: var(--cortex-300);
+  text-decoration-color: var(--mist-300);
   text-underline-offset: 3px;
 }
 .md a:hover {
-  text-decoration-color: var(--cortex-600);
+  text-decoration-color: var(--mist-600);
 }
 .md ul,
 .md ol {
@@ -261,7 +294,7 @@ html.dark {
   padding: 0;
 }
 .md blockquote {
-  border-left: 2px solid var(--cortex-300);
+  border-left: 2px solid var(--mist-300);
   padding-left: 12px;
   color: var(--text-secondary);
 }

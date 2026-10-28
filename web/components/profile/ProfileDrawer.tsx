@@ -30,7 +30,7 @@ export function ProfileDrawer(props: {
       <aside id="profile-drawer-panel" role="dialog" aria-modal="true" aria-label="Profile" className="relative flex h-full w-full max-w-[420px] animate-rise flex-col border-l border-border bg-bg shadow-lift">
         <header id="profile-drawer-header" className="flex items-center justify-between px-6 pt-6">
           <div id="profile-drawer-who" className="flex items-center gap-3">
-            <span id="profile-drawer-avatar" className="flex h-11 w-11 items-center justify-center rounded-full bg-cortex-100 font-medium text-cortex-600">
+            <span id="profile-drawer-avatar" className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-accent font-medium text-text-primary">
               {initials(draft.name) || "?"}
             </span>
             <div id="profile-drawer-heading">

@@ -21,7 +21,7 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
   }
   return (
     <div id={id} className="flex items-center gap-3 rounded-2xl border border-border bg-paper p-3 transition hover:border-border-strong">
-      <span id={`${id}-thumb`} aria-hidden="true" style={{ background: "var(--accent-gradient)" }} className="flex h-12 w-10 shrink-0 items-center justify-center rounded-lg border border-border font-display text-lg italic text-cortex-600">
+      <span id={`${id}-thumb`} aria-hidden="true" style={{ background: "var(--accent-gradient)" }} className="flex h-12 w-10 shrink-0 items-center justify-center rounded-lg border border-border font-display text-lg italic text-mist-600">
         Aa
       </span>
       <div id={`${id}-text`} className="min-w-0 flex-1">

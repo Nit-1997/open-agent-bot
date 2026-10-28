@@ -63,7 +63,7 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
                   {s.done ? (
                     <Check id={`${sid}-check`} aria-hidden="true" size={10} className="text-text-muted" />
                   ) : (
-                    <span id={`${sid}-spin`} className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-cortex-500 border-t-transparent" />
+                    <span id={`${sid}-spin`} className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-mist-500 border-t-transparent" />
                   )}
                 </span>
                 <span id={`${sid}-row`} className="flex items-center gap-2 text-[13px] text-text-secondary">

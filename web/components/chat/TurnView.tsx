@@ -21,7 +21,7 @@ export function TurnView(props: {
     <article id={id} className="animate-rise">
       {turn.user && (
         <div id={`${id}-user`} className="flex justify-end">
-          <p id={`${id}-user-text`} className="max-w-[85%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-surface px-4 py-2.5 text-[15px] leading-6 text-text-primary">
+          <p id={`${id}-user-text`} className="max-w-[85%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-charcoal px-4 py-2.5 text-[15px] leading-6 text-on-charcoal">
             {turn.user.text}
           </p>
         </div>
