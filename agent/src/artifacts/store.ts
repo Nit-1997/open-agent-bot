@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Browser, chromium } from "playwright";
+import { publicHttpUrlError } from "../tools/net.js";
 
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
 
@@ -34,8 +35,11 @@ export class ArtifactStore {
   async renderPdf(id: string): Promise<Buffer | null> {
     const a = await this.get(id);
     if (!a) return null;
-    this.browser ??= chromium.launch();
-    const context = await (await this.browser).newContext();
+    const context = await (await this.launch()).newContext();
+    await context.route("**/*", (route) => {
+      const url = route.request().url();
+      return url.startsWith("data:") || !publicHttpUrlError(url) ? route.continue() : route.abort();
+    });
     try {
       const page = await context.newPage();
       await page.setContent(a.html, { waitUntil: "load", timeout: 20000 });
@@ -45,9 +49,21 @@ export class ArtifactStore {
     }
   }
 
+  private launch(): Promise<Browser> {
+    if (!this.browser) {
+      const launching = chromium.launch();
+      launching.catch(() => {
+        if (this.browser === launching) this.browser = undefined;
+      });
+      this.browser = launching;
+    }
+    return this.browser;
+  }
+
   async close(): Promise<void> {
-    if (this.browser) await (await this.browser).close();
+    const browser = this.browser;
     this.browser = undefined;
+    if (browser) await (await browser).close().catch(() => {});
   }
 }
 

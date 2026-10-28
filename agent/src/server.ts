@@ -73,11 +73,14 @@ serve({ fetch: app.fetch, port: cfg.port, hostname: "0.0.0.0" }, (info) => {
   console.log(`agent listening on :${info.port}`);
 });
 
+let stopping = false;
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
+    if (stopping) return;
+    stopping = true;
     void store
       .disposeAll()
-      .then(() => Promise.all([pool.closeAll(), artifacts.close()]))
+      .then(() => Promise.allSettled([pool.closeAll(), artifacts.close()]))
       .finally(() => process.exit(0));
   });
 }

@@ -8,7 +8,8 @@ import { bestValue, rankTiles, type StoreResult } from "../shop/rank.js";
 import { type Store, storeFor as defaultStoreFor } from "../shop/stores.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "./browserPool.js";
-import { isBlockedUrl } from "./browsePolicy.js";
+import { looseList } from "./args.js";
+import { BOT_WALL, isBlockedUrl } from "./browsePolicy.js";
 import { publicHttpUrlError } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
@@ -17,7 +18,6 @@ const MAX_ITEMS = 12;
 const TABS = 4;
 const PICKS = 3;
 const SCOPE = 3;
-const BOT_WALL = /(robot or human|are you a robot|captcha|access denied|unusual traffic|verify you are human|press and hold|sorry! something went wrong)/i;
 
 type Item = { query: string; qty: number };
 type Job = { store: Store; item: Item };
@@ -33,21 +33,8 @@ type Deps = {
   cart?: ActiveCart;
 };
 
-function list<T>(v: unknown): T[] {
-  if (Array.isArray(v)) return v as T[];
-  if (typeof v === "string") {
-    try {
-      const parsed = JSON.parse(v);
-      return Array.isArray(parsed) ? parsed : [parsed];
-    } catch {
-      return v.split(",").map((s) => s.trim()).filter(Boolean) as T[];
-    }
-  }
-  return [];
-}
-
 function items(v: unknown): Item[] {
-  return list<unknown>(v)
+  return looseList<unknown>(v)
     .map((x) => (typeof x === "string" ? { query: x, qty: 1 } : { query: String((x as Item).query ?? ""), qty: Math.max(1, Math.round(Number((x as Item).qty) || 1)) }))
     .filter((i) => i.query.trim())
     .slice(0, MAX_ITEMS);
@@ -195,9 +182,9 @@ export function shopTool(deps: Deps) {
     async execute(_id, params): Promise<ToolResult> {
       const cart = deps.cart ?? fallbackCart;
       const asked = items(params.items);
-      const picked = list<string>(params.stores).map((x) => resolve(String(x))).filter((x): x is Store => !!x).slice(0, MAX_STORES);
+      const picked = looseList<string>(params.stores).map((x) => resolve(String(x))).filter((x): x is Store => !!x).slice(0, MAX_STORES);
       const ids = picked.map((x) => x.id);
-      if (params.remove) cart.remove(list<string>(params.remove).map(String));
+      if (params.remove) cart.remove(looseList<string>(params.remove).map(String));
       const switching = ids.length > 0 && !(ids.length === cart.stores.length && ids.every((id) => cart.stores.includes(id)));
       let added: CartItem[];
       let search: CartItem[];

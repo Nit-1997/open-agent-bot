@@ -1,5 +1,9 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { mapLimit } from "../lib/concurrency.js";
+import { keyWords } from "../lib/keywords.js";
+import { queryList } from "./args.js";
+import { timeoutSignal } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 type Deps = { searxngUrl: string; braveApiKey?: string; fetch?: typeof fetch };
@@ -9,7 +13,7 @@ type Kind = "web" | "images";
 type SearxResult = { title?: string; url?: string; content?: string; thumbnail?: string; thumbnail_src?: string; img_src?: string };
 type BraveResult = { title?: string; url?: string; description?: string; thumbnail?: { src?: string } };
 
-const timeout = (signal?: AbortSignal) => (signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000));
+const timeout = (signal?: AbortSignal) => timeoutSignal(15000, signal);
 
 async function searxng(deps: Deps, f: typeof fetch, query: string, kind: Kind, signal?: AbortSignal): Promise<Hit[]> {
   const url = new URL("/search", deps.searxngUrl);
@@ -66,66 +70,34 @@ function format(hits: Hit[], kind: Kind): string {
     .join("\n");
 }
 
-function searchTool(deps: Deps, kind: Kind, meta: { name: string; label: string; description: string; defaultCount: number }) {
-  return defineTool({
-    name: meta.name,
-    label: meta.label,
-    description: meta.description,
-    parameters: Type.Object({
-      query: Type.String({ minLength: 1 }),
-      count: Type.Optional(Type.Number({ description: `results to return, default ${meta.defaultCount}, max 15` })),
-    }),
-    async execute(_id, params, signal): Promise<ToolResult> {
-      const count = Math.min(Math.max(Math.floor(params.count ?? meta.defaultCount), 1), 15);
-      try {
-        const hits = (await search(deps, params.query, kind, count, signal)).slice(0, count);
-        if (!hits.length) return ok(`no results for "${params.query}"`);
-        return ok(format(hits, kind), { results: hits });
-      } catch (err) {
-        return fail(`search failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    },
-  });
+async function runSearch(deps: Deps, kind: Kind, query: string, count: number, signal?: AbortSignal): Promise<ToolResult> {
+  try {
+    const hits = (await search(deps, query, kind, count, signal)).slice(0, count);
+    if (!hits.length) return ok(`no results for "${query}"`);
+    return ok(format(hits, kind), { results: hits });
+  } catch (err) {
+    return fail(`search failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
+const clampCount = (n: number | undefined, fallback: number) => Math.min(Math.max(Math.floor(n ?? fallback), 1), 15);
+
 export const webSearchTool = (deps: Deps) =>
-  searchTool(deps, "web", {
+  defineTool({
     name: "web_search",
     label: "Web search",
     description: "Search the web. Returns titles, URLs, snippets, and an image when the result has one. Use fetch_page or browse to read a result.",
-    defaultCount: 8,
+    parameters: Type.Object({
+      query: Type.String({ minLength: 1 }),
+      count: Type.Optional(Type.Number({ description: "results to return, default 8, max 15" })),
+    }),
+    execute: (_id, params, signal) => runSearch(deps, "web", params.query, clampCount(params.count, 8), signal),
   });
 
 const MAX_BATCH = 10;
 const PER_NAME = 2;
 
-export async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await fn(items[i]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
-}
-
-export function queryList(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map(String);
-  if (typeof v === "string") {
-    try {
-      const parsed = JSON.parse(v);
-      if (Array.isArray(parsed)) return parsed.map(String);
-    } catch {}
-    return [v];
-  }
-  return [];
-}
-
 export function imageSearchTool(deps: Deps) {
-  const one = searchTool(deps, "images", { name: "image_search", label: "", description: "", defaultCount: 6 });
   return defineTool({
     name: "image_search",
     label: "Image search",
@@ -136,11 +108,11 @@ export function imageSearchTool(deps: Deps) {
       queries: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "one search per name, up to 10; returns the top pictures for each" })),
       count: Type.Optional(Type.Number({ description: "results for a single query, default 6, max 15" })),
     }),
-    async execute(id, params, signal): Promise<ToolResult> {
+    async execute(_id, params, signal): Promise<ToolResult> {
       const names = queryList(params.queries).map((q) => q.trim()).filter(Boolean).slice(0, MAX_BATCH);
       if (!names.length) {
         if (!params.query) return fail("pass query or queries");
-        return one.execute(id, { query: params.query, count: params.count }, signal, undefined, {} as never) as Promise<ToolResult>;
+        return runSearch(deps, "images", params.query, clampCount(params.count, 6), signal);
       }
       const sections = await mapLimit(names, 3, async (q) => {
         try {
@@ -154,16 +126,6 @@ export function imageSearchTool(deps: Deps) {
     },
   });
 }
-
-const FILLER = new Set(["a", "an", "the", "of", "or", "and", "with", "for", "lb", "lbs", "oz", "fl", "ct", "pk", "pack", "bag", "box", "can", "canned", "jar", "bottle", "packet", "packets", "bunch", "fresh", "about"]);
-
-export const keyWords = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z\s]+/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length > 1 && !FILLER.has(w))
-    .map((w) => w.replace(/(es|s)$/, ""));
 
 export function matchingImage(name: string, hits: Hit[]): string | undefined {
   const want = [...new Set(keyWords(name))];

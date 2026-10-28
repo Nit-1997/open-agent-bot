@@ -1,6 +1,8 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { WeatherData } from "./data.js";
+import { findPlace } from "./geo.js";
+import { timeoutSignal } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 export function wmoCondition(code: number): string {
@@ -69,7 +71,7 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
     async execute(_id, params, signal): Promise<ToolResult> {
       const units = params.units ?? deps.defaultUnits ?? "metric";
       const deg = units === "imperial" ? "°F" : "°C";
-      const opts = { signal: signal ?? AbortSignal.timeout(15000) };
+      const opts = { signal: timeoutSignal(15000, signal) };
 
       let range: { start: string; end: string } | undefined;
       if (params.start_date !== undefined) {
@@ -82,13 +84,7 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
       }
 
       try {
-        const g = new URL("https://geocoding-api.open-meteo.com/v1/search");
-        g.searchParams.set("name", params.location);
-        g.searchParams.set("count", "1");
-        const geo = (await (await f(g, opts)).json()) as {
-          results?: Array<{ name: string; country?: string; admin1?: string; latitude: number; longitude: number }>;
-        };
-        const place = geo.results?.[0];
+        const place = await findPlace(params.location, f, signal);
         if (!place) return fail(`no location found for "${params.location}"`);
         const location = [place.name, place.country].filter(Boolean).join(", ");
 
@@ -98,8 +94,8 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
           const archives = await Promise.all(
             years.map(async (back) => {
               const u = new URL("https://archive-api.open-meteo.com/v1/archive");
-              u.searchParams.set("latitude", String(place.latitude));
-              u.searchParams.set("longitude", String(place.longitude));
+              u.searchParams.set("latitude", String(place.lat));
+              u.searchParams.set("longitude", String(place.lon));
               u.searchParams.set("start_date", shiftYear(range.start, back));
               u.searchParams.set("end_date", shiftYear(range.end, back));
               u.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code");
@@ -145,8 +141,8 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
         }
 
         const u = new URL("https://api.open-meteo.com/v1/forecast");
-        u.searchParams.set("latitude", String(place.latitude));
-        u.searchParams.set("longitude", String(place.longitude));
+        u.searchParams.set("latitude", String(place.lat));
+        u.searchParams.set("longitude", String(place.lon));
         u.searchParams.set("current", "temperature_2m,weather_code");
         u.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max");
         u.searchParams.set("timezone", "auto");

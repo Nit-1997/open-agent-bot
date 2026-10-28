@@ -1,4 +1,4 @@
-import { keyWords } from "../tools/webSearch.js";
+import { keyWords } from "../lib/keywords.js";
 import type { Tile } from "./extract.js";
 
 export type ItemResult = { query: string; qty: number; picks: Tile[] };

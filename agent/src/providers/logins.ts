@@ -36,6 +36,7 @@ export class LoginFlows {
   }
 
   start(providerId: string): string {
+    for (const id of this.flows.keys()) this.live(id);
     const id = randomUUID();
     const flow: Flow = { state: { providerId, status: "running" }, createdAt: this.now(), abort: new AbortController() };
     this.flows.set(id, flow);

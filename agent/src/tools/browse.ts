@@ -4,13 +4,12 @@ import { Type } from "typebox";
 import type { UserContext } from "../prompt/systemPrompt.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "./browserPool.js";
-import { type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "./browsePolicy.js";
+import { BOT_WALL, type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "./browsePolicy.js";
 import { fail, ok, type ToolResult } from "./result.js";
-import { publicHttpUrlError } from "./net.js";
+import { BLOCKING_STATUSES, publicHttpUrlError } from "./net.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 
 export const MAX_ACTIONS = 10;
-const BOT_WALL = /(captcha|are you a robot|access denied|unusual traffic|verify you are human)/i;
 
 const ActionSchema = Type.Union([
   Type.Object({ op: Type.Literal("goto"), url: Type.String() }),
@@ -45,86 +44,89 @@ async function settle(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
 }
 
-export function browseTool(deps: { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean; frames?: FrameBus }) {
+type BrowseDeps = { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean; frames?: FrameBus };
+
+export async function runBrowse(deps: BrowseDeps, actions: BrowseAction[]): Promise<ToolResult> {
+  if (actions.length > MAX_ACTIONS) return fail(`too many actions (max ${MAX_ACTIONS} per call)`);
+  const page = await deps.pool.page(deps.threadId, deps.userContext);
+  const stopWatch = deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
+  let lastStatus: number | undefined;
+
+  try {
+    for (const a of actions) {
+      const loc = locate(page, a);
+      const target = loc ? await targetInfo(loc) : undefined;
+      const verdict = checkAction(a, { url: page.url(), target }, { allowPrivateHosts: deps.allowPrivateHosts });
+      if (!verdict.allowed) return handoff(verdict.reason, a.op === "goto" ? a.url : page.url());
+
+      switch (a.op) {
+        case "goto": {
+          const res = await page.goto(a.url, { waitUntil: "domcontentloaded", timeout: 20000 });
+          lastStatus = res?.status();
+          break;
+        }
+        case "click":
+          await loc!.click({ timeout: 10000 });
+          await settle(page);
+          break;
+        case "type":
+          await loc!.fill(a.value, { timeout: 10000 });
+          if (a.submit) {
+            await loc!.press("Enter");
+            await settle(page);
+          }
+          break;
+        case "select":
+          await loc!.selectOption(a.value, { timeout: 10000 });
+          await settle(page);
+          break;
+        case "wait":
+          await page.waitForTimeout(Math.min(Math.max(a.ms, 0), 5000));
+          break;
+        case "read":
+          break;
+      }
+      const landedError = publicHttpUrlError(page.url(), { allowPrivateHosts: deps.allowPrivateHosts });
+      if (landedError && page.url() !== "about:blank") {
+        await page.goto("about:blank").catch(() => {});
+        return fail(`stopped: ${landedError}`);
+      }
+      if (isBlockedUrl(page.url())) {
+        const url = page.url();
+        await page.goBack().catch(() => {});
+        return handoff("reached a login, cart, checkout, or payment page", url);
+      }
+    }
+
+    const url = page.url();
+    const host = (() => {
+      try {
+        return new URL(url).hostname;
+      } catch {
+        return url;
+      }
+    })();
+    const html = await page.content();
+    const body = htmlToText(html);
+    if ((lastStatus && BLOCKING_STATUSES.has(lastStatus)) || (BOT_WALL.test(body.slice(0, 2000)) && body.length < 3000)) {
+      return ok(`blocked by ${host}: ${url}`, { blocked: true, url });
+    }
+    const shown = truncate(body);
+    return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${shown}${imagesText(html, url, shown)}`, { url });
+  } catch (err) {
+    return fail(`browse failed on ${page.url()}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+  } finally {
+    await stopWatch?.();
+  }
+}
+
+export function browseTool(deps: BrowseDeps) {
   return defineTool({
     name: "browse",
     label: "Browse",
     description:
       "Control a real browser as a guest to read pages that need JavaScript or interaction. Actions run in order on this chat's tab and the tab persists between calls: goto a URL, click (by CSS selector or visible text), type into a field (submit:true presses Enter), select an option, wait (ms ≤ 5000), read. Returns the final page text. Allowed: searching, filtering, entering a PIN/ZIP code, choosing dates or stores. It refuses checkout, cart, payment, login, sign-up, and booking steps and returns the link for the user instead.",
     parameters: Type.Object({ actions: Type.Array(ActionSchema, { minItems: 1 }) }),
-    async execute(_id, params): Promise<ToolResult> {
-      const actions = params.actions as BrowseAction[];
-      if (actions.length > MAX_ACTIONS) return fail(`too many actions (max ${MAX_ACTIONS} per call)`);
-      const page = await deps.pool.page(deps.threadId, deps.userContext);
-      const stopWatch = deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
-      let lastStatus: number | undefined;
-
-      try {
-        for (const a of actions) {
-          const loc = locate(page, a);
-          const target = loc ? await targetInfo(loc) : undefined;
-          const verdict = checkAction(a, { url: page.url(), target }, { allowPrivateHosts: deps.allowPrivateHosts });
-          if (!verdict.allowed) return handoff(verdict.reason, a.op === "goto" ? a.url : page.url());
-
-          switch (a.op) {
-            case "goto": {
-              const res = await page.goto(a.url, { waitUntil: "domcontentloaded", timeout: 20000 });
-              lastStatus = res?.status();
-              break;
-            }
-            case "click":
-              await loc!.click({ timeout: 10000 });
-              await settle(page);
-              break;
-            case "type":
-              await loc!.fill(a.value, { timeout: 10000 });
-              if (a.submit) {
-                await loc!.press("Enter");
-                await settle(page);
-              }
-              break;
-            case "select":
-              await loc!.selectOption(a.value, { timeout: 10000 });
-              await settle(page);
-              break;
-            case "wait":
-              await page.waitForTimeout(Math.min(Math.max(a.ms, 0), 5000));
-              break;
-            case "read":
-              break;
-          }
-          const landedError = publicHttpUrlError(page.url(), { allowPrivateHosts: deps.allowPrivateHosts });
-          if (landedError && page.url() !== "about:blank") {
-            await page.goto("about:blank").catch(() => {});
-            return fail(`stopped: ${landedError}`);
-          }
-          if (isBlockedUrl(page.url())) {
-            const url = page.url();
-            await page.goBack().catch(() => {});
-            return handoff("reached a login, cart, checkout, or payment page", url);
-          }
-        }
-
-        const url = page.url();
-        const host = (() => {
-          try {
-            return new URL(url).hostname;
-          } catch {
-            return url;
-          }
-        })();
-        const html = await page.content();
-        const body = htmlToText(html);
-        if ((lastStatus && [401, 403, 429, 503].includes(lastStatus)) || (BOT_WALL.test(body.slice(0, 2000)) && body.length < 3000)) {
-          return ok(`blocked by ${host}: ${url}`, { blocked: true, url });
-        }
-        const shown = truncate(body);
-        return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${shown}${imagesText(html, url, shown)}`, { url });
-      } catch (err) {
-        return fail(`browse failed on ${page.url()}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
-      } finally {
-        await stopWatch?.();
-      }
-    },
+    execute: (_id, params) => runBrowse(deps, params.actions as BrowseAction[]),
   });
 }

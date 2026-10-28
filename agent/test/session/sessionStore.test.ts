@@ -36,4 +36,21 @@ describe("SessionStore", () => {
     expect(e.dispose).not.toHaveBeenCalled();
     expect(store.get("t1")).toBe(e);
   });
+
+  it("sweep keeps going when one dispose fails", async () => {
+    let now = 0;
+    const broken = { ...entry(), dispose: vi.fn(async () => Promise.reject(new Error("boom"))) };
+    const healthy = entry();
+    const queue = [broken, healthy];
+    const store = new SessionStore({ idleMs: 1000, now: () => now, create: async () => queue.shift()! });
+    await store.getOrCreate("t1", null);
+    await store.getOrCreate("t2", null);
+    now = 5000;
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(store.sweep()).resolves.toBeUndefined();
+    quiet.mockRestore();
+    expect(healthy.dispose).toHaveBeenCalled();
+    expect(store.get("t1")).toBeUndefined();
+    expect(store.get("t2")).toBeUndefined();
+  });
 });

@@ -53,4 +53,25 @@ describe("fetch_page network guard", () => {
     }
     expect(f.calls).toEqual([]);
   });
+
+  it("refuses a redirect to an internal host", async () => {
+    const f = fakeFetch([
+      [/example\.com/, () => new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data" } })],
+      [/169\.254/, () => html("secret")],
+    ]);
+    const r = await call(f, "https://example.com/go");
+    expect(r.isError).toBe(true);
+    expect(text(r)).toContain("refusing internal or private address");
+    expect(f.calls).toEqual(["https://example.com/go"]);
+  });
+
+  it("follows public redirects and reports the final url", async () => {
+    const f = fakeFetch([
+      [/old/, () => new Response(null, { status: 301, headers: { location: "/new" } })],
+      [/new/, () => html("<article><p>Moved here.</p></article>")],
+    ]);
+    const t = text(await call(f, "https://example.com/old"));
+    expect(t).toMatch(/^url: https:\/\/example\.com\/new/);
+    expect(t).toContain("Moved here.");
+  });
 });

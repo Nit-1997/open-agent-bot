@@ -3,14 +3,13 @@ import type { ArtifactStore } from "../artifacts/store.js";
 import type { AgentConfig } from "../config.js";
 import { regionFor } from "../prompt/region.js";
 import type { UserContext } from "../prompt/systemPrompt.js";
-import { browseTool } from "./browse.js";
+import { browseTool, runBrowse } from "./browse.js";
 import { ToolBudget, withBudget } from "./budget.js";
 import type { BrowserPool } from "./browserPool.js";
 import { createArtifactTool } from "./createArtifact.js";
 import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
 import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon } from "./geo.js";
-import type { ToolResult } from "./result.js";
 import type { Evidence } from "../grounding/evidence.js";
 import type { FrameBus } from "../browser/frames.js";
 import type { ActiveCart } from "../shop/cart.js";
@@ -56,20 +55,20 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       }
     : undefined;
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
-  const browse = browseTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames });
+  const browseDeps = { pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames };
   return [
     withBudget(webSearchTool(search), deps.budget, "search"),
     withBudget(imageSearchTool(search), deps.budget, "images"),
     withBudget(musicTool({ country: regionFor(deps.userContext).country }), deps.budget, "lookup"),
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
-    withBudget(browse, deps.budget, "read"),
+    withBudget(browseTool(browseDeps), deps.budget, "read"),
     withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart }), deps.budget, "shop"),
     weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),
     withBudget(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
       currency: regionFor(deps.userContext).currency,
-      browse: (actions) => browse.execute("flights", { actions } as never, undefined, undefined, {} as never) as Promise<ToolResult>,
+      browse: (actions) => runBrowse(browseDeps, actions),
       drive,
     }), deps.budget, "flights"),
     showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),

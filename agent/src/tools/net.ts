@@ -1,8 +1,12 @@
 import { isIP } from "node:net";
 
+export const BLOCKING_STATUSES = new Set([401, 403, 429, 503]);
+
+const MAX_REDIRECTS = 5;
+
 function isPrivateIPv4(ip: string): boolean {
   const [a, b] = ip.split(".").map(Number);
-  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
 }
 
 export function isInternalHost(hostname: string): boolean {
@@ -25,4 +29,42 @@ export function publicHttpUrlError(raw: string, opts: { allowPrivateHosts?: bool
   if (u.protocol !== "http:" && u.protocol !== "https:") return `unsupported url scheme ${u.protocol}`;
   if (!opts.allowPrivateHosts && isInternalHost(u.hostname)) return `refusing internal or private address ${u.hostname}`;
   return null;
+}
+
+export function timeoutSignal(ms: number, signal?: AbortSignal): AbortSignal {
+  return signal ? AbortSignal.any([signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms);
+}
+
+export async function fetchPublic(
+  f: typeof fetch,
+  url: string,
+  init: RequestInit = {},
+  opts: { allowPrivateHosts?: boolean } = {},
+): Promise<{ res: Response; url: string }> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const err = publicHttpUrlError(current, opts);
+    if (err) throw new Error(err);
+    const res = await f(current, { ...init, redirect: "manual" });
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+    if (!location) return { res, url: current };
+    await res.body?.cancel().catch(() => {});
+    current = new URL(location, current).href;
+  }
+  throw new Error(`too many redirects from ${new URL(url).host}`);
+}
+
+export async function readCapped(res: Response, maxBytes: number): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (size < maxBytes) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+  }
+  await reader.cancel().catch(() => {});
+  return new TextDecoder().decode(Buffer.concat(chunks).subarray(0, maxBytes));
 }

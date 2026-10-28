@@ -9,7 +9,13 @@ export class BrowserPool {
   private threads = new Map<string, Promise<{ context: BrowserContext; page: Page }>>();
 
   private launch(): Promise<Browser> {
-    this.browser ??= chromium.launch({ args: ["--disable-dev-shm-usage"] });
+    if (!this.browser) {
+      const launching = chromium.launch({ args: ["--disable-dev-shm-usage"] });
+      launching.catch(() => {
+        if (this.browser === launching) this.browser = undefined;
+      });
+      this.browser = launching;
+    }
     return this.browser;
   }
 
@@ -30,7 +36,10 @@ export class BrowserPool {
       t.catch(() => this.threads.delete(threadId));
       this.threads.set(threadId, t);
     }
-    return t.then(async (x) => (x.page.isClosed() ? await x.context.newPage() : x.page));
+    return t.then(async (x) => {
+      if (x.page.isClosed()) x.page = await x.context.newPage();
+      return x.page;
+    });
   }
 
   async tab(threadId: string, ctx: UserContext | null): Promise<Page> {
@@ -47,7 +56,8 @@ export class BrowserPool {
 
   async closeAll(): Promise<void> {
     await Promise.all([...this.threads.keys()].map((id) => this.close(id)));
-    if (this.browser) await (await this.browser).close();
+    const browser = this.browser;
     this.browser = undefined;
+    if (browser) await (await browser).close().catch(() => {});
   }
 }

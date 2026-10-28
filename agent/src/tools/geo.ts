@@ -1,3 +1,5 @@
+import { timeoutSignal } from "./net.js";
+
 export type LatLon = { lat: number; lon: number };
 export type Airport = LatLon & { name: string };
 
@@ -80,17 +82,23 @@ export async function driveRoute(from: LatLon, to: LatLon, f: typeof fetch = fet
   return { miles: oneDecimal(milesBetween(from, to) * ROAD_FACTOR), source: "estimate" };
 }
 
+export type Place = LatLon & { name: string; country?: string };
+
+export async function findPlace(name: string, f: typeof fetch = fetch, signal?: AbortSignal): Promise<Place | null> {
+  const u = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  u.searchParams.set("name", name);
+  u.searchParams.set("count", "1");
+  const res = await f(u, { signal: timeoutSignal(10000, signal) });
+  if (!res.ok) throw new Error(`geocoding HTTP ${res.status}`);
+  const hit = ((await res.json()) as { results?: Array<{ name: string; country?: string; latitude: number; longitude: number }> }).results?.[0];
+  return hit ? { name: hit.name, ...(hit.country && { country: hit.country }), lat: hit.latitude, lon: hit.longitude } : null;
+}
+
 export async function geocode(place: string, f: typeof fetch = fetch): Promise<LatLon | null> {
   const tries = [...new Set([place, place.split(",")[0]].map((s) => s.trim()).filter(Boolean))];
   for (const name of tries) {
-    try {
-      const u = new URL("https://geocoding-api.open-meteo.com/v1/search");
-      u.searchParams.set("name", name);
-      u.searchParams.set("count", "1");
-      const res = await f(u, { signal: AbortSignal.timeout(10000) });
-      const hit = ((await res.json()) as { results?: Array<{ latitude: number; longitude: number }> }).results?.[0];
-      if (hit) return { lat: hit.latitude, lon: hit.longitude };
-    } catch {}
+    const hit = await findPlace(name, f).catch(() => null);
+    if (hit) return { lat: hit.lat, lon: hit.lon };
   }
   return null;
 }

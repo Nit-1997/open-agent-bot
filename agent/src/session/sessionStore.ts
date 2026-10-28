@@ -67,7 +67,7 @@ export class SessionStore {
     for (const [id, e] of this.entries) {
       if (!e.busy && e.lastUsed < cutoff) {
         this.entries.delete(id);
-        await e.dispose();
+        await e.dispose().catch((err: unknown) => console.error(`[session] dispose failed thread=${id}`, err));
       }
     }
   }
@@ -75,6 +75,6 @@ export class SessionStore {
   async disposeAll(): Promise<void> {
     const all = [...this.entries.values()];
     this.entries.clear();
-    await Promise.all(all.map((e) => e.dispose()));
+    await Promise.allSettled(all.map((e) => e.dispose()));
   }
 }

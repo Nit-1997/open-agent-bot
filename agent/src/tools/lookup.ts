@@ -1,11 +1,13 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { mapLimit } from "../lib/concurrency.js";
+import { queryList } from "./args.js";
+import { timeoutSignal } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
-import { mapLimit, queryList } from "./webSearch.js";
 
 const MAX_BATCH = 10;
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
-const timeout = (signal?: AbortSignal) => (signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000));
+const timeout = (signal?: AbortSignal) => timeoutSignal(10000, signal);
 
 const Queries = Type.Union([Type.Array(Type.String()), Type.String()], { description: "names to look up, up to 10, in one call" });
 

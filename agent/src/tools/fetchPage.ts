@@ -1,10 +1,10 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fail, ok, type ToolResult } from "./result.js";
-import { publicHttpUrlError } from "./net.js";
+import { BLOCKING_STATUSES, fetchPublic, publicHttpUrlError, readCapped, timeoutSignal } from "./net.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 
-const BLOCKING_STATUSES = new Set([401, 403, 429, 503]);
+const MAX_BODY_BYTES = 5_000_000;
 
 export function httpErrorText(status: number, host: string): string {
   return BLOCKING_STATUSES.has(status)
@@ -25,21 +25,19 @@ export function fetchPageTool(deps: { fetch?: typeof fetch } = {}) {
       if (urlError) return fail(urlError);
       const url = new URL(params.url);
       try {
-        const res = await f(url, {
-          signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
+        const { res, url: at } = await fetchPublic(f, url.href, {
+          signal: timeoutSignal(15000, signal),
           headers: { "user-agent": "Mozilla/5.0 (compatible; OpenAgent/0.1)", accept: "text/html,text/plain,application/json" },
-          redirect: "follow",
         });
-        if (!res.ok) return fail(httpErrorText(res.status, url.host));
+        if (!res.ok) return fail(httpErrorText(res.status, new URL(at).host));
         const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
         if (type === "text/html" || type === "application/xhtml+xml") {
-          const page = await res.text();
-          const at = res.url || url.href;
+          const page = await readCapped(res, MAX_BODY_BYTES);
           const body = truncate(htmlToText(page));
           return ok(`url: ${at}\n\n${body}${imagesText(page, at, body)}`);
         }
         if (type === "text/plain" || type === "application/json" || type.endsWith("+json")) {
-          return ok(`url: ${res.url || url.href}\n\n${truncate(await res.text())}`);
+          return ok(`url: ${at}\n\n${truncate(await readCapped(res, MAX_BODY_BYTES))}`);
         }
         return fail(`unsupported content-type ${type || "unknown"}`);
       } catch (err) {
