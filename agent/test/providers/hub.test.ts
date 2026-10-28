@@ -15,9 +15,18 @@ const seed = {
 };
 
 const make = (dir = mkdtempSync(join(tmpdir(), "hub-")), extra: Partial<Parameters<typeof ProviderHub.create>[0]> = {}) =>
-  ProviderHub.create({ dataDir: dir, litellm: seed, ...extra }).then((hub) => ({ hub, dir }));
+  ProviderHub.create({ dataDir: dir, litellm: seed, fetch: fakeFetch([]), ...extra }).then((hub) => ({ hub, dir }));
 
 describe("ProviderHub", () => {
+  it("takes context and output limits for gateway models from LiteLLM, keeping safe defaults for unknown ones", async () => {
+    const f = fakeFetch([
+      [/model\/info/, () => json({ data: [{ model_name: "chat-sonnet-5.5", model_info: { max_input_tokens: 1_000_000, max_output_tokens: 128_000 } }, { model_name: "chat-default", model_info: null }] })],
+    ]);
+    const { hub } = await make(undefined, { fetch: f });
+    expect(hub.resolve("litellm/chat-sonnet-5.5")).toMatchObject({ contextWindow: 1_000_000, maxTokens: 32_000 });
+    expect(hub.resolve("litellm/chat-default")).toMatchObject({ contextWindow: 32768, maxTokens: 4096 });
+  });
+
   it("lists the curated providers, with the LiteLLM gateway seeded and ready", async () => {
     const { hub } = await make();
     const list = hub.list();

@@ -26,6 +26,8 @@ export function createTranslator(ids: Deps) {
   let textOpen = false;
   let text = "";
   const renderedKinds = new Set<string>();
+  const NOT_AN_ANSWER = new Set(["followups", "grounding_note"]);
+  let answered = false;
   const notedClaims = new Set<string>();
 
   const widgetCall = (id: string, widget: Widget): BaseEvent[] => [
@@ -70,6 +72,7 @@ export function createTranslator(ids: Deps) {
           out.push({ type: EventType.TEXT_MESSAGE_START, messageId: assistantId, role: "assistant" } as BaseEvent);
         }
         text += a.delta;
+        if (a.delta.trim()) answered = true;
         out.push({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: assistantId, delta: a.delta } as BaseEvent);
         return out;
       }
@@ -101,8 +104,10 @@ export function createTranslator(ids: Deps) {
         const fromData = !details?.widget;
         let widget = e.isError ? null : (details?.widget ?? (details?.data ? render(details.data) : null));
         if (widget?.kind === "ui") widget = groundUi(widget as UiWidget, evidence);
+        if (e.toolName === "create_artifact" && !e.isError) answered = true;
         if (widget && !(fromData && renderedKinds.has(widget.kind))) {
           if (fromData) renderedKinds.add(widget.kind);
+          if (!NOT_AN_ANSWER.has(widget.kind)) answered = true;
           out.push(...widgetCall(`${e.toolCallId}-widget`, widget));
         }
         return out;
@@ -112,5 +117,5 @@ export function createTranslator(ids: Deps) {
     }
   };
 
-  return { translate, finish: closeText };
+  return { translate, finish: closeText, answered: () => answered };
 }

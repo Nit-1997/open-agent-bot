@@ -9,7 +9,7 @@ import { type CatalogEntry, catalogEntry, CLOUD, LOCAL, LOCAL_KINDS, type LocalK
 type AnyModel = Model<any>;
 type Complete = (model: AnyModel, context: Context, options?: { maxTokens?: number; signal?: AbortSignal }) => Promise<AssistantMessage>;
 
-export type SeedModel = { id: string; label: string; note?: string };
+export type SeedModel = { id: string; label: string; note?: string; contextWindow?: number; maxTokens?: number };
 type Custom = { kind: LocalKind | "litellm"; label: string; baseUrl: string; models: SeedModel[] };
 type Settings = { custom: Record<string, Custom>; enabled: Record<string, string[]>; hidden: string[] };
 
@@ -34,6 +34,27 @@ export type ModelView = { id: string; label: string; contextWindow: number; note
 export type TestResult = { ok: boolean; toolCall: boolean; latencyMs: number; cost?: number; error?: string };
 
 const LOCAL_MODEL = { reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens: 4096 };
+const MAX_OUTPUT_TOKENS = 32_000;
+
+type LiteLlmInfo = { data?: Array<{ model_name?: string; model_info?: { max_input_tokens?: number | null; max_output_tokens?: number | null } | null }> };
+
+async function withGatewayLimits(f: typeof fetch, gateway: { baseUrl: string; apiKey: string; models: SeedModel[] }): Promise<SeedModel[]> {
+  try {
+    const res = await f(`${gateway.baseUrl.replace(/\/+$/, "")}/model/info`, { headers: { authorization: `Bearer ${gateway.apiKey}` }, signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return gateway.models;
+    const info = new Map(((await res.json()) as LiteLlmInfo).data?.map((d) => [d.model_name, d.model_info]) ?? []);
+    return gateway.models.map((m) => {
+      const i = info.get(m.id);
+      return {
+        ...m,
+        ...(i?.max_input_tokens && { contextWindow: i.max_input_tokens }),
+        ...(i?.max_output_tokens && { maxTokens: Math.min(i.max_output_tokens, MAX_OUTPUT_TOKENS) }),
+      };
+    });
+  } catch {
+    return gateway.models;
+  }
+}
 
 function priceNote(m: AnyModel): string | undefined {
   const { input, output } = m.cost ?? { input: 0, output: 0 };
@@ -76,7 +97,8 @@ export class ProviderHub {
     }
     const hub = new ProviderHub(rt, opts.dataDir, settings, keys, opts.fetch ?? fetch, opts.complete ?? ((m, c, o) => rt.completeSimple(m, c, o)), signedIn);
     if (opts.litellm && !settings.hidden.includes("litellm")) {
-      settings.custom.litellm = { kind: "litellm", label: "LiteLLM gateway", baseUrl: opts.litellm.baseUrl, models: opts.litellm.models };
+      const models = await withGatewayLimits(opts.fetch ?? fetch, opts.litellm);
+      settings.custom.litellm = { kind: "litellm", label: "LiteLLM gateway", baseUrl: opts.litellm.baseUrl, models };
       keys.litellm = opts.litellm.apiKey;
       settings.enabled.litellm ??= opts.litellm.models.map((m) => m.id);
     }
@@ -95,7 +117,13 @@ export class ProviderHub {
       baseUrl: c.baseUrl,
       apiKey: this.keys[id] || "none",
       api: "openai-completions",
-      models: c.models.map((m) => ({ id: m.id, name: m.label, ...LOCAL_MODEL })),
+      models: c.models.map((m) => ({
+        id: m.id,
+        name: m.label,
+        ...LOCAL_MODEL,
+        ...(m.contextWindow && { contextWindow: m.contextWindow }),
+        ...(m.maxTokens && { maxTokens: m.maxTokens }),
+      })),
     });
   }
 

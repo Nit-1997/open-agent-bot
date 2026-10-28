@@ -1,6 +1,6 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
-import { handleRun, readUserContext } from "../../src/agui/runHandler.js";
+import { EMPTY_REPLY_NUDGE, handleRun, readUserContext } from "../../src/agui/runHandler.js";
 import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import { Evidence } from "../../src/grounding/evidence.js";
@@ -62,6 +62,7 @@ describe("handleRun", () => {
     const script: Script = async (emit) => {
       emit(ev.assistantStart);
       frames.publish({ url: "https://www.shipt.com/x", data: "abc" });
+      emit(ev.delta("Found it."));
       emit(ev.assistantEnd());
     };
     const { store } = setup(script, undefined, undefined, frames);
@@ -69,6 +70,31 @@ describe("handleRun", () => {
     const custom = out.filter((e) => e.type === EventType.CUSTOM) as unknown as Array<{ name: string; value: unknown }>;
     expect(custom).toEqual([{ type: EventType.CUSTOM, name: "browser_frame", value: { url: "https://www.shipt.com/x", data: "abc" } }]);
     expect(frames.size).toBe(0);
+    expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
+  });
+
+  it("asks once more when a run ends without showing the user an answer", async () => {
+    let turn = 0;
+    const script: Script = async (emit) => {
+      emit(ev.assistantStart);
+      if (turn++ > 0) emit(ev.delta("Here is the answer."));
+      emit(ev.assistantEnd());
+    };
+    const { store, session } = setup(script);
+    const out = await collect(handleRun(input(), store, new AbortController().signal));
+    expect(session.prompts).toEqual(["hello", EMPTY_REPLY_NUDGE]);
+    expect(out.filter((e) => e.type === EventType.TEXT_MESSAGE_CONTENT)).toHaveLength(1);
+    expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
+  });
+
+  it("asks only once, even if the second reply is empty too", async () => {
+    const silent: Script = async (emit) => {
+      emit(ev.assistantStart);
+      emit(ev.assistantEnd());
+    };
+    const { store, session } = setup(silent);
+    const out = await collect(handleRun(input(), store, new AbortController().signal));
+    expect(session.prompts).toHaveLength(2);
     expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
   });
 

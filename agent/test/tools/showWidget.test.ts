@@ -182,9 +182,34 @@ describe("suggest_replies", () => {
     expect(r.details.widget).toEqual({ kind: "followups", replies: ["Make it high protein", "Gluten-free options"] });
   });
 
-  it("accepts replies sent as a JSON string and rejects long or too many", async () => {
+  it("accepts replies sent as a JSON string and trims long or extra ones", async () => {
     expect((await run({ replies: '["Cheaper picks"]' })).details.widget).toEqual({ kind: "followups", replies: ["Cheaper picks"] });
-    expect((await run({ replies: ["x".repeat(41)] })).isError).toBe(true);
-    expect((await run({ replies: ["a", "b", "c", "d", "e"] })).isError).toBe(true);
+    expect(((await run({ replies: ["x".repeat(41)] })).details.widget as { replies: string[] }).replies[0]).toHaveLength(40);
+    expect(((await run({ replies: ["a", "b", "c", "d", "e"] })).details.widget as { replies: string[] }).replies).toEqual(["a", "b", "c", "d"]);
+    expect((await run({ replies: [] })).isError).toBe(true);
+  });
+});
+
+describe("show_ui fits text to the card instead of failing", () => {
+  it("trims long labels and table cells and drops extra items", async () => {
+    const r = await exec({
+      title: "Jev for agent evals: where it helps",
+      blocks: [
+        { type: "stats", items: [{ label: "Cost per call (LangChain test)", value: "$0.00035" }] },
+        { type: "table", columns: ["Use"], rows: [["A table cell that is much longer than forty-eight characters allows"]] },
+        { type: "checklist", items: Array.from({ length: 15 }, (_, i) => ({ text: `step ${i}` })) },
+      ],
+    });
+    expect(r.isError).toBeFalsy();
+    const blocks = (r.details.widget as { blocks: Array<Record<string, any>> }).blocks;
+    expect(blocks[0].items[0].label).toBe("Cost per call (LangChai…");
+    expect(blocks[0].items[0].label).toHaveLength(24);
+    expect(blocks[1].rows[0][0]).toHaveLength(48);
+    expect(blocks[2].items).toHaveLength(12);
+  });
+
+  it("still rejects structural mistakes", async () => {
+    const r = await exec({ title: "x", blocks: [{ type: "links", items: [{ label: "no url" }] }] });
+    expect(r.isError).toBe(true);
   });
 });

@@ -5,6 +5,9 @@ import type { SessionEntry, SessionStore } from "../session/sessionStore.js";
 import type { CartEdits } from "../shop/cart.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
+export const EMPTY_REPLY_NUDGE =
+  "Your reply so far shows me nothing but follow-up suggestions. Answer my previous message now from what the tools already returned, without searching again.";
+
 export const SESSION_EXPIRED_MESSAGE = "This chat's session ended (the agent restarted or the chat sat idle). Start a new chat.";
 
 function messageText(m: Message): string {
@@ -142,17 +145,20 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   };
   signal.addEventListener("abort", onAbort, { once: true });
 
-  const running = entry.session
-    .prompt(messageText(last))
-    .catch((err: unknown) => {
-      modelError = err instanceof Error ? err.message : String(err);
-    })
-    .finally(() => {
-      done = true;
-      wake?.();
-    });
-
-  try {
+  let running: Promise<void> = Promise.resolve();
+  const start = (text: string) => {
+    done = false;
+    running = entry.session
+      .prompt(text)
+      .catch((err: unknown) => {
+        modelError = err instanceof Error ? err.message : String(err);
+      })
+      .finally(() => {
+        done = true;
+        wake?.();
+      });
+  };
+  async function* drain(): AsyncGenerator<BaseEvent> {
     while (true) {
       while (queue.length) yield queue.shift()!;
       if (done) break;
@@ -160,6 +166,16 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
       wake = undefined;
     }
     await running;
+  }
+
+  start(messageText(last));
+  try {
+    yield* drain();
+    if (!modelError && !signal.aborted && !translator.answered()) {
+      console.log(`[run] thread=${threadId} empty reply, asking for the answer`);
+      start(EMPTY_REPLY_NUDGE);
+      yield* drain();
+    }
     for (const e of translator.finish()) yield e;
     if (signal.aborted) return;
     console.log(`[run] thread=${threadId} done error=${modelError ?? "none"}`);

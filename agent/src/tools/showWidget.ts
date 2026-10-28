@@ -1,6 +1,6 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { UI_BLOCK_TYPES, type UiWidget, validateWidget } from "../../../shared/widgets.js";
+import { fitWidget, UI_BLOCK_TYPES, type UiWidget, validateWidget } from "../../../shared/widgets.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at most 8 blocks, labels not sentences. Blocks, in display order:
@@ -65,7 +65,7 @@ export const showUiTool = (deps: { findImage?: FindImage; isSourced?: (url: stri
           return fail("invalid card:\n/blocks: blocks must be an array of block objects, not text");
         }
       }
-      const r = validateWidget({ kind: "ui", ...(textify({ ...params, blocks }) as object) });
+      const r = validateWidget(fitWidget({ kind: "ui", ...(textify({ ...params, blocks }) as object) }));
       if (!r.ok) return fail(`invalid card:\n${r.errors.join("\n")}`);
       const filled = deps.findImage ? await fillImages(r.value as UiWidget, deps.findImage, deps.isSourced ?? (() => true)) : { widget: r.value as UiWidget, sourced: [] };
       return ok(
@@ -93,7 +93,7 @@ export const suggestRepliesTool = () =>
           replies = [replies];
         }
       }
-      const r = validateWidget({ kind: "followups", replies });
+      const r = validateWidget(fitWidget({ kind: "followups", replies }));
       if (!r.ok) return fail(`invalid replies:\n${r.errors.join("\n")}`);
       return ok("Follow-ups shown. Don't repeat them in your text.", { widget: r.value });
     },

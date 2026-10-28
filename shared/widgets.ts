@@ -262,6 +262,36 @@ export type WidgetKind = WidgetPayload["kind"];
 
 export const WIDGET_KINDS = Object.keys(WidgetSchemas) as WidgetKind[];
 
+type SchemaShape = { maxLength?: number; maxItems?: number; items?: TSchema; properties?: Record<string, TSchema> };
+
+function fit(schema: TSchema, v: unknown): unknown {
+  const s = schema as SchemaShape;
+  if (typeof v === "string") return s.maxLength != null && v.length > s.maxLength ? `${v.slice(0, s.maxLength - 1).trimEnd()}…` : v;
+  if (Array.isArray(v)) {
+    const kept = s.maxItems != null ? v.slice(0, s.maxItems) : v;
+    return s.items ? kept.map((x) => fit(s.items!, x)) : kept;
+  }
+  if (v && typeof v === "object" && s.properties) {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, s.properties![k] ? fit(s.properties![k], x) : x]));
+  }
+  return v;
+}
+
+const fitItems = (items: unknown, schemas: Record<string, TSchema>) =>
+  Array.isArray(items) ? items.map((b) => {
+    const type = (b as { type?: unknown } | null)?.type;
+    return typeof type === "string" && type in schemas ? fit(schemas[type], b) : b;
+  }) : items;
+
+export function fitWidget(x: unknown): unknown {
+  const kind = (x as { kind?: unknown } | null)?.kind;
+  if (typeof kind !== "string" || !(kind in WidgetSchemas)) return x;
+  const out = fit(WidgetSchemas[kind as WidgetKind], x) as Record<string, unknown>;
+  if (kind === "ui") return { ...out, blocks: fitItems(out.blocks, UiBlockSchemas) };
+  if (kind === "ask") return { ...out, fields: fitItems(out.fields, AskFieldSchemas) };
+  return out;
+}
+
 function schemaErrors(schema: TSchema, x: unknown, prefix = ""): string[] {
   const seen = new Set<string>();
   const errors: string[] = [];
