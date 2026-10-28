@@ -30,6 +30,11 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
       const what = args.kind === "song" ? "song" : "album";
       return `${done ? "Looked up" : "Looking up"} ${n} ${n === 1 ? what : `${what}s`}`;
     }
+    case "shop": {
+      const n = list(args.items).length;
+      const stores = list(args.stores).map((st) => st.charAt(0).toUpperCase() + st.slice(1)).join(", ");
+      return `${done ? "Shopped" : "Shopping"} ${n} ${n === 1 ? "item" : "items"} at ${stores}`;
+    }
     case "wikipedia": {
       const many = list(args.queries);
       return `${done ? "Read" : "Reading"} Wikipedia on ${many.length === 1 ? many[0] : `${many.length} topics`}`;
@@ -54,7 +59,7 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
 
 export function stepKind(name: string): "search" | "read" | "weather" | "flight" | "write" | "other" {
   if (name === "web_search" || name === "image_search") return "search";
-  if (name === "music" || name === "wikipedia") return "read";
+  if (name === "music" || name === "wikipedia" || name === "shop") return "read";
   if (name === "fetch_page" || name === "browse") return "read";
   if (name === "weather") return "weather";
   if (name === "flights") return "flight";

@@ -2,7 +2,7 @@ import { keyWords } from "../tools/webSearch.js";
 import type { Tile } from "./extract.js";
 
 export type ItemResult = { query: string; qty: number; picks: Tile[] };
-export type StoreResult = { store: string; items: ItemResult[] };
+export type StoreResult = { store: string; home?: string; items: ItemResult[] };
 export type StoreSummary = { store: string; found: number; missing: string[]; total: number };
 
 export function matches(query: string, title: string): boolean {

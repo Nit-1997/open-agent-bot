@@ -167,6 +167,31 @@ export const GroundingNoteSchema = Type.Object({
   claims: Type.Array(Str, { minItems: 1 }),
 });
 
+const CartPickSchema = Type.Object({
+  title: Str,
+  price: Type.Optional(Type.Number()),
+  priceText: Type.Optional(Str),
+  image: Type.Optional(Url),
+  url: Url,
+  size: Type.Optional(Str),
+  rating: Type.Optional(Type.Number()),
+  sponsored: Type.Optional(Type.Boolean()),
+});
+
+export const CartSchema = Type.Object({
+  kind: Type.Literal("cart"),
+  stores: Type.Array(
+    Type.Object({
+      name: Str,
+      total: Type.Number(),
+      url: Url,
+      missing: Type.Array(Str),
+      items: Type.Array(Type.Object({ query: Str, qty: Type.Number(), picks: Type.Array(CartPickSchema, { maxItems: 3 }) }), { minItems: 1, maxItems: 12 }),
+    }),
+    { minItems: 1, maxItems: 6 },
+  ),
+});
+
 export const FollowupsSchema = Type.Object({
   kind: Type.Literal("followups"),
   replies: Type.Array(S(40), { minItems: 1, maxItems: 4 }),
@@ -179,6 +204,7 @@ export const WidgetSchemas = {
   grounding_note: GroundingNoteSchema,
   ask: AskSchema,
   followups: FollowupsSchema,
+  cart: CartSchema,
 } as const;
 
 export type WeatherCard = Static<typeof WeatherCardSchema>;
@@ -191,7 +217,8 @@ export type AskFieldType = keyof typeof AskFieldSchemas;
 export type AskField = Static<typeof AskFieldSchema>;
 export type AskWidget = Omit<Static<typeof AskSchema>, "fields"> & { fields: AskField[] };
 export type Followups = Static<typeof FollowupsSchema>;
-export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget | Followups;
+export type Cart = Static<typeof CartSchema>;
+export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget | Followups | Cart;
 export type WidgetKind = WidgetPayload["kind"];
 
 export const WIDGET_KINDS = Object.keys(WidgetSchemas) as WidgetKind[];

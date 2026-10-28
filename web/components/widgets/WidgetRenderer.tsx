@@ -1,5 +1,6 @@
 import { validateWidget } from "@shared/widgets";
 import { AskCard } from "./AskCard";
+import { CartCard } from "./CartCard";
 import { FlightList } from "./FlightList";
 import { GroundingNote } from "./GroundingNote";
 import { UiCard } from "./UiCard";
@@ -23,5 +24,7 @@ export function WidgetRenderer(props: { toolCallId: string; args: unknown; local
       return <AskCard toolCallId={toolCallId} widget={w} locale={locale} answered={props.answered} onAnswer={props.onAnswer} />;
     case "followups":
       return null;
+    case "cart":
+      return <CartCard toolCallId={toolCallId} widget={w} />;
   }
 }

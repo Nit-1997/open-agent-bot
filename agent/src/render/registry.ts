@@ -4,7 +4,34 @@ import type { FlightsData, WeatherData } from "../tools/data.js";
 const MAX_FLIGHTS = 8;
 const MAX_COMPARED_FLIGHTS = 24;
 
+type ShopData = {
+  stores: Array<{ store: string; home?: string; items: Array<{ query: string; qty: number; picks: Array<Record<string, unknown>> }> }>;
+  summary: Array<{ store: string; total: number; missing: string[] }>;
+};
+
+const CART_FIELDS = ["title", "price", "priceText", "image", "url", "size", "rating", "sponsored"];
+
 const renderers: Record<string, (data: any) => unknown> = {
+  shop: (d: ShopData) => {
+    if (!d.summary.length) return null;
+    return {
+      kind: "cart",
+      stores: d.summary.slice(0, 6).map((sum) => {
+        const s = d.stores.find((x) => x.store === sum.store)!;
+        return {
+          name: sum.store,
+          total: sum.total,
+          url: s.home ?? "",
+          missing: sum.missing,
+          items: s.items.map((i) => ({
+            query: i.query,
+            qty: i.qty,
+            picks: i.picks.slice(0, 3).map((p) => Object.fromEntries(CART_FIELDS.filter((k) => p[k] !== undefined).map((k) => [k, p[k]]))),
+          })),
+        };
+      }),
+    };
+  },
   weather: (d: WeatherData) => ({
     kind: "weather_card",
     mode: d.mode,

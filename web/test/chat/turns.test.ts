@@ -84,6 +84,8 @@ describe("steps", () => {
     expect(stepLabel("music", { queries: ["Rumours", "Abbey Road"] })).toBe("Looked up 2 albums");
     expect(stepLabel("music", { queries: ["Hey Jude"], kind: "song" }, false)).toBe("Looking up 1 song");
     expect(stepLabel("wikipedia", { queries: ["Kinkaku-ji"] })).toBe("Read Wikipedia on Kinkaku-ji");
+    expect(stepLabel("shop", { stores: ["shipt"], items: [{ query: "rice" }, { query: "beans" }] })).toBe("Shopped 2 items at Shipt");
+    expect(stepLabel("shop", { stores: ["amazon", "bestbuy"], items: [{ query: "headphones" }] }, false)).toBe("Shopping 1 item at Amazon, Bestbuy");
     expect(stepLabel("wikipedia", { queries: ["Kinkaku-ji", "Ryoan-ji"] }, false)).toBe("Reading Wikipedia on 2 topics");
     expect(stepLabel("fetch_page", { url: "https://www.target.com/x" })).toBe("Read target.com");
     expect(stepLabel("weather", { location: "Pune" })).toBe("Checked weather in Pune");

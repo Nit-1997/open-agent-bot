@@ -106,8 +106,8 @@ async function runAll(deps: Deps, jobs: Job[]): Promise<JobResult[]> {
 
 function storeResults(results: JobResult[], wanted: Item[]): StoreResult[] {
   const byStore = new Map<string, StoreResult>();
-  const add = (label: string, item: Item, picks: Tile[]) => {
-    const s = byStore.get(label) ?? { store: label, items: wanted.map((w) => ({ query: w.query, qty: w.qty, picks: [] as Tile[] })) };
+  const add = (label: string, home: string, item: Item, picks: Tile[]) => {
+    const s = byStore.get(label) ?? { store: label, home, items: wanted.map((w) => ({ query: w.query, qty: w.qty, picks: [] as Tile[] })) };
     byStore.set(label, s);
     const slot = s.items.find((i) => i.query === item.query)!;
     if (!slot.picks.length) slot.picks = picks;
@@ -119,10 +119,10 @@ function storeResults(results: JobResult[], wanted: Item[]): StoreResult[] {
       for (const t of r.tiles) if (t.group) groups.set(t.group, [...(groups.get(t.group) ?? []), t]);
       for (const [group, tiles] of groups) {
         const picks = rankTiles(r.item.query, tiles).slice(0, PICKS);
-        if (picks.length) add(`${group} (${r.store.label})`, r.item, picks);
+        if (picks.length) add(`${group} (${r.store.label})`, r.store.home, r.item, picks);
       }
     } else {
-      add(r.store.label, r.item, rankTiles(r.item.query, r.tiles).slice(0, PICKS));
+      add(r.store.label, r.store.home, r.item, rankTiles(r.item.query, r.tiles).slice(0, PICKS));
     }
   }
   return [...byStore.values()];
