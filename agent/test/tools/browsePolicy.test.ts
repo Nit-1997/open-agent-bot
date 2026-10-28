@@ -59,6 +59,10 @@ describe("isBlockedUrl", () => {
       "https://www.google.com/travel/flights?q=Flights%20from%20SFO%20to%20BLR",
       "https://blog.example.com/author/jane",
       "https://www.paytmmall.com/shop/search?q=diya",
+      "https://www.booking.com/searchresults.html?ss=Las+Vegas&checkin=2026-11-12",
+      "https://www.booking.com/hotel/us/the-linq.html",
+      "https://www.booking.co.uk/searchresults.html?ss=London",
+      "https://www.bookshop.org/search?q=dune",
     ]) {
       expect(isBlockedUrl(u), u).toBe(false);
     }
@@ -72,6 +76,9 @@ describe("isBlockedUrl", () => {
       "https://example.com/sign-up",
       "https://example.com/oauth/authorize",
       "https://example.com/billing",
+      "https://secure.booking.com/book.html?hotel_id=1",
+      "https://accounts.google.com/signin",
+      "https://login.example.co.uk/",
     ]) {
       expect(isBlockedUrl(u), u).toBe(true);
     }

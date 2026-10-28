@@ -25,10 +25,16 @@ const BLOCKED_TARGET_TEXT =
 const BLOCKED_AUTOCOMPLETE = /cc-|current-password|new-password|one-time-code|name|email|tel|street-address|address-line|bday|username/i;
 const BLOCKED_INPUT_TYPES = new Set(["password", "email", "tel"]);
 
+function subdomains(hostname: string): string {
+  const labels = hostname.toLowerCase().split(".");
+  const suffix = labels.length > 2 && labels.at(-2)!.length <= 3 && labels.at(-1)!.length === 2 ? 3 : 2;
+  return labels.slice(0, -suffix).join(".");
+}
+
 export function isBlockedUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    return BLOCKED_URL_WORDS.test(`${u.hostname}${u.pathname}`);
+    return BLOCKED_URL_WORDS.test(`${subdomains(u.hostname)}/${u.pathname}`);
   } catch {
     return false;
   }
