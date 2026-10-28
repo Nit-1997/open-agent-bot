@@ -1,0 +1,82 @@
+import { timeoutSignal } from "./net.js";
+
+const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
+const SPOTIFY_ITEM = /^\/(?:intl-[a-z-]+\/)?(playlist|album|track|artist)\/([A-Za-z0-9]+)/;
+const FILLER = new Set(["playlist", "playlists", "spotify", "apple", "music", "songs", "song", "mix", "the", "and", "for", "of", "by", "best"]);
+
+export type MusicCard = { title: string; url?: string; subtitle?: string };
+
+const words = (s: string) =>
+  new Set(
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !FILLER.has(w)),
+  );
+
+export function spotifyItemUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "open.spotify.com") return undefined;
+    const m = SPOTIFY_ITEM.exec(u.pathname);
+    return m ? `https://open.spotify.com/${m[1]}/${m[2]}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function spotifyCover(url: string, f: typeof fetch): Promise<string | undefined> {
+  const api = new URL("https://open.spotify.com/oembed");
+  api.searchParams.set("url", url);
+  const res = await f(api, { signal: timeoutSignal(6000), headers: UA });
+  if (!res.ok) return undefined;
+  const thumb = ((await res.json()) as { thumbnail_url?: unknown }).thumbnail_url;
+  return typeof thumb === "string" && thumb.startsWith("https://") ? thumb : undefined;
+}
+
+type ITunesAlbum = { collectionName?: string; artistName?: string; artworkUrl100?: string };
+
+export function confidentAlbum(results: ITunesAlbum[], name: string): ITunesAlbum | undefined {
+  const want = words(name);
+  if (!want.size) return undefined;
+  const need = Math.max(2, Math.ceil(want.size / 2));
+  let best: ITunesAlbum | undefined;
+  let bestHits = 0;
+  for (const r of results) {
+    const have = words(`${r.collectionName ?? ""} ${r.artistName ?? ""}`);
+    let hits = 0;
+    for (const w of want) if (have.has(w)) hits++;
+    if (hits > bestHits && r.artworkUrl100) {
+      best = r;
+      bestHits = hits;
+    }
+  }
+  return bestHits >= Math.min(need, want.size) ? best : undefined;
+}
+
+async function appleCover(name: string, country: string, f: typeof fetch): Promise<string | undefined> {
+  const url = new URL("https://itunes.apple.com/search");
+  url.searchParams.set("term", name);
+  url.searchParams.set("entity", "album");
+  url.searchParams.set("limit", "8");
+  url.searchParams.set("country", country);
+  const res = await f(url, { signal: timeoutSignal(6000), headers: UA });
+  if (!res.ok) return undefined;
+  const hit = confidentAlbum(((await res.json()) as { results?: ITunesAlbum[] }).results ?? [], name);
+  return hit?.artworkUrl100?.replace(/\/\d+x\d+bb\./, "/600x600bb.");
+}
+
+export function musicCover(deps: { country: string; fetch?: typeof fetch }) {
+  const f = deps.fetch ?? fetch;
+  return async (card: MusicCard): Promise<string | undefined> => {
+    const spotify = spotifyItemUrl(card.url);
+    if (spotify) {
+      const cover = await spotifyCover(spotify, f).catch(() => undefined);
+      if (cover) return cover;
+    }
+    return appleCover(card.title, deps.country, f).catch(() => undefined);
+  };
+}

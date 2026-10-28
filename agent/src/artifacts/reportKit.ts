@@ -68,7 +68,8 @@ figcaption { margin-top: 8px; font-size: 13px; color: var(--ink-3); }
 .option p { margin: 0; font-size: 14px; color: var(--ink-2); }
 .option.pick { border: 2px solid var(--mist-500); box-shadow: 0 10px 30px rgba(24, 58, 64, 0.12); }
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--mist-900); color: #fff; font: 600 11px/1.5 var(--sans); letter-spacing: 0.04em; }
-.option > .badge { position: absolute; top: 12px; left: 12px; }
+.option > .badge { align-self: flex-start; margin: 14px 16px 0; }
+.option:has(> img) > .badge { position: absolute; top: 12px; left: 12px; margin: 0; }
 .tags { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .tags li { margin: 0; padding: 2px 9px; border-radius: 999px; background: var(--surface); font-size: 12px; color: var(--ink-2); }
 

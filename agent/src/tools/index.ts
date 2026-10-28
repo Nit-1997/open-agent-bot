@@ -16,6 +16,7 @@ import { type FrameBus, watch } from "../browser/frames.js";
 import type { OpenTab } from "../stays/search.js";
 import type { ActiveCart } from "../shop/cart.js";
 import { askUserTool } from "./askUser.js";
+import { musicCover } from "./musicArt.js";
 import { showUiTool, suggestRepliesTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
 import { imageSearchTool, matchingImage, search as runSearch, webSearchTool } from "./webSearch.js";
@@ -86,7 +87,10 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       drive,
     }), deps.budget, "flights"),
     withBudget(staysTool({ openTab, currency: regionFor(deps.userContext).currency }), deps.budget, "stays"),
-    showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),
+    showUiTool({
+      findMusicArt: musicCover({ country: regionFor(deps.userContext).country }),
+      isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
+      findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),
     suggestRepliesTool(),
     askUserTool(),
     createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }),

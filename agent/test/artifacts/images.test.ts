@@ -21,6 +21,13 @@ describe("vetImages", () => {
     expect(r.html).toContain("<h3>BRZ</h3>");
   });
 
+  it("drops tiny Google thumbnails even when a tool returned them", async () => {
+    const thumb = "https://encrypted-tbn0.gstatic.com/images?q=tbn:abc";
+    const r = await vetImages(`<h1>Diwali</h1><img src="${thumb}" alt="logo">`, { isSourced: () => true, loads: async () => true });
+    expect(r).toMatchObject({ kept: 0, dropped: 1 });
+    expect(r.html).not.toContain("gstatic");
+  });
+
   it("keeps a full document a full document", async () => {
     const r = await vetImages("<!doctype html><html><head><title>T</title></head><body><p>hi</p></body></html>", check);
     expect(r.html).toMatch(/<html>.*<title>T<\/title>.*<p>hi<\/p>/s);

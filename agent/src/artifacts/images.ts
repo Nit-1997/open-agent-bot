@@ -2,6 +2,8 @@ import { parseHTML } from "linkedom";
 import { mapLimit } from "../lib/concurrency.js";
 import { fetchPublic, timeoutSignal } from "../tools/net.js";
 
+const THUMBNAIL = /^https:\/\/encrypted-tbn\d\.gstatic\.com\//i;
+
 export type ImageCheck = { isSourced: (url: string) => boolean; loads: (url: string) => Promise<boolean> };
 
 export function imageLoads(f: typeof fetch = fetch) {
@@ -23,6 +25,7 @@ export async function vetImages(html: string, check: ImageCheck): Promise<{ html
   const verdicts = await mapLimit(images, 6, async (img) => {
     const src = (img.getAttribute("src") ?? "").trim();
     if (/^data:image\//i.test(src)) return true;
+    if (THUMBNAIL.test(src)) return false;
     return /^https?:\/\//i.test(src) && check.isSourced(src) && (await check.loads(src));
   });
   let dropped = 0;
