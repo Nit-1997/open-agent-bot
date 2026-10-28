@@ -10,7 +10,7 @@ import { createArtifactTool } from "./createArtifact.js";
 import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
 import type { ToolResult } from "./result.js";
-import { showPlanTool, showProductsTool } from "./showWidget.js";
+import { showUiTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
 import { webSearchTool } from "./webSearch.js";
 
@@ -37,8 +37,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       currency: regionFor(deps.userContext).currency,
       browse: (actions) => browse.execute("flights", { actions } as never, undefined, undefined, {} as never) as Promise<ToolResult>,
     }), deps.budget, "flights"),
-    showProductsTool(),
-    showPlanTool(),
+    showUiTool(),
     createArtifactTool(deps.artifacts),
   ];
 }

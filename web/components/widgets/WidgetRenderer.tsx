@@ -1,7 +1,7 @@
 import { validateWidget } from "@shared/widgets";
 import { FlightList } from "./FlightList";
-import { PlanChecklist } from "./PlanChecklist";
-import { ProductComparison } from "./ProductComparison";
+import { GroundingNote } from "./GroundingNote";
+import { UiCard } from "./UiCard";
 import { WeatherCard } from "./WeatherCard";
 
 export function WidgetRenderer({ toolCallId, args, locale }: { toolCallId: string; args: unknown; locale: string }) {
@@ -13,9 +13,9 @@ export function WidgetRenderer({ toolCallId, args, locale }: { toolCallId: strin
       return <WeatherCard toolCallId={toolCallId} widget={w} />;
     case "flight_list":
       return <FlightList toolCallId={toolCallId} widget={w} locale={locale} />;
-    case "product_comparison":
-      return <ProductComparison toolCallId={toolCallId} widget={w} locale={locale} />;
-    case "plan_checklist":
-      return <PlanChecklist toolCallId={toolCallId} widget={w} />;
+    case "ui":
+      return <UiCard toolCallId={toolCallId} widget={w} />;
+    case "grounding_note":
+      return <GroundingNote toolCallId={toolCallId} widget={w} />;
   }
 }

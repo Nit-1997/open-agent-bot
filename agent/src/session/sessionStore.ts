@@ -1,3 +1,4 @@
+import type { Evidence } from "../grounding/evidence.js";
 import type { PiSession } from "../pi/createPiSession.js";
 import type { UserContext } from "../prompt/systemPrompt.js";
 
@@ -7,6 +8,7 @@ export type SessionEntry = {
   lastUsed: number;
   dispose: () => Promise<void>;
   onRunStart?: () => void;
+  evidence?: Evidence;
 };
 
 export class SessionStore {

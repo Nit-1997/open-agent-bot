@@ -1,10 +1,14 @@
 import { type BaseEvent, EventType } from "@ag-ui/core";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { UiWidget } from "../../../shared/widgets.js";
+import { Evidence } from "../grounding/evidence.js";
+import { groundUi } from "../grounding/groundUi.js";
 import { renderData } from "../render/registry.js";
 
 export type PiEvent = AgentSessionEvent;
 
-type Deps = { newId: () => string; render?: (data: unknown) => { kind: string } | null };
+type Widget = { kind: string };
+type Deps = { newId: () => string; render?: (data: unknown) => Widget | null; evidence?: Evidence };
 
 export function resultText(result: unknown): string {
   const content = (result as { content?: Array<{ type: string; text?: string }> } | undefined)?.content;
@@ -17,14 +21,33 @@ export function resultText(result: unknown): string {
 
 export function createTranslator(ids: Deps) {
   const render = ids.render ?? renderData;
+  const evidence = ids.evidence ?? new Evidence();
   let assistantId: string | undefined;
   let textOpen = false;
+  let text = "";
   const renderedKinds = new Set<string>();
+  const notedClaims = new Set<string>();
+
+  const widgetCall = (id: string, widget: Widget): BaseEvent[] => [
+    {
+      type: EventType.TOOL_CALL_START,
+      toolCallId: id,
+      toolCallName: "show_widget",
+      ...(assistantId ? { parentMessageId: assistantId } : {}),
+    } as BaseEvent,
+    { type: EventType.TOOL_CALL_ARGS, toolCallId: id, delta: JSON.stringify({ widget }) } as BaseEvent,
+    { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent,
+    { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: id, content: `rendered ${widget.kind}`, role: "tool" } as BaseEvent,
+  ];
 
   const closeText = (): BaseEvent[] => {
     if (!textOpen || !assistantId) return [];
     textOpen = false;
-    return [{ type: EventType.TEXT_MESSAGE_END, messageId: assistantId } as BaseEvent];
+    const out: BaseEvent[] = [{ type: EventType.TEXT_MESSAGE_END, messageId: assistantId } as BaseEvent];
+    const claims = evidence.unverified(text).filter((c) => !notedClaims.has(c));
+    claims.forEach((c) => notedClaims.add(c));
+    if (claims.length) out.push(...widgetCall(`${assistantId}-widget`, { kind: "grounding_note", claims } as Widget));
+    return out;
   };
 
   const translate = (e: PiEvent): BaseEvent[] => {
@@ -43,8 +66,10 @@ export function createTranslator(ids: Deps) {
         if (!assistantId) assistantId = ids.newId();
         if (!textOpen) {
           textOpen = true;
+          text = "";
           out.push({ type: EventType.TEXT_MESSAGE_START, messageId: assistantId, role: "assistant" } as BaseEvent);
         }
+        text += a.delta;
         out.push({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: assistantId, delta: a.delta } as BaseEvent);
         return out;
       }
@@ -63,38 +88,21 @@ export function createTranslator(ids: Deps) {
           { type: EventType.TOOL_CALL_END, toolCallId: e.toolCallId } as BaseEvent,
         ];
       case "tool_execution_end": {
+        const content = resultText(e.result);
         const out: BaseEvent[] = [
-          {
-            type: EventType.TOOL_CALL_RESULT,
-            messageId: ids.newId(),
-            toolCallId: e.toolCallId,
-            content: resultText(e.result),
-            role: "tool",
-          } as BaseEvent,
+          { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: e.toolCallId, content, role: "tool" } as BaseEvent,
         ];
-        const details = (e.result as { details?: { widget?: { kind: string }; data?: unknown } } | undefined)?.details;
+        const details = (e.result as { details?: { widget?: Widget; data?: unknown } } | undefined)?.details;
+        if (!e.toolName.startsWith("show_")) {
+          evidence.add(content);
+          if (details?.data) evidence.add(JSON.stringify(details.data));
+        }
         const fromData = !details?.widget;
-        const widget = e.isError ? null : (details?.widget ?? (details?.data ? render(details.data) : null));
+        let widget = e.isError ? null : (details?.widget ?? (details?.data ? render(details.data) : null));
+        if (widget?.kind === "ui") widget = groundUi(widget as UiWidget, evidence);
         if (widget && !(fromData && renderedKinds.has(widget.kind))) {
           if (fromData) renderedKinds.add(widget.kind);
-          const id = `${e.toolCallId}-widget`;
-          out.push(
-            {
-              type: EventType.TOOL_CALL_START,
-              toolCallId: id,
-              toolCallName: "show_widget",
-              ...(assistantId ? { parentMessageId: assistantId } : {}),
-            } as BaseEvent,
-            { type: EventType.TOOL_CALL_ARGS, toolCallId: id, delta: JSON.stringify({ widget }) } as BaseEvent,
-            { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent,
-            {
-              type: EventType.TOOL_CALL_RESULT,
-              messageId: ids.newId(),
-              toolCallId: id,
-              content: `rendered ${widget.kind}`,
-              role: "tool",
-            } as BaseEvent,
-          );
+          out.push(...widgetCall(`${e.toolCallId}-widget`, widget));
         }
         return out;
       }

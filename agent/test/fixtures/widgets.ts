@@ -17,18 +17,20 @@ export const validWidgets = {
     searchUrl: "https://www.google.com/travel/flights?q=SFO+BLR",
     source: "Google Flights",
   },
-  product_comparison: {
-    kind: "product_comparison",
-    query: "Sony WH-1000XM5",
-    currency: "INR",
-    rows: [
-      { store: "Amazon.in", title: "Sony WH-1000XM5", price: 26990, availability: "in_stock", url: "https://amazon.in/x" },
-      { store: "Flipkart", title: "Sony WH-1000XM5", availability: "blocked", url: "https://flipkart.com/x" },
+  ui: {
+    kind: "ui",
+    title: "Diwali party for 25",
+    subtitle: "Pune · Nov 8",
+    blocks: [
+      { type: "heading", text: "Budget" },
+      { type: "stats", items: [{ label: "Guests", value: "25" }, { label: "Budget", value: "₹15,000" }] },
+      { type: "table", columns: ["Item", "Qty"], rows: [["Kaju katli", "1.5 kg"]] },
+      { type: "list", items: [{ title: "Diya set", value: "₹499", badge: "In stock", url: "https://amazon.in/x" }] },
+      { type: "checklist", title: "Day before", items: [{ text: "Clean the house", note: "start early" }] },
+      { type: "links", items: [{ label: "Amazon", url: "https://amazon.in/x" }] },
+      { type: "callout", tone: "info", text: "Prices change often." },
+      { type: "text", text: "Have fun!" },
     ],
   },
-  plan_checklist: {
-    kind: "plan_checklist",
-    title: "Diwali party for 25",
-    sections: [{ name: "Sweets", items: [{ label: "Kaju katli", quantity: "1.5 kg", url: "https://example.com" }] }],
-  },
+  grounding_note: { kind: "grounding_note", claims: ["$7.49"] },
 } as const;

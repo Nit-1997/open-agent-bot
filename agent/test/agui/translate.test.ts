@@ -1,6 +1,7 @@
 import { EventType } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { createTranslator, type PiEvent } from "../../src/agui/translate.js";
+import { Evidence } from "../../src/grounding/evidence.js";
 
 const renderStub = (data: unknown) =>
   (data as { kind?: string } | undefined)?.kind === "weather" ? ({ kind: "weather_card", location: "Pune" } as never) : null;
@@ -24,8 +25,8 @@ const toolEnd = {
   result: { content: [{ type: "text", text: "Sunny" }, { type: "text", text: " 28C" }], details: {} },
 } as unknown as PiEvent;
 
-const run = (events: PiEvent[]) => {
-  const t = createTranslator(ids());
+const run = (events: PiEvent[], evidence?: Evidence) => {
+  const t = createTranslator({ ...ids(), evidence });
   return [...events.flatMap((e) => t.translate(e)), ...t.finish()];
 };
 
@@ -80,8 +81,8 @@ describe("createTranslator", () => {
   });
 
   it("render tools that return details.widget are shown as-is", () => {
-    const widget = { kind: "plan_checklist", title: "x", sections: [] };
-    const end = { ...toolEnd, toolName: "show_plan", result: { content: [{ type: "text", text: "ok" }], details: { widget } } } as unknown as PiEvent;
+    const widget = { kind: "weather_card", location: "Pune" };
+    const end = { ...toolEnd, toolName: "show_x", result: { content: [{ type: "text", text: "ok" }], details: { widget } } } as unknown as PiEvent;
     const out = run([end]);
     expect(out.map((e) => e.type)).toContain(EventType.TOOL_CALL_START);
     expect(JSON.parse((out[2] as unknown as { delta: string }).delta)).toEqual({ widget });
@@ -124,5 +125,60 @@ describe("createTranslator", () => {
   it("unknown and thinking events are ignored", () => {
     const out = run([{ type: "turn_start" } as unknown as PiEvent, thinking, { type: "agent_settled" } as unknown as PiEvent]);
     expect(out).toEqual([]);
+  });
+});
+
+const widgetArgs = (out: ReturnType<typeof run>) =>
+  out
+    .filter((e) => e.type === EventType.TOOL_CALL_ARGS && (e as unknown as { toolCallId: string }).toolCallId.endsWith("-widget"))
+    .map((e) => JSON.parse((e as unknown as { delta: string }).delta).widget);
+
+const searchEnd = {
+  ...toolEnd,
+  toolCallId: "s1",
+  toolName: "web_search",
+  result: { content: [{ type: "text", text: "Target Diya 12ct $6.99 In stock https://www.target.com/p/diya/-/A-1" }], details: {} },
+} as unknown as PiEvent;
+
+const uiEnd = (blocks: unknown[]) =>
+  ({
+    ...toolEnd,
+    toolCallId: "u1",
+    toolName: "show_ui",
+    result: { content: [{ type: "text", text: "shown" }], details: { widget: { kind: "ui", title: "Shopping", blocks } } },
+  }) as unknown as PiEvent;
+
+describe("grounding", () => {
+  it("marks card values no tool returned and keeps sourced ones clean", () => {
+    const out = run([searchEnd, uiEnd([{ type: "list", items: [{ title: "Diya", value: "$6.99", badge: "In stock" }, { title: "Lantern", value: "$5.99" }] }])]);
+    expect(widgetArgs(out)).toEqual([
+      { kind: "ui", title: "Shopping", blocks: [{ type: "list", items: [{ title: "Diya", value: "$6.99", badge: "In stock" }, { title: "Lantern", value: "$5.99" }] }], unverified: ["$5.99"] },
+    ]);
+  });
+
+  it("evidence persists across runs of the same session", () => {
+    const evidence = new Evidence();
+    run([searchEnd], evidence);
+    const out = run([uiEnd([{ type: "text", text: "$6.99" }])], evidence);
+    expect(widgetArgs(out)[0].unverified).toBeUndefined();
+  });
+
+  it("adds a note after a message whose text has unsourced claims", () => {
+    const out = run([searchEnd, assistantStart, delta("Diyas $6.99, rangoli kit $7."), delta("49, ✅ In Stock"), assistantEnd]);
+    const types = out.map((e) => e.type);
+    expect(types.indexOf(EventType.TEXT_MESSAGE_END)).toBeLessThan(types.lastIndexOf(EventType.TOOL_CALL_START));
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
+  });
+
+  it("adds no note when the text is fully sourced, and notes each claim once per run", () => {
+    expect(widgetArgs(run([searchEnd, assistantStart, delta("Diyas are $6.99."), assistantEnd]))).toEqual([]);
+    const twice = run([assistantStart, delta("$7.49"), assistantEnd, assistantStart, delta("still $7.49"), assistantEnd]);
+    expect(widgetArgs(twice)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
+  });
+
+  it("checks text still open when the run finishes", () => {
+    const t = createTranslator(ids());
+    const out = [...[assistantStart, delta("$7.49")].flatMap((e) => t.translate(e)), ...t.finish()];
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
   });
 });

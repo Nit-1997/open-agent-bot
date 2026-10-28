@@ -1,6 +1,7 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { handleRun } from "../../src/agui/runHandler.js";
+import { Evidence } from "../../src/grounding/evidence.js";
 import type { UserContext } from "../../src/prompt/systemPrompt.js";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
 import { ev, fakeSession, type Script } from "./fakeSession.js";
@@ -11,7 +12,7 @@ const say: Script = async (emit) => {
   emit(ev.assistantEnd());
 };
 
-function setup(script: Script = say) {
+function setup(script: Script = say, evidence?: Evidence) {
   const session = fakeSession(script);
   const runStarts = { count: 0 };
   const contexts: Array<UserContext | null> = [];
@@ -19,7 +20,7 @@ function setup(script: Script = say) {
     idleMs: 60000,
     create: async (_t, ctx): Promise<SessionEntry> => {
       contexts.push(ctx);
-      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++ };
+      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence };
     },
   });
   return { session, store, contexts, runStarts };
@@ -56,6 +57,18 @@ describe("handleRun", () => {
       EventType.RUN_FINISHED,
     ]);
     expect(session.prompts).toEqual(["hello"]);
+  });
+
+  it("treats what the user said as evidence for the reply", async () => {
+    const echo: Script = async (emit) => {
+      emit(ev.assistantStart);
+      emit(ev.delta("With a $200 budget, rangoli kits run $7.49."));
+      emit(ev.assistantEnd());
+    };
+    const { store } = setup(echo, new Evidence());
+    const out = await collect(handleRun(input({ messages: [{ id: "m1", role: "user", content: "my budget is $200" }] as RunAgentInput["messages"] }), store, new AbortController().signal));
+    const note = out.find((e) => e.type === EventType.TOOL_CALL_ARGS) as unknown as { delta: string };
+    expect(JSON.parse(note.delta).widget).toEqual({ kind: "grounding_note", claims: ["$7.49"] });
   });
 
   it("calls onRunStart once per run so per-reply budgets reset", async () => {

@@ -1,8 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FlightList } from "@/components/widgets/FlightList";
-import { PlanChecklist } from "@/components/widgets/PlanChecklist";
-import { ProductComparison } from "@/components/widgets/ProductComparison";
+import { UiCard } from "@/components/widgets/UiCard";
 import { WeatherCard } from "@/components/widgets/WeatherCard";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import { validWidgets } from "./fixtures";
@@ -18,13 +17,6 @@ describe("widgets", () => {
     expect(screen.getByText("Pune, India")).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getByText("28°C")).toBeInTheDocument();
-  });
-
-  it("ProductComparison renders blocked row with link", () => {
-    render(<ProductComparison toolCallId="p1" widget={validWidgets.product_comparison} locale="en-IN" />);
-    expect(screen.getByText("Site blocked automated access — open link")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Flipkart/ })).toHaveAttribute("href", "https://flipkart.com/x");
-    expect(screen.getByText("₹26,990.00")).toBeInTheDocument();
   });
 
   it("FlightList always renders searchUrl link", () => {
@@ -53,11 +45,37 @@ describe("widgets", () => {
     expect(badge.closest("li")).toHaveTextContent("Frontier");
   });
 
-  it("PlanChecklist renders sections and items", () => {
-    render(<PlanChecklist toolCallId="c1" widget={validWidgets.plan_checklist} />);
-    expect(screen.getByText("Sweets")).toBeInTheDocument();
-    expect(screen.getByText("Kaju katli")).toBeInTheDocument();
-    expect(screen.getByText("1.5 kg")).toBeInTheDocument();
+  it("UiCard renders every block type", () => {
+    render(<UiCard toolCallId="u1" widget={validWidgets.ui} />);
+    expect(screen.getByRole("heading", { name: "Diwali party for 25" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Budget" })).toBeInTheDocument();
+    expect(screen.getByText("₹15,000")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Price" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Diya set/ })).toHaveAttribute("href", "https://amazon.in/x");
+    expect(screen.getByRole("checkbox", { name: /Clean the house/ })).not.toBeChecked();
+    expect(screen.getByRole("link", { name: "Amazon" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByText("Prices change often.")).toBeInTheDocument();
+    expect(screen.getByText("Have fun!")).toBeInTheDocument();
+  });
+
+  it("UiCard marks every unverified value and explains removed links", () => {
+    render(<UiCard toolCallId="u2" widget={validWidgets.ui} />);
+    const marks = screen.getAllByTitle("Not found in the sources I read");
+    expect(marks.map((m) => m.textContent)).toEqual(["₹350", "₹350"]);
+    expect(screen.getByText(/weren't found in the sources/)).toBeInTheDocument();
+    expect(screen.getByText(/1 link that didn't come from a source was removed/)).toBeInTheDocument();
+  });
+
+  it("UiCard without flags shows no grounding footer", () => {
+    const { unverified: _u, removedLinks: _r, ...clean } = validWidgets.ui;
+    render(<UiCard toolCallId="u3" widget={clean} />);
+    expect(screen.queryByTitle("Not found in the sources I read")).toBeNull();
+    expect(screen.queryByText(/weren't found in the sources/)).toBeNull();
+  });
+
+  it("GroundingNote lists the claims", () => {
+    render(<WidgetRenderer toolCallId="g1" args={{ widget: validWidgets.grounding_note }} locale="en-US" />);
+    expect(screen.getByText(/\$7\.49, In Stock/)).toBeInTheDocument();
   });
 
   it("WidgetRenderer renders nothing for invalid payload", () => {
@@ -66,7 +84,7 @@ describe("widgets", () => {
   });
 
   it("WidgetRenderer dispatches on kind", () => {
-    render(<WidgetRenderer toolCallId="x" args={{ widget: validWidgets.plan_checklist }} locale="en-US" />);
+    render(<WidgetRenderer toolCallId="x" args={{ widget: validWidgets.ui }} locale="en-US" />);
     expect(screen.getByText("Diwali party for 25")).toBeInTheDocument();
   });
 

@@ -19,7 +19,7 @@ describe("ToolActivity", () => {
   });
 
   it("renders nothing for show_* tools since the card is the visible result", () => {
-    const { container } = render(<ToolActivity toolCallId="c3" name="show_products" status="complete" parameters={{}} />);
+    const { container } = render(<ToolActivity toolCallId="c3" name="show_ui" status="complete" parameters={{}} />);
     expect(container).toBeEmptyDOMElement();
   });
 

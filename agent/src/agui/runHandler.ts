@@ -73,7 +73,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     wake?.();
   };
 
-  const translator = createTranslator({ newId: randomUUID });
+  entry.evidence?.add(messageText(last));
+  const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {
     if (e.type === "tool_execution_start") console.log(`[run] thread=${threadId} tool=${e.toolName} args=${JSON.stringify(e.args).slice(0, 300)}`);
     if (e.type === "tool_execution_end") console.log(`[run] thread=${threadId} tool=${e.toolName} error=${e.isError} result=${JSON.stringify(e.result?.content?.[0]?.text ?? "").slice(0, 200)}`);

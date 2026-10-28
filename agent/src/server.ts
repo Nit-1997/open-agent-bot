@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig } from "./config.js";
+import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
@@ -29,6 +30,7 @@ const store = new SessionStore({
       busy: false,
       lastUsed: Date.now(),
       onRunStart: () => budget.reset(),
+      evidence: new Evidence(),
       dispose: async () => {
         await Promise.all([handle.dispose(), pool.close(threadId)]);
       },

@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
-import { showPlanTool, showProductsTool } from "../../src/tools/showWidget.js";
+import { showUiTool } from "../../src/tools/showWidget.js";
 import { validWidgets } from "../fixtures/widgets.js";
 
-const strip = ({ kind: _k, ...rest }: Record<string, unknown>) => rest;
-const exec = (tool: { execute: (...a: never[]) => Promise<unknown> }, params: unknown) =>
-  tool.execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
+const exec = (params: unknown) =>
+  showUiTool().execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
     isError?: boolean;
     content: Array<{ text: string }>;
     details: { widget?: unknown };
   }>;
+
+const { kind: _k, ...uiParams } = validWidgets.ui;
 
 describe("validateWidget", () => {
   for (const [kind, w] of Object.entries(validWidgets)) {
@@ -23,31 +24,59 @@ describe("validateWidget", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors[0]).toMatch(/kind/);
   });
+
+  it("reports block errors with their path", () => {
+    const r = validateWidget({ ...validWidgets.ui, blocks: [{ type: "carousel" }, { type: "links", items: [{ label: "x" }] }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors[0]).toMatch(/^\/blocks\/0\/type: must be one of heading, text/);
+      expect(r.errors.join("\n")).toContain("/blocks/1/items/0");
+    }
+  });
 });
 
-describe("flat show_* tools", () => {
-  const cases = [
-    ["show_products", showProductsTool(), validWidgets.product_comparison],
-    ["show_plan", showPlanTool(), validWidgets.plan_checklist],
-  ] as const;
+describe("show_ui", () => {
+  it("takes title and blocks and returns a valid ui widget", async () => {
+    const res = await exec(uiParams);
+    expect(res.isError).toBeFalsy();
+    expect(res.content[0].text).toBe("shown to the user as a card");
+    expect(res.details.widget).toEqual(validWidgets.ui);
+  });
 
-  for (const [name, tool, widget] of cases) {
-    it(`${name} takes top-level fields and returns a valid details.widget`, async () => {
-      expect(tool.name).toBe(name);
-      const res = await exec(tool, strip(widget as Record<string, unknown>));
-      expect(res.isError).toBeFalsy();
-      expect(res.content[0].text).toBe(`shown to the user as a ${widget.kind} card`);
-      expect(res.details.widget).toEqual(widget);
-      expect(validateWidget(res.details.widget).ok).toBe(true);
+  it("accepts numbers where text is expected", async () => {
+    const blocks = [
+      { type: "stats", items: [{ label: "Guests", value: 25 }] },
+      { type: "table", columns: ["Item", "Price"], rows: [["Diya", 6.99]] },
+    ];
+    const res = await exec({ title: "x", blocks });
+    expect(res.isError).toBeFalsy();
+    expect(res.details.widget).toMatchObject({
+      blocks: [{ items: [{ value: "25" }] }, { rows: [["Diya", "6.99"]] }],
     });
-  }
+  });
 
-  it("show_widget rejects invalid payload with path-level errors", async () => {
-    const bad = { ...strip(validWidgets.product_comparison), rows: [{ ...validWidgets.product_comparison.rows[0], availability: "maybe" }] };
-    const res = await exec(showProductsTool(), bad);
+  it("accepts blocks sent as a JSON string", async () => {
+    const res = await exec({ title: "x", blocks: JSON.stringify([{ type: "text", text: "hi" }]) });
+    expect(res.isError).toBeFalsy();
+    expect(res.details.widget).toMatchObject({ blocks: [{ type: "text", text: "hi" }] });
+  });
+
+  it("explains a blocks string that isn't valid JSON", async () => {
+    const res = await exec({ title: "x", blocks: "[{type: text}" });
     expect(res.isError).toBe(true);
-    expect(res.content[0].text).toMatch(/^invalid widget:/);
-    expect(res.content[0].text).toContain("/rows/0/availability");
+    expect(res.content[0].text).toMatch(/blocks must be an array/);
+  });
+
+  it("its parameter schema lets pi pass a blocks string through", () => {
+    const blocks = (showUiTool().parameters as { properties: { blocks: { anyOf?: Array<{ type: string }> } } }).properties.blocks;
+    expect(blocks.anyOf?.map((s) => s.type)).toEqual(["array", "string"]);
+  });
+
+  it("returns path-level errors the model can fix", async () => {
+    const res = await exec({ title: "x", blocks: [{ type: "callout", tone: "loud", text: "hi" }] });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/^invalid card:/);
+    expect(res.content[0].text).toContain("/blocks/0/tone");
     expect(res.details.widget).toBeUndefined();
   });
 });
