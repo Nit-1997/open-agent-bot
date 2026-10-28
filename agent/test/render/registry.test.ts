@@ -22,7 +22,7 @@ describe("renderData", () => {
     const page = readFileSync(new URL("../fixtures/google-flights-sfo-bna.txt", import.meta.url), "utf8");
     const options = parseGoogleFlights(page);
     const many = Array.from({ length: 12 }, () => options[0]);
-    const w = renderData({ kind: "flights", from: "SFO", to: "BNA", date: "2026-12-12", currency: "USD", options: many, airports: [], searchUrl: "https://g.co/x", source: "Google Flights" });
+    const w = renderData({ kind: "flights", from: "SFO", to: "BNA", date: "2026-12-12", currency: "USD", options: many, airports: [], prefs: {}, searchUrl: "https://g.co/x", source: "Google Flights" });
     expect(w?.kind).toBe("flight_list");
     expect(validateWidget(w).ok).toBe(true);
     expect((w as { flights: unknown[] }).flights).toHaveLength(8);

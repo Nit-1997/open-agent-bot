@@ -1,11 +1,19 @@
+"use client";
+
+import { type FlightPrefs, LAYOVER_OPTIONS, type LayoverPref, matchesPrefs, rankAirports, TIME_OPTIONS, type TimeBucket } from "@shared/flights";
 import type { FlightList as FlightListData } from "@shared/widgets";
+import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import { ExternalLink } from "./Card";
 
-type Airport = NonNullable<FlightListData["airports"]>[number];
+const VISIBLE_FLIGHTS = 8;
 
-function stopsLabel(stops: number) {
-  return stops === 0 ? "Nonstop" : `${stops} stop${stops > 1 ? "s" : ""}`;
+function stopsLabel(f: { stops: number; layoverMinutes?: number; layoverAt?: string }) {
+  if (f.stops === 0) return "Nonstop";
+  const base = `${f.stops} stop${f.stops > 1 ? "s" : ""}`;
+  if (!f.layoverAt) return base;
+  const wait = f.layoverMinutes != null ? `${Math.floor(f.layoverMinutes / 60)}h ${f.layoverMinutes % 60}m ` : "";
+  return `${base} · ${wait}in ${f.layoverAt}`;
 }
 
 function prettyDate(date: string) {
@@ -21,9 +29,55 @@ function whole(value: number, currency: string, locale: string) {
   }
 }
 
-function rank(airports: Airport[]): Airport[] {
-  const score = (a: Airport) => (a.status === "failed" ? 2 : a.recommended ? 0 : 1);
-  return [...airports].sort((a, b) => score(a) - score(b) || (a.total ?? Infinity) - (b.total ?? Infinity));
+function Filters({ id, prefs, onChange }: { id: string; prefs: FlightPrefs; onChange: (p: FlightPrefs) => void }) {
+  const layover = prefs.maxLayover ?? "any";
+  const times = prefs.times ?? [];
+  const chip = (on: boolean) =>
+    `cursor-pointer rounded-full border px-2.5 py-1 text-[12px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-cortex-500 ${
+      on ? "border-cortex-300 bg-cortex-50 text-cortex-600" : "border-border bg-paper text-text-secondary hover:border-border-strong"
+    }`;
+  return (
+    <div id={id} className="space-y-2 border-b border-border px-4 py-3">
+      <div id={`${id}-layover`} role="radiogroup" aria-label="Layovers" className="flex flex-wrap items-center gap-1.5">
+        <span id={`${id}-layover-label`} className="eyebrow mr-1">
+          Layovers
+        </span>
+        {LAYOVER_OPTIONS.map((o) => (
+          <label id={`${id}-layover-${o.id}`} key={o.id} className={chip(layover === o.id)}>
+            <input
+              id={`${id}-layover-${o.id}-input`}
+              type="radio"
+              name={`${id}-layover`}
+              checked={layover === o.id}
+              onChange={() => onChange({ ...prefs, maxLayover: o.id as LayoverPref })}
+              className="sr-only"
+            />
+            {o.label}
+          </label>
+        ))}
+      </div>
+      <div id={`${id}-times`} role="group" aria-label="Departure time" className="flex flex-wrap items-center gap-1.5">
+        <span id={`${id}-times-label`} className="eyebrow mr-1">
+          Departs
+        </span>
+        {TIME_OPTIONS.map((o) => {
+          const on = times.includes(o.id);
+          return (
+            <label id={`${id}-time-${o.id}`} key={o.id} title={o.hint} className={chip(on)}>
+              <input
+                id={`${id}-time-${o.id}-input`}
+                type="checkbox"
+                checked={on}
+                onChange={() => onChange({ ...prefs, times: on ? times.filter((t) => t !== o.id) : [...times, o.id as TimeBucket] })}
+                className="sr-only"
+              />
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function Badge({ id, tone, children }: { id: string; tone: "agent" | "good" | "plain"; children: React.ReactNode }) {
@@ -37,12 +91,20 @@ function Badge({ id, tone, children }: { id: string; tone: "agent" | "good" | "p
 
 export function FlightList({ toolCallId, widget, locale }: { toolCallId: string; widget: FlightListData; locale: string }) {
   const id = `flight-list-${toolCallId}`;
-  const prices = widget.flights.map((f) => f.price).filter((p): p is number => p != null);
+  const [prefs, setPrefs] = useState<FlightPrefs>(widget.prefs ?? {});
+  const [showAll, setShowAll] = useState(false);
+  const visible = useMemo(() => widget.flights.filter((f) => matchesPrefs(f, prefs)), [widget.flights, prefs]);
+  const airports = useMemo(
+    () => (widget.airports && widget.airports.length > 1 ? rankAirports(widget.airports, widget.flights, prefs) : undefined),
+    [widget.airports, widget.flights, prefs],
+  );
+  const prices = visible.map((f) => f.price).filter((p): p is number => p != null);
   const cheapest = prices.length ? Math.min(...prices) : undefined;
-  const cheapestIndex = widget.flights.findIndex((f) => f.price === cheapest);
-  const airports = widget.airports && widget.airports.length > 1 ? rank(widget.airports) : undefined;
-  const hasRides = airports?.some((a) => a.ground != null);
+  const cheapestIndex = visible.findIndex((f) => f.price === cheapest);
+  const hasRides = airports?.some((a) => a.rideOneWay != null);
   const dates = `${prettyDate(widget.date)}${widget.returnDate ? ` → ${prettyDate(widget.returnDate)}` : ""}`;
+  const shown = showAll ? visible : visible.slice(0, VISIBLE_FLIGHTS);
+  const bookUrl = airports?.find((a) => a.bestValue)?.searchUrl ?? widget.searchUrl;
 
   return (
     <section id={id} className="w-full overflow-hidden rounded-2xl border border-border bg-paper">
@@ -50,7 +112,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
         <div id={`${id}-route`} className="min-w-0">
           <h3 id={`${id}-title`} className="truncate text-lg font-semibold">{`${widget.from} → ${widget.to}`}</h3>
           <p id={`${id}-subtitle`} className="text-xs text-text-secondary">
-            {`${dates} · ${widget.flights.length} option${widget.flights.length === 1 ? "" : "s"} · ${widget.source}`}
+            {`${dates} · ${visible.length} of ${widget.flights.length} option${widget.flights.length === 1 ? "" : "s"} · ${widget.source}`}
           </p>
         </div>
         {cheapest != null && (
@@ -65,10 +127,12 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
         )}
       </header>
 
+      {widget.flights.length > 1 && <Filters id={`${id}-filters`} prefs={prefs} onChange={setPrefs} />}
+
       {airports && (
         <div id={`${id}-airports`} className="border-b border-border px-4 py-3">
           <p id={`${id}-airports-title`} className="eyebrow mb-2">
-            Airports compared
+            Airports, by fare plus ride
           </p>
           <ul id={`${id}-airports-list`} className="space-y-1.5">
             {airports.map((a, i) => {
@@ -89,7 +153,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                 <li
                   id={aid}
                   key={a.code}
-                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 ${a.recommended ? "bg-cortex-50 ring-1 ring-cortex-300" : "bg-surface"}`}
+                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 ${a.bestValue ? "bg-cortex-50 ring-1 ring-cortex-300" : "bg-surface"}`}
                 >
                   <div id={`${aid}-main`} className="min-w-0">
                     <div id={`${aid}-head`} className="flex flex-wrap items-center gap-1.5">
@@ -101,9 +165,9 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                           {a.name}
                         </span>
                       )}
-                      {a.recommended && (
-                        <Badge id={`${aid}-recommended`} tone="agent">
-                          Recommended
+                      {a.bestValue && (
+                        <Badge id={`${aid}-best`} tone="agent">
+                          Best value
                         </Badge>
                       )}
                       {a.closest && (
@@ -111,27 +175,28 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                           Closest
                         </Badge>
                       )}
-                      {a.cheapest && (
-                        <Badge id={`${aid}-cheapest`} tone="good">
-                          Cheapest all-in
-                        </Badge>
-                      )}
                     </div>
-                    {a.ground != null && (
+                    {a.rideOneWay != null && (
                       <p id={`${aid}-ride`} className="mt-0.5 text-xs text-text-muted">
-                        {`${a.miles} mi · ~${whole(a.ground, widget.currency, locale)} ride`}
+                        {`~${whole(a.rideOneWay, widget.currency, locale)} each way · ${a.driveMinutes != null ? `${a.driveMinutes} min drive` : `${a.miles} mi`}`}
                       </p>
                     )}
                   </div>
                   <div id={`${aid}-prices`} className="shrink-0 text-right">
-                    {a.bestFare != null && (
-                      <span id={`${aid}-fare`} className="block text-sm font-semibold">
-                        {whole(a.bestFare, widget.currency, locale)}
-                      </span>
-                    )}
-                    {a.ground != null && a.total != null && (
-                      <span id={`${aid}-total`} className="block text-[11px] text-text-muted">
-                        {`${whole(a.total, widget.currency, locale)} all-in`}
+                    {a.bestFare != null ? (
+                      <>
+                        <span id={`${aid}-fare`} className="block text-sm font-semibold">
+                          {whole(a.bestFare, widget.currency, locale)}
+                        </span>
+                        {a.rideOneWay != null && a.total != null && (
+                          <span id={`${aid}-total`} className="block text-[11px] text-text-muted">
+                            {`${whole(a.total, widget.currency, locale)} all-in`}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span id={`${aid}-nomatch`} className="text-[11px] text-text-muted">
+                        No flights match these filters
                       </span>
                     )}
                   </div>
@@ -146,9 +211,13 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
         <p id={`${id}-empty`} className="px-4 py-3 text-sm text-text-muted">
           No flight options could be read from the page.
         </p>
+      ) : visible.length === 0 ? (
+        <p id={`${id}-filtered-empty`} className="px-4 py-3 text-sm text-text-muted">
+          No flights match these filters. Try a longer layover or another time of day.
+        </p>
       ) : (
         <ul id={`${id}-flights`} className="divide-y divide-border">
-          {widget.flights.map((f, i) => {
+          {shown.map((f, i) => {
             const fid = `${id}-flight-${i}`;
             return (
               <li id={fid} key={i} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 px-4 py-2.5">
@@ -175,7 +244,8 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                   <span id={`${fid}-airline`} className="font-medium text-text-secondary">
                     {f.airline}
                   </span>
-                  <span id={`${fid}-meta-text`}>{`${f.duration} · ${stopsLabel(f.stops)}`}</span>
+                  <span id={`${fid}-duration`}>{f.duration}</span>
+                  <span id={`${fid}-stops`}>{stopsLabel(f)}</span>
                   {i === cheapestIndex && (
                     <Badge id={`${fid}-cheapest`} tone="good">
                       Cheapest
@@ -187,15 +257,25 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
           })}
         </ul>
       )}
+      {visible.length > VISIBLE_FLIGHTS && (
+        <button
+          id={`${id}-show-all`}
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="w-full border-t border-border px-4 py-2 text-[13px] text-text-secondary transition hover:bg-surface"
+        >
+          {showAll ? "Show fewer" : `Show all ${visible.length} flights`}
+        </button>
+      )}
 
       <footer id={`${id}-footer`} className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
         <div id={`${id}-notes`} className="min-w-0 text-xs text-text-muted">
           <p id={`${id}-note`}>{widget.priceNote ?? "Prices as listed on Google Flights"}</p>
-          {hasRides && <p id={`${id}-ride-note`}>Rides are rough estimates from your home, there and back.</p>}
+          {hasRides && <p id={`${id}-ride-note`}>Rides are estimates from your home by driving distance, there and back.</p>}
         </div>
         <ExternalLink
           id={`${id}-search-link`}
-          href={widget.searchUrl}
+          href={bookUrl}
           className="shrink-0 rounded-full bg-charcoal px-4 py-1.5 text-sm font-medium text-on-charcoal hover:opacity-85"
         >
           Search &amp; book yourself

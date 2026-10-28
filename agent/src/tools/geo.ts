@@ -56,8 +56,7 @@ export const AIRPORTS: Record<string, Airport> = {
 
 const EARTH_MILES = 3958.8;
 const ROAD_FACTOR = 1.25;
-const RIDE_BASE = 10;
-const RIDE_PER_MILE = 1.8;
+const METERS_PER_MILE = 1609.344;
 
 export function milesBetween(a: LatLon, b: LatLon): number {
   const rad = (d: number) => (d * Math.PI) / 180;
@@ -67,9 +66,18 @@ export function milesBetween(a: LatLon, b: LatLon): number {
   return 2 * EARTH_MILES * Math.asin(Math.sqrt(h));
 }
 
-export function rideshareRoundTrip(straightMiles: number): number {
-  const oneWay = RIDE_BASE + RIDE_PER_MILE * straightMiles * ROAD_FACTOR;
-  return Math.round((2 * oneWay) / 5) * 5;
+export type Drive = { miles: number; minutes?: number; source: "road" | "estimate" };
+
+const oneDecimal = (n: number) => Math.round(n * 10) / 10;
+
+export async function driveRoute(from: LatLon, to: LatLon, f: typeof fetch = fetch): Promise<Drive> {
+  try {
+    const u = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=false`;
+    const res = await f(u, { signal: AbortSignal.timeout(8000) });
+    const route = res.ok ? ((await res.json()) as { routes?: Array<{ distance: number; duration: number }> }).routes?.[0] : undefined;
+    if (route) return { miles: oneDecimal(route.distance / METERS_PER_MILE), minutes: Math.round(route.duration / 60), source: "road" };
+  } catch {}
+  return { miles: oneDecimal(milesBetween(from, to) * ROAD_FACTOR), source: "estimate" };
 }
 
 export async function geocode(place: string, f: typeof fetch = fetch): Promise<LatLon | null> {

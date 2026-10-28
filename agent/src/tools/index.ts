@@ -9,7 +9,7 @@ import type { BrowserPool } from "./browserPool.js";
 import { createArtifactTool } from "./createArtifact.js";
 import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
-import { geocode, type LatLon } from "./geo.js";
+import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon } from "./geo.js";
 import type { ToolResult } from "./result.js";
 import { askUserTool } from "./askUser.js";
 import { showUiTool } from "./showWidget.js";
@@ -35,6 +35,18 @@ function memo<T>(fn: () => Promise<T>): () => Promise<T> {
 export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
   const homeText = deps.userContext?.profile?.home;
   const home = homeText ? memo<LatLon | null>(() => geocode(homeText)) : undefined;
+  const drives = new Map<string, Promise<Drive | null>>();
+  const drive = home
+    ? (code: string) => {
+        if (!drives.has(code)) {
+          drives.set(
+            code,
+            home().then((h) => (h && AIRPORTS[code] ? driveRoute(h, AIRPORTS[code]) : null)),
+          );
+        }
+        return drives.get(code)!;
+      }
+    : undefined;
   const browse = browseTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext });
   return [
     withBudget(webSearchTool({ searxngUrl: deps.cfg.searxngUrl }), deps.budget, "search"),
@@ -45,7 +57,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       locale: deps.userContext?.locale ?? "en-US",
       currency: regionFor(deps.userContext).currency,
       browse: (actions) => browse.execute("flights", { actions } as never, undefined, undefined, {} as never) as Promise<ToolResult>,
-      home,
+      drive,
     }), deps.budget, "flights"),
     showUiTool(),
     askUserTool(),

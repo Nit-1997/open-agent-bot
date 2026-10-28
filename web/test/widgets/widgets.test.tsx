@@ -28,7 +28,8 @@ describe("widgets", () => {
 
   it("FlightList shows duration text as given", () => {
     render(<FlightList toolCallId="f2" widget={validWidgets.flight_list} locale="en-US" />);
-    expect(screen.getByText("20h 0m · Nonstop")).toBeInTheDocument();
+    expect(screen.getByText("20h 0m")).toBeInTheDocument();
+    expect(screen.getByText("Nonstop")).toBeInTheDocument();
   });
 
   it("FlightList badges the cheapest option", () => {

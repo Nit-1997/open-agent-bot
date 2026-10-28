@@ -2,6 +2,7 @@ import { validateWidget, type WidgetPayload } from "../../../shared/widgets.js";
 import type { FlightsData, WeatherData } from "../tools/data.js";
 
 const MAX_FLIGHTS = 8;
+const MAX_COMPARED_FLIGHTS = 24;
 
 const renderers: Record<string, (data: any) => unknown> = {
   weather: (d: WeatherData) => ({
@@ -20,8 +21,9 @@ const renderers: Record<string, (data: any) => unknown> = {
     to: d.to,
     date: d.date,
     currency: d.currency,
-    flights: d.options.slice(0, MAX_FLIGHTS),
-    ...(d.airports.length > 1 && { airports: d.airports.map(({ options: _o, ...a }) => a) }),
+    flights: d.options.slice(0, d.airports.length > 1 ? MAX_COMPARED_FLIGHTS : MAX_FLIGHTS),
+    ...(d.airports.length > 1 && { airports: d.airports }),
+    ...((d.prefs.maxLayover || d.prefs.times) && { prefs: d.prefs }),
     ...(d.returnDate && { returnDate: d.returnDate }),
     ...(d.priceNote && { priceNote: d.priceNote }),
     searchUrl: d.searchUrl,

@@ -1,3 +1,5 @@
+import type { FlightPrefs } from "../../../shared/flights.js";
+
 export type WeatherData = {
   kind: "weather";
   mode: "forecast" | "typical";
@@ -9,21 +11,26 @@ export type WeatherData = {
   source: string;
 };
 
-export type FlightOption = { airline: string; departTime: string; arriveTime: string; duration: string; stops: number; price?: number; origin?: string };
+export type FlightOption = {
+  airline: string;
+  departTime: string;
+  arriveTime: string;
+  duration: string;
+  stops: number;
+  layoverMinutes?: number;
+  layoverAt?: string;
+  price?: number;
+  origin?: string;
+};
 
 export type AirportResult = {
   code: string;
   name?: string;
   miles?: number;
-  ground?: number;
-  bestFare?: number;
-  total?: number;
-  options: number;
-  searchUrl: string;
+  driveMinutes?: number;
+  rideOneWay?: number;
   status: "ok" | "failed";
-  closest?: boolean;
-  cheapest?: boolean;
-  recommended?: boolean;
+  searchUrl: string;
 };
 
 export type FlightsData = {
@@ -35,6 +42,7 @@ export type FlightsData = {
   currency: string;
   options: FlightOption[];
   airports: AirportResult[];
+  prefs: FlightPrefs;
   priceNote?: string;
   searchUrl: string;
   source: string;
