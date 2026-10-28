@@ -46,6 +46,8 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
       const goto = actions.find((a) => a.op === "goto");
       return `${done ? "Browsed" : "Browsing"} ${goto ? host(goto.url) : "a page"}`;
     }
+    case "stays":
+      return `${done ? "Searched" : "Searching"} stays in ${String(args.location ?? "…")}`;
     case "weather":
       return `${done ? "Checked" : "Checking"} weather in ${String(args.location ?? "…")}`;
     case "flights":
@@ -58,7 +60,7 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
 }
 
 export function stepKind(name: string): "search" | "read" | "weather" | "flight" | "write" | "other" {
-  if (name === "web_search" || name === "image_search") return "search";
+  if (name === "web_search" || name === "image_search" || name === "stays") return "search";
   if (name === "music" || name === "wikipedia" || name === "shop") return "read";
   if (name === "fetch_page" || name === "browse") return "read";
   if (name === "weather") return "weather";

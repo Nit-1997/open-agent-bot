@@ -3,6 +3,7 @@ import { AskCard } from "./AskCard";
 import { type CartEdits, CartCard } from "./CartCard";
 import { FlightList } from "./FlightList";
 import { GroundingNote } from "./GroundingNote";
+import { StayList } from "./StayList";
 import { UiCard } from "./UiCard";
 import { WeatherCard } from "./WeatherCard";
 
@@ -24,6 +25,8 @@ export function WidgetRenderer(props: { toolCallId: string; args: unknown; local
       return <AskCard toolCallId={toolCallId} widget={w} locale={locale} answered={props.answered} onAnswer={props.onAnswer} />;
     case "followups":
       return null;
+    case "stay_list":
+      return <StayList toolCallId={toolCallId} widget={w} locale={locale} />;
     case "cart":
       return <CartCard toolCallId={toolCallId} widget={w} locale={locale} stale={props.staleCart} onEdit={props.staleCart ? undefined : props.onCartEdit} />;
   }

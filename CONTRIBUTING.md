@@ -43,6 +43,7 @@ agent/src/
                        browsePolicy.ts (what the browser may not do),
                        browserGuard.ts (blocks private-network requests), budget.ts
   shop/                catalog tile extraction, ranking and the per-chat cart
+  stays/               hotel and rental search: one file per site in sources/
   grounding/           checks prices, ratings and links against tool evidence
   render/              tool data → widget payloads
   lib/                 small shared helpers with no tool dependencies
@@ -62,6 +63,20 @@ web/
 3. Register it in `tools/index.ts`. Wrap it in `withBudget` if it costs a network round trip.
 4. If it returns structured data for a card, add a renderer in `render/registry.ts` and a schema in `shared/widgets.ts`.
 5. Add a step label in `web/lib/steps.ts` and tests under `agent/test/tools/`.
+
+## Adding a stay source
+
+The `stays` tool searches every site in `agent/src/stays/sources/index.ts` at once, each in its own browser tab. To add a site:
+
+1. Create `agent/src/stays/sources/<site>.ts` that exports a `StaySource` (see `types.ts`):
+   - `id`, `label`, `site` (domain, used for the favicon), and `lists` (`"hotel"`, `"rental"` or both)
+   - `searchUrl(q)`: the site's search URL for `q.location`, `q.checkin`, `q.checkout`, `q.adults`, `q.rooms` and `q.currency`
+   - `read(page, q)` (optional): pulls listings from the loaded results page. Leave it out and the site is offered as a link the user opens, which is the right choice for sites that block automated browsers (see `expedia.ts`).
+2. Split `read` in two, like `booking.ts`: a `collect` function that runs in the page and returns plain objects, and a pure `parse<Site>Card(card, q)` that turns one into a `Stay`. Prefer `data-testid` or ARIA labels over class names, which change often. Use the helpers in `stays/parse.ts` for prices, review counts and cleaning tracking parameters off links.
+3. Add it to `STAY_SOURCES`.
+4. Add `parse` cases to `agent/test/stays/parse.test.ts` with card text copied from the real site, and a fixture-page case to `sources.int.test.ts`.
+
+Check that the site's search results load for the agent's browser first: run the stack, ask for stays somewhere, and look at the stays card. Sites that blocked the browser or returned nothing readable are listed in its footer as links.
 
 ## Conventions
 

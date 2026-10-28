@@ -193,6 +193,42 @@ export const CartSchema = Type.Object({
   ),
 });
 
+const StaySchema = Type.Object({
+  title: Str,
+  url: Url,
+  image: Type.Optional(Url),
+  nightly: Type.Optional(Type.Number()),
+  total: Type.Optional(Type.Number()),
+  rating: Type.Optional(Type.Number()),
+  ratingScale: Type.Optional(Type.Number()),
+  reviews: Type.Optional(Type.Number()),
+  kind: Type.Optional(Str),
+  area: Type.Optional(Str),
+  badge: Type.Optional(Str),
+});
+
+export const StayListSchema = Type.Object({
+  kind: Type.Literal("stay_list"),
+  location: Str,
+  checkin: Str,
+  checkout: Str,
+  nights: Type.Number(),
+  adults: Type.Number(),
+  currency: Str,
+  maxNightly: Type.Optional(Type.Number()),
+  sources: Type.Array(
+    Type.Object({
+      id: Str,
+      label: Str,
+      site: Str,
+      url: Url,
+      status: Type.Enum(["ok", "blocked", "failed", "link"]),
+      stays: Type.Array(StaySchema, { maxItems: 10 }),
+    }),
+    { minItems: 1, maxItems: 12 },
+  ),
+});
+
 export const FollowupsSchema = Type.Object({
   kind: Type.Literal("followups"),
   replies: Type.Array(S(40), { minItems: 1, maxItems: 4 }),
@@ -206,6 +242,7 @@ export const WidgetSchemas = {
   ask: AskSchema,
   followups: FollowupsSchema,
   cart: CartSchema,
+  stay_list: StayListSchema,
 } as const;
 
 export type WeatherCard = Static<typeof WeatherCardSchema>;
@@ -219,7 +256,8 @@ export type AskField = Static<typeof AskFieldSchema>;
 export type AskWidget = Omit<Static<typeof AskSchema>, "fields"> & { fields: AskField[] };
 export type Followups = Static<typeof FollowupsSchema>;
 export type Cart = Static<typeof CartSchema>;
-export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget | Followups | Cart;
+export type StayList = Static<typeof StayListSchema>;
+export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget | Followups | Cart | StayList;
 export type WidgetKind = WidgetPayload["kind"];
 
 export const WIDGET_KINDS = Object.keys(WidgetSchemas) as WidgetKind[];

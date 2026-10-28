@@ -1,7 +1,7 @@
 import { validateWidget, type WidgetPayload } from "../../../shared/widgets.js";
 import { currencyOf } from "../shop/currency.js";
 import type { ItemResult } from "../shop/rank.js";
-import type { FlightsData, WeatherData } from "../tools/data.js";
+import type { FlightsData, StaysData, WeatherData } from "../tools/data.js";
 
 const MAX_FLIGHTS = 8;
 const MAX_COMPARED_FLIGHTS = 24;
@@ -36,6 +36,17 @@ const renderers: Record<string, (data: any) => unknown> = {
       }),
     };
   },
+  stays: (d: StaysData) => ({
+    kind: "stay_list",
+    location: d.location,
+    checkin: d.checkin,
+    checkout: d.checkout,
+    nights: d.nights,
+    adults: d.adults,
+    currency: d.currency,
+    ...(d.maxNightly != null && { maxNightly: d.maxNightly }),
+    sources: d.sources.map((s) => ({ id: s.id, label: s.label, site: s.site, url: s.url, status: s.status, stays: s.stays.slice(0, 10) })),
+  }),
   weather: (d: WeatherData) => ({
     kind: "weather_card",
     mode: d.mode,

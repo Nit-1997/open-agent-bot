@@ -11,7 +11,8 @@ import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
 import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon } from "./geo.js";
 import type { Evidence } from "../grounding/evidence.js";
-import type { FrameBus } from "../browser/frames.js";
+import { type FrameBus, watch } from "../browser/frames.js";
+import type { OpenTab } from "../stays/search.js";
 import type { ActiveCart } from "../shop/cart.js";
 import { askUserTool } from "./askUser.js";
 import { showUiTool, suggestRepliesTool } from "./showWidget.js";
@@ -19,6 +20,7 @@ import { weatherTool } from "./weather.js";
 import { imageSearchTool, matchingImage, search as runSearch, webSearchTool } from "./webSearch.js";
 import { musicTool, wikipediaTool } from "./lookup.js";
 import { shopTool } from "./shop.js";
+import { staysTool } from "./stays.js";
 
 export type ToolDeps = {
   cfg: AgentConfig;
@@ -32,7 +34,7 @@ export type ToolDeps = {
   cart?: ActiveCart;
 };
 
-export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2, shop: 2 };
+export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2, shop: 2, stays: 2 };
 
 function memo<T>(fn: () => Promise<T>): () => Promise<T> {
   let p: Promise<T> | undefined;
@@ -55,6 +57,17 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       }
     : undefined;
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
+  const openTab: OpenTab = async (live) => {
+    const page = await deps.pool.tab(deps.threadId, deps.userContext);
+    const stop = live && deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
+    return {
+      page,
+      close: async () => {
+        await stop?.();
+        await page.close().catch(() => {});
+      },
+    };
+  };
   const browseDeps = { pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames };
   return [
     withBudget(webSearchTool(search), deps.budget, "search"),
@@ -71,6 +84,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
       drive,
     }), deps.budget, "flights"),
+    withBudget(staysTool({ openTab, currency: regionFor(deps.userContext).currency }), deps.budget, "stays"),
     showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),
     suggestRepliesTool(),
     askUserTool(),

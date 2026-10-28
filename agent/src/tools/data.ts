@@ -1,3 +1,4 @@
+import type { Stay } from "../stays/types.js";
 import type { FlightPrefs } from "../../../shared/flights.js";
 
 export type WeatherData = {
@@ -48,4 +49,16 @@ export type FlightsData = {
   source: string;
 };
 
-export type ToolData = WeatherData | FlightsData;
+export type StaysData = {
+  kind: "stays";
+  location: string;
+  checkin: string;
+  checkout: string;
+  nights: number;
+  adults: number;
+  currency: string;
+  maxNightly?: number;
+  sources: Array<{ id: string; label: string; site: string; url: string; status: "ok" | "blocked" | "failed" | "link"; stays: Stay[] }>;
+};
+
+export type ToolData = WeatherData | FlightsData | StaysData;
