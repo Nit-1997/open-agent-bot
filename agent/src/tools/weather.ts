@@ -43,7 +43,12 @@ const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const toIso = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => toIso(new Date(toDate(iso).getTime() + n * DAY));
 const daysBetween = (a: string, b: string) => Math.round((toDate(b).getTime() - toDate(a).getTime()) / DAY);
-const shiftYear = (iso: string, years: number) => `${Number(iso.slice(0, 4)) - years}${iso.slice(4)}`;
+const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+const shiftYear = (iso: string, years: number) => {
+  const y = Number(iso.slice(0, 4)) - years;
+  const md = iso.slice(5);
+  return `${y}-${md === "02-29" && !isLeap(y) ? "02-28" : md}`;
+};
 const isIso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(toDate(v).getTime());
 
 function mode<T>(xs: T[]): T {
@@ -53,6 +58,18 @@ function mode<T>(xs: T[]): T {
 }
 
 const avg = (xs: number[]) => Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+const finite = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
+
+type PastDay = { hi: number; lo: number; rain: number; code: number };
+
+function pastDays(archives: Archive[], date: string): PastDay[] {
+  const md = date.slice(5);
+  return archives.flatMap((a) => {
+    const i = a.daily.time.findIndex((t) => t.slice(5) === md);
+    const day = { hi: a.daily.temperature_2m_max[i], lo: a.daily.temperature_2m_min[i], rain: a.daily.precipitation_sum[i], code: a.daily.weather_code[i] };
+    return i >= 0 && finite(day.hi) && finite(day.lo) ? [{ ...day, rain: finite(day.rain) ? day.rain : 0, code: finite(day.code) ? day.code : -1 }] : [];
+  });
+}
 
 export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric" | "imperial"; today?: () => string } = {}) {
   const f = deps.fetch ?? fetch;
@@ -110,27 +127,27 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
             }),
           );
           const span = daysBetween(range.start, range.end) + 1;
+          const days = Array.from({ length: span }, (_, i) => addDays(range.start, i)).flatMap((date) => {
+            const at = pastDays(archives, date);
+            if (!at.length) return [];
+            return [
+              {
+                date,
+                high: avg(at.map((x) => x.hi)),
+                low: avg(at.map((x) => x.lo)),
+                condition: mode(at.map((x) => wmoCondition(x.code))),
+                precipChance: Math.round((100 * at.filter((x) => x.rain > 0).length) / at.length),
+              },
+            ];
+          });
+          if (!days.length) return fail(`no past weather data for ${location} on those dates`);
           const data: WeatherData = {
             kind: "weather",
             mode: "typical",
             basis: `${Number(range.start.slice(0, 4)) - TYPICAL_YEARS}–${Number(range.start.slice(0, 4)) - 1}`,
             location,
             units,
-            days: Array.from({ length: span }, (_, i) => {
-              const at = archives.map((a) => ({
-                hi: a.daily.temperature_2m_max[i],
-                lo: a.daily.temperature_2m_min[i],
-                rain: a.daily.precipitation_sum[i],
-                code: a.daily.weather_code[i],
-              }));
-              return {
-                date: addDays(range.start, i),
-                high: avg(at.map((x) => x.hi)),
-                low: avg(at.map((x) => x.lo)),
-                condition: mode(at.map((x) => wmoCondition(x.code))),
-                precipChance: Math.round((100 * at.filter((x) => x.rain > 0).length) / at.length),
-              };
-            }),
+            days,
             source: "https://open-meteo.com",
           };
           const summary = [

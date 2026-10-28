@@ -108,6 +108,21 @@ describe("weather", () => {
       expect(validateWidget(renderData(data as never))).toMatchObject({ ok: true });
     });
 
+    it("averages only the years that have data for a day instead of returning NaN", async () => {
+      const f = fakeFetch([
+        [/geocoding-api/, () => geo.clone()],
+        [
+          /archive-api.*start_date=2025/,
+          () => json({ daily: { time: ["2025-11-25", "2025-11-26"], temperature_2m_max: [60, null], temperature_2m_min: [40, null], precipitation_sum: [0, null], weather_code: [0, null] } }),
+        ],
+        [/archive-api.*start_date=2024/, () => json({ daily: { time: ["2024-11-25"], temperature_2m_max: [62], temperature_2m_min: [42], precipitation_sum: [0], weather_code: [0] } })],
+        [/archive-api.*start_date=2023/, () => json({ daily: { time: [], temperature_2m_max: [], temperature_2m_min: [], precipitation_sum: [], weather_code: [] } })],
+      ]);
+      const r = await exec(f, { start_date: "2026-11-25", end_date: "2026-11-26" });
+      const days = (r.details as { data: { days: unknown[] } }).data.days;
+      expect(days).toEqual([{ date: "2026-11-25", high: 61, low: 41, condition: "Clear", precipChance: 0 }]);
+    });
+
     it("rejects a range that ends before it starts or runs longer than 14 days", async () => {
       expect((await exec(routes(), { start_date: "2026-11-10", end_date: "2026-11-01" })).isError).toBe(true);
       expect((await exec(routes(), { start_date: "2026-11-01", end_date: "2026-12-01" })).isError).toBe(true);
