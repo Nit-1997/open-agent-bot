@@ -9,7 +9,7 @@ import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { TurnView } from "./TurnView";
 
-export function ChatSession(props: { agentId: string; threadId: string; locale: string; onNewChat: () => void }) {
+export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string; onNewChat: () => void }) {
   const { agent } = useAgent({ agentId: `chat-${props.threadId}`, runtimeAgentId: props.agentId, threadId: props.threadId });
   const { copilotkit } = useCopilotKit();
   const [sending, setSending] = useState(false);
@@ -89,7 +89,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
         className="flex min-h-0 flex-1 flex-col overflow-y-auto"
       >
         {turns.length === 0 ? (
-          <EmptyState onPick={send} />
+          <EmptyState name={props.name?.trim().split(/\s+/)[0]} onPick={send} />
         ) : (
           <div id="chat-turns" className="mx-auto w-full max-w-[720px] space-y-10 px-4 pb-8 pt-6">
             {turns.map((t) => (

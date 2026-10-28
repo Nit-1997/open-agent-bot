@@ -24,17 +24,15 @@ Ports: web 3000, agent 8000, LiteLLM 4000, SearXNG 8081.
 
 All model calls go through LiteLLM. The agent asks for an alias (`AGENT_MODEL`, default `chat-default`); `deploy-config/litellm/config.yaml` maps aliases to real models.
 
-To add a hosted model, e.g. Claude:
+`chat-sonnet-5.5` (Claude Sonnet 5.5) is already defined; put `ANTHROPIC_API_KEY=...` in `deploy-config/.env-llm` to use it.
 
-```yaml
-  - model_name: chat-strong
-    litellm_params:
-      model: anthropic/claude-sonnet-5-5
-      api_key: os.environ/ANTHROPIC_API_KEY
+Users pick models in the app (a default during onboarding, and per chat from the header menu). The agent only offers the aliases listed in `AGENT_MODELS` in `deploy-config/.env-agent`, as `alias=Label=note` entries separated by `|`:
+
+```
+AGENT_MODELS=chat-sonnet-5.5=Sonnet 5.5=Best quality, about 5 cents a turn|chat-default=Qwen 3.5 (local)=Free and private; slower and weaker at cards
 ```
 
-Put `ANTHROPIC_API_KEY=...` in `deploy-config/.env-llm`, set `AGENT_MODEL=chat-strong` in `deploy-config/.env-agent`, then `docker compose up -d`.
-
+`AGENT_MODEL` stays the fallback when the browser doesn't ask for one. Avoid `$` in these values; Compose expands it.
 
 ## Develop
 

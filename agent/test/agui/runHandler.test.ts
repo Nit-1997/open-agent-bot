@@ -1,6 +1,6 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
-import { handleRun } from "../../src/agui/runHandler.js";
+import { handleRun, readUserContext } from "../../src/agui/runHandler.js";
 import { Evidence } from "../../src/grounding/evidence.js";
 import type { UserContext } from "../../src/prompt/systemPrompt.js";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
@@ -12,7 +12,7 @@ const say: Script = async (emit) => {
   emit(ev.assistantEnd());
 };
 
-function setup(script: Script = say, evidence?: Evidence) {
+function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string) => Promise<void>) {
   const session = fakeSession(script);
   const runStarts = { count: 0 };
   const contexts: Array<UserContext | null> = [];
@@ -20,7 +20,7 @@ function setup(script: Script = say, evidence?: Evidence) {
     idleMs: 60000,
     create: async (_t, ctx): Promise<SessionEntry> => {
       contexts.push(ctx);
-      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence };
+      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence, setModel };
     },
   });
   return { session, store, contexts, runStarts };
@@ -57,6 +57,25 @@ describe("handleRun", () => {
       EventType.RUN_FINISHED,
     ]);
     expect(session.prompts).toEqual(["hello"]);
+  });
+
+  it("switches the session to the model the user picked before prompting", async () => {
+    const calls: string[] = [];
+    const { store, session } = setup(say, undefined, async (id) => {
+      calls.push(`model:${id}:${session.prompts.length}`);
+    });
+    const value = JSON.stringify({ timeZone: "UTC", locale: "en-US", localTime: "t", model: "chat-sonnet-5.5" });
+    await collect(handleRun(input({ context: [{ description: "user_context", value }] }), store, new AbortController().signal));
+    expect(calls).toEqual(["model:chat-sonnet-5.5:0"]);
+  });
+
+  it("reports a model switch failure as a model error", async () => {
+    const { store } = setup(say, undefined, async () => {
+      throw new Error("model chat-x is not available");
+    });
+    const value = JSON.stringify({ timeZone: "UTC", locale: "en-US", localTime: "t", model: "chat-x" });
+    const out = await collect(handleRun(input({ context: [{ description: "user_context", value }] }), store, new AbortController().signal));
+    expect(out.at(-1)).toMatchObject({ type: EventType.RUN_ERROR, code: "MODEL_ERROR", message: "model chat-x is not available" });
   });
 
   it("treats what the user said as evidence for the reply", async () => {
@@ -172,5 +191,26 @@ describe("handleRun", () => {
       handleRun(input({ context: [{ description: "user_context", value: JSON.stringify(ctx) }] }), store, new AbortController().signal),
     );
     expect(contexts).toEqual([ctx]);
+  });
+});
+
+describe("readUserContext", () => {
+  const ctx = (v: unknown) => readUserContext(input({ context: [{ description: "user_context", value: JSON.stringify(v) }] }));
+
+  it("reads the model and a trimmed profile", () => {
+    const r = ctx({
+      timeZone: "UTC",
+      locale: "en-US",
+      localTime: "t",
+      model: "chat-sonnet-5.5",
+      profile: { name: "  Nitin ", home: "Sunnyvale", interests: ["Vegetarian", 7, "x".repeat(80)], notes: "n".repeat(2000), extra: "dropped" },
+    });
+    expect(r?.model).toBe("chat-sonnet-5.5");
+    expect(r?.profile).toEqual({ name: "Nitin", home: "Sunnyvale", interests: ["Vegetarian", "x".repeat(40)], notes: "n".repeat(1000) });
+  });
+
+  it("ignores a profile that isn't an object and empty fields", () => {
+    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", profile: "hi", model: 3 })).toEqual({ timeZone: "UTC", locale: "en-US", localTime: "t" });
+    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", profile: { name: " " } })?.profile).toBeUndefined();
   });
 });

@@ -47,6 +47,12 @@ describe("weather", () => {
     expect(new URL(f.calls[1]).searchParams.get("temperature_unit")).toBe("fahrenheit");
   });
 
+  it("defaults to the user's region units when the model doesn't say", async () => {
+    const f = routes();
+    await weatherTool({ fetch: f, defaultUnits: "imperial" }).execute("c", { location: "Sunnyvale" }, undefined, undefined, {} as never);
+    expect(new URL(f.calls[1]).searchParams.get("temperature_unit")).toBe("fahrenheit");
+  });
+
   it("weather unknown location message", async () => {
     const f = fakeFetch([[/geocoding-api/, () => json({})]]);
     const r = await weatherTool({ fetch: f }).execute("c", { location: "Atlantis" }, undefined, undefined, {} as never);

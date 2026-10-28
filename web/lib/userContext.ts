@@ -1,11 +1,32 @@
-export type UserContext = { timeZone: string; locale: string; localTime: string };
+import type { Profile } from "./profile";
+
+export type UserContext = {
+  timeZone: string;
+  locale: string;
+  localTime: string;
+  model?: string;
+  profile?: Pick<Profile, "name" | "home" | "interests" | "notes">;
+};
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function getUserContext(now: Date = new Date()): UserContext {
+type Extras = { model?: string; profile?: Profile };
+
+export function withChat(base: UserContext, { model, profile: p }: Extras): UserContext {
   return {
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    locale: navigator.language,
-    localTime: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+    ...base,
+    ...(model && { model }),
+    ...(p && { profile: { name: p.name, home: p.home, interests: p.interests, notes: p.notes } }),
   };
+}
+
+export function getUserContext(now: Date = new Date(), extras: Extras = {}): UserContext {
+  return withChat(
+    {
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      locale: navigator.language,
+      localTime: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+    },
+    extras,
+  );
 }

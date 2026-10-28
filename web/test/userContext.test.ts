@@ -9,3 +9,14 @@ describe("getUserContext", () => {
     expect(ctx.localTime).toBe("2026-10-27T14:05:09");
   });
 });
+
+describe("getUserContext with profile and model", () => {
+  it("adds the chat's model and the profile the agent should know", () => {
+    const ctx = getUserContext(new Date(2026, 9, 27, 14, 5, 9), {
+      model: "chat-sonnet-5.5",
+      profile: { name: "Nitin", home: "Sunnyvale", interests: ["Vegetarian"], notes: "", defaultModel: "chat-default", onboarded: true },
+    });
+    expect(ctx.model).toBe("chat-sonnet-5.5");
+    expect(ctx.profile).toEqual({ name: "Nitin", home: "Sunnyvale", interests: ["Vegetarian"], notes: "" });
+  });
+});

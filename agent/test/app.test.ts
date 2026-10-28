@@ -23,4 +23,18 @@ describe("createApp", () => {
     const res = await app.request("/agui", { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
     expect(res.status).toBe(400);
   });
+
+  it("lists the models users can pick, behind the shared secret", async () => {
+    const cfg = loadConfig({ LLM_API_KEY: "k", AGENT_MODEL: "chat-default", AGENT_MODELS: "chat-sonnet-5.5=Sonnet 5.5", AGENT_SHARED_SECRET: "s3" });
+    const app = createApp({ cfg, store: store() });
+    expect((await app.request("/models")).status).toBe(401);
+    const res = await app.request("/models", { headers: { "x-agent-secret": "s3" } });
+    expect(await res.json()).toEqual({
+      default: "chat-default",
+      models: [
+        { id: "chat-default", label: "chat-default" },
+        { id: "chat-sonnet-5.5", label: "Sonnet 5.5" },
+      ],
+    });
+  });
 });

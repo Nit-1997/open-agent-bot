@@ -9,16 +9,14 @@ export function registerLitellm(runtime: ModelRuntime, cfg: AgentConfig): void {
     baseUrl: cfg.llmBaseUrl,
     apiKey: cfg.llmApiKey,
     api: "openai-completions",
-    models: [
-      {
-        id: cfg.model,
-        name: cfg.model,
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 32768,
-        maxTokens: 4096,
-      },
-    ],
+    models: cfg.models.map((m) => ({
+      id: m.id,
+      name: m.label,
+      reasoning: false,
+      input: ["text" as const],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 32768,
+      maxTokens: 4096,
+    })),
   });
 }

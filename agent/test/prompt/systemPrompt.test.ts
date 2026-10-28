@@ -24,4 +24,22 @@ describe("buildSystemPrompt", () => {
   it("tells the model to ask when there is no context", () => {
     expect(buildSystemPrompt(null)).toContain("ask the user");
   });
+
+  it("includes the user's profile and uses their home instead of asking", () => {
+    const p = buildSystemPrompt({
+      timeZone: "America/Los_Angeles",
+      locale: "en-US",
+      localTime: "2026-10-27T18:00",
+      profile: { name: "Nitin", home: "Sunnyvale, CA 94087", interests: ["Vegetarian"], notes: "Two cats." },
+    });
+    expect(p).toContain("Name: Nitin");
+    expect(p).toContain("Home: Sunnyvale, CA 94087");
+    expect(p).toContain("Interests: Vegetarian");
+    expect(p).toContain("Notes: Two cats.");
+    expect(p).toMatch(/use their home/i);
+  });
+
+  it("leaves the profile section out when there is none", () => {
+    expect(buildSystemPrompt({ timeZone: "UTC", locale: "en-US", localTime: "2026-10-27T18:00" })).not.toContain("About the user");
+  });
 });

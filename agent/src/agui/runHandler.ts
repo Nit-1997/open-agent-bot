@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
-import type { UserContext } from "../prompt/systemPrompt.js";
+import type { UserContext, UserProfile } from "../prompt/systemPrompt.js";
 import type { SessionStore } from "../session/sessionStore.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
@@ -13,13 +13,32 @@ function messageText(m: Message): string {
   return "";
 }
 
+const clip = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
+
+function readProfile(v: unknown): UserProfile | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const p = v as Record<string, unknown>;
+  const interests = Array.isArray(p.interests)
+    ? p.interests.map((i) => clip(i, 40)).filter((i): i is string => !!i).slice(0, 12)
+    : [];
+  const profile: UserProfile = {
+    ...(clip(p.name, 80) && { name: clip(p.name, 80) }),
+    ...(clip(p.home, 200) && { home: clip(p.home, 200) }),
+    ...(interests.length && { interests }),
+    ...(clip(p.notes, 1000) && { notes: clip(p.notes, 1000) }),
+  };
+  return Object.keys(profile).length ? profile : undefined;
+}
+
 export function readUserContext(input: RunAgentInput): UserContext | null {
   const item = input.context?.find((c) => c.description === "user_context");
   if (!item) return null;
   try {
     const v = typeof item.value === "string" ? JSON.parse(item.value) : item.value;
     if (v && typeof v.timeZone === "string" && typeof v.locale === "string" && typeof v.localTime === "string") {
-      return { timeZone: v.timeZone, locale: v.locale, localTime: v.localTime };
+      const model = clip(v.model, 100);
+      const profile = readProfile(v.profile);
+      return { timeZone: v.timeZone, locale: v.locale, localTime: v.localTime, ...(model && { model }), ...(profile && { profile }) };
     }
   } catch {}
   return null;
@@ -72,6 +91,16 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     queue.push(...events);
     wake?.();
   };
+
+  if (userContext?.model && entry.setModel) {
+    try {
+      await entry.setModel(userContext.model);
+    } catch (err) {
+      entry.busy = false;
+      yield runError("MODEL_ERROR", err instanceof Error ? err.message : String(err));
+      return;
+    }
+  }
 
   entry.evidence?.add(messageText(last));
   const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });

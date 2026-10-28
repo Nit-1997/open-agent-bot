@@ -39,8 +39,15 @@ export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifac
     });
   });
 
+  const authorized = (secret: string | undefined) => !deps.cfg.sharedSecret || secret === deps.cfg.sharedSecret;
+
+  app.get("/models", (c) => {
+    if (!authorized(c.req.header("x-agent-secret"))) return c.json({ error: "unauthorized" }, 401);
+    return c.json({ default: deps.cfg.model, models: deps.cfg.models });
+  });
+
   app.post("/agui", async (c) => {
-    if (deps.cfg.sharedSecret && c.req.header("x-agent-secret") !== deps.cfg.sharedSecret) {
+    if (!authorized(c.req.header("x-agent-secret"))) {
       return c.json({ error: "unauthorized" }, 401);
     }
     const body = await c.req.json().catch(() => null);

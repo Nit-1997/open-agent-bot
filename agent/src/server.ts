@@ -24,6 +24,7 @@ const store = new SessionStore({
       cfg,
       systemPrompt: buildSystemPrompt(userContext),
       tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget }),
+      modelId: cfg.models.some((m) => m.id === userContext?.model) ? userContext?.model : cfg.model,
     });
     return {
       session: handle.session,
@@ -31,6 +32,11 @@ const store = new SessionStore({
       lastUsed: Date.now(),
       onRunStart: () => budget.reset(),
       evidence: new Evidence(),
+      setModel: async (id: string) => {
+        if (!cfg.models.some((m) => m.id === id)) throw new Error(`model ${id} is not available`);
+        await handle.setModel(id);
+        console.log(`[run] thread=${threadId} model=${id}`);
+      },
       dispose: async () => {
         await Promise.all([handle.dispose(), pool.close(threadId)]);
       },

@@ -17,6 +17,7 @@ export type PiSession = AgentSession;
 
 export type PiSessionHandle = {
   session: PiSession;
+  setModel: (id: string) => Promise<void>;
   dispose: () => Promise<void>;
 };
 
@@ -24,6 +25,7 @@ export async function createPiSession(opts: {
   cfg: AgentConfig;
   systemPrompt: string;
   tools: ToolDefinition<any, any, any>[];
+  modelId?: string;
 }): Promise<PiSessionHandle> {
   const dir = await mkdtemp(join(tmpdir(), "pi-session-"));
   const modelRuntime = await ModelRuntime.create({
@@ -32,8 +34,9 @@ export async function createPiSession(opts: {
     refreshOnCreate: false,
   });
   registerLitellm(modelRuntime, opts.cfg);
-  const model = modelRuntime.getModel(LITELLM_PROVIDER, opts.cfg.model);
-  if (!model) throw new Error(`model ${opts.cfg.model} not registered`);
+  const modelId = opts.modelId ?? opts.cfg.model;
+  const model = modelRuntime.getModel(LITELLM_PROVIDER, modelId);
+  if (!model) throw new Error(`model ${modelId} not registered`);
 
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
@@ -64,6 +67,12 @@ export async function createPiSession(opts: {
 
   return {
     session,
+    setModel: async (id: string) => {
+      if (session.model?.id === id) return;
+      const next = modelRuntime.getModel(LITELLM_PROVIDER, id);
+      if (!next) throw new Error(`model ${id} is not available`);
+      await session.setModel(next);
+    },
     dispose: async () => {
       session.dispose();
       await rm(dir, { recursive: true, force: true });

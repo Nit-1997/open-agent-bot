@@ -28,7 +28,7 @@ type Forecast = {
   };
 };
 
-export function weatherTool(deps: { fetch?: typeof fetch } = {}) {
+export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric" | "imperial" } = {}) {
   const f = deps.fetch ?? fetch;
   return defineTool({
     name: "weather",
@@ -42,7 +42,7 @@ export function weatherTool(deps: { fetch?: typeof fetch } = {}) {
     }),
     async execute(_id, params, signal): Promise<ToolResult> {
       const days = Math.min(Math.max(Math.floor(params.days ?? 3), 1), 7);
-      const units = params.units ?? "metric";
+      const units = params.units ?? deps.defaultUnits ?? "metric";
       const opts = { signal: signal ?? AbortSignal.timeout(15000) };
       try {
         const g = new URL("https://geocoding-api.open-meteo.com/v1/search");

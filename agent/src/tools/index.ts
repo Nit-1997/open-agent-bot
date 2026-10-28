@@ -31,7 +31,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(webSearchTool({ searxngUrl: deps.cfg.searxngUrl }), deps.budget, "search"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browse, deps.budget, "read"),
-    weatherTool(),
+    weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),
     withBudget(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
       currency: regionFor(deps.userContext).currency,

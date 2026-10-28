@@ -9,6 +9,7 @@ export type SessionEntry = {
   dispose: () => Promise<void>;
   onRunStart?: () => void;
   evidence?: Evidence;
+  setModel?: (id: string) => Promise<void>;
 };
 
 export class SessionStore {
