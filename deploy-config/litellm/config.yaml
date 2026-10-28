@@ -26,6 +26,7 @@ model_list:
   - model_name: chat-sonnet-5.5
     litellm_params:
       model: anthropic/claude-sonnet-5-5
+      num_retries: 2
       api_key: os.environ/ANTHROPIC_API_KEY
 
 litellm_settings:
