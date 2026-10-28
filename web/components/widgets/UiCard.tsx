@@ -255,7 +255,7 @@ export function UiCard({ toolCallId, widget }: { toolCallId: string; widget: UiW
       {(flags.length > 0 || removed > 0) && (
         <footer id={`${id}-grounding`} className="mt-3 border-t border-border pt-2 text-xs text-warn-fg">
           {flags.length > 0 && (
-            <p id={`${id}-grounding-unverified`}>Values marked with ? weren't found in the sources I read. Check the store before relying on them.</p>
+            <p id={`${id}-grounding-unverified`}>Values marked with ? weren&apos;t found in the sources I read. Check the store before relying on them.</p>
           )}
           {removed > 0 && (
             <p id={`${id}-grounding-links`}>

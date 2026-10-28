@@ -2,7 +2,7 @@
 
 import { useAgentContext } from "@copilotkit/react-core/v2";
 import { Moon, Plus, Sun, User } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ChatSession } from "@/components/chat/ChatSession";
 import { ModelMenu } from "@/components/profile/ModelMenu";
 import { ModelsPanel } from "@/components/profile/ModelsPanel";
@@ -15,8 +15,7 @@ import { getUserContext, type UserContext, withChat } from "@/lib/userContext";
 export const AGENT_ID = "openagent";
 
 function ThemeToggle() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const toggle = () => {
     const next = !dark;
     document.documentElement.classList.toggle("dark", next);
@@ -43,21 +42,16 @@ export function Chat() {
   const profile = useProfile();
   const { list: models, reload: reloadModels } = useModels();
   const [modelsPanel, setModelsPanel] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const [userContext, setUserContext] = useState<UserContext | null>(null);
+  const [threadId, setThreadId] = useState(() => crypto.randomUUID());
+  const [userContext, setUserContext] = useState<UserContext>(() => getUserContext());
   const [chatModel, setChatModel] = useState<string | undefined>(undefined);
   const [drawer, setDrawer] = useState(false);
-
-  useEffect(() => {
-    setThreadId(crypto.randomUUID());
-    setUserContext(getUserContext());
-  }, []);
 
   const model = chatModel ?? profile.defaultModel;
 
   useAgentContext({
     description: "user_context",
-    value: userContext ? JSON.stringify(withChat(userContext, { model, profile })) : "",
+    value: JSON.stringify(withChat(userContext, { model, profile })),
   });
 
   const startNewChat = useCallback(() => {
@@ -104,9 +98,7 @@ export function Chat() {
           </div>
         </header>
         <main id="chat-main" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-bg">
-          {threadId && (
-            <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext?.locale ?? "en-US"} name={profile.name} onNewChat={startNewChat} />
-          )}
+          <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext.locale} name={profile.name} onNewChat={startNewChat} />
         </main>
       </div>
       {drawer && (

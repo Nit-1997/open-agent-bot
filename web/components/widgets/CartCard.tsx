@@ -2,7 +2,7 @@
 
 import type { Cart } from "@shared/widgets";
 import { Minus, Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Picture } from "./CardRow";
 
 type Line = { qty: number; choice: number; removed: boolean };
@@ -32,8 +32,7 @@ export function CartCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
     }
   };
 
-  const report = useRef(onEdit);
-  report.current = onEdit;
+  const report = useEffectEvent((edits: CartEdits) => onEdit?.(edits));
   const touched = useRef(false);
   useEffect(() => {
     if (!touched.current) {
@@ -51,7 +50,7 @@ export function CartCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
         }),
       ),
     };
-    report.current?.(edits);
+    report(edits);
   }, [shared, choices, widget]);
 
   const inCart = store.items.map((item, i) => ({ item, line: current[i], pick: item.picks[current[i].choice], i })).filter((x) => x.pick);
@@ -137,17 +136,17 @@ export function CartCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
                       <div id={`${rid}-controls`} className="flex shrink-0 flex-col items-end gap-2">
                         <div id={`${rid}-qty`} className="flex items-center rounded-full border border-border">
                           <button id={`${rid}-dec`} type="button" aria-label="Decrease quantity" disabled={stale || line.qty <= 1} onClick={() => update(i, { qty: line.qty - 1 })} className="p-1.5 text-text-secondary disabled:opacity-30">
-                            <Minus size={12} />
+                            <Minus id={`${rid}-dec-icon`} aria-hidden="true" size={12} />
                           </button>
                           <span id={`${rid}-qty-n`} className="w-5 text-center text-sm">
                             {line.qty}
                           </span>
                           <button id={`${rid}-inc`} type="button" aria-label="Increase quantity" disabled={stale} onClick={() => update(i, { qty: line.qty + 1 })} className="p-1.5 text-text-secondary disabled:opacity-30">
-                            <Plus size={12} />
+                            <Plus id={`${rid}-inc-icon`} aria-hidden="true" size={12} />
                           </button>
                         </div>
                         <button id={`${rid}-remove`} type="button" aria-label="Remove" disabled={stale} onClick={() => update(i, { removed: true })} className="rounded-full bg-surface p-1.5 text-text-secondary hover:text-text-primary">
-                          <Trash2 size={13} />
+                          <Trash2 id={`${rid}-remove-icon`} aria-hidden="true" size={13} />
                         </button>
                       </div>
                     </div>

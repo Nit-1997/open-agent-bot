@@ -73,7 +73,7 @@ describe("widgets", () => {
   });
 
   it("UiCard without flags shows no grounding footer", () => {
-    const { unverified: _u, removedLinks: _r, ...clean } = validWidgets.ui;
+    const clean = { ...validWidgets.ui, unverified: undefined, removedLinks: undefined };
     render(<UiCard toolCallId="u3" widget={clean} />);
     expect(screen.queryByTitle("Not found in the sources I read")).toBeNull();
     expect(screen.queryByText(/weren't found in the sources/)).toBeNull();

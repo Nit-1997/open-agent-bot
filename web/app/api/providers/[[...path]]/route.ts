@@ -1,15 +1,14 @@
+import { agentHeaders, agentUrl } from "@/lib/agentServer";
+
 const ALLOWED = /^(local|test|logins\/[0-9a-f-]{36}(\/answer)?|[a-z0-9-]+(\/(key|models|login))?)?$/;
 
 async function forward(req: Request, { params }: { params: Promise<{ path?: string[] }> }) {
   const sub = ((await params).path ?? []).join("/");
   if (!ALLOWED.test(sub)) return Response.json({ error: "not found" }, { status: 404 });
-  const base = process.env.AGENT_URL ?? "http://localhost:8000";
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (process.env.AGENT_SHARED_SECRET) headers["x-agent-secret"] = process.env.AGENT_SHARED_SECRET;
   try {
-    const upstream = await fetch(`${base}/providers${sub ? `/${sub}` : ""}`, {
+    const upstream = await fetch(agentUrl(`/providers${sub ? `/${sub}` : ""}`), {
       method: req.method,
-      headers,
+      headers: agentHeaders({ "content-type": "application/json" }),
       body: req.method === "GET" || req.method === "DELETE" ? undefined : await req.text(),
       cache: "no-store",
     });

@@ -28,7 +28,9 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   const running = sending || agent.isRunning;
   const lastId = turns.at(-1)?.id;
   const lastRef = useRef(lastId);
-  lastRef.current = lastId;
+  useEffect(() => {
+    lastRef.current = lastId;
+  }, [lastId]);
   const [frames, setFrames] = useState<Record<string, BrowserFrame>>({});
   const [cartEdits, setCartEdits] = useState<CartEdits | null>(null);
   const latestCart = useMemo(() => {
@@ -57,11 +59,6 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [running]);
-
-  useEffect(() => {
-    if (running || !lastId) return;
-    setTiming((t) => (t[lastId] && !t[lastId].end ? { ...t, [lastId]: { ...t[lastId], end: Date.now() } } : t));
-  }, [running, lastId]);
 
   useEffect(() => {
     const el = scroller.current;
@@ -97,6 +94,8 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
     } finally {
       setSending(false);
+      const id = lastRef.current;
+      if (id) setTiming((t) => (t[id] && !t[id].end ? { ...t, [id]: { ...t[id], end: Date.now() } } : t));
     }
   }, [agent, copilotkit]);
 
