@@ -2,6 +2,7 @@ import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import type { Turn } from "@/lib/turns";
 import { ActivitySteps } from "./ActivitySteps";
+import { Followups } from "./Followups";
 import { Markdown } from "./Markdown";
 import { SourcesRow } from "./SourcesRow";
 
@@ -17,6 +18,8 @@ export function TurnView(props: {
 }) {
   const { turn, running } = props;
   const id = `turn-${turn.id}`;
+  const isFollowups = (w: unknown) => (w as { kind?: string } | null)?.kind === "followups";
+  const replies = turn.items.flatMap((it) => (it.kind === "widget" && isFollowups(it.widget) ? ((it.widget as { replies?: string[] }).replies ?? []) : []));
   return (
     <article id={id} className="animate-rise">
       {turn.user && (
@@ -31,6 +34,7 @@ export function TurnView(props: {
         <div id={`${id}-body`} className="space-y-3">
           {turn.items.map((item) => {
             if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
+            if (item.kind === "widget" && isFollowups(item.widget)) return null;
             if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} answered={props.answered} onAnswer={props.onAnswer} />;
             if (item.result === undefined) {
               return (
@@ -41,6 +45,7 @@ export function TurnView(props: {
           })}
         </div>
         {!running && <SourcesRow id={`${id}-sources`} sources={turn.sources} />}
+        {!running && !props.answered && replies.length > 0 && <Followups id={`${id}-followups`} replies={replies.slice(0, 4)} onPick={props.onAnswer} />}
       </div>
     </article>
   );

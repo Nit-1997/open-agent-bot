@@ -167,12 +167,18 @@ export const GroundingNoteSchema = Type.Object({
   claims: Type.Array(Str, { minItems: 1 }),
 });
 
+export const FollowupsSchema = Type.Object({
+  kind: Type.Literal("followups"),
+  replies: Type.Array(S(40), { minItems: 1, maxItems: 4 }),
+});
+
 export const WidgetSchemas = {
   weather_card: WeatherCardSchema,
   flight_list: FlightListSchema,
   ui: UiSchema,
   grounding_note: GroundingNoteSchema,
   ask: AskSchema,
+  followups: FollowupsSchema,
 } as const;
 
 export type WeatherCard = Static<typeof WeatherCardSchema>;
@@ -184,7 +190,8 @@ export type GroundingNote = Static<typeof GroundingNoteSchema>;
 export type AskFieldType = keyof typeof AskFieldSchemas;
 export type AskField = Static<typeof AskFieldSchema>;
 export type AskWidget = Omit<Static<typeof AskSchema>, "fields"> & { fields: AskField[] };
-export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget;
+export type Followups = Static<typeof FollowupsSchema>;
+export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget | Followups;
 export type WidgetKind = WidgetPayload["kind"];
 
 export const WIDGET_KINDS = Object.keys(WidgetSchemas) as WidgetKind[];

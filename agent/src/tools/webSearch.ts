@@ -43,7 +43,7 @@ async function brave(deps: Deps, f: typeof fetch, query: string, kind: Kind, cou
     .filter((h) => kind === "web" || h.image);
 }
 
-async function search(deps: Deps, query: string, kind: Kind, count: number, signal?: AbortSignal): Promise<Hit[]> {
+export async function search(deps: Deps, query: string, kind: Kind, count: number, signal?: AbortSignal): Promise<Hit[]> {
   const f = deps.fetch ?? fetch;
   let hits: Hit[] = [];
   let error: unknown;

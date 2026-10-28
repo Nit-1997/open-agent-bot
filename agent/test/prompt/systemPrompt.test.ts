@@ -4,7 +4,7 @@ import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 describe("buildSystemPrompt", () => {
   it("includes user context and the core rules", () => {
     const p = buildSystemPrompt({ timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T14:00" });
-    for (const s of ["Asia/Kolkata", "en-IN", "2026-10-27T14:00", "checkout", "show_ui", "unverified", "create_artifact", "ask_user", "start_date", "typical", "nearby airports", "Don't offer driving", "max_layover", "depart_times", "Compare nearby airports?", "Lead with the answer in one sentence", "Only check the weather when", "never mention that you can't buy", "cards block", "even when some have no image", "image_search", "shape \"wide\"", "queries listing every item", "start the card with an image block", "call music once", "call wikipedia once"]) {
+    for (const s of ["Asia/Kolkata", "en-IN", "2026-10-27T14:00", "checkout", "show_ui", "unverified", "create_artifact", "ask_user", "start_date", "typical", "nearby airports", "Don't offer driving", "max_layover", "depart_times", "Compare nearby airports?", "Lead with the answer in one sentence", "Only check the weather when", "never mention that you can't buy", "cards block", "even when some have no image", "image_search", "shape \"wide\"", "queries listing every item", "start the card with an image block", "call music once", "call wikipedia once", "even a single product", "one card per item, even without a link or price", "suggest_replies"]) {
       expect(p).toContain(s);
     }
   });

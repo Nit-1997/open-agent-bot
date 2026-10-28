@@ -14,7 +14,7 @@ function list(v: unknown): string[] {
   return [];
 }
 
-export const RENDER_TOOLS = new Set(["show_ui", "show_widget", "ask_user"]);
+export const RENDER_TOOLS = new Set(["show_ui", "show_widget", "ask_user", "suggest_replies"]);
 
 export function stepLabel(name: string, args: StepArgs, done = true): string {
   const host = (u: unknown) => hostOf(String(u ?? "")) ?? "a page";

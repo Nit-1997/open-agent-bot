@@ -33,18 +33,19 @@ const store = new SessionStore({
   idleMs: SESSION_IDLE_MS,
   create: async (threadId, userContext) => {
     const budget = new ToolBudget(PER_REPLY_LIMITS);
+    const evidence = new Evidence();
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: modelFor(userContext?.model),
       systemPrompt: buildSystemPrompt(userContext),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence }),
     });
     return {
       session: handle.session,
       busy: false,
       lastUsed: Date.now(),
       onRunStart: () => budget.reset(),
-      evidence: new Evidence(),
+      evidence,
       setModel: async (ref: string) => {
         const model = hub.resolve(ref);
         if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);

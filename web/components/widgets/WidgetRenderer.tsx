@@ -21,5 +21,7 @@ export function WidgetRenderer(props: { toolCallId: string; args: unknown; local
       return <GroundingNote toolCallId={toolCallId} widget={w} />;
     case "ask":
       return <AskCard toolCallId={toolCallId} widget={w} locale={locale} answered={props.answered} onAnswer={props.onAnswer} />;
+    case "followups":
+      return null;
   }
 }

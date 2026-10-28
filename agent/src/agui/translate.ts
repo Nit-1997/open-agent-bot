@@ -92,8 +92,9 @@ export function createTranslator(ids: Deps) {
         const out: BaseEvent[] = [
           { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: e.toolCallId, content, role: "tool" } as BaseEvent,
         ];
-        const details = (e.result as { details?: { widget?: Widget; data?: unknown } } | undefined)?.details;
-        if (!e.toolName.startsWith("show_") && e.toolName !== "ask_user") {
+        const details = (e.result as { details?: { widget?: Widget; data?: unknown; sourced?: string } } | undefined)?.details;
+        if (details?.sourced) evidence.add(details.sourced);
+        if (!e.toolName.startsWith("show_") && e.toolName !== "ask_user" && e.toolName !== "suggest_replies") {
           evidence.add(content);
           if (details?.data) evidence.add(JSON.stringify(details.data));
         }

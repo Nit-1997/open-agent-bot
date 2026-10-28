@@ -11,10 +11,11 @@ import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
 import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon } from "./geo.js";
 import type { ToolResult } from "./result.js";
+import type { Evidence } from "../grounding/evidence.js";
 import { askUserTool } from "./askUser.js";
-import { showUiTool } from "./showWidget.js";
+import { showUiTool, suggestRepliesTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
-import { imageSearchTool, webSearchTool } from "./webSearch.js";
+import { imageSearchTool, search as runSearch, webSearchTool } from "./webSearch.js";
 import { musicTool, wikipediaTool } from "./lookup.js";
 
 export type ToolDeps = {
@@ -24,6 +25,7 @@ export type ToolDeps = {
   threadId: string;
   userContext: UserContext | null;
   budget: ToolBudget;
+  evidence?: Evidence;
 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2 };
@@ -64,7 +66,8 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       browse: (actions) => browse.execute("flights", { actions } as never, undefined, undefined, {} as never) as Promise<ToolResult>,
       drive,
     }), deps.budget, "flights"),
-    showUiTool(),
+    showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (q) => (await runSearch(search, q, "images", 1)).find((h) => h.image)?.image }),
+    suggestRepliesTool(),
     askUserTool(),
     createArtifactTool(deps.artifacts),
   ];

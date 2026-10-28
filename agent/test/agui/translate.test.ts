@@ -156,6 +156,28 @@ describe("grounding", () => {
     ]);
   });
 
+  it("keeps card pictures the card tool looked up itself", () => {
+    const filled = {
+      ...toolEnd,
+      toolCallId: "u2",
+      toolName: "show_ui",
+      result: {
+        content: [{ type: "text", text: "shown" }],
+        details: {
+          widget: { kind: "ui", title: "Cart", blocks: [{ type: "cards", items: [{ title: "Barilla", image: "https://tse1.mm.bing.net/barilla.jpg" }] }] },
+          sourced: "image: https://tse1.mm.bing.net/barilla.jpg",
+        },
+      },
+    } as unknown as PiEvent;
+    expect(widgetArgs(run([filled]))[0].blocks[0].items[0].image).toBe("https://tse1.mm.bing.net/barilla.jpg");
+  });
+
+  it("follow-up suggestions are not evidence", () => {
+    const sug = { ...toolEnd, toolCallId: "s1", toolName: "suggest_replies", result: { content: [{ type: "text", text: "Under $20" }], details: {} } } as unknown as PiEvent;
+    const out = run([sug, assistantStart, delta("Picks under $20."), assistantEnd]);
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$20"] }]);
+  });
+
   it("a form the agent shows is not evidence for its own claims", () => {
     const ask = { ...toolEnd, toolCallId: "q1", toolName: "ask_user", result: { content: [{ type: "text", text: "budget $250" }], details: {} } } as unknown as PiEvent;
     const out = run([ask, assistantStart, delta("Flights from $250."), assistantEnd]);

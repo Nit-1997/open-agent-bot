@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
-import { showUiTool } from "../../src/tools/showWidget.js";
+import { showUiTool, suggestRepliesTool } from "../../src/tools/showWidget.js";
 import { validWidgets } from "../fixtures/widgets.js";
 
 const exec = (params: unknown) =>
@@ -128,5 +128,63 @@ describe("flight schema", () => {
     const r = validateWidget({ ...f, flights: [{ ...flight, durationMin: 1200 }] });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.join("\n")).toContain("/flights/0");
+  });
+});
+
+describe("show_ui image fill", () => {
+  const execWith = (findImage: (q: string) => Promise<string | undefined>, params: unknown) =>
+    showUiTool({ findImage }).execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
+      content: Array<{ text: string }>;
+      details: { widget: { blocks: Array<{ items: Array<{ title: string; image?: string }> }> }; sourced?: string };
+    }>;
+
+  it("looks up a picture for every card that has none, by name and source", async () => {
+    const asked: string[] = [];
+    const findImage = async (q: string) => {
+      asked.push(q);
+      return q.startsWith("Barilla") ? "https://tse1.mm.bing.net/barilla.jpg" : undefined;
+    };
+    const res = await execWith(findImage, {
+      title: "Mac and cheese cart",
+      blocks: [{ type: "cards", items: [
+        { title: "Barilla Elbow Macaroni 16 oz", source: "Shipt" },
+        { title: "Good & Gather Sharp Cheddar", image: "https://target.scene7.com/cheddar.jpg" },
+        { title: "First Street Butter" },
+      ] }],
+    });
+    expect(asked).toEqual(["Barilla Elbow Macaroni 16 oz Shipt", "First Street Butter"]);
+    const items = res.details.widget.blocks[0].items;
+    expect(items.map((i) => i.image)).toEqual(["https://tse1.mm.bing.net/barilla.jpg", "https://target.scene7.com/cheddar.jpg", undefined]);
+    expect(res.details.sourced).toContain("https://tse1.mm.bing.net/barilla.jpg");
+  });
+});
+
+describe("show_ui replaces unsourced pictures", () => {
+  it("looks up a picture when the card's image wasn't returned by any tool", async () => {
+    const tool = showUiTool({ findImage: async () => "https://tse1.mm.bing.net/real.jpg", isSourced: (u) => u.includes("target.scene7.com") });
+    const res = (await tool.execute(...(["c", {
+      title: "Cart",
+      blocks: [{ type: "cards", items: [
+        { title: "Made-up picture", image: "https://cdn.invented.example/x.jpg" },
+        { title: "Sourced picture", image: "https://target.scene7.com/ok.jpg" },
+      ] }],
+    }, undefined, undefined, {}] as never[]))) as { details: { widget: { blocks: Array<{ items: Array<{ image?: string }> }> } } };
+    expect(res.details.widget.blocks[0].items.map((i) => i.image)).toEqual(["https://tse1.mm.bing.net/real.jpg", "https://target.scene7.com/ok.jpg"]);
+  });
+});
+
+describe("suggest_replies", () => {
+  const run = (params: unknown) =>
+    suggestRepliesTool().execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{ isError?: boolean; details: { widget?: unknown } }>;
+
+  it("shows 1-4 short replies as a followups widget", async () => {
+    const r = await run({ replies: ["Make it high protein", "Gluten-free options"] });
+    expect(r.details.widget).toEqual({ kind: "followups", replies: ["Make it high protein", "Gluten-free options"] });
+  });
+
+  it("accepts replies sent as a JSON string and rejects long or too many", async () => {
+    expect((await run({ replies: '["Cheaper picks"]' })).details.widget).toEqual({ kind: "followups", replies: ["Cheaper picks"] });
+    expect((await run({ replies: ["x".repeat(41)] })).isError).toBe(true);
+    expect((await run({ replies: ["a", "b", "c", "d", "e"] })).isError).toBe(true);
   });
 });
