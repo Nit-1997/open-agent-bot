@@ -1,17 +1,18 @@
 {
   "name": "agent",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "Open Agent backend: AG-UI server, pi agent sessions, and research tools",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/agent/src/server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@ag-ui/core": "^1.0.3",
     "@ag-ui/encoder": "^1.0.3",

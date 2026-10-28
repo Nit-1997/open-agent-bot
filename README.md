@@ -45,8 +45,10 @@ There's no app login yet: anyone who can reach port 3000 can change keys. Keep p
 
 ## Develop
 
-- Agent: `cd agent && npm test && npm run build` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test`)
-- Web: `cd web && npm test && npm run build`
+- Agent: `cd agent && npm run typecheck && npm test && npm run build` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test`)
+- Web: `cd web && npm run lint && npm run typecheck && npm test && npm run build`
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, how to add a tool, and conventions. Report security issues as described in [SECURITY.md](SECURITY.md).
 
 ## Safety rails
 

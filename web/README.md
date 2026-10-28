@@ -1,36 +1,18 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Open Agent web
 
-## Getting Started
-
-First, run the development server:
+The chat UI: Next.js with CopilotKit, talking to the agent over AG-UI.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+AGENT_URL=http://localhost:8000 npm run dev   # http://localhost:3000
+npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Env var | Purpose |
+| --- | --- |
+| `AGENT_URL` | Agent base URL (default `http://localhost:8000`, `http://agent:8000` in compose) |
+| `AGENT_SHARED_SECRET` | Sent as `x-agent-secret` on every call to the agent; must match the agent's value |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Everything under `app/api/` is a thin server-side proxy to the agent, so the browser never sees the agent URL or secret. Widget payloads are validated with the schemas in `../shared/widgets.ts` before rendering.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See the repository [README](../README.md) and [CONTRIBUTING](../CONTRIBUTING.md) for the full stack.
