@@ -46,6 +46,8 @@ agent/src/
   stays/               hotel and rental search: one file per site in sources/
   grounding/           checks prices, ratings and links against tool evidence
   render/              tool data → widget payloads
+  artifacts/           report storage, PDF export, and the report kit (reportKit.ts: CSS
+                       components plus the guide the model sees in create_artifact)
   lib/                 small shared helpers with no tool dependencies
 shared/                widget schemas and flight helpers used by both agent and web
 web/

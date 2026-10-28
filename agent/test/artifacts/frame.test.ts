@@ -5,7 +5,8 @@ describe("withReportFrame", () => {
   it("adds base styles and new-tab links ahead of the model's own head content", () => {
     const out = withReportFrame("<!doctype html><html><head><title>R</title><style>h1{color:red}</style></head><body><h1>R</h1></body></html>");
     expect(out.indexOf('<base target="_blank">')).toBeLessThan(out.indexOf("<title>R</title>"));
-    expect(out.indexOf("max-width: 760px")).toBeLessThan(out.indexOf("h1{color:red}"));
+    expect(out.indexOf("max-width: 880px")).toBeLessThan(out.indexOf("h1{color:red}"));
+    expect(out).toContain('<meta name="referrer" content="no-referrer">');
   });
 
   it("wraps fragments and head-less documents", () => {

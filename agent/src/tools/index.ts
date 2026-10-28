@@ -6,6 +6,7 @@ import type { UserContext } from "../prompt/systemPrompt.js";
 import { browseTool, runBrowse } from "./browse.js";
 import { type ToolBudget, withBudget } from "./budget.js";
 import type { BrowserPool } from "./browserPool.js";
+import { imageLoads } from "../artifacts/images.js";
 import { createArtifactTool } from "./createArtifact.js";
 import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
@@ -34,7 +35,7 @@ export type ToolDeps = {
   cart?: ActiveCart;
 };
 
-export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 4, flights: 2, shop: 2, stays: 2 };
+export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2 };
 
 function memo<T>(fn: () => Promise<T>): () => Promise<T> {
   let p: Promise<T> | undefined;
@@ -88,6 +89,6 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),
     suggestRepliesTool(),
     askUserTool(),
-    createArtifactTool(deps.artifacts),
+    createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }),
   ];
 }
