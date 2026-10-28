@@ -1,7 +1,6 @@
 "use client";
 
 import { CopilotKit } from "@copilotkit/react-core/v2";
-import "@copilotkit/react-core/v2/styles.css";
 import { useSyncExternalStore } from "react";
 
 const subscribe = () => () => {};

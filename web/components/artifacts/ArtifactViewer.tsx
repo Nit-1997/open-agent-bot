@@ -10,16 +10,16 @@ export function ArtifactViewer({ artifactId, title, onClose }: { artifactId: str
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div id={id} role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-neutral-950">
-      <div id={`${id}-bar`} className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+    <div id={id} role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex flex-col bg-paper">
+      <div id={`${id}-bar`} className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
         <span id={`${id}-title`} className="truncate text-sm font-medium">
           {title}
         </span>
         <div id={`${id}-actions`} className="flex gap-2">
-          <a id={`${id}-pdf`} href={`/api/artifacts/${artifactId}?format=pdf`} className="rounded-md border border-neutral-300 px-3 py-1 text-sm dark:border-neutral-700">
+          <a id={`${id}-pdf`} href={`/api/artifacts/${artifactId}?format=pdf`} className="rounded-full border border-border px-3.5 py-1.5 text-[13px] font-medium">
             Download PDF
           </a>
-          <button id={`${id}-close`} type="button" onClick={onClose} className="rounded-md bg-neutral-900 px-3 py-1 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900">
+          <button id={`${id}-close`} type="button" onClick={onClose} className="rounded-full bg-charcoal px-3.5 py-1.5 text-[13px] font-medium text-on-charcoal">
             Close
           </button>
         </div>

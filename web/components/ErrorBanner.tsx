@@ -19,19 +19,19 @@ export function ErrorBanner(props: {
     <div
       id="error-banner"
       role="alert"
-      className="mx-3 mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
+      className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl bg-danger-bg px-4 py-2.5 text-sm text-danger-fg"
     >
       <span id="error-banner-text" className="flex-1">
         {TEXT[props.kind]}
         {props.message && props.kind !== "SESSION_EXPIRED" ? ` ${props.message}` : ""}
       </span>
       {props.kind === "SESSION_EXPIRED" && (
-        <button id="error-banner-new-chat" type="button" onClick={props.onNewChat} className="rounded-md bg-red-700 px-3 py-1 text-white">
+        <button id="error-banner-new-chat" type="button" onClick={props.onNewChat} className="rounded-full bg-charcoal px-3 py-1 text-xs font-medium text-on-charcoal">
           Start new chat
         </button>
       )}
       {showRetry && (
-        <button id="error-banner-retry" type="button" onClick={props.onRetry} className="rounded-md bg-red-700 px-3 py-1 text-white">
+        <button id="error-banner-retry" type="button" onClick={props.onRetry} className="rounded-full bg-charcoal px-3 py-1 text-xs font-medium text-on-charcoal">
           Retry
         </button>
       )}

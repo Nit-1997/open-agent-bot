@@ -1,163 +1,81 @@
 "use client";
 
-import {
-  CopilotChat,
-  useAgent,
-  useAgentContext,
-  useCopilotKit,
-  useDefaultRenderTool,
-  useRenderTool,
-} from "@copilotkit/react-core/v2";
+import { useAgentContext } from "@copilotkit/react-core/v2";
+import { Moon, Plus, Sun } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
-import { ErrorBanner } from "@/components/ErrorBanner";
-import { ToolActivity } from "@/components/ToolActivity";
-import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
-import { classifyRunError, type RunErrorKind } from "@/lib/errors";
-import { passthrough } from "@/lib/passthroughSchema";
+import { ChatSession } from "@/components/chat/ChatSession";
 import { getUserContext, type UserContext } from "@/lib/userContext";
 
 export const AGENT_ID = "openagent";
 
-function newThreadId() {
-  return crypto.randomUUID();
+function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
+  const toggle = () => {
+    const next = !dark;
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      localStorage.setItem("theme", next ? "dark" : "light");
+    } catch {}
+    setDark(next);
+  };
+  const Icon = dark ? Sun : Moon;
+  return (
+    <button
+      id="theme-toggle"
+      type="button"
+      onClick={toggle}
+      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      className="flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition hover:bg-surface hover:text-text-primary"
+    >
+      <Icon id="theme-toggle-icon" aria-hidden="true" size={16} />
+    </button>
+  );
 }
 
 export function Chat() {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<UserContext | null>(null);
-  const [error, setError] = useState<{
-    kind: RunErrorKind;
-    message?: string;
-  } | null>(null);
 
   useEffect(() => {
-    setThreadId(newThreadId());
+    setThreadId(crypto.randomUUID());
     setUserContext(getUserContext());
   }, []);
-  const { agent } = useAgent({ agentId: AGENT_ID });
-  const { copilotkit } = useCopilotKit();
 
   useAgentContext({
     description: "user_context",
     value: userContext ? JSON.stringify(userContext) : "",
   });
 
-  useDefaultRenderTool(
-    {
-      render: ({ name, toolCallId, status, parameters }) => (
-        <ToolActivity
-          toolCallId={toolCallId}
-          name={name}
-          status={status}
-          parameters={parameters}
-        />
-      ),
-    },
-    [],
-  );
-
-  const locale = userContext?.locale ?? "en-US";
-
-  useRenderTool(
-    {
-      name: "show_widget",
-      parameters: passthrough<{ widget?: unknown }>(),
-      render: ({ toolCallId, status, parameters }) =>
-        status === "inProgress" ? null : (
-          <WidgetRenderer
-            toolCallId={toolCallId}
-            args={parameters}
-            locale={locale}
-          />
-        ),
-    },
-    [locale],
-  );
-
-  useRenderTool(
-    {
-      name: "create_artifact",
-      parameters: passthrough<{ title?: string; html?: string }>(),
-      render: ({ toolCallId, status, parameters, result }) =>
-        status === "complete" ? (
-          <ArtifactCard
-            toolCallId={toolCallId}
-            title={parameters.title ?? "Page"}
-            result={result}
-          />
-        ) : (
-          <ToolActivity
-            toolCallId={toolCallId}
-            name="create_artifact"
-            status={status}
-            parameters={parameters}
-          />
-        ),
-    },
-    [],
-  );
-
   const startNewChat = useCallback(() => {
-    setError(null);
-    setThreadId(newThreadId());
+    setThreadId(crypto.randomUUID());
     setUserContext(getUserContext());
   }, []);
 
-  const retry = useCallback(() => {
-    setError(null);
-    void copilotkit.runAgent({ agent }).catch(() => {});
-  }, [agent, copilotkit]);
-
   return (
-    <div
-      id="chat-shell"
-      className="mx-auto flex h-dvh w-full max-w-[760px] flex-col"
-    >
-      <header
-        id="chat-header"
-        className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800"
-      >
-        <h1 id="chat-title" className="text-base font-semibold">
-          Open Agent
-        </h1>
-        <button
-          id="chat-new-button"
-          type="button"
-          onClick={startNewChat}
-          className="rounded-md border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
-        >
-          New chat
-        </button>
+    <div id="chat-shell" className="flex h-dvh w-full flex-col bg-bg">
+      <header id="chat-header" className="flex items-center justify-between px-4 py-3 sm:px-6">
+        <div id="chat-brand" className="flex items-center gap-2.5">
+          <span id="chat-brand-orb" aria-hidden="true" className="orb h-6 w-6" />
+          <h1 id="chat-title" className="font-display text-[22px] leading-none text-text-primary">
+            Open Agent
+          </h1>
+        </div>
+        <div id="chat-actions" className="flex items-center gap-1">
+          <ThemeToggle />
+          <button
+            id="chat-new-button"
+            type="button"
+            onClick={startNewChat}
+            className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-charcoal px-3.5 py-2 text-[13px] font-medium text-on-charcoal transition hover:opacity-85"
+          >
+            <Plus id="chat-new-icon" aria-hidden="true" size={14} />
+            New chat
+          </button>
+        </div>
       </header>
-      {error && (
-        <ErrorBanner
-          kind={error.kind}
-          message={error.message}
-          onNewChat={startNewChat}
-          onRetry={retry}
-          onDismiss={() => setError(null)}
-        />
-      )}
-      <main id="chat-main" className="min-h-0 flex-1">
-        {threadId && (
-          <CopilotChat
-            key={threadId}
-            agentId={AGENT_ID}
-            threadId={threadId}
-            className="h-full"
-            labels={{
-              chatInputPlaceholder: "Ask me to research, compare, or plan…",
-            }}
-            onError={(event) => {
-              if ("error" in event)
-                setError({
-                  kind: classifyRunError(event),
-                  message: event.error?.message,
-                });
-            }}
-          />
-        )}
+      <main id="chat-main" className="flex min-h-0 flex-1 flex-col">
+        {threadId && <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext?.locale ?? "en-US"} onNewChat={startNewChat} />}
       </main>
     </div>
   );

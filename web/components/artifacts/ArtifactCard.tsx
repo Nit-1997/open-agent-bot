@@ -14,28 +14,31 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
   const id = `artifact-card-${toolCallId}`;
   if (!artifactId) {
     return (
-      <p id={`${id}-error`} className="my-2 text-sm text-red-700 dark:text-red-400">
+      <p id={`${id}-error`} className="my-2 text-sm text-danger-fg">
         Couldn&apos;t create the page{result ? `: ${result}` : "."}
       </p>
     );
   }
   return (
-    <div id={id} className="my-2 flex items-center justify-between gap-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
-      <div id={`${id}-text`} className="min-w-0">
-        <p id={`${id}-title`} className="truncate text-sm font-semibold">
+    <div id={id} className="flex items-center gap-3 rounded-2xl border border-border bg-paper p-3 transition hover:border-border-strong">
+      <span id={`${id}-thumb`} aria-hidden="true" style={{ background: "var(--accent-gradient)" }} className="flex h-12 w-10 shrink-0 items-center justify-center rounded-lg border border-border font-display text-lg italic text-cortex-600">
+        Aa
+      </span>
+      <div id={`${id}-text`} className="min-w-0 flex-1">
+        <p id={`${id}-title`} className="truncate text-[15px] font-medium text-text-primary">
           {title}
         </p>
-        <p id={`${id}-kind`} className="text-xs text-neutral-500">
-          Page · open full screen or download as PDF
+        <p id={`${id}-kind`} className="eyebrow mt-1">
+          Page · PDF ready
         </p>
       </div>
-      <div id={`${id}-actions`} className="flex shrink-0 gap-2">
-        <button id={`${id}-open`} type="button" onClick={() => setOpen(true)} className="rounded-md bg-neutral-900 px-3 py-1 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900">
+      <div id={`${id}-actions`} className="flex shrink-0 gap-1.5">
+        <a id={`${id}-pdf`} aria-label="Download PDF" href={`/api/artifacts/${artifactId}?format=pdf`} className="rounded-full border border-border px-3.5 py-1.5 text-[13px] font-medium text-text-secondary transition hover:border-border-strong">
+          PDF
+        </a>
+        <button id={`${id}-open`} type="button" onClick={() => setOpen(true)} className="rounded-full bg-charcoal px-3.5 py-1.5 text-[13px] font-medium text-on-charcoal transition hover:opacity-85">
           Open
         </button>
-        <a id={`${id}-pdf`} href={`/api/artifacts/${artifactId}?format=pdf`} className="rounded-md border border-neutral-300 px-3 py-1 text-sm dark:border-neutral-700">
-          Download PDF
-        </a>
       </div>
       {open && <ArtifactViewer artifactId={artifactId} title={title} onClose={() => setOpen(false)} />}
     </div>
