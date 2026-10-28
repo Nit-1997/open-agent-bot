@@ -1,3 +1,4 @@
+import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 export const BLOCKING_STATUSES = new Set([401, 403, 429, 503]);
@@ -31,6 +32,17 @@ export function publicHttpUrlError(raw: string, opts: { allowPrivateHosts?: bool
   return null;
 }
 
+export type Lookup = (hostname: string) => Promise<string[]>;
+
+export const dnsLookup: Lookup = async (hostname) => (await lookup(hostname, { all: true })).map((a) => a.address);
+
+export async function resolvesInternal(hostname: string, resolve: Lookup = dnsLookup): Promise<boolean> {
+  const h = hostname.replace(/^\[|\]$/g, "");
+  if (isIP(h)) return isInternalHost(h);
+  const addresses = await resolve(h).catch(() => []);
+  return addresses.some(isInternalHost);
+}
+
 export function timeoutSignal(ms: number, signal?: AbortSignal): AbortSignal {
   return signal ? AbortSignal.any([signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms);
 }
@@ -39,12 +51,14 @@ export async function fetchPublic(
   f: typeof fetch,
   url: string,
   init: RequestInit = {},
-  opts: { allowPrivateHosts?: boolean } = {},
+  opts: { allowPrivateHosts?: boolean; lookup?: Lookup } = {},
 ): Promise<{ res: Response; url: string }> {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const err = publicHttpUrlError(current, opts);
     if (err) throw new Error(err);
+    const host = new URL(current).hostname;
+    if (!opts.allowPrivateHosts && (await resolvesInternal(host, opts.lookup))) throw new Error(`refusing ${host}: it resolves to a private address`);
     const res = await f(current, { ...init, redirect: "manual" });
     const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (!location) return { res, url: current };

@@ -3,7 +3,8 @@ import { fetchPageTool } from "../../src/tools/fetchPage.js";
 import { fakeFetch, html } from "../fixtures/fakeFetch.js";
 
 const text = (r: { content: Array<{ text?: string }> }) => r.content[0].text ?? "";
-const call = (f: typeof fetch, url: string) => fetchPageTool({ fetch: f }).execute("c", { url }, undefined, undefined, {} as never);
+const publicDns = async () => ["93.184.216.34"];
+const call = (f: typeof fetch, url: string, lookup = publicDns) => fetchPageTool({ fetch: f, lookup }).execute("c", { url }, undefined, undefined, {} as never);
 
 describe("fetch_page", () => {
   it("fetch_page truncates and rejects binary", async () => {
@@ -63,6 +64,14 @@ describe("fetch_page network guard", () => {
     expect(r.isError).toBe(true);
     expect(text(r)).toContain("refusing internal or private address");
     expect(f.calls).toEqual(["https://example.com/go"]);
+  });
+
+  it("refuses a public name that resolves to a private address", async () => {
+    const f = fakeFetch([[/.*/, () => html("secret")]]);
+    const r = await call(f, "https://rebind.example.com/", async () => ["10.0.0.5"]);
+    expect(r.isError).toBe(true);
+    expect(text(r)).toContain("resolves to a private address");
+    expect(f.calls).toEqual([]);
   });
 
   it("follows public redirects and reports the final url", async () => {

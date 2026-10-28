@@ -40,7 +40,8 @@ agent/src/
   session/             per-thread session store with idle sweep
   prompt/              system prompt and region/currency detection
   tools/               one file per agent tool, plus net.ts (URL guard, safe fetch),
-                       browsePolicy.ts (what the browser may not do), budget.ts
+                       browsePolicy.ts (what the browser may not do),
+                       browserGuard.ts (blocks private-network requests), budget.ts
   shop/                catalog tile extraction, ranking and the per-chat cart
   grounding/           checks prices, ratings and links against tool evidence
   render/              tool data → widget payloads

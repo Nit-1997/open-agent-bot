@@ -6,7 +6,7 @@ import { browseTool } from "../../src/tools/browse.js";
 
 let server: Server;
 let base: string;
-const pool = new BrowserPool();
+const pool = new BrowserPool({ allowPrivateHosts: true });
 
 const page = (body: string, title = "Fixture") => `<!doctype html><html><head><title>${title}</title></head><body>${body}</body></html>`;
 

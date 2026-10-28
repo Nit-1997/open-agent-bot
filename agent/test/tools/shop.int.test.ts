@@ -9,7 +9,7 @@ import { shopTool } from "../../src/tools/shop.js";
 let server: Server;
 const hits: string[] = [];
 let base: string;
-const pool = new BrowserPool();
+const pool = new BrowserPool({ allowPrivateHosts: true });
 
 const card = (title: string, price: string, img: string, href: string, extra = "") =>
   `<li><a href="${href}"><img src="${img}" alt="${title}" width="150" height="150"></a><span>${price}</span>${extra}</li>`;

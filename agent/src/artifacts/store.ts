@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Browser, chromium } from "playwright";
-import { publicHttpUrlError } from "../tools/net.js";
+import { blockInternalRequests } from "../tools/browserGuard.js";
 
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
 
@@ -36,10 +36,7 @@ export class ArtifactStore {
     const a = await this.get(id);
     if (!a) return null;
     const context = await (await this.launch()).newContext();
-    await context.route("**/*", (route) => {
-      const url = route.request().url();
-      return url.startsWith("data:") || !publicHttpUrlError(url) ? route.continue() : route.abort();
-    });
+    await blockInternalRequests(context);
     try {
       const page = await context.newPage();
       await page.setContent(a.html, { waitUntil: "load", timeout: 20000 });

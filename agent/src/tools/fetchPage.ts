@@ -1,7 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fail, ok, type ToolResult } from "./result.js";
-import { BLOCKING_STATUSES, fetchPublic, publicHttpUrlError, readCapped, timeoutSignal } from "./net.js";
+import { BLOCKING_STATUSES, fetchPublic, type Lookup, publicHttpUrlError, readCapped, timeoutSignal } from "./net.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 
 const MAX_BODY_BYTES = 5_000_000;
@@ -12,7 +12,7 @@ export function httpErrorText(status: number, host: string): string {
     : `HTTP ${status} from ${host}`;
 }
 
-export function fetchPageTool(deps: { fetch?: typeof fetch } = {}) {
+export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup } = {}) {
   const f = deps.fetch ?? fetch;
   return defineTool({
     name: "fetch_page",
@@ -28,7 +28,7 @@ export function fetchPageTool(deps: { fetch?: typeof fetch } = {}) {
         const { res, url: at } = await fetchPublic(f, url.href, {
           signal: timeoutSignal(15000, signal),
           headers: { "user-agent": "Mozilla/5.0 (compatible; OpenAgent/0.1)", accept: "text/html,text/plain,application/json" },
-        });
+        }, { lookup: deps.lookup });
         if (!res.ok) return fail(httpErrorText(res.status, new URL(at).host));
         const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
         if (type === "text/html" || type === "application/xhtml+xml") {

@@ -1,5 +1,6 @@
 import { type Browser, type BrowserContext, chromium, type Page } from "playwright";
 import type { UserContext } from "../prompt/systemPrompt.js";
+import { blockInternalRequests } from "./browserGuard.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
@@ -7,6 +8,8 @@ const USER_AGENT =
 export class BrowserPool {
   private browser?: Promise<Browser>;
   private threads = new Map<string, Promise<{ context: BrowserContext; page: Page }>>();
+
+  constructor(private readonly opts: { allowPrivateHosts?: boolean } = {}) {}
 
   private launch(): Promise<Browser> {
     if (!this.browser) {
@@ -30,6 +33,7 @@ export class BrowserPool {
           viewport: { width: 1280, height: 900 },
         });
         context.setDefaultTimeout(20000);
+        await blockInternalRequests(context, this.opts);
         const page = await context.newPage();
         return { context, page };
       })();
