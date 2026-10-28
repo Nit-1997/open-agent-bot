@@ -154,3 +154,24 @@ export function imageSearchTool(deps: Deps) {
     },
   });
 }
+
+const FILLER = new Set(["a", "an", "the", "of", "or", "and", "with", "for", "lb", "lbs", "oz", "fl", "ct", "pk", "pack", "bag", "box", "can", "canned", "jar", "bottle", "packet", "packets", "bunch", "fresh", "about"]);
+
+const keyWords = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z\s]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !FILLER.has(w))
+    .map((w) => w.replace(/(es|s)$/, ""));
+
+export function matchingImage(name: string, hits: Hit[]): string | undefined {
+  const want = [...new Set(keyWords(name))];
+  if (!want.length) return undefined;
+  const need = Math.max(1, Math.ceil(want.length * 0.6));
+  return hits.find((h) => {
+    if (!h.image) return false;
+    const have = new Set(keyWords(h.title));
+    return want.filter((w) => have.has(w)).length >= need;
+  })?.image;
+}

@@ -132,7 +132,7 @@ describe("flight schema", () => {
 });
 
 describe("show_ui image fill", () => {
-  const execWith = (findImage: (q: string) => Promise<string | undefined>, params: unknown) =>
+  const execWith = (findImage: (name: string, source?: string) => Promise<string | undefined>, params: unknown) =>
     showUiTool({ findImage }).execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
       content: Array<{ text: string }>;
       details: { widget: { blocks: Array<{ items: Array<{ title: string; image?: string }> }> }; sourced?: string };
@@ -140,9 +140,9 @@ describe("show_ui image fill", () => {
 
   it("looks up a picture for every card that has none, by name and source", async () => {
     const asked: string[] = [];
-    const findImage = async (q: string) => {
-      asked.push(q);
-      return q.startsWith("Barilla") ? "https://tse1.mm.bing.net/barilla.jpg" : undefined;
+    const findImage = async (name: string, source?: string) => {
+      asked.push([name, source].filter(Boolean).join(" "));
+      return name.startsWith("Barilla") ? "https://tse1.mm.bing.net/barilla.jpg" : undefined;
     };
     const res = await execWith(findImage, {
       title: "Mac and cheese cart",

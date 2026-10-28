@@ -15,7 +15,7 @@ import type { Evidence } from "../grounding/evidence.js";
 import { askUserTool } from "./askUser.js";
 import { showUiTool, suggestRepliesTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
-import { imageSearchTool, search as runSearch, webSearchTool } from "./webSearch.js";
+import { imageSearchTool, matchingImage, search as runSearch, webSearchTool } from "./webSearch.js";
 import { musicTool, wikipediaTool } from "./lookup.js";
 
 export type ToolDeps = {
@@ -66,7 +66,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       browse: (actions) => browse.execute("flights", { actions } as never, undefined, undefined, {} as never) as Promise<ToolResult>,
       drive,
     }), deps.budget, "flights"),
-    showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (q) => (await runSearch(search, q, "images", 1)).find((h) => h.image)?.image }),
+    showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),
     suggestRepliesTool(),
     askUserTool(),
     createArtifactTool(deps.artifacts),

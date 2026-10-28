@@ -22,7 +22,7 @@ function textify(v: unknown): unknown {
   return v;
 }
 
-type FindImage = (query: string) => Promise<string | undefined>;
+type FindImage = (name: string, source?: string) => Promise<string | undefined>;
 
 async function fillImages(widget: UiWidget, findImage: FindImage, isSourced: (url: string) => boolean): Promise<{ widget: UiWidget; sourced: string[] }> {
   const sourced: string[] = [];
@@ -32,7 +32,7 @@ async function fillImages(widget: UiWidget, findImage: FindImage, isSourced: (ur
       const items = await Promise.all(
         b.items.map(async (it) => {
           if (it.image && isSourced(it.image)) return it;
-          const image = await findImage([it.title, it.source].filter(Boolean).join(" ")).catch(() => undefined);
+          const image = await findImage(it.title, it.source).catch(() => undefined);
           if (!image) return it.image ? { ...it, image: undefined } : it;
           sourced.push(`image: ${image}`);
           return { ...it, image };
