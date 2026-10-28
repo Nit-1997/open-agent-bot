@@ -24,6 +24,42 @@ function textify(v: unknown): unknown {
 
 type FindImage = (name: string, source?: string) => Promise<string | undefined>;
 
+const MUSIC_HOSTS: Record<string, string> = { "open.spotify.com": "Spotify", "music.apple.com": "Apple Music", "music.youtube.com": "YouTube Music" };
+const MUSIC_WORDS = /\b(playlist|album|mixtape|soundtrack)\b/i;
+
+type ListItem = { title?: unknown; subtitle?: unknown; value?: unknown; badge?: unknown; url?: unknown };
+
+function musicSource(it: ListItem): string | undefined {
+  try {
+    const host = new URL(String(it.url)).hostname.replace(/^www\./, "");
+    if (MUSIC_HOSTS[host]) return MUSIC_HOSTS[host];
+  } catch {}
+  return MUSIC_WORDS.test(`${it.title ?? ""} ${it.subtitle ?? ""}`) ? "" : undefined;
+}
+
+export function musicListsToCards(blocks: unknown): unknown {
+  if (!Array.isArray(blocks)) return blocks;
+  return blocks.map((b) => {
+    if (!b || typeof b !== "object" || (b as { type?: unknown }).type !== "list") return b;
+    const items = (b as { items?: unknown }).items;
+    if (!Array.isArray(items) || items.length < 2) return b;
+    const sources = (items as ListItem[]).map(musicSource);
+    if (sources.filter((s) => s !== undefined).length * 2 < items.length) return b;
+    return {
+      type: "cards",
+      shape: "square",
+      items: (items as ListItem[]).map((it, i) => ({
+        title: it.title,
+        ...(it.subtitle !== undefined && { subtitle: it.subtitle }),
+        ...(it.value !== undefined && { note: it.value }),
+        ...(it.badge !== undefined && { badge: it.badge }),
+        ...(it.url !== undefined && { url: it.url }),
+        ...(sources[i] && { source: sources[i] }),
+      })),
+    };
+  });
+}
+
 async function fillImages(widget: UiWidget, findImage: FindImage, isSourced: (url: string) => boolean): Promise<{ widget: UiWidget; sourced: string[] }> {
   const sourced: string[] = [];
   const blocks = await Promise.all(
@@ -65,7 +101,7 @@ export const showUiTool = (deps: { findImage?: FindImage; isSourced?: (url: stri
           return fail("invalid card:\n/blocks: blocks must be an array of block objects, not text");
         }
       }
-      const r = validateWidget(fitWidget({ kind: "ui", ...(textify({ ...params, blocks }) as object) }));
+      const r = validateWidget(fitWidget({ kind: "ui", ...(textify({ ...params, blocks: musicListsToCards(blocks) }) as object) }));
       if (!r.ok) return fail(`invalid card:\n${r.errors.join("\n")}`);
       const filled = deps.findImage ? await fillImages(r.value as UiWidget, deps.findImage, deps.isSourced ?? (() => true)) : { widget: r.value as UiWidget, sourced: [] };
       return ok(
