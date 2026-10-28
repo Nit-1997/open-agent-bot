@@ -6,6 +6,7 @@ import {
   LAYOVER_OPTIONS,
   type LayoverPref,
   matchesPrefs,
+  type RankedAirport,
   rankAirports,
   rideOneWay,
   TIME_OPTIONS,
@@ -88,13 +89,99 @@ function summary(o: FlightOption, currency: string): string {
 }
 
 type Attempt = { result: ToolResult; text: string; options: FlightOption[]; hardFail: boolean };
+type Search = { code: string; url: string; last: Attempt };
+type Browse = (actions: BrowseAction[], opts?: { fresh?: boolean; live?: boolean }) => Promise<ToolResult>;
+type Deps = { locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null> };
+type Params = { from: string; to: string; date: string; returnDate?: string; adults?: number; max_layover?: string; depart_times?: string };
 
-export function flightsTool(deps: {
-  locale: string;
-  currency: string;
-  browse: (actions: BrowseAction[]) => Promise<ToolResult>;
-  drive?: (airportCode: string) => Promise<Drive | null>;
-}) {
+function readPrefs(params: Params): FlightPrefs {
+  const times = (params.depart_times ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t): t is TimeBucket => (TIME_IDS as string[]).includes(t));
+  return {
+    ...(params.max_layover && params.max_layover !== "any" && { maxLayover: params.max_layover as LayoverPref }),
+    ...(times.length && { times }),
+  };
+}
+
+async function searchOrigin(deps: Deps, params: Params, code: string, opts: { fresh: boolean; live: boolean }): Promise<Search> {
+  const url = googleFlightsUrl({ ...params, from: code }, deps.locale, deps.currency);
+  const attempt = async (): Promise<Attempt> => {
+    const result = await deps.browse([{ op: "goto", url }, { op: "wait", ms: 3000 }, { op: "read" }], opts);
+    const text = result.content.map((c) => c.text).join("");
+    const hardFail = !!(result.isError || result.details?.blocked || result.details?.stopped);
+    return { result, text, options: hardFail ? [] : parseGoogleFlights(text), hardFail };
+  };
+  let last = await attempt();
+  if (!last.options.length) last = await attempt();
+  return { code, url, last };
+}
+
+async function airportResults(deps: Deps, searches: Search[], withRides: boolean): Promise<AirportResult[]> {
+  return Promise.all(
+    searches.map(async ({ code, url, last }): Promise<AirportResult> => {
+      const known = AIRPORTS[code.toUpperCase()];
+      const drive = withRides && deps.drive ? await deps.drive(code.toUpperCase()).catch(() => null) : null;
+      return {
+        code,
+        ...(known && { name: known.name }),
+        ...(drive && { miles: drive.miles, ...(drive.minutes != null && { driveMinutes: drive.minutes }), rideOneWay: rideOneWay(drive.miles) }),
+        status: last.options.length ? "ok" : "failed",
+        searchUrl: url,
+      };
+    }),
+  );
+}
+
+function airportLine(a: RankedAirport<AirportResult>, money: (n: number) => string): string {
+  if (a.status === "failed") return `- ${a.code}: couldn't load (the card links to Google Flights for it)`;
+  const ride =
+    a.rideOneWay != null ? `${a.driveMinutes != null ? `${a.driveMinutes} min drive` : `${a.miles} mi`}, ride about ${money(a.rideOneWay)} each way (estimate), ` : "";
+  const fare = a.bestFare != null ? `best matching fare ${money(a.bestFare)}${a.rideOneWay != null ? `, about ${money(a.total!)} all-in` : ""}` : "no flights match the preferences";
+  const flags = [a.bestValue && "best value", a.closest && "closest"].filter(Boolean).join(", ");
+  return `- ${a.code}${a.name ? ` ${a.name}` : ""}: ${ride}${fare}${flags ? ` (${flags})` : ""}`;
+}
+
+function prefsText(prefs: FlightPrefs): string[] {
+  return [
+    prefs.maxLayover && `layovers ${LAYOVER_OPTIONS.find((o) => o.id === prefs.maxLayover)!.label.toLowerCase()}`,
+    prefs.times &&
+      `departs ${prefs.times
+        .map((t) => {
+          const o = TIME_OPTIONS.find((x) => x.id === t)!;
+          return `${o.label.toLowerCase()} ${o.hint}`;
+        })
+        .join(" or ")}`,
+  ].filter((x): x is string => !!x);
+}
+
+function optionLines(options: FlightOption[], prefs: FlightPrefs, line: (o: FlightOption) => string): string[] {
+  const wanted = prefsText(prefs);
+  if (!wanted.length) return ["Options found:", ...options.slice(0, 10).map(line)];
+  const matching = options.filter((o) => matchesPrefs(o, prefs));
+  const others = options.filter((o) => !matchesPrefs(o, prefs));
+  return [
+    `Matching the preferences (${wanted.join("; ")}):`,
+    ...(matching.length ? matching.slice(0, 10).map(line) : ["- none"]),
+    ...(others.length ? ["Other options (outside the preferences):", ...others.slice(0, 5).map(line)] : []),
+  ];
+}
+
+function modelText(data: FlightsData, ranked: RankedAirport<AirportResult>[], searches: Search[], multi: boolean): string {
+  const money = (n: number) => `${n} ${data.currency}`;
+  const line = (o: FlightOption) => `- ${summary(multi ? o : { ...o, origin: undefined }, data.currency)}`;
+  return [
+    `searchUrl: ${data.searchUrl}`,
+    "",
+    `(Note for you, do not repeat to the user: ${multi ? "one flight card comparing these airports, with filters the user can change," : "a flight card with these options and the booking link"} is already displayed.)`,
+    ...(data.priceNote ? [`Prices: ${data.priceNote}.`] : []),
+    ...(multi ? ["Airports, ranked by the best fare matching the preferences plus a round-trip ride:", ...ranked.map((a) => airportLine(a, money))] : []),
+    ...(data.options.length ? optionLines(data.options, data.prefs, line) : ["No options could be read from the page.", "Page text:", searches[0].last.text]),
+  ].join("\n");
+}
+
+export function flightsTool(deps: Deps) {
   return defineTool({
     name: "flights",
     label: "Flights",
@@ -114,29 +201,10 @@ export function flightsTool(deps: {
       }
       const origins = [...new Set(params.from.split(",").map((o) => o.trim()).filter(Boolean))].slice(0, MAX_ORIGINS);
       if (!origins.length) return fail("from is empty");
-      const times = (params.depart_times ?? "")
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t): t is TimeBucket => (TIME_IDS as string[]).includes(t));
-      const prefs: FlightPrefs = {
-        ...(params.max_layover && params.max_layover !== "any" && { maxLayover: params.max_layover as LayoverPref }),
-        ...(times.length && { times }),
-      };
+      const prefs = readPrefs(params);
+      const multi = origins.length > 1;
 
-      const attempt = async (url: string): Promise<Attempt> => {
-        const result = await deps.browse([{ op: "goto", url }, { op: "wait", ms: 3000 }, { op: "read" }]);
-        const text = result.content.map((c) => c.text).join("");
-        const hardFail = !!(result.isError || result.details?.blocked || result.details?.stopped);
-        return { result, text, options: hardFail ? [] : parseGoogleFlights(text), hardFail };
-      };
-
-      const searches: Array<{ code: string; url: string; last: Attempt }> = [];
-      for (const code of origins) {
-        const url = googleFlightsUrl({ ...params, from: code }, deps.locale, deps.currency);
-        let last = await attempt(url);
-        if (!last.options.length) last = await attempt(url);
-        searches.push({ code, url, last });
-      }
+      const searches = await Promise.all(origins.map((code, i) => searchOrigin(deps, params, code, { fresh: multi, live: i === 0 })));
 
       if (searches.every((s) => s.last.hardFail)) {
         const links = searches.map((s) => `searchUrl: ${s.url}`).join("\n");
@@ -144,21 +212,7 @@ export function flightsTool(deps: {
         return { ...first.result, content: [{ type: "text", text: `${links}\n\n${first.text}` }], details: { searchUrl: searches[0].url } };
       }
 
-      const multi = origins.length > 1;
-      const withRides = multi && deps.currency === "USD" && deps.drive;
-      const airports = await Promise.all(
-        searches.map(async ({ code, url, last }): Promise<AirportResult> => {
-          const known = AIRPORTS[code.toUpperCase()];
-          const drive = withRides ? await deps.drive!(code.toUpperCase()).catch(() => null) : null;
-          return {
-            code,
-            ...(known && { name: known.name }),
-            ...(drive && { miles: drive.miles, ...(drive.minutes != null && { driveMinutes: drive.minutes }), rideOneWay: rideOneWay(drive.miles) }),
-            status: last.options.length ? "ok" : "failed",
-            searchUrl: url,
-          };
-        }),
-      );
+      const airports = await airportResults(deps, searches, multi && deps.currency === "USD");
       const tagged = searches.flatMap((s) => s.last.options.map((o) => ({ ...o, origin: s.code })));
       const options = multi ? [...tagged].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity)) : tagged;
       const ranked = rankAirports(airports, options, prefs);
@@ -179,47 +233,7 @@ export function flightsTool(deps: {
         searchUrl: best.searchUrl,
         source: "Google Flights",
       };
-
-      const money = (n: number) => `${n} ${deps.currency}`;
-      const airportLines = ranked.map((a) => {
-        if (a.status === "failed") return `- ${a.code}: couldn't load (the card links to Google Flights for it)`;
-        const ride =
-          a.rideOneWay != null
-            ? `${a.driveMinutes != null ? `${a.driveMinutes} min drive` : `${a.miles} mi`}, ride about ${money(a.rideOneWay)} each way (estimate), `
-            : "";
-        const fare = a.bestFare != null ? `best matching fare ${money(a.bestFare)}${a.rideOneWay != null ? `, about ${money(a.total!)} all-in` : ""}` : "no flights match the preferences";
-        const flags = [a.bestValue && "best value", a.closest && "closest"].filter(Boolean).join(", ");
-        return `- ${a.code}${a.name ? ` ${a.name}` : ""}: ${ride}${fare}${flags ? ` (${flags})` : ""}`;
-      });
-      const prefText = [
-        prefs.maxLayover && `layovers ${LAYOVER_OPTIONS.find((o) => o.id === prefs.maxLayover)!.label.toLowerCase()}`,
-        prefs.times &&
-          `departs ${prefs.times
-            .map((t) => {
-              const o = TIME_OPTIONS.find((x) => x.id === t)!;
-              return `${o.label.toLowerCase()} ${o.hint}`;
-            })
-            .join(" or ")}`,
-      ].filter(Boolean);
-      const line = (o: FlightOption) => `- ${summary(multi ? o : { ...o, origin: undefined }, deps.currency)}`;
-      const matching = options.filter((o) => matchesPrefs(o, prefs));
-      const others = options.filter((o) => !matchesPrefs(o, prefs));
-      const optionLines = prefText.length
-        ? [
-            `Matching the preferences (${prefText.join("; ")}):`,
-            ...(matching.length ? matching.slice(0, 10).map(line) : ["- none"]),
-            ...(others.length ? ["Other options (outside the preferences):", ...others.slice(0, 5).map(line)] : []),
-          ]
-        : ["Options found:", ...options.slice(0, 10).map(line)];
-      const lines = [
-        `searchUrl: ${data.searchUrl}`,
-        "",
-        `(Note for you, do not repeat to the user: ${multi ? "one flight card comparing these airports, with filters the user can change," : "a flight card with these options and the booking link"} is already displayed.)`,
-        ...(basis ? [`Prices: ${basis}.`] : []),
-        ...(multi ? ["Airports, ranked by the best fare matching the preferences plus a round-trip ride:", ...airportLines] : []),
-        ...(options.length ? optionLines : ["No options could be read from the page.", "Page text:", searches[0].last.text]),
-      ];
-      return ok(lines.join("\n"), { data });
+      return ok(modelText(data, ranked, searches, multi), { data });
     },
   });
 }

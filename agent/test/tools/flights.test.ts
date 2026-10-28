@@ -93,6 +93,23 @@ describe("flights tool", () => {
     expect((r.details as { data?: unknown }).data).toBeUndefined();
   });
 
+  it("searches nearby airports at the same time, each in its own tab, streaming only the first", async () => {
+    const calls: Array<{ fresh?: boolean; live?: boolean }> = [];
+    let inFlight = 0;
+    let peak = 0;
+    const browse = async (_a: unknown, opts: { fresh?: boolean; live?: boolean } = {}) => {
+      calls.push(opts);
+      peak = Math.max(peak, ++inFlight);
+      await new Promise((r) => setTimeout(r, 10));
+      inFlight--;
+      return ok(page);
+    };
+    await flightsTool({ locale: "en-US", currency: "USD", browse }).execute("c", { from: "SJC, SFO, OAK", to: "BNA", date: "2026-12-12" }, undefined, undefined, {} as never);
+    expect(peak).toBe(3);
+    expect(calls.every((c) => c.fresh)).toBe(true);
+    expect(calls.filter((c) => c.live)).toHaveLength(1);
+  });
+
   it("rejects malformed dates", async () => {
     const r = await flightsTool({ locale: "en-US", currency: "USD", browse: async () => ok("") }).execute(
       "c",

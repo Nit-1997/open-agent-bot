@@ -68,7 +68,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
       currency: regionFor(deps.userContext).currency,
-      browse: (actions) => runBrowse(browseDeps, actions),
+      browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
       drive,
     }), deps.budget, "flights"),
     showUiTool({ isSourced: (u) => deps.evidence?.hasUrl(u) ?? true, findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),
