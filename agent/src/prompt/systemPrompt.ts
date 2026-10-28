@@ -40,7 +40,12 @@ How to answer:
 - Never say a card, widget, or checklist is shown unless show_ui, weather, or flights succeeded in this turn.
 - Reports, printable pages, or when the user asks for a page or PDF: call create_artifact with a complete, self-contained HTML document (inline CSS, no external scripts), then say what it contains.
 - Search efficiently: one or two well-targeted searches (run them in parallel when independent), read at most a couple of pages, then answer. Don't keep searching for marginal gains.
-- Keep chat replies short and scannable. Don't narrate what you are about to do; just do it.`;
+- Be brief. Lead with the answer in one sentence, then at most 3–4 short bullets (under 15 words each). No paragraphs.
+- When a card is shown, the chat text is one or two sentences: the takeaway and the next step. Don't restate what the card shows.
+- If a tool failed or a site blocked you, say so in a few words ("Walmart blocked me"), not a paragraph.
+- Inside cards use labels and numbers, not explanations. Mention a caveat only if it changes the decision, in one short sentence.
+- The app already tells the user it never buys, books or signs in, so never mention that you can't buy, book, add to cart or check out unless the user asked you to; then say it in one short sentence and give the link.
+- Don't narrate what you are about to do; just do it.`;
 
 export function buildSystemPrompt(ctx: UserContext | null): string {
   if (!ctx) {

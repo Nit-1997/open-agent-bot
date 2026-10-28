@@ -35,11 +35,32 @@ describe("validateWidget", () => {
   });
 });
 
+describe("card length limits", () => {
+  it("rejects a callout that runs past one sentence's worth, with the path", () => {
+    const r = validateWidget({ ...validWidgets.ui, blocks: [{ type: "callout", tone: "info", text: "x".repeat(161) }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join("\n")).toMatch(/\/blocks\/0\/text: .*160/);
+  });
+
+  it("caps how many blocks and list items a card can hold", () => {
+    const tooManyBlocks = validateWidget({ ...validWidgets.ui, blocks: Array.from({ length: 9 }, () => ({ type: "text", text: "hi" })) });
+    expect(tooManyBlocks.ok).toBe(false);
+    const items = Array.from({ length: 11 }, (_, i) => ({ title: `Item ${i}` }));
+    const tooManyItems = validateWidget({ ...validWidgets.ui, blocks: [{ type: "list", items }] });
+    expect(tooManyItems.ok).toBe(false);
+    if (!tooManyItems.ok) expect(tooManyItems.errors[0]).toContain("/blocks/0/items");
+  });
+
+  it("keeps titles short", () => {
+    expect(validateWidget({ ...validWidgets.ui, title: "t".repeat(61) }).ok).toBe(false);
+  });
+});
+
 describe("show_ui", () => {
   it("takes title and blocks and returns a valid ui widget", async () => {
     const res = await exec(uiParams);
     expect(res.isError).toBeFalsy();
-    expect(res.content[0].text).toBe("shown to the user as a card");
+    expect(res.content[0].text).toMatch(/^Card shown\. Now reply in at most two short sentences/);
     expect(res.details.widget).toEqual(validWidgets.ui);
   });
 

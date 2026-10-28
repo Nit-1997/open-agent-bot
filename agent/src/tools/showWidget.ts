@@ -3,15 +3,15 @@ import { Type } from "typebox";
 import { UI_BLOCK_TYPES, validateWidget } from "../../../shared/widgets.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
-const BLOCKS_HELP = `Blocks, in display order:
+const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at most 8 blocks, labels not sentences. Blocks, in display order:
 - {type:"heading", text}
-- {type:"text", text}
+- {type:"text", text} (2 sentences max)
 - {type:"stats", items:[{label, value, note?}]} for a few key numbers
 - {type:"table", columns:[...], rows:[[...]]} for comparisons; every cell is text
-- {type:"list", items:[{title, subtitle?, value?, badge?, url?}]} for products, places, options
+- {type:"list", items:[{title, subtitle?, value?, badge?, url?}]} for products, places, options (up to 10; subtitle a few words)
 - {type:"checklist", title?, items:[{text, note?}]} for to-dos, shopping lists, menus
 - {type:"links", items:[{label, url}]}
-- {type:"callout", tone:"info"|"warning"|"success", text}`;
+- {type:"callout", tone:"info"|"warning"|"success", text} (one short sentence, only if it changes a decision)`;
 
 function textify(v: unknown): unknown {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
@@ -43,6 +43,9 @@ export const showUiTool = () =>
       }
       const r = validateWidget({ kind: "ui", ...(textify({ ...params, blocks }) as object) });
       if (!r.ok) return fail(`invalid card:\n${r.errors.join("\n")}`);
-      return ok("shown to the user as a card", { widget: r.value });
+      return ok(
+        "Card shown. Now reply in at most two short sentences: the takeaway and the next step. Don't repeat the card, don't list what failed beyond a few words, and don't add bullets.",
+        { widget: r.value },
+      );
     },
   });

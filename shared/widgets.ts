@@ -68,28 +68,34 @@ export const FlightListSchema = Type.Object({
 
 const Str = Type.String();
 
+const S = (maxLength: number) => Type.String({ maxLength });
+
 export const UiBlockSchemas = {
-  heading: Type.Object({ type: Type.Literal("heading"), text: Str }),
-  text: Type.Object({ type: Type.Literal("text"), text: Str }),
+  heading: Type.Object({ type: Type.Literal("heading"), text: S(40) }),
+  text: Type.Object({ type: Type.Literal("text"), text: S(280) }),
   stats: Type.Object({
     type: Type.Literal("stats"),
-    items: Type.Array(Type.Object({ label: Str, value: Str, note: Type.Optional(Str) }), { minItems: 1 }),
+    items: Type.Array(Type.Object({ label: S(24), value: S(20), note: Type.Optional(S(40)) }), { minItems: 1, maxItems: 4 }),
   }),
-  table: Type.Object({ type: Type.Literal("table"), columns: Type.Array(Str, { minItems: 1 }), rows: Type.Array(Type.Array(Str)) }),
+  table: Type.Object({
+    type: Type.Literal("table"),
+    columns: Type.Array(S(24), { minItems: 1, maxItems: 5 }),
+    rows: Type.Array(Type.Array(S(48), { maxItems: 5 }), { maxItems: 10 }),
+  }),
   list: Type.Object({
     type: Type.Literal("list"),
     items: Type.Array(
-      Type.Object({ title: Str, subtitle: Type.Optional(Str), value: Type.Optional(Str), badge: Type.Optional(Str), url: Type.Optional(Url) }),
-      { minItems: 1 },
+      Type.Object({ title: S(60), subtitle: Type.Optional(S(90)), value: Type.Optional(S(20)), badge: Type.Optional(S(16)), url: Type.Optional(Url) }),
+      { minItems: 1, maxItems: 10 },
     ),
   }),
   checklist: Type.Object({
     type: Type.Literal("checklist"),
-    title: Type.Optional(Str),
-    items: Type.Array(Type.Object({ text: Str, note: Type.Optional(Str) }), { minItems: 1 }),
+    title: Type.Optional(S(40)),
+    items: Type.Array(Type.Object({ text: S(80), note: Type.Optional(S(60)) }), { minItems: 1, maxItems: 12 }),
   }),
-  links: Type.Object({ type: Type.Literal("links"), items: Type.Array(Type.Object({ label: Str, url: Url }), { minItems: 1 }) }),
-  callout: Type.Object({ type: Type.Literal("callout"), tone: Type.Enum(["info", "warning", "success"]), text: Str }),
+  links: Type.Object({ type: Type.Literal("links"), items: Type.Array(Type.Object({ label: S(30), url: Url }), { minItems: 1, maxItems: 6 }) }),
+  callout: Type.Object({ type: Type.Literal("callout"), tone: Type.Enum(["info", "warning", "success"]), text: S(160) }),
 } as const;
 
 export const UI_BLOCK_TYPES = Object.keys(UiBlockSchemas) as UiBlockType[];
@@ -98,9 +104,9 @@ export const UiBlockSchema = Type.Union([B.heading, B.text, B.stats, B.table, B.
 
 export const UiSchema = Type.Object({
   kind: Type.Literal("ui"),
-  title: Str,
-  subtitle: Type.Optional(Str),
-  blocks: Type.Array(Type.Unknown(), { minItems: 1, maxItems: 20 }),
+  title: S(60),
+  subtitle: Type.Optional(S(80)),
+  blocks: Type.Array(Type.Unknown(), { minItems: 1, maxItems: 8 }),
   unverified: Type.Optional(Type.Array(Str)),
   removedLinks: Type.Optional(Type.Number()),
 });

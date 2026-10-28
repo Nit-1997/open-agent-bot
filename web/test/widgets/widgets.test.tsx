@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FlightList } from "@/components/widgets/FlightList";
 import { UiCard } from "@/components/widgets/UiCard";
@@ -72,6 +72,26 @@ describe("widgets", () => {
     render(<UiCard toolCallId="u3" widget={clean} />);
     expect(screen.queryByTitle("Not found in the sources I read")).toBeNull();
     expect(screen.queryByText(/weren't found in the sources/)).toBeNull();
+  });
+
+  it("UiCard shows the first five list items and reveals the rest on demand", () => {
+    const items = Array.from({ length: 8 }, (_, i) => ({ title: `Item ${i + 1}` }));
+    render(<UiCard toolCallId="u5" widget={{ kind: "ui", title: "Shopping", blocks: [{ type: "list", items }] }} />);
+    expect(screen.getByText("Item 5")).toBeInTheDocument();
+    expect(screen.queryByText("Item 6")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show 3 more" }));
+    expect(screen.getByText("Item 8")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show less" })).toBeInTheDocument();
+  });
+
+  it("UiCard collapses long checklists and tables the same way", () => {
+    const checklist = { type: "checklist" as const, items: Array.from({ length: 9 }, (_, i) => ({ text: `Task ${i + 1}` })) };
+    const table = { type: "table" as const, columns: ["A"], rows: Array.from({ length: 8 }, (_, i) => [`Row ${i + 1}`]) };
+    render(<UiCard toolCallId="u6" widget={{ kind: "ui", title: "Plan", blocks: [checklist, table] }} />);
+    expect(screen.queryByText("Task 6")).toBeNull();
+    expect(screen.queryByText("Row 6")).toBeNull();
+    expect(screen.getByRole("button", { name: "Show 4 more" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 3 more" })).toBeInTheDocument();
   });
 
   it("GroundingNote lists the claims", () => {
