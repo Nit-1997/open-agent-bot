@@ -51,6 +51,12 @@ describe("pageImages", () => {
     expect(pageImages(`<body>${many}</body>`, "https://s.com/")).toHaveLength(24);
   });
 
+  it("finds a visible product's image even when the page has many others first", () => {
+    const many = Array.from({ length: 30 }, (_, i) => `<img src="/p/${i}.jpg" alt="Hidden product ${i}">`).join("");
+    const t = imagesText(`<body>${many}<img src="/b.jpg" alt="Tiempo Academy Turf"></body>`, "https://s.com/", "Tiempo Academy Turf $95");
+    expect(t).toContain("https://s.com/b.jpg");
+  });
+
   it("lists only images for products the model can see in the page text", () => {
     const html = `<body><img src="/a.jpg" alt="Women's Track Jacket"><img src="/b.jpg" alt="Tiempo Maestro Academy Turf Shoes"></body>`;
     const t = imagesText(html, "https://s.com/", "Tiempo Maestro Academy\nTurf Shoes\n$95");

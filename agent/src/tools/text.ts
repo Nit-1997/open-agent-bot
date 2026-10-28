@@ -69,7 +69,7 @@ function firstImage(image: unknown): string | undefined {
   return undefined;
 }
 
-export function pageImages(html: string, base: string): PageImage[] {
+export function pageImages(html: string, base: string, limit = MAX_IMAGES): PageImage[] {
   const { document } = parseHTML(html);
   const found: PageImage[] = [];
   const add = (alt: string | null | undefined, src: string | null | undefined) => {
@@ -91,13 +91,15 @@ export function pageImages(html: string, base: string): PageImage[] {
     const src = [img.getAttribute("src"), img.getAttribute("data-src"), img.getAttribute("srcset")].find((x) => x && !x.startsWith("data:"));
     add(img.getAttribute("alt"), src);
   }
-  return found.slice(0, MAX_IMAGES);
+  return found.slice(0, limit);
 }
 
 const flat = (s: string) => s.replace(/\s+/g, " ").toLowerCase();
 
 export function imagesText(html: string, base: string, visible: string): string {
   const seen = flat(visible);
-  const images = pageImages(html, base).filter((i) => seen.includes(flat(i.alt).slice(0, 24)));
+  const images = pageImages(html, base, Infinity)
+    .filter((i) => seen.includes(flat(i.alt).slice(0, 24)))
+    .slice(0, MAX_IMAGES);
   return images.length ? `\n\nimages:\n${images.map((i) => `- ${i.alt} — ${i.src}`).join("\n")}` : "";
 }
