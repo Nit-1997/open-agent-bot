@@ -172,7 +172,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
           />
         )}
         <Composer running={running} onSend={send} onStop={stop} autoFocus />
-        <p id="chat-disclaimer" className="mt-2 text-center text-[11px] text-text-faint">
+        <p id="chat-disclaimer" className="mt-2 text-center text-[13px] sm:text-[11px] text-text-faint">
           Read-only: I look things up and plan, but never buy, book, or sign in for you.
         </p>
       </div>

@@ -5,7 +5,7 @@ export function Card(props: { id: string; title: string; subtitle?: string; chil
         {props.title}
       </h3>
       {props.subtitle && (
-        <p id={`${props.id}-subtitle`} className="text-xs text-text-muted">
+        <p id={`${props.id}-subtitle`} className="text-[13px] sm:text-xs text-text-muted">
           {props.subtitle}
         </p>
       )}

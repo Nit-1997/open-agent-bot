@@ -7,6 +7,7 @@ describe("getUserContext", () => {
     expect(ctx.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     expect(ctx.locale).toBe(navigator.language);
     expect(ctx.localTime).toBe("2026-10-27T14:05:09");
+    expect(ctx.viewport).toEqual({ width: window.innerWidth, height: window.innerHeight });
   });
 });
 

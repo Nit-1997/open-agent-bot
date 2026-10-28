@@ -24,7 +24,7 @@ export function Picture({ id, src, alt, fallback, className }: { id: string; src
   );
 }
 
-function Card({ id, item, wide, m }: { id: string; item: CardItem; wide: boolean; m: Mark }) {
+function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide: boolean; folded: boolean; m: Mark }) {
   const head = (
     <>
       <div id={`${id}-media`} className={`relative w-full overflow-hidden ${wide ? "aspect-[16/10] bg-surface" : "aspect-square bg-white"}`}>
@@ -36,22 +36,22 @@ function Card({ id, item, wide, m }: { id: string; item: CardItem; wide: boolean
           className={wide ? "h-full w-full object-cover" : "h-full w-full object-contain p-2 mix-blend-multiply"}
         />
         {item.badge && (
-          <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[10px] font-semibold text-on-charcoal">
+          <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[12px] sm:text-[10px] font-semibold text-on-charcoal">
             {m(`${id}-badge`, item.badge)}
           </span>
         )}
       </div>
       <span id={`${id}-text`} className="flex flex-col gap-0.5 px-3 pt-2">
-        <span id={`${id}-title`} className="line-clamp-2 text-[13px] font-medium leading-snug text-text-primary">
+        <span id={`${id}-title`} className="line-clamp-2 text-[14px] sm:text-[13px] font-medium leading-snug text-text-primary">
           {m(`${id}-title`, item.title)}
         </span>
         {item.subtitle && (
-          <span id={`${id}-subtitle`} className="line-clamp-1 text-xs text-text-secondary">
+          <span id={`${id}-subtitle`} className="line-clamp-1 text-[13px] sm:text-xs text-text-secondary">
             {m(`${id}-subtitle`, item.subtitle)}
           </span>
         )}
         {item.note && (
-          <span id={`${id}-note`} className="line-clamp-1 text-xs text-text-muted">
+          <span id={`${id}-note`} className="line-clamp-1 text-[13px] sm:text-xs text-text-muted">
             {m(`${id}-note`, item.note)}
           </span>
         )}
@@ -59,7 +59,7 @@ function Card({ id, item, wide, m }: { id: string; item: CardItem; wide: boolean
     </>
   );
   return (
-    <li id={id} className={`${wide ? "w-64" : "w-44"} shrink-0 snap-start`}>
+    <li id={id} className={`${wide ? "sm:w-64" : "sm:w-44"} min-w-0 snap-start sm:shrink-0 ${folded ? "hidden sm:block" : ""}`}>
       <div id={`${id}-card`} className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-paper transition hover:border-border-strong hover:shadow-sm">
         {item.url ? (
           <a id={`${id}-link`} href={item.url} target="_blank" rel="noopener noreferrer" className="flex flex-col">
@@ -68,7 +68,7 @@ function Card({ id, item, wide, m }: { id: string; item: CardItem; wide: boolean
         ) : (
           head
         )}
-        <span id={`${id}-foot`} className="mt-auto flex items-center gap-2 px-3 pb-2 pt-1.5 text-[11px] text-text-muted">
+        <span id={`${id}-foot`} className="mt-auto flex items-center gap-2 px-3 pb-2 pt-1.5 text-[13px] sm:text-[11px] text-text-muted">
           {item.price && (
             <span id={`${id}-price`} className="text-sm font-semibold text-text-primary">
               {m(`${id}-price`, item.price)}
@@ -96,10 +96,16 @@ function Card({ id, item, wide, m }: { id: string; item: CardItem; wide: boolean
   );
 }
 
+const NARROW_TALL = 4;
+const NARROW_WIDE = 2;
+
 export function CardRow({ id, label, block, m }: { id: string; label: string; block: CardsBlock; m: Mark }) {
   const row = useRef<HTMLUListElement>(null);
   const [edges, setEdges] = useState({ start: true, end: true });
   const wide = block.shape === "wide";
+  const [all, setAll] = useState(false);
+  const fold = wide ? NARROW_WIDE : NARROW_TALL;
+  const hidden = all ? 0 : Math.max(0, block.items.length - fold);
 
   const measure = () => {
     const el = row.current;
@@ -118,12 +124,17 @@ export function CardRow({ id, label, block, m }: { id: string; label: string; bl
         ref={row}
         aria-label={label}
         onScroll={measure}
-        className="flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={`grid ${wide ? "grid-cols-1" : "grid-cols-2"} gap-3 px-4 pb-2 sm:flex sm:snap-x sm:snap-mandatory sm:scroll-px-4 sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
       >
         {block.items.map((it, i) => (
-          <Card key={i} id={`${id}-${i}`} item={it} wide={wide} m={m} />
+          <Card key={i} id={`${id}-${i}`} item={it} wide={wide} folded={!all && i >= fold} m={m} />
         ))}
       </ul>
+      {hidden > 0 && (
+        <button id={`${id}-more`} type="button" onClick={() => setAll(true)} className="mx-4 mt-1 w-[calc(100%-2rem)] rounded-xl border border-border bg-paper py-2 text-[14px] text-text-secondary hover:border-border-strong sm:hidden">
+          {`Show ${hidden} more`}
+        </button>
+      )}
       {!edges.start && (
         <button id={`${id}-prev`} type="button" aria-label="Scroll left" onClick={() => scroll(-1)} className={`${arrow} left-2`}>
           ‹
@@ -154,7 +165,7 @@ export function ImageBlock({ id, block, m }: { id: string; block: Extract<UiBloc
         className="max-h-72 w-full object-cover"
       />
       {(block.caption || block.source) && (
-        <figcaption id={`${id}-caption`} className="flex items-baseline gap-2 px-3 py-1.5 text-xs text-text-muted">
+        <figcaption id={`${id}-caption`} className="flex items-baseline gap-2 px-3 py-1.5 text-[13px] sm:text-xs text-text-muted">
           <span id={`${id}-caption-text`} className="flex-1">
             {m(`${id}-caption-text`, block.caption)}
           </span>

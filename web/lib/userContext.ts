@@ -5,6 +5,7 @@ export type UserContext = {
   locale: string;
   localTime: string;
   model?: string;
+  viewport?: { width: number; height: number };
   profile?: Pick<Profile, "name" | "home" | "interests" | "notes">;
 };
 
@@ -26,6 +27,7 @@ export function getUserContext(now: Date = new Date(), extras: Extras = {}): Use
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       locale: navigator.language,
       localTime: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
     },
     extras,
   );

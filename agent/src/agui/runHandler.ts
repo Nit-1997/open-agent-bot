@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
-import type { UserContext, UserProfile } from "../prompt/systemPrompt.js";
+import type { UserContext, UserProfile, Viewport } from "../prompt/systemPrompt.js";
 import type { SessionEntry, SessionStore } from "../session/sessionStore.js";
 import type { CartEdits } from "../shop/cart.js";
 import { createTranslator, type PiEvent } from "./translate.js";
@@ -34,6 +34,13 @@ function readProfile(v: unknown): UserProfile | undefined {
   return Object.keys(profile).length ? profile : undefined;
 }
 
+function readViewport(v: unknown): Viewport | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const { width, height } = v as Record<string, unknown>;
+  const ok = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 200 && n <= 10000;
+  return ok(width) && ok(height) ? { width: Math.round(width), height: Math.round(height) } : undefined;
+}
+
 export function readUserContext(input: RunAgentInput): UserContext | null {
   const item = input.context?.find((c) => c.description === "user_context");
   if (!item) return null;
@@ -42,7 +49,8 @@ export function readUserContext(input: RunAgentInput): UserContext | null {
     if (v && typeof v.timeZone === "string" && typeof v.locale === "string" && typeof v.localTime === "string") {
       const model = clip(v.model, 100);
       const profile = readProfile(v.profile);
-      return { timeZone: v.timeZone, locale: v.locale, localTime: v.localTime, ...(model && { model }), ...(profile && { profile }) };
+      const viewport = readViewport(v.viewport);
+      return { timeZone: v.timeZone, locale: v.locale, localTime: v.localTime, ...(model && { model }), ...(profile && { profile }), ...(viewport && { viewport }) };
     }
   } catch {}
   return null;

@@ -9,7 +9,7 @@ export function Followups({ id, replies, onPick }: { id: string; replies: string
           key={i}
           type="button"
           onClick={() => onPick(r)}
-          className="rounded-full border border-border bg-paper px-3 py-1.5 text-[13px] text-text-secondary transition hover:border-border-strong hover:text-text-primary"
+          className="rounded-full border border-border bg-paper px-3 py-1.5 text-[14px] sm:text-[13px] text-text-secondary transition hover:border-border-strong hover:text-text-primary"
         >
           {r}
         </button>

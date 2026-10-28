@@ -37,14 +37,14 @@ export function SourcesRow({ id, sources }: { id: string; sources: Source[] }) {
                 rel="noopener noreferrer"
                 className="flex items-start gap-2.5 rounded-xl border border-border bg-paper p-2.5 transition hover:border-border-strong hover:shadow-float"
               >
-                <span id={`${id}-num-${i}`} className="mt-0.5 font-mono text-[10px] text-text-faint">
+                <span id={`${id}-num-${i}`} className="mt-0.5 font-mono text-[12px] sm:text-[10px] text-text-faint">
                   {i + 1}
                 </span>
                 <span id={`${id}-text-${i}`} className="min-w-0 flex-1">
-                  <span id={`${id}-title-${i}`} className="line-clamp-2 text-[13px] font-medium leading-snug text-text-primary">
+                  <span id={`${id}-title-${i}`} className="line-clamp-2 text-[14px] sm:text-[13px] font-medium leading-snug text-text-primary">
                     {s.title}
                   </span>
-                  <span id={`${id}-host-${i}`} className="mt-1 flex items-center gap-1.5 text-[11px] text-text-muted">
+                  <span id={`${id}-host-${i}`} className="mt-1 flex items-center gap-1.5 text-[13px] sm:text-[11px] text-text-muted">
                     <Favicon id={`${id}-fav-${i}`} host={s.host} size={14} className="ring-0" />
                     {s.host}
                   </span>

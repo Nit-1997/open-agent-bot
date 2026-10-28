@@ -20,4 +20,12 @@ describe("LiveBrowser", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("img", { name: "Last view of shipt.com" })).toBeInTheDocument();
   });
+
+  it("opens the live view full screen and closes it with Escape", () => {
+    render(<LiveBrowser id="lb3" frame={frame} live />);
+    fireEvent.click(screen.getByRole("button", { name: "Expand browser view" }));
+    expect(screen.getByRole("dialog", { name: "Browser view of shipt.com" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });

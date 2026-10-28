@@ -249,6 +249,12 @@ describe("handleRun", () => {
 describe("readUserContext", () => {
   const ctx = (v: unknown) => readUserContext(input({ context: [{ description: "user_context", value: JSON.stringify(v) }] }));
 
+  it("keeps a sane viewport and drops a bad one", () => {
+    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: 558.4, height: 698 } })?.viewport).toEqual({ width: 558, height: 698 });
+    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: "wide", height: 698 } })?.viewport).toBeUndefined();
+    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: 50, height: 698 } })?.viewport).toBeUndefined();
+  });
+
   it("reads the model and a trimmed profile", () => {
     const r = ctx({
       timeZone: "UTC",

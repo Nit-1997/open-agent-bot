@@ -5,6 +5,13 @@ import { blockInternalRequests } from "./browserGuard.js";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
+const DESKTOP = { width: 1280, height: 900 };
+const PHONE = { width: 430, height: 932 };
+
+export function browseViewport(ctx: UserContext | null): { width: number; height: number } {
+  return ctx?.viewport && ctx.viewport.width < 640 ? PHONE : DESKTOP;
+}
+
 export class BrowserPool {
   private browser?: Promise<Browser>;
   private threads = new Map<string, Promise<{ context: BrowserContext; page: Page }>>();
@@ -30,18 +37,22 @@ export class BrowserPool {
           userAgent: USER_AGENT,
           locale: ctx?.locale,
           timezoneId: ctx?.timeZone,
-          viewport: { width: 1280, height: 900 },
+          viewport: DESKTOP,
         });
         context.setDefaultTimeout(20000);
         await blockInternalRequests(context, this.opts);
         const page = await context.newPage();
+        await page.setViewportSize(browseViewport(ctx));
         return { context, page };
       })();
       t.catch(() => this.threads.delete(threadId));
       this.threads.set(threadId, t);
     }
     return t.then(async (x) => {
-      if (x.page.isClosed()) x.page = await x.context.newPage();
+      if (x.page.isClosed()) {
+        x.page = await x.context.newPage();
+        await x.page.setViewportSize(browseViewport(ctx));
+      }
       return x.page;
     });
   }

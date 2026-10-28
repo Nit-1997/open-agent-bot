@@ -61,7 +61,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
             const n = nights(start, end);
             return (
               <fieldset id={fid} key={i} disabled={answered} className="space-y-1.5">
-                <legend id={`${fid}-label`} className="text-[13px] font-medium text-text-secondary">
+                <legend id={`${fid}-label`} className="text-[14px] sm:text-[13px] font-medium text-text-secondary">
                   {f.label}
                 </legend>
                 <div id={`${fid}-row`} className="flex flex-wrap items-center gap-2">
@@ -70,7 +70,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
                     →
                   </span>
                   <input id={`${fid}-end`} type="date" aria-label={`${f.label} to`} min={start} value={end} onChange={(e) => set(i, `${start}|${e.target.value}`)} className={control} />
-                  <span id={`${fid}-nights`} className={`rounded-full px-2.5 py-1 font-mono text-[11px] ${n < 0 ? "bg-danger-bg text-danger-fg" : "bg-surface text-text-secondary"}`}>
+                  <span id={`${fid}-nights`} className={`rounded-full px-2.5 py-1 font-mono text-[13px] sm:text-[11px] ${n < 0 ? "bg-danger-bg text-danger-fg" : "bg-surface text-text-secondary"}`}>
                     {n < 0 ? "End is before start" : n === 0 ? "Same day" : `${n} night${n === 1 ? "" : "s"}`}
                   </span>
                 </div>
@@ -83,7 +83,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
             const max = f.max ?? 99;
             return (
               <div id={fid} key={i} className="flex items-center justify-between gap-3">
-                <span id={`${fid}-label`} className="text-[13px] font-medium text-text-secondary">
+                <span id={`${fid}-label`} className="text-[14px] sm:text-[13px] font-medium text-text-secondary">
                   {f.label}
                 </span>
                 <div id={`${fid}-stepper`} className="flex items-center gap-1 rounded-full border border-border bg-bg p-1">
@@ -117,7 +117,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
           if (f.type === "choice") {
             return (
               <fieldset id={fid} key={i} disabled={answered} className="space-y-1.5">
-                <legend id={`${fid}-label`} className="text-[13px] font-medium text-text-secondary">
+                <legend id={`${fid}-label`} className="text-[14px] sm:text-[13px] font-medium text-text-secondary">
                   {f.label}
                 </legend>
                 <div id={`${fid}-options`} role="radiogroup" className="flex flex-wrap gap-1.5">
@@ -127,7 +127,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
                       <label
                         id={`${fid}-o${j}`}
                         key={o}
-                        className={`cursor-pointer rounded-full border px-3 py-1.5 text-[13px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-mist-500 ${
+                        className={`cursor-pointer rounded-full border px-3 py-1.5 text-[14px] sm:text-[13px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-mist-500 ${
                           on ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-bg text-text-secondary hover:border-border-strong"
                         }`}
                       >
@@ -142,7 +142,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
           }
           return (
             <div id={fid} key={i} className="space-y-1.5">
-              <label id={`${fid}-label`} htmlFor={`${fid}-input`} className="block text-[13px] font-medium text-text-secondary">
+              <label id={`${fid}-label`} htmlFor={`${fid}-input`} className="block text-[14px] sm:text-[13px] font-medium text-text-secondary">
                 {f.label}
               </label>
               <input id={`${fid}-input`} value={values[i]} disabled={answered} placeholder={f.placeholder} onChange={(e) => set(i, e.target.value)} className={`${control} w-full`} />
@@ -152,7 +152,7 @@ export function AskCard(props: { toolCallId: string; widget: AskWidget; locale: 
       </div>
       <div id={`${id}-footer`} className="mt-5 flex items-center justify-end">
         {answered ? (
-          <span id={`${id}-answered`} className="inline-flex items-center gap-1.5 text-[13px] text-text-muted">
+          <span id={`${id}-answered`} className="inline-flex items-center gap-1.5 text-[14px] sm:text-[13px] text-text-muted">
             <Check id={`${id}-answered-icon`} aria-hidden="true" size={14} />
             Answered
           </span>

@@ -46,7 +46,7 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
           {headline}
         </span>
         {(running ? elapsed : summary) && (
-          <span id={`${id}-meta`} className="shrink-0 font-mono text-[11px] text-text-faint">
+          <span id={`${id}-meta`} className="shrink-0 font-mono text-[13px] sm:text-[11px] text-text-faint">
             {running ? elapsed : summary}
           </span>
         )}
@@ -66,7 +66,7 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
                     <span id={`${sid}-spin`} className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-mist-500 border-t-transparent" />
                   )}
                 </span>
-                <span id={`${sid}-row`} className="flex items-center gap-2 text-[13px] text-text-secondary">
+                <span id={`${sid}-row`} className="flex items-center gap-2 text-[14px] sm:text-[13px] text-text-secondary">
                   <Icon id={`${sid}-icon`} aria-hidden="true" size={14} className="shrink-0 text-text-faint" />
                   <span id={`${sid}-label`} className="truncate">
                     {stepLabel(s.name, s.args, s.done)}
@@ -79,7 +79,7 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
                         <Favicon key={h} id={`${sid}-site-${j}`} host={h} size={16} />
                       ))}
                     </span>
-                    <span id={`${sid}-sites-count`} className="text-[11px] text-text-faint">{`${s.sites.length} results`}</span>
+                    <span id={`${sid}-sites-count`} className="text-[13px] sm:text-[11px] text-text-faint">{`${s.sites.length} results`}</span>
                   </span>
                 )}
               </li>

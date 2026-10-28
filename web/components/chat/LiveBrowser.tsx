@@ -1,23 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { Maximize2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { hostOf } from "@/lib/sources";
 
 export type BrowserFrame = { url: string; data: string };
 
+function Expanded({ id, src, host, onClose }: { id: string; src: string; host: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div id={`${id}-expanded`} role="dialog" aria-modal="true" aria-label={`Browser view of ${host}`} className="fixed inset-0 z-50 flex flex-col bg-black/85 p-3 sm:p-6" onClick={onClose}>
+      <div id={`${id}-expanded-bar`} className="mb-2 flex items-center justify-between text-sm text-white/80">
+        <span id={`${id}-expanded-host`}>{host}</span>
+        <button id={`${id}-expanded-close`} type="button" aria-label="Close browser view" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25">
+          <X id={`${id}-expanded-close-icon`} aria-hidden="true" size={18} />
+        </button>
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img id={`${id}-expanded-img`} src={src} alt={`Browser view of ${host}`} className="min-h-0 flex-1 rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+}
+
 export function LiveBrowser({ id, frame, live }: { id: string; frame: BrowserFrame; live: boolean }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const host = hostOf(frame.url) ?? "a page";
   const src = `data:image/jpeg;base64,${frame.data}`;
+  const overlay = expanded && <Expanded id={id} src={src} host={host} onClose={() => setExpanded(false)} />;
   if (live) {
     return (
       <figure id={id} className="mb-3 overflow-hidden rounded-xl border border-border bg-surface">
-        <figcaption id={`${id}-bar`} className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-text-secondary">
+        <figcaption id={`${id}-bar`} className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-[13px] text-text-secondary sm:text-xs">
           <span id={`${id}-dot`} aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-mist-500" />
-          <span id={`${id}-label`}>Browsing {host}</span>
+          <span id={`${id}-label`} className="flex-1">
+            Browsing {host}
+          </span>
+          <button id={`${id}-expand`} type="button" aria-label="Expand browser view" onClick={() => setExpanded(true)} className="flex h-7 w-7 items-center justify-center rounded-full text-text-muted hover:bg-surface-accent hover:text-text-primary">
+            <Maximize2 id={`${id}-expand-icon`} aria-hidden="true" size={14} />
+          </button>
         </figcaption>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img id={`${id}-img`} src={src} alt={`Live view of ${host}`} className="max-h-72 w-full object-cover object-top" />
+        <button id={`${id}-view`} type="button" aria-label={`Expand live view of ${host}`} onClick={() => setExpanded(true)} className="block w-full bg-paper">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img id={`${id}-img`} src={src} alt={`Live view of ${host}`} className="max-h-[62vh] w-full object-contain object-top sm:max-h-80 sm:object-cover" />
+        </button>
+        {overlay}
       </figure>
     );
   }
@@ -29,16 +60,19 @@ export function LiveBrowser({ id, frame, live }: { id: string; frame: BrowserFra
         aria-expanded={open}
         aria-label={`Last view of ${host}`}
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-lg border border-border bg-paper px-2 py-1 text-xs text-text-muted hover:border-border-strong"
+        className="flex items-center gap-2 rounded-lg border border-border bg-paper px-2 py-1 text-[13px] text-text-muted hover:border-border-strong sm:text-xs"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img id={`${id}-thumb`} src={src} alt="" className="h-8 w-12 rounded object-cover object-top" />
         <span id={`${id}-thumb-label`}>Browser · {host}</span>
       </button>
       {open && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img id={`${id}-full`} src={src} alt={`Last view of ${host}`} className="mt-2 w-full rounded-xl border border-border" />
+        <button id={`${id}-full-button`} type="button" aria-label={`Expand last view of ${host}`} onClick={() => setExpanded(true)} className="mt-2 block w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img id={`${id}-full`} src={src} alt={`Last view of ${host}`} className="w-full rounded-xl border border-border" />
+        </button>
       )}
+      {overlay}
     </div>
   );
 }

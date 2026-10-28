@@ -35,7 +35,7 @@ function Filters({ id, prefs, onChange }: { id: string; prefs: FlightPrefs; onCh
   const layover = prefs.maxLayover ?? "any";
   const times = prefs.times ?? [];
   const chip = (on: boolean) =>
-    `cursor-pointer rounded-full border px-2.5 py-1 text-[12px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-mist-500 ${
+    `cursor-pointer rounded-full border px-2.5 py-1 text-[13px] sm:text-[12px] transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-mist-500 ${
       on ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"
     }`;
   return (
@@ -85,7 +85,7 @@ function Filters({ id, prefs, onChange }: { id: string; prefs: FlightPrefs; onCh
 function Badge({ id, tone, children }: { id: string; tone: "agent" | "good" | "plain"; children: React.ReactNode }) {
   const cls = tone === "agent" ? "bg-charcoal text-on-charcoal" : tone === "good" ? "bg-success-bg text-success-fg" : "bg-surface-accent text-text-secondary";
   return (
-    <span id={id} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
+    <span id={id} className={`rounded-full px-2 py-0.5 text-[12px] sm:text-[10px] font-semibold ${cls}`}>
       {children}
     </span>
   );
@@ -113,7 +113,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
       <header id={`${id}-header`} style={{ background: "var(--accent-gradient)" }} className="flex items-center justify-between gap-3 px-4 py-3.5 text-text-primary">
         <div id={`${id}-route`} className="min-w-0">
           <h3 id={`${id}-title`} className="truncate text-lg font-semibold">{`${widget.from} → ${widget.to}`}</h3>
-          <p id={`${id}-subtitle`} className="text-xs text-text-secondary">
+          <p id={`${id}-subtitle`} className="text-[13px] sm:text-xs text-text-secondary">
             {`${dates} · ${visible.length} of ${widget.flights.length} option${widget.flights.length === 1 ? "" : "s"} · ${widget.source}`}
           </p>
         </div>
@@ -145,7 +145,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                     <span id={`${aid}-code`} className="font-mono font-medium">
                       {a.code}
                     </span>
-                    <ExternalLink id={`${aid}-link`} href={a.searchUrl} className="text-xs text-mist-600 underline underline-offset-2">
+                    <ExternalLink id={`${aid}-link`} href={a.searchUrl} className="text-[13px] sm:text-xs text-mist-600 underline underline-offset-2">
                       Couldn&apos;t load · open on Google Flights
                     </ExternalLink>
                   </li>
@@ -163,7 +163,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                         {a.code}
                       </span>
                       {a.name && (
-                        <span id={`${aid}-name`} className="text-xs text-text-muted">
+                        <span id={`${aid}-name`} className="text-[13px] sm:text-xs text-text-muted">
                           {a.name}
                         </span>
                       )}
@@ -179,7 +179,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                       )}
                     </div>
                     {a.rideOneWay != null && (
-                      <p id={`${aid}-ride`} className="mt-0.5 text-xs text-text-muted">
+                      <p id={`${aid}-ride`} className="mt-0.5 text-[13px] sm:text-xs text-text-muted">
                         {`~${whole(a.rideOneWay, widget.currency, locale)} each way · ${a.driveMinutes != null ? `${a.driveMinutes} min drive` : `${a.miles} mi`}`}
                       </p>
                     )}
@@ -191,13 +191,13 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                           {whole(a.bestFare, widget.currency, locale)}
                         </span>
                         {a.rideOneWay != null && a.total != null && (
-                          <span id={`${aid}-total`} className="block text-[11px] text-text-muted">
+                          <span id={`${aid}-total`} className="block text-[13px] sm:text-[11px] text-text-muted">
                             {`${whole(a.total, widget.currency, locale)} all-in`}
                           </span>
                         )}
                       </>
                     ) : (
-                      <span id={`${aid}-nomatch`} className="text-[11px] text-text-muted">
+                      <span id={`${aid}-nomatch`} className="text-[13px] sm:text-[11px] text-text-muted">
                         No flights match these filters
                       </span>
                     )}
@@ -225,7 +225,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
               <li id={fid} key={i} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 px-4 py-2.5">
                 <div id={`${fid}-times`} className="flex items-baseline gap-2">
                   {airports && f.origin && (
-                    <span id={`${fid}-origin`} className="rounded-md bg-surface-accent px-1.5 py-0.5 font-mono text-[10px] font-medium text-text-secondary">
+                    <span id={`${fid}-origin`} className="rounded-md bg-surface-accent px-1.5 py-0.5 font-mono text-[12px] sm:text-[10px] font-medium text-text-secondary">
                       {f.origin}
                     </span>
                   )}
@@ -242,7 +242,7 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
                 <span id={`${fid}-price`} className="row-span-2 text-right text-base font-bold">
                   {money(f.price, widget.currency, locale) ?? "—"}
                 </span>
-                <div id={`${fid}-meta`} className="flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
+                <div id={`${fid}-meta`} className="flex flex-wrap items-center gap-x-2 text-[13px] sm:text-xs text-text-muted">
                   <span id={`${fid}-airline`} className="inline-flex items-center gap-1.5 font-medium text-text-secondary">
                     {airlineHost(f.airline) && <Favicon id={`${fid}-logo`} host={airlineHost(f.airline)!} size={16} className="ring-0" />}
                     {f.airline}
@@ -265,14 +265,14 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
           id={`${id}-show-all`}
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="w-full border-t border-border px-4 py-2 text-[13px] text-text-secondary transition hover:bg-surface"
+          className="w-full border-t border-border px-4 py-2 text-[14px] sm:text-[13px] text-text-secondary transition hover:bg-surface"
         >
           {showAll ? "Show fewer" : `Show all ${visible.length} flights`}
         </button>
       )}
 
       <footer id={`${id}-footer`} className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
-        <div id={`${id}-notes`} className="min-w-0 text-xs text-text-muted">
+        <div id={`${id}-notes`} className="min-w-0 text-[13px] sm:text-xs text-text-muted">
           <p id={`${id}-note`}>{widget.priceNote ?? "Prices as listed on Google Flights"}</p>
           {hasRides && <p id={`${id}-ride-note`}>Rides are estimates from your home by driving distance, there and back.</p>}
         </div>

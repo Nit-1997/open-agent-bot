@@ -56,6 +56,19 @@ describe("StayList", () => {
     expect(screen.getByRole("link", { name: /Search on Expedia/ })).toHaveAttribute("href", "https://www.expedia.com/Hotel-Search");
   });
 
+  it("folds a long list on narrow screens until asked for more", () => {
+    const many: StayListWidget = {
+      ...widget,
+      sources: [{ ...widget.sources[0], stays: Array.from({ length: 6 }, (_, i) => ({ title: `Hotel ${i}`, url: `https://www.google.com/travel/search?q=h${i}`, nightly: 100 + i })) }],
+    };
+    const { container } = render(<StayList toolCallId="s3" widget={many} />);
+    const folded = () => [...container.querySelectorAll("li")].filter((li) => li.className.includes("hidden sm:block")).length;
+    expect(folded()).toBe(2);
+    fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
+    expect(folded()).toBe(0);
+    expect(screen.queryByRole("button", { name: /Show \d+ more/ })).toBeNull();
+  });
+
   it("labels the step", () => {
     expect(stepLabel("stays", { location: "Las Vegas" }, false)).toBe("Searching stays in Las Vegas");
   });

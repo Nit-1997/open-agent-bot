@@ -48,7 +48,7 @@ export async function watch(page: Page, bus: FrameBus): Promise<() => Promise<vo
     cdp.send("Page.screencastFrameAck", { sessionId: e.sessionId }).catch(() => {});
     if (live) bus.publish({ url: page.url(), data: e.data });
   });
-  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 60, maxWidth: 800, maxHeight: 600 });
+  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, maxWidth: 1280, maxHeight: 1280 });
   return async () => {
     live = false;
     await cdp.send("Page.stopScreencast").catch(() => {});

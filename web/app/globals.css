@@ -223,6 +223,11 @@ html.dark {
   line-height: 1.65;
   color: var(--text-primary);
 }
+@media (max-width: 639px) {
+  .md {
+    font-size: 16.5px;
+  }
+}
 .md > * + * {
   margin-top: 0.75em;
 }

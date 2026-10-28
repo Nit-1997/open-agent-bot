@@ -30,13 +30,13 @@ function ratingText(s: Stay): string | undefined {
   return s.ratingScale === 10 ? `${s.rating}/10` : `${s.rating}`;
 }
 
-function StayCard({ id, stay, currency, locale, showSource }: { id: string; stay: Stay; currency: string; locale: string; showSource: boolean }) {
+function StayCard({ id, stay, currency, locale, showSource, folded }: { id: string; stay: Stay; currency: string; locale: string; showSource: boolean; folded: boolean }) {
   const nightly = money(stay.nightly, currency, locale);
   const total = money(stay.total, currency, locale);
   const rating = ratingText(stay);
   const details = [stay.kind, stay.area].filter(Boolean).join(" · ");
   return (
-    <li id={id} className="w-60 shrink-0 snap-start">
+    <li id={id} className={`min-w-0 snap-start sm:w-60 sm:shrink-0 ${folded ? "hidden sm:block" : ""}`}>
       <a
         id={`${id}-link`}
         href={stay.url}
@@ -47,17 +47,17 @@ function StayCard({ id, stay, currency, locale, showSource }: { id: string; stay
         <span id={`${id}-media`} className="relative block aspect-[16/10] w-full overflow-hidden bg-surface">
           <Picture id={`${id}-img`} src={stay.image} alt={stay.title} fallback={stay.title} className="h-full w-full object-cover" />
           {stay.badge && (
-            <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[10px] font-semibold text-on-charcoal">
+            <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[12px] sm:text-[10px] font-semibold text-on-charcoal">
               {stay.badge}
             </span>
           )}
         </span>
         <span id={`${id}-text`} className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
-          <span id={`${id}-title`} className="line-clamp-2 text-[13px] font-medium leading-snug text-text-primary">
+          <span id={`${id}-title`} className="line-clamp-2 text-[14px] sm:text-[13px] font-medium leading-snug text-text-primary">
             {stay.title}
           </span>
           {details && (
-            <span id={`${id}-details`} className="line-clamp-1 text-xs text-text-secondary">
+            <span id={`${id}-details`} className="line-clamp-1 text-[13px] sm:text-xs text-text-secondary">
               {details}
             </span>
           )}
@@ -67,23 +67,23 @@ function StayCard({ id, stay, currency, locale, showSource }: { id: string; stay
             {nightly ? (
               <span id={`${id}-nightly`} className="text-sm font-semibold text-text-primary">
                 {nightly}
-                <span id={`${id}-per-night`} className="text-[11px] font-normal text-text-muted">
+                <span id={`${id}-per-night`} className="text-[13px] sm:text-[11px] font-normal text-text-muted">
                   {" "}
                   / night
                 </span>
               </span>
             ) : (
-              <span id={`${id}-no-price`} className="text-xs text-text-muted">
+              <span id={`${id}-no-price`} className="text-[13px] sm:text-xs text-text-muted">
                 Price not shown
               </span>
             )}
             {total && (
-              <span id={`${id}-total`} className="text-[11px] text-text-muted">
+              <span id={`${id}-total`} className="text-[13px] sm:text-[11px] text-text-muted">
                 {total} total
               </span>
             )}
           </span>
-          <span id={`${id}-meta`} className="flex flex-col items-end gap-0.5 text-[11px] text-text-muted">
+          <span id={`${id}-meta`} className="flex flex-col items-end gap-0.5 text-[13px] sm:text-[11px] text-text-muted">
             {rating && (
               <span id={`${id}-rating`} className="inline-flex items-center gap-0.5 font-medium text-text-secondary">
                 <Star id={`${id}-star`} aria-hidden="true" size={11} className="fill-current" />
@@ -99,11 +99,14 @@ function StayCard({ id, stay, currency, locale, showSource }: { id: string; stay
   );
 }
 
+const NARROW_SHOWN = 4;
+
 export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId: string; widget: StayListWidget; locale?: string }) {
   const id = `stays-${toolCallId}`;
   const read = widget.sources.filter((s) => s.status === "ok" && s.stays.length);
   const others = widget.sources.filter((s) => !(s.status === "ok" && s.stays.length));
   const [tab, setTab] = useState(read.length > 1 ? ALL : (read[0]?.id ?? ALL));
+  const [unfolded, setUnfolded] = useState(false);
 
   const tagged = (s: Source): Stay[] => s.stays.map((x) => ({ ...x, source: s.label }));
   const all = read
@@ -122,7 +125,7 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
         <h3 id={`${id}-title`} className="text-base font-semibold text-text-primary">
           Stays in {widget.location}
         </h3>
-        <p id={`${id}-subtitle`} className="text-xs text-text-muted">
+        <p id={`${id}-subtitle`} className="text-[13px] sm:text-xs text-text-muted">
           {`${dateRange(widget.checkin, widget.checkout, locale)} · ${nights} · ${guests}${budget}`}
         </p>
       </header>
@@ -137,7 +140,7 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`shrink-0 rounded-full border px-3 py-1 text-[13px] transition ${tab === t.id ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"}`}
+              className={`shrink-0 rounded-full border px-3 py-1 text-[14px] sm:text-[13px] transition ${tab === t.id ? "border-charcoal bg-charcoal text-on-charcoal" : "border-border bg-paper text-text-secondary hover:border-border-strong"}`}
             >
               {t.label}
             </button>
@@ -146,9 +149,9 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
       )}
 
       {shown.length > 0 ? (
-        <ul id={`${id}-list`} className="-mx-1 mt-3 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
+        <ul id={`${id}-list`} className="mt-3 grid grid-cols-2 gap-3 pb-2 sm:-mx-1 sm:flex sm:snap-x sm:overflow-x-auto sm:px-1">
           {shown.map((s, i) => (
-            <StayCard key={`${tab}-${i}`} id={`${id}-${tab}-${i}`} stay={s} currency={widget.currency} locale={locale} showSource={tab === ALL} />
+            <StayCard key={`${tab}-${i}`} id={`${id}-${tab}-${i}`} stay={s} currency={widget.currency} locale={locale} showSource={tab === ALL} folded={!unfolded && i >= NARROW_SHOWN} />
           ))}
         </ul>
       ) : (
@@ -157,8 +160,14 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
         </p>
       )}
 
+      {!unfolded && shown.length > NARROW_SHOWN && (
+        <button id={`${id}-more`} type="button" onClick={() => setUnfolded(true)} className="w-full rounded-xl border border-border bg-paper py-2 text-[14px] text-text-secondary hover:border-border-strong sm:hidden">
+          {`Show ${shown.length - NARROW_SHOWN} more`}
+        </button>
+      )}
+
       {others.length > 0 && (
-        <footer id={`${id}-others`} className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-text-muted">
+        <footer id={`${id}-others`} className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[13px] sm:text-xs text-text-muted">
           {others.map((s) => (
             <a
               id={`${id}-other-${s.id}`}
