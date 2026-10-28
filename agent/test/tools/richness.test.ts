@@ -39,27 +39,27 @@ describe("music lists become picture cards", () => {
 });
 
 describe("reports lead with a picture", () => {
-  const store = { save: async () => ({ id: "a1" }) } as never;
+  const store = { save: async (_t: string, html: string) => ({ id: "a1", html }) };
   const images = { isSourced: () => true, loads: async () => true };
-  const pic = '<img src="https://img.example/miata.jpg" alt="Miata">';
+  const pic = '<img src="https://img.example/miata.jpg" alt="Miata RF">';
+  const filler = "<p>" + "x".repeat(7000) + "</p>";
 
   it("knows when a picture is near the top", () => {
     expect(leadsWithPicture(`<body><h1>Miata</h1>${pic}<p>text</p></body>`)).toBe(true);
     expect(leadsWithPicture("<body><h1>Miata</h1><p>no pictures</p></body>")).toBe(false);
   });
 
-  it("asks once for a lead picture, then saves whatever comes next", async () => {
-    const tool = createArtifactTool(store, images);
-    const first = await run(tool, { title: "Miata", html: "<h1>Miata</h1><p>Verdict</p>" });
-    expect(first.isError).toBe(true);
-    expect(first.content[0].text).toMatch(/lead picture/);
-    const second = await run(tool, { title: "Miata", html: "<h1>Miata</h1><p>Verdict</p>" });
-    expect(second.isError).toBeUndefined();
-    expect(second.details.artifactId).toBe("a1");
+  it("copies the first picture up as the hero when a product report has pictures lower down", async () => {
+    let saved = "";
+    const tool = createArtifactTool({ save: async (_t: string, html: string) => ((saved = html), { id: "a1" }) } as never, images);
+    const res = await run(tool, { title: "Miata", html: `<header class="hero"><h1>Miata</h1></header>${filler}<article class="option">${pic}</article>` });
+    expect(res.isError).toBeUndefined();
+    expect(saved.indexOf("miata.jpg")).toBeLessThan(saved.indexOf("xxxx"));
   });
 
-  it("saves straight away when the report opens with a picture", async () => {
-    const res = await run(createArtifactTool(store, images), { title: "Miata", html: `<h1>Miata</h1>${pic}` });
+  it("saves an educational report without pictures as written, with no error", async () => {
+    const res = await run(createArtifactTool(store as never, images), { title: "Jev", html: "<h1>Jev</h1><p>Verdict</p>" });
+    expect(res.isError).toBeUndefined();
     expect(res.details.artifactId).toBe("a1");
   });
 });

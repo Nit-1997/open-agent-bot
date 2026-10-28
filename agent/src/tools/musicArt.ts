@@ -42,7 +42,7 @@ type ITunesAlbum = { collectionName?: string; artistName?: string; artworkUrl100
 export function confidentAlbum(results: ITunesAlbum[], name: string): ITunesAlbum | undefined {
   const want = words(name);
   if (!want.size) return undefined;
-  const need = Math.max(2, Math.ceil(want.size / 2));
+  const need = Math.max(1, Math.ceil(want.size / 2));
   let best: ITunesAlbum | undefined;
   let bestHits = 0;
   for (const r of results) {
@@ -54,7 +54,7 @@ export function confidentAlbum(results: ITunesAlbum[], name: string): ITunesAlbu
       bestHits = hits;
     }
   }
-  return bestHits >= Math.min(need, want.size) ? best : undefined;
+  return bestHits >= need ? best : undefined;
 }
 
 async function appleCover(name: string, country: string, f: typeof fetch): Promise<string | undefined> {

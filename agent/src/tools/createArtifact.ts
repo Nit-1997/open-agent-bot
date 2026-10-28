@@ -16,8 +16,26 @@ export function leadsWithPicture(html: string): boolean {
   return first !== -1 && first < LEAD_CHARS;
 }
 
+export function addHero(html: string, src: string, alt: string): string {
+  const img = `<img src="${src.replace(/"/g, "&quot;")}" alt="${alt.replace(/[<>"]/g, "")}">`;
+  const header = /<header\b[^>]*class="[^"]*\bhero\b[^"]*"[^>]*>/i.exec(html);
+  if (header) {
+    const close = html.indexOf("</header>", header.index);
+    if (close !== -1) return `${html.slice(0, close)}${img}${html.slice(close)}`;
+  }
+  const h1 = /<\/h1>/i.exec(html);
+  if (h1) return `${html.slice(0, h1.index + 5)}<figure class="hero">${img}</figure>${html.slice(h1.index + 5)}`;
+  return html.replace(/(<body[^>]*>)/i, `$1<figure class="hero">${img}</figure>`);
+}
+
+function firstPicture(html: string): { src: string; alt: string } | undefined {
+  const m = /<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i.exec(html);
+  if (!m) return undefined;
+  const alt = /\balt="([^"]*)"/i.exec(m[0])?.[1] ?? "";
+  return { src: m[1], alt };
+}
+
 export function createArtifactTool(artifacts: ArtifactStore, images?: ImageCheck) {
-  let askedForPicture = false;
   return defineTool({
     name: "create_artifact",
     label: "Create artifact",
@@ -31,12 +49,8 @@ export function createArtifactTool(artifacts: ArtifactStore, images?: ImageCheck
         return fail("html too large (max 2MB)");
       }
       const vetted = images ? await vetImages(params.html, images) : { html: params.html, kept: 0, dropped: 0 };
-      if (images && !askedForPicture && !leadsWithPicture(vetted.html)) {
-        askedForPicture = true;
-        return fail(
-          "Not saved: the report needs a lead picture near the top. Call image_search (or use an image a page you read listed) for the main subject, put it as the hero right after the title, then call create_artifact again with the full report.",
-        );
-      }
+      const lead = vetted.kept > 0 && !leadsWithPicture(vetted.html) ? firstPicture(vetted.html) : undefined;
+      if (lead) vetted.html = addHero(vetted.html, lead.src, lead.alt || params.title);
       const { id } = await artifacts.save(params.title, withReportFrame(vetted.html));
       const pictures = vetted.dropped
         ? ` ${vetted.kept} pictures shown; ${vetted.dropped} removed because no tool returned them or they didn't load.`
