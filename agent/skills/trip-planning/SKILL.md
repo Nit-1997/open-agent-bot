@@ -1,6 +1,6 @@
 ---
 name: trip-planning
-description: Load for trips, flights, hotels, rentals, or what to do in a place.
+description: Load for trips, flights, hotels, vacation rentals, or what to do in a place (not for a car rental question alone).
 ---
 
 # Trip planning
