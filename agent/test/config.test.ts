@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { loadConfig } from "../src/config.js";
+import { hasCap, loadConfig } from "../src/config.js";
 
 describe("loadConfig", () => {
+  it("reads model capabilities and matches gateway refs with or without the litellm prefix", () => {
+    const cfg = loadConfig({ AGENT_MODEL_CAPS: "chat-sonnet-5.5=frontier,codemode|chat-default=small|openai/gpt-x=frontier" });
+    expect(cfg.modelCaps["chat-sonnet-5.5"]).toEqual(["frontier", "codemode"]);
+    expect(hasCap(cfg, "litellm/chat-sonnet-5.5", "codemode")).toBe(true);
+    expect(hasCap(cfg, "chat-default", "small")).toBe(true);
+    expect(hasCap(cfg, "chat-default", "codemode")).toBe(false);
+    expect(hasCap(cfg, "openai/gpt-x", "frontier")).toBe(true);
+    expect(hasCap(cfg, undefined, "small")).toBe(false);
+  });
+
   it("applies defaults", () => {
     expect(loadConfig({ LLM_API_KEY: "k" })).toEqual({
       port: 8000,
@@ -27,6 +37,7 @@ describe("loadConfig", () => {
         router: false,
         rpiv: false,
       },
+      modelCaps: {},
     });
   });
 

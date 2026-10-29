@@ -28,7 +28,26 @@ export type AgentConfig = {
   models: ModelOption[];
   jevModel: string;
   flags: Flags;
+  modelCaps: Record<string, string[]>;
 };
+
+export type ModelCap = "frontier" | "small" | "codemode";
+
+function parseCaps(raw: string | undefined): Record<string, string[]> {
+  return Object.fromEntries(
+    (raw ?? "")
+      .split("|")
+      .map((entry) => entry.split("=").map((p) => p.trim()))
+      .filter(([id, caps]) => id && caps)
+      .map(([id, caps]) => [id, caps.split(",").map((c) => c.trim()).filter(Boolean)]),
+  );
+}
+
+export function hasCap(cfg: Pick<AgentConfig, "modelCaps">, ref: string | undefined, cap: ModelCap): boolean {
+  if (!ref) return false;
+  const bare = ref.startsWith("litellm/") ? ref.slice("litellm/".length) : ref;
+  return (cfg.modelCaps[ref] ?? cfg.modelCaps[bare] ?? []).includes(cap);
+}
 
 const on = (v: string | undefined) => ["1", "true", "on", "yes"].includes((v ?? "").trim().toLowerCase());
 
@@ -60,5 +79,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
     models: parseModels(env.AGENT_MODELS, model),
     jevModel: env.JEV_MODEL || "openrouter/typesafe/jev-1.14",
     flags: parseFlags(env),
+    modelCaps: parseCaps(env.AGENT_MODEL_CAPS),
   };
 }
