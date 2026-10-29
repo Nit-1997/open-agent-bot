@@ -4,7 +4,7 @@ import type { AgentConfig } from "../config.js";
 import { regionFor } from "../prompt/region.js";
 import type { UserContext } from "../prompt/systemPrompt.js";
 import { browseTool, runBrowse } from "./browse.js";
-import { type ToolBudget, withBudget } from "./budget.js";
+import { type Budget, withBudget } from "./budget.js";
 import type { BrowserPool } from "./browserPool.js";
 import { imageLoads } from "../artifacts/images.js";
 import { createArtifactTool } from "./createArtifact.js";
@@ -37,7 +37,7 @@ export type ToolDeps = {
   pool: BrowserPool;
   threadId: string;
   userContext: UserContext | null;
-  budget: ToolBudget;
+  budget: Budget;
   evidence?: Evidence;
   frames?: FrameBus;
   cart?: ActiveCart;
@@ -90,7 +90,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
   return [
     withBudget(webSearchTool(search), deps.budget, "search"),
     withBudget(withRules(imageSearchTool(search), RULES.imageSearch, v2), deps.budget, "images"),
-    withBudget(musicTool({ country }), deps.budget, "lookup"),
+    withBudget(musicTool({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }), deps.budget, "lookup"),
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browseTool(browseDeps), deps.budget, "read"),
@@ -104,7 +104,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       nearby,
       v2,
     }), RULES.flights, v2), deps.budget, "flights"),
-    withBudget(withRules(staysTool({ openTab, currency: regionFor(deps.userContext).currency }), RULES.stays, v2), deps.budget, "stays"),
+    withBudget(withRules(staysTool({ openTab, currency: regionFor(deps.userContext).currency, judge: deps.cfg.flags.jevStays ? (deps.judge ?? noJudge) : undefined }), RULES.stays, v2), deps.budget, "stays"),
     withRules(showUiTool({
       findMusicArt: musicCover({ country }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,

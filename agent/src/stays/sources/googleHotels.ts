@@ -1,4 +1,4 @@
-import { amount, clip, count, httpImage, totalFromNightly } from "../parse.js";
+import { amount, clip, count, currencyTag, httpImage, totalFromNightly } from "../parse.js";
 import type { Stay, StayQuery, StaySource } from "../types.js";
 
 export type GoogleCard = { name: string; priceLabel: string; text: string; image?: string };
@@ -44,7 +44,7 @@ export function parseGoogleCard(c: GoogleCard, q: StayQuery): Stay | null {
     title,
     url: searchFor(q, `${title} ${q.location}`),
     ...(httpImage(c.image) && { image: c.image }),
-    ...(nightly != null && { nightly, total: totalFromNightly(nightly, q) }),
+    ...(nightly != null && { nightly, total: totalFromNightly(nightly, q), ...currencyTag(c.priceLabel, q) }),
     ...(rating && { rating: Number(rating[1]), ratingScale: 5 as const, reviews: count(rating[2]) }),
     kind: rental ? "Rental" : stars ? `${stars[1]}-star hotel` : "Hotel",
     ...(deal && { badge: `${deal[1]}% off usual` }),

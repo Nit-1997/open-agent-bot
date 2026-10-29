@@ -69,6 +69,44 @@ describe("StayList", () => {
     expect(screen.queryByRole("button", { name: /Show \d+ more/ })).toBeNull();
   });
 
+  it("shows the wishes each stay meets and puts the ones meeting the most first", () => {
+    const wished: StayListWidget = {
+      ...widget,
+      currency: "EUR",
+      maxNightly: 400,
+      sources: [
+        {
+          ...widget.sources[0],
+          stays: [
+            { title: "Hotel Indie", url: "https://www.google.com/travel/search?q=i", nightly: 150, met: [] },
+            { title: "Hyatt Regency", url: "https://www.google.com/travel/search?q=h", nightly: 380, met: ["Marriott/Hyatt"] },
+          ],
+        },
+        { ...widget.sources[1], stays: [{ title: "Hotel du Louvre", url: "https://www.booking.com/hotel/fr/louvre.html", nightly: 390, met: ["Marriott/Hyatt", "near the Louvre"] }] },
+      ],
+    };
+    const { container } = render(<StayList toolCallId="s4" widget={wished} />);
+    const titles = [...container.querySelectorAll('li [id$="-title"]')].map((e) => e.textContent);
+    expect(titles).toEqual(["Hotel du Louvre", "Hyatt Regency", "Hotel Indie"]);
+    expect(container.querySelector("#stays-s4-all-0-wishes")?.textContent).toBe("Marriott/Hyattnear the Louvre");
+    expect(container.querySelector("#stays-s4-all-0-wish-1")?.textContent).toBe("near the Louvre");
+    expect(container.querySelector("#stays-s4-all-2-wishes")).toBeNull();
+    expect(screen.getByText("Nov 12 – Nov 15 · 3 nights · 2 guests · up to €400.00/night")).toBeInTheDocument();
+    expect(container.querySelector("#stays-s4-all-0-nightly")?.textContent).toContain("€390.00");
+    const ids = [...container.querySelectorAll("[id]")].map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("shows a stay in its own currency when it differs from the card's", () => {
+    const mixed: StayListWidget = {
+      ...widget,
+      currency: "EUR",
+      sources: [{ ...widget.sources[0], stays: [{ title: "Dollar hotel", url: "https://www.google.com/travel/search?q=d", nightly: 420, currency: "USD" }] }],
+    };
+    const { container } = render(<StayList toolCallId="s5" widget={mixed} />);
+    expect(container.querySelector("#stays-s5-google_hotels-0-nightly")?.textContent).toContain("$420.00");
+  });
+
   it("labels the step", () => {
     expect(stepLabel("stays", { location: "Las Vegas" }, false)).toBe("Searching stays in Las Vegas");
   });

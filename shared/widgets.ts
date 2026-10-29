@@ -207,6 +207,8 @@ const StaySchema = Type.Object({
   kind: Type.Optional(Str),
   area: Type.Optional(Str),
   badge: Type.Optional(Str),
+  currency: Type.Optional(Str),
+  met: Type.Optional(Type.Array(Str, { maxItems: 4 })),
 });
 
 export const StayListSchema = Type.Object({

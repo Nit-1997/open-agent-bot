@@ -24,6 +24,8 @@ export type Stay = {
   kind?: string;
   area?: string;
   badge?: string;
+  currency?: string;
+  met?: string[];
 };
 
 export type StaySource = {

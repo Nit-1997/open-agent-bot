@@ -216,6 +216,52 @@ describe("classify", () => {
   });
 });
 
+describe("batched yesno", () => {
+  const crit = { id: "x", version: "1", question: "Is it?", yes: "y", no: "n" };
+  const bools = (ps: number[]) => ({
+    stopReason: "stop",
+    usage: { cost: { total: 0.0002 } },
+    answers: Object.fromEntries(ps.map((p, i) => [`t${i}`, { type: "bool", probability: p }])),
+  });
+
+  it("asks one bool question per item in a single call and keeps item order", async () => {
+    const { runtime, calls } = fakeRuntime({ classify: async (ctx) => bools(Object.keys(ctx.questions).map((_, i) => (i % 2 ? 0.2 : 0.8))) });
+    const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    const out = await judge.yesno(items(4), crit, { batch: { shared: { brands: ["Hyatt"] } } });
+    expect(out).toEqual([
+      { id: "t0", yes: true, p: 0.8 },
+      { id: "t1", yes: false, p: 0.2 },
+      { id: "t2", yes: true, p: 0.8 },
+      { id: "t3", yes: false, p: 0.2 },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].questions.t2.type).toBe("bool");
+    expect(calls[0].questions.t2.instructions).toContain("i=2");
+    expect(calls[0].state.brands).toEqual(["Hyatt"]);
+    expect((calls[0].state.tiles as unknown[]).length).toBe(4);
+    expect(judge.usage().calls).toBe(1);
+  });
+
+  it("splits above the per-call cap and falls back to one call per item when the batch fails", async () => {
+    const split = fakeRuntime({ classify: async (ctx) => bools(Object.keys(ctx.questions).map(() => 0.9)) });
+    const a = await createJudge({ runtime: split.runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    expect(await a.yesno(items(5), crit, { batch: { shared: {}, max: 2 } })).toHaveLength(5);
+    expect(split.calls).toHaveLength(3);
+
+    const broken = fakeRuntime({ classify: async (ctx) => (ctx.questions.t0 ? { stopReason: "error", answers: {} } : { stopReason: "stop", answers: { q: { type: "bool", probability: 0.6 } } }) });
+    const b = await createJudge({ runtime: broken.runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    const out = await b.yesno(items(3), crit, { batch: { shared: {} } });
+    expect(out?.map((r) => r.yes)).toEqual([true, true, true]);
+    expect(broken.calls).toHaveLength(4);
+  });
+
+  it("returns null when the batch and the per-item fallback both fail", async () => {
+    const { runtime } = fakeRuntime({ classify: async () => ({ stopReason: "error", answers: {} }) });
+    const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    expect(await judge.yesno(items(3), crit, { batch: { shared: {} } })).toBeNull();
+  });
+});
+
 describe("scopeJudge", () => {
   it("counts only its own calls and resets per turn", async () => {
     const { runtime } = fakeRuntime();

@@ -1,5 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import type { Judge } from "../judge/index.js";
+import { musicMatch } from "../judge/criteria/musicMatch.js";
 import { mapLimit } from "../lib/concurrency.js";
 import { queryList } from "./args.js";
 import { timeoutSignal } from "./net.js";
@@ -15,7 +17,7 @@ function names(v: unknown): string[] {
   return queryList(v).map((q) => q.trim()).filter(Boolean).slice(0, MAX_BATCH);
 }
 
-type ITunes = {
+export type ITunes = {
   collectionName?: string;
   trackName?: string;
   artistName?: string;
@@ -37,7 +39,7 @@ function describeMusic(r: ITunes, kind: "album" | "song"): string {
 
 const words = (s: string) => new Set(s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 1));
 
-function bestMatch(results: ITunes[], query: string, kind: "album" | "song"): ITunes | undefined {
+export function bestMatch(results: ITunes[], query: string, kind: "album" | "song"): ITunes | undefined {
   const want = words(query);
   const score = (r: ITunes) => {
     const have = words(`${kind === "song" ? r.trackName : r.collectionName} ${r.artistName}`);
@@ -48,7 +50,23 @@ function bestMatch(results: ITunes[], query: string, kind: "album" | "song"): IT
   return results.reduce<ITunes | undefined>((best, r) => (!best || score(r) > score(best) ? r : best), undefined);
 }
 
-export function musicTool(deps: { country: string; fetch?: typeof fetch }) {
+const optionText = (r: ITunes, kind: "album" | "song") => {
+  const year = r.releaseDate?.slice(0, 4);
+  return kind === "song"
+    ? `${r.trackName} by ${r.artistName}, from the release "${r.collectionName}"${year ? ` (${year})` : ""}`
+    : `${r.collectionName} by ${r.artistName}${year ? ` (${year})` : ""}`;
+};
+
+export async function pickMusic(results: ITunes[], query: string, kind: "album" | "song", judge?: Judge, signal?: AbortSignal): Promise<ITunes | undefined> {
+  if (judge?.available && results.length) {
+    const options = Object.fromEntries(results.map((r, i) => [`c${i}`, optionText(r, kind)]));
+    const verdict = await judge.choose({ request: query, kind }, options, musicMatch, { signal });
+    if (verdict) return verdict.choice == null ? undefined : results[Number(verdict.choice.slice(1))];
+  }
+  return bestMatch(results, query, kind);
+}
+
+export function musicTool(deps: { country: string; fetch?: typeof fetch; judge?: Judge }) {
   const f = deps.fetch ?? fetch;
   return defineTool({
     name: "music",
@@ -67,12 +85,12 @@ export function musicTool(deps: { country: string; fetch?: typeof fetch }) {
         const url = new URL("https://itunes.apple.com/search");
         url.searchParams.set("term", q);
         url.searchParams.set("entity", kind);
-        url.searchParams.set("limit", "5");
+        url.searchParams.set("limit", deps.judge?.available ? "10" : "5");
         url.searchParams.set("country", deps.country);
         try {
           const res = await f(url, { signal: timeout(signal), headers: UA });
           if (!res.ok) return `${q}:\nlookup failed: HTTP ${res.status}`;
-          const hit = bestMatch(((await res.json()) as { results?: ITunes[] }).results ?? [], q, kind);
+          const hit = await pickMusic(((await res.json()) as { results?: ITunes[] }).results ?? [], q, kind, deps.judge, signal);
           return `${q}:\n${hit ? describeMusic(hit, kind) : "not found"}`;
         } catch (err) {
           return `${q}:\nlookup failed: ${err instanceof Error ? err.message : String(err)}`;
