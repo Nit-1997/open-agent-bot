@@ -16,6 +16,7 @@ import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { BrowserPool } from "./tools/browserPool.js";
 import { ToolBudget, TurnBudget } from "./tools/budget.js";
+import { completeWith } from "./workflows/llm.js";
 import { buildTools, PER_REPLY_LIMITS } from "./tools/index.js";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
@@ -32,7 +33,7 @@ const hub = await ProviderHub.create({
 const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: cfg.jevConcurrency });
 console.log(`[jev] model=${cfg.jevModel} available=${judge.available} rerank=${cfg.flags.jevRerank}`);
 
-const routerSkills = cfg.flags.router && cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace }) : [];
+const routerSkills = cfg.flags.router && cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv }) : [];
 const router: Router | undefined = cfg.flags.router
   ? {
       route: (input, o) => routeTurn(judge, input, o),
@@ -55,14 +56,15 @@ const store = new SessionStore({
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = workspace ? workspaceCart(workspace, threadId) : new ActiveCart();
-    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace }) : [];
+    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv }) : [];
     const turnJudge = scopeJudge(judge);
     let hintNote: string | undefined;
+    let current = modelFor(userContext?.model);
     const handle = await createPiSession({
       runtime: hub.runtime,
-      model: modelFor(userContext?.model),
+      model: current,
       systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, judge: turnJudge, workspace }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, judge: turnJudge, workspace, complete: completeWith(hub.runtime, () => current) }),
       ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
       ...(workspace && { history }),
       ...((workspace || router) && { contextNote: () => [workspace && workspaceNote(workspace, threadId), hintNote].filter(Boolean).join("\n\n") || undefined }),
@@ -89,6 +91,7 @@ const store = new SessionStore({
         const model = hub.resolve(ref);
         if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);
         await handle.setModel(model);
+        current = model;
         console.log(`[run] thread=${threadId} model=${ref}`);
       },
       dispose: async () => {

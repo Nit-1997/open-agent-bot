@@ -138,3 +138,14 @@ describe("load_skill", () => {
     }
   });
 });
+
+describe("rpiv lines", () => {
+  const body = (rpiv: boolean) => loadSkillCatalog(skillsDir({}), { rpiv }).find((x) => x.name === "research")!.body;
+
+  it("point the research skill at the research tool only when the flag is on", () => {
+    expect(body(false)).not.toContain("research tool");
+    expect(body(false)).not.toContain("[rpiv]");
+    expect(body(true)).toContain("When the research tool is listed");
+    expect(body(true)).not.toContain("[rpiv]");
+  });
+});

@@ -35,6 +35,22 @@ function firstPicture(html: string): { src: string; alt: string } | undefined {
   return { src: m[1], alt };
 }
 
+export async function storeArtifact(artifacts: ArtifactStore, images: ImageCheck | undefined, title: string, html: string): Promise<ToolResult> {
+  if (Buffer.byteLength(html) > MAX_HTML_BYTES) {
+    return fail("html too large (max 2MB)");
+  }
+  const vetted = images ? await vetImages(html, images) : { html, kept: 0, dropped: 0 };
+  const lead = vetted.kept > 0 && !leadsWithPicture(vetted.html) ? firstPicture(vetted.html) : undefined;
+  if (lead) vetted.html = addHero(vetted.html, lead.src, lead.alt || title);
+  const { id } = await artifacts.save(title, withReportFrame(vetted.html));
+  const pictures = vetted.dropped
+    ? ` ${vetted.kept} pictures shown; ${vetted.dropped} removed because no tool returned them or they didn't load.`
+    : vetted.kept
+      ? ` ${vetted.kept} pictures shown.`
+      : "";
+  return ok(`artifact ${id} created: ${title}${pictures}`, { artifactId: id, title });
+}
+
 export function createArtifactTool(artifacts: ArtifactStore, images?: ImageCheck) {
   return defineTool({
     name: "create_artifact",
@@ -44,20 +60,6 @@ export function createArtifactTool(artifacts: ArtifactStore, images?: ImageCheck
       title: Type.String({ minLength: 1, maxLength: 120 }),
       html: Type.String({ minLength: 1 }),
     }),
-    async execute(_id, params): Promise<ToolResult> {
-      if (Buffer.byteLength(params.html) > MAX_HTML_BYTES) {
-        return fail("html too large (max 2MB)");
-      }
-      const vetted = images ? await vetImages(params.html, images) : { html: params.html, kept: 0, dropped: 0 };
-      const lead = vetted.kept > 0 && !leadsWithPicture(vetted.html) ? firstPicture(vetted.html) : undefined;
-      if (lead) vetted.html = addHero(vetted.html, lead.src, lead.alt || params.title);
-      const { id } = await artifacts.save(params.title, withReportFrame(vetted.html));
-      const pictures = vetted.dropped
-        ? ` ${vetted.kept} pictures shown; ${vetted.dropped} removed because no tool returned them or they didn't load.`
-        : vetted.kept
-          ? ` ${vetted.kept} pictures shown.`
-          : "";
-      return ok(`artifact ${id} created: ${params.title}${pictures}`, { artifactId: id, title: params.title });
-    },
+    execute: (_id, params): Promise<ToolResult> => storeArtifact(artifacts, images, params.title, params.html),
   });
 }

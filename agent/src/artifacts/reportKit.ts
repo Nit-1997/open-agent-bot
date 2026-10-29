@@ -97,6 +97,8 @@ td.yes { color: var(--good); font-weight: 600; } td.no { color: var(--bad); font
 .steps li { counter-increment: step; position: relative; padding: 2px 0 10px 44px; }
 .steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--mist-100); color: var(--mist-900); font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
+.unverified { background: var(--warn-bg); text-decoration: underline wavy #d97706; text-underline-offset: 3px; cursor: help; }
+.unchecked { text-decoration: underline dotted var(--mist-300); text-underline-offset: 3px; cursor: help; }
 .quote { margin: 22px 0; padding: 4px 0 4px 20px; border-left: 3px solid var(--mist-300); font: italic 400 22px/1.4 var(--serif); color: var(--ink-2); }
 .sources { font-size: 13px; color: var(--ink-3); }
 .sources li { margin: 3px 0; }

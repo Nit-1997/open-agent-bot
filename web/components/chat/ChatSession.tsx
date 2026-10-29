@@ -5,7 +5,8 @@ import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { classifyRunError, type RunErrorKind } from "@/lib/errors";
-import { buildTurns, type ChatMessage } from "@/lib/turns";
+import type { WorkflowStepEvent } from "@/lib/steps";
+import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import type { CartEdits } from "@/components/widgets/CartCard";
@@ -26,7 +27,8 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   const reveal = useRef<string | null>(null);
   const [below, setBelow] = useState(false);
 
-  const turns = useMemo(() => buildTurns(agent.messages as readonly ChatMessage[]), [agent.messages]);
+  const [workflow, setWorkflow] = useState<Record<string, WorkflowStepEvent[]>>({});
+  const turns = useMemo(() => withWorkflow(buildTurns(agent.messages as readonly ChatMessage[]), workflow), [agent.messages, workflow]);
   const running = sending || agent.isRunning;
   const lastId = turns.at(-1)?.id;
   const lastRef = useRef(lastId);
@@ -59,6 +61,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
       onCustomEvent: ({ event }) => {
         const id = lastRef.current;
         if (event.name === "browser_frame" && id) setFrames((f) => ({ ...f, [id]: event.value as BrowserFrame }));
+        if (event.name === "workflow_step" && id) setWorkflow((w) => ({ ...w, [id]: [...(w[id] ?? []), event.value as WorkflowStepEvent] }));
       },
       onRunErrorEvent: ({ event }) => {
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();

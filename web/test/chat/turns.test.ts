@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dedupeSources, faviconUrl, linksIn, searchResults } from "@/lib/sources";
 import { stepLabel, summarizeSteps } from "@/lib/steps";
-import { buildTurns, type ChatMessage } from "@/lib/turns";
+import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
 
 const call = (id: string, name: string, args: unknown) => ({ id, type: "function", function: { name, arguments: JSON.stringify(args) } });
 
@@ -95,5 +95,37 @@ describe("steps", () => {
     const steps = buildTurns(messages)[0].steps;
     expect(summarizeSteps(steps)).toBe("1 search · 1 page read");
     expect(summarizeSteps([])).toBe("");
+  });
+});
+
+describe("research workflow", () => {
+  const msgs: ChatMessage[] = [
+    { id: "u1", role: "user", content: "heat pump report" },
+    { id: "a1", role: "assistant", content: "", toolCalls: [call("r1", "research", { question: "heat pump or furnace?" })] },
+  ];
+  const ev = (phase: "research" | "plan" | "implement" | "verify", status: "start" | "done", detail?: object) => ({ workflow: "research" as const, phase, status, detail });
+
+  it("shows the research tool as an artifact once its result arrives", () => {
+    const done = buildTurns([...msgs, { id: "t1", role: "tool", toolCallId: "r1", content: "artifact abcdefghijkl created: Heat pump vs furnace\nRead 4 sources." }]);
+    expect(done[0].items).toEqual([expect.objectContaining({ kind: "artifact", title: "Heat pump vs furnace" })]);
+    expect(buildTurns(msgs)[0].items).toEqual([expect.objectContaining({ kind: "artifact", result: undefined })]);
+  });
+
+  it("replaces the research call with its phases, labeled in order", () => {
+    const turns = withWorkflow(buildTurns(msgs), { u1: [ev("research", "start"), ev("research", "done", { sources: 4 }), ev("plan", "start"), ev("plan", "done"), ev("implement", "start"), ev("implement", "done"), ev("verify", "start"), ev("verify", "done", { supported: 9, total: 11 })] });
+    expect(turns[0].steps.map((s) => stepLabel(s.name, s.args, s.done))).toEqual(["Researching sources", "Planning the report", "Writing the report", "Checking claims (9 of 11 supported)"]);
+    expect(turns[0].steps.every((s) => s.done)).toBe(true);
+    expect(new Set(turns[0].steps.map((s) => s.id)).size).toBe(4);
+  });
+
+  it("marks only started phases and leaves the active one running", () => {
+    const turns = withWorkflow(buildTurns(msgs), { u1: [ev("research", "start"), ev("research", "done"), ev("plan", "start")] });
+    expect(turns[0].steps.map((s) => [s.args.phase, s.done])).toEqual([["research", true], ["plan", false]]);
+    expect(stepLabel("workflow_step", { phase: "verify" }, false)).toBe("Checking claims");
+  });
+
+  it("keeps the research step when no workflow events arrived", () => {
+    expect(withWorkflow(buildTurns(msgs), {})[0].steps.map((s) => s.name)).toEqual(["research"]);
+    expect(stepLabel("research", { question: "q" }, false)).toBe("Researching “q”");
   });
 });

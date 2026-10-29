@@ -90,6 +90,10 @@ export function createTranslator(ids: Deps) {
           { type: EventType.TOOL_CALL_ARGS, toolCallId: e.toolCallId, delta: JSON.stringify(e.args ?? {}) } as BaseEvent,
           { type: EventType.TOOL_CALL_END, toolCallId: e.toolCallId } as BaseEvent,
         ];
+      case "tool_execution_update": {
+        const step = (e.partialResult as { details?: { workflowStep?: unknown } } | undefined)?.details?.workflowStep;
+        return step ? [{ type: EventType.CUSTOM, name: "workflow_step", value: step } as BaseEvent] : [];
+      }
       case "tool_execution_end": {
         const content = resultText(e.result);
         const out: BaseEvent[] = [
@@ -104,7 +108,7 @@ export function createTranslator(ids: Deps) {
         const fromData = !details?.widget;
         let widget = e.isError ? null : (details?.widget ?? (details?.data ? render(details.data) : null));
         if (widget?.kind === "ui") widget = groundUi(widget as UiWidget, evidence);
-        if (e.toolName === "create_artifact" && !e.isError) answered = true;
+        if ((e.toolName === "create_artifact" || e.toolName === "research") && !e.isError) answered = true;
         if (widget && !(fromData && renderedKinds.has(widget.kind))) {
           if (fromData) renderedKinds.add(widget.kind);
           if (!NOT_AN_ANSWER.has(widget.kind)) answered = true;
