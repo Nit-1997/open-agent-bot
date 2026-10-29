@@ -1,7 +1,7 @@
 "use client";
 
 import type { Cart } from "@shared/widgets";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Info, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { money as formatMoney } from "@/lib/format";
 import { Picture } from "./CardRow";
@@ -56,8 +56,10 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
 
   const inCart = store.items.map((item, i) => ({ item, line: current[i], pick: item.picks[current[i].choice], i })).filter((x) => x.pick);
   const kept = inCart.filter((x) => !x.line.removed);
-  const subtotal = kept.reduce((sum, x) => sum + (x.pick.price ?? 0) * x.line.qty, 0);
-  const unpriced = kept.filter((x) => x.pick.price === undefined).length;
+  const counted = kept.filter((x) => x.pick.match !== "substitute");
+  const subtotal = counted.reduce((sum, x) => sum + (x.pick.price ?? 0) * x.line.qty, 0);
+  const unpriced = counted.filter((x) => x.pick.price === undefined).length;
+  const outside = kept.length - counted.length;
   const missing = store.items.filter((i) => !i.picks.length);
   const portal = portalOf(store.name);
 
@@ -122,6 +124,19 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                           </span>
                           {pick.size && <span id={`${rid}-size`}> · {pick.size}</span>}
                           {pick.sponsored && <span id={`${rid}-ad`}> · Sponsored</span>}
+                          {pick.match === "substitute" && (
+                            <span id={`${rid}-substitute`} title={pick.why} className="ml-1.5 rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn-fg sm:text-[10px]">
+                              Substitute
+                            </span>
+                          )}
+                          {pick.match === "substitute" && (
+                            <span id={`${rid}-not-in-total`}> · not in total</span>
+                          )}
+                          {pick.match === "exact" && pick.why && (
+                            <span id={`${rid}-why`} role="img" title={pick.why} aria-label={`Match: ${pick.why}`} className="ml-1.5 inline-block align-middle text-text-muted">
+                              <Info id={`${rid}-why-icon`} aria-hidden="true" size={12} />
+                            </span>
+                          )}
                         </p>
                         {item.picks.length > 1 && !stale && (
                           <button
@@ -171,6 +186,11 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                               <span id={`${rid}-alt-${n}-title`} className="line-clamp-1 flex-1">
                                 {alt.title}
                               </span>
+                              {alt.match === "substitute" && (
+                                <span id={`${rid}-alt-${n}-substitute`} title={alt.why} className="shrink-0 rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn-fg sm:text-[10px]">
+                                  Substitute
+                                </span>
+                              )}
                               <span id={`${rid}-alt-${n}-price`} className="font-semibold">
                                 {alt.priceText ?? ""}
                               </span>
@@ -220,6 +240,11 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
           {unpriced > 0 && (
             <p id={`${id}-unpriced`} className="mt-1 text-xs text-text-muted">
               Plus {unpriced} without a listed price
+            </p>
+          )}
+          {outside > 0 && (
+            <p id={`${id}-substitutes-note`} className="mt-1 text-xs text-text-muted">
+              {outside} {outside === 1 ? "substitute is" : "substitutes are"} not in this total
             </p>
           )}
           <a

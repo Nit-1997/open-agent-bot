@@ -69,6 +69,43 @@ describe("CartCard", () => {
   });
 });
 
+describe("CartCard match labels", () => {
+  const labeled: Cart = {
+    kind: "cart",
+    stores: [
+      {
+        name: "Target (Shipt)",
+        total: 2.39,
+        url: "https://www.shipt.com/",
+        missing: [],
+        items: [
+          { query: "rice", qty: 1, picks: [{ ...pick("Good & Gather Rice 32oz", 2.39), match: "exact", why: "exact, 94%" }] },
+          { query: "sour cream", qty: 1, picks: [{ ...pick("Greek Yogurt 16oz", 3.2), match: "substitute", why: "substitute, 71%" }] },
+        ],
+      },
+    ],
+  };
+
+  it("badges substitutes with the reason on hover, and gives exact picks a quiet reason marker", () => {
+    const { container } = render(<CartCard toolCallId="m1" widget={labeled} />);
+    const row = screen.getByRole("listitem", { name: "sour cream" });
+    const badge = within(row).getByText("Substitute");
+    expect(badge).toHaveAttribute("title", "substitute, 71%");
+    expect(within(screen.getByRole("listitem", { name: "rice" })).queryByText("Substitute")).toBeNull();
+    expect(within(row).getByText(/not in total/)).toBeInTheDocument();
+    expect(subtotal()).toBe("$2.39");
+    expect(screen.getByText("1 substitute is not in this total")).toBeInTheDocument();
+    expect(screen.getByLabelText("Match: exact, 94%")).toHaveAttribute("title", "exact, 94%");
+    const ids = [...container.querySelectorAll("[id]")].map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("shows no badge when the picks carry no match label", () => {
+    render(<CartCard toolCallId="m2" widget={cart} />);
+    expect(screen.queryByText("Substitute")).toBeNull();
+  });
+});
+
 describe("CartCard edits", () => {
   it("treats the list as one cart: quantities and removals carry across store tabs", () => {
     render(<CartCard toolCallId="c5" widget={cart} />);

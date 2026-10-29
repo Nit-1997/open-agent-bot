@@ -2,6 +2,8 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Store } from "../../src/shop/stores.js";
+import type { Judge } from "../../src/judge/index.js";
+import { noJudge } from "../../src/judge/index.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import { BrowserPool } from "../../src/tools/browserPool.js";
 import { shopTool } from "../../src/tools/shop.js";
@@ -59,10 +61,17 @@ const stores = (): Record<string, Store> => ({
   wall: { id: "wall", label: "Wall Mart", home: `${base}/wall/`, searchUrl: (q) => `${base}/wall/search?q=${encodeURIComponent(q)}`, scrolls: 0 },
 });
 
-const run = (params: object, cart = new ActiveCart()) =>
-  shopTool({ pool, threadId: "shop-t", userContext: null, allowPrivateHosts: true, storeFor: (s) => stores()[s.toLowerCase()], cart }).execute(
+const run = (params: object, cart = new ActiveCart(), judge?: Judge) =>
+  shopTool({ pool, threadId: "shop-t", userContext: null, allowPrivateHosts: true, storeFor: (s) => stores()[s.toLowerCase()], cart, judge }).execute(
     ...(["c", params, undefined, undefined, {}] as never[]),
   ) as Promise<{ isError?: boolean; content: Array<{ text: string }>; details: { data?: { summary: Array<{ store: string; found: number; total: number; missing: string[] }> } } }>;
+
+const fakeJudge = (levels: (title: string) => string): Judge => ({
+  ...noJudge,
+  available: true,
+  score: (async (items: { id: string; state: { product: string } }[]) =>
+    items.map((i) => ({ id: i.id, level: levels(i.state.product), p: 0.94, probabilities: {} }))) as never,
+});
 
 describe("shop (real Chromium)", () => {
   it("searches each store for each item, picks real catalog matches, and ranks stores by value", async () => {
@@ -131,4 +140,39 @@ describe("shop (real Chromium)", () => {
     const r = await run({ stores: ["sorry"], items: [{ query: "rice" }] });
     expect(r.content[0].text).toContain("Sorry Store: blocked by a bot check.");
   }, 60000);
+
+  describe("with the Jev re-rank", () => {
+    const levels = (title: string) => (/Goya/.test(title) ? "exact" : /Chips/.test(title) ? "substitute" : "irrelevant");
+
+    it("keeps exact then substitute picks, drops the rest, and labels each pick", async () => {
+      const r = await run({ stores: ["storea"], items: [{ query: "black beans" }] }, new ActiveCart(), fakeJudge(levels));
+      const picks = (r.details.data as unknown as { stores: Array<{ items: Array<{ picks: Array<{ title: string; match: string; why: string }> }> }> }).stores[0].items[0].picks;
+      expect(picks.map((p) => [p.title, p.match, p.why])).toEqual([
+        ["Goya Black Beans 15.5 oz", "exact", "exact, 94%"],
+        ["Black Bean Chips", "substitute", "substitute, 94%"],
+      ]);
+      expect(r.content[0].text).toContain("substitute");
+    }, 60000);
+
+    it("counts only exact matches as found and lists substitute-only items separately", async () => {
+      const r = await run({ stores: ["storea"], items: [{ query: "black beans" }, { query: "rice" }] }, new ActiveCart(), fakeJudge((t) => (/Rice/.test(t) ? "substitute" : "exact")));
+      expect(r.details.data?.summary[0]).toMatchObject({ store: "Store A", found: 1, missing: [], substitutes: ["rice"] });
+      expect(r.content[0].text).toContain("(substitutes only: rice)");
+      expect(r.content[0].text).toContain("- rice: no exact match, substitutes");
+    }, 60000);
+
+    it("falls back to keyword ranking when the judge returns nothing", async () => {
+      const failing: Judge = { ...noJudge, available: true, score: async () => null };
+      const plain = await run({ stores: ["storea"], items: [{ query: "black beans" }] });
+      const fallback = await run({ stores: ["storea"], items: [{ query: "black beans" }] }, new ActiveCart(), failing);
+      expect(fallback.content[0].text).toBe(plain.content[0].text);
+    }, 60000);
+
+    it("falls back when the judge is unavailable, and is identical with no judge at all", async () => {
+      const plain = await run({ stores: ["storea", "storeb"], items: [{ query: "black beans" }, { query: "rice" }] });
+      const down = await run({ stores: ["storea", "storeb"], items: [{ query: "black beans" }, { query: "rice" }] }, new ActiveCart(), noJudge);
+      expect(down.content[0].text).toBe(plain.content[0].text);
+      expect(down.details.data).toEqual(plain.details.data);
+    }, 60000);
+  });
 });

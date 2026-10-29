@@ -176,6 +176,8 @@ const CartPickSchema = Type.Object({
   size: Type.Optional(Str),
   rating: Type.Optional(Type.Number()),
   sponsored: Type.Optional(Type.Boolean()),
+  match: Type.Optional(Type.Union([Type.Literal("exact"), Type.Literal("substitute")])),
+  why: Type.Optional(Str),
 });
 
 export const CartSchema = Type.Object({

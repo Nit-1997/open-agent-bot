@@ -32,6 +32,16 @@ describe("shop data renders a cart", () => {
     expect((renderData(big) as unknown as { stores: Array<{ items: unknown[] }> }).stores[0].items).toHaveLength(14);
   });
 
+  it("passes the match label and its reason through to the picks", () => {
+    const labeled = {
+      kind: "shop",
+      stores: [{ store: "Target (Shipt)", home: "https://www.shipt.com/", items: [{ query: "rice", qty: 1, picks: [{ ...pick("Rice", 2), match: "exact", why: "exact, 94%" }, { ...pick("Quinoa", 3), match: "substitute", why: "substitute, 71%" }] }] }],
+      summary: [{ store: "Target (Shipt)", found: 1, missing: [], total: 2 }],
+    };
+    const w = renderData(labeled) as unknown as { stores: Array<{ items: Array<{ picks: Array<{ match: string; why: string }> }> }> };
+    expect(w.stores[0].items[0].picks.map((p) => [p.match, p.why])).toEqual([["exact", "exact, 94%"], ["substitute", "substitute, 71%"]]);
+  });
+
   it("renders nothing when no store had any item", () => {
     expect(renderData({ ...data, summary: [] })).toBeNull();
   });

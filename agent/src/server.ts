@@ -6,6 +6,7 @@ import { FrameBus } from "./browser/frames.js";
 import { ActiveCart } from "./shop/cart.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
+import { createJudge, scopeJudge } from "./judge/index.js";
 import { ProviderHub } from "./providers/hub.js";
 import { LoginFlows } from "./providers/logins.js";
 import { loadSkillCatalog, skillsDir } from "./skills/catalog.js";
@@ -25,6 +26,9 @@ const hub = await ProviderHub.create({
   ...(cfg.llmApiKey && { litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey, models: cfg.models } }),
 });
 
+const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: 16 });
+console.log(`[jev] model=${cfg.jevModel} available=${judge.available} rerank=${cfg.flags.jevRerank}`);
+
 function modelFor(ref: string | undefined) {
   const fallback = defaultModelRef(cfg, hub);
   const model = (ref && hub.resolve(ref)) || (fallback && hub.resolve(fallback));
@@ -40,18 +44,26 @@ const store = new SessionStore({
     const frames = new FrameBus();
     const cart = new ActiveCart();
     const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir()) : [];
+    const turnJudge = scopeJudge(judge);
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: modelFor(userContext?.model),
       systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, judge: turnJudge }),
       ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
     });
     return {
       session: handle.session,
       busy: false,
       lastUsed: Date.now(),
-      onRunStart: () => budget.reset(),
+      onRunStart: () => {
+        budget.reset();
+        turnJudge.reset();
+      },
+      turnStats: () => {
+        const u = turnJudge.usage();
+        return { jevCalls: u.calls, jevCostUsd: u.costUsd };
+      },
       evidence,
       frames,
       cart,

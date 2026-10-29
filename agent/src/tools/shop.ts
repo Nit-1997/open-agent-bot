@@ -5,7 +5,8 @@ import type { UserContext } from "../prompt/systemPrompt.js";
 import { ActiveCart, type CartItem } from "../shop/cart.js";
 import { extractTiles, type Tile } from "../shop/extract.js";
 import { currencyOf, formatMoney } from "../shop/currency.js";
-import { bestValue, rankTiles, type StoreResult } from "../shop/rank.js";
+import { bestValue, judgeRank, type Pick, rankTiles, SHORTLIST, type StoreResult } from "../shop/rank.js";
+import type { Judge } from "../judge/index.js";
 import { type Store, storeFor as defaultStoreFor } from "../shop/stores.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "./browserPool.js";
@@ -19,6 +20,7 @@ const MAX_ITEMS = 12;
 const TABS = 4;
 const PICKS = 3;
 const SCOPE = 3;
+const RERANK_BUDGET_MS = 20000;
 
 type Item = { query: string; qty: number };
 type Job = { store: Store; item: Item };
@@ -32,7 +34,10 @@ type Deps = {
   storeFor?: (name: string) => Store | undefined;
   frames?: FrameBus;
   cart?: ActiveCart;
+  judge?: Judge;
 };
+
+type Lane = { label: string; home: string; item: Item; tiles: Tile[]; grouped: boolean };
 
 function items(v: unknown): Item[] {
   return looseList<unknown>(v)
@@ -95,41 +100,65 @@ async function runAll(deps: Deps, jobs: Job[]): Promise<JobResult[]> {
   return results;
 }
 
-function storeResults(results: JobResult[], wanted: Item[]): StoreResult[] {
-  const byStore = new Map<string, StoreResult>();
-  const add = (label: string, home: string, item: Item, picks: Tile[]) => {
-    const s = byStore.get(label) ?? { store: label, home, items: wanted.map((w) => ({ query: w.query, qty: w.qty, picks: [] as Tile[] })) };
-    byStore.set(label, s);
-    const slot = s.items.find((i) => i.query === item.query)!;
-    if (!slot.picks.length) slot.picks = picks;
-  };
-  for (const r of results) {
-    if (r.blocked || r.error) continue;
-    if (r.store.marketplace) {
-      const groups = new Map<string, Tile[]>();
-      for (const t of r.tiles) if (t.group) groups.set(t.group, [...(groups.get(t.group) ?? []), t]);
-      for (const [group, tiles] of groups) {
-        const picks = rankTiles(r.item.query, tiles).slice(0, PICKS);
-        if (picks.length) add(`${group} (${r.store.label})`, r.store.home, r.item, picks);
-      }
-    } else {
-      add(r.store.label, r.store.home, r.item, rankTiles(r.item.query, r.tiles).slice(0, PICKS));
-    }
+function lanesOf(results: JobResult[]): Lane[] {
+  return results.flatMap((r): Lane[] => {
+    if (r.blocked || r.error) return [];
+    if (!r.store.marketplace) return [{ label: r.store.label, home: r.store.home, item: r.item, tiles: r.tiles, grouped: false }];
+    const groups = new Map<string, Tile[]>();
+    for (const t of r.tiles) if (t.group) groups.set(t.group, [...(groups.get(t.group) ?? []), t]);
+    return [...groups].map(([group, tiles]) => ({ label: `${group} (${r.store.label})`, home: r.store.home, item: r.item, tiles, grouped: true }));
+  });
+}
+
+async function rankLanes(judge: Judge | undefined, lanes: Lane[]): Promise<Pick[][]> {
+  const keyword = (l: Lane) => rankTiles(l.item.query, l.tiles);
+  if (!judge) return lanes.map(keyword);
+  if (!judge.available) {
+    console.log("[shop] rerank fallback reason=unavailable");
+    return lanes.map(keyword);
   }
+  const started = Date.now();
+  const signal = AbortSignal.timeout(RERANK_BUDGET_MS);
+  let tiles = 0;
+  const failed: string[] = [];
+  const ranked = await Promise.all(
+    lanes.map(async (l) => {
+      tiles += Math.min(l.tiles.length, SHORTLIST);
+      const picks = await judgeRank(judge, l.item.query, l.tiles, { signal, batch: true }).catch(() => null);
+      if (picks) return picks;
+      failed.push(l.item.query);
+      return keyword(l);
+    }),
+  );
+  if (failed.length) console.log(`[shop] rerank fallback reason=${signal.aborted ? "budget" : "judge"} lanes=${failed.length}/${lanes.length}`);
+  console.log(`[shop] rerank ms=${Date.now() - started} tiles=${tiles}`);
+  return ranked;
+}
+
+function storeResults(lanes: Lane[], ranked: Pick[][], wanted: Item[]): StoreResult[] {
+  const byStore = new Map<string, StoreResult>();
+  lanes.forEach((l, n) => {
+    const picks = ranked[n].slice(0, PICKS);
+    if (l.grouped && !picks.length) return;
+    const s = byStore.get(l.label) ?? { store: l.label, home: l.home, items: wanted.map((w) => ({ query: w.query, qty: w.qty, picks: [] as Pick[] })) };
+    byStore.set(l.label, s);
+    const slot = s.items.find((i) => i.query === l.item.query)!;
+    if (!slot.picks.length) slot.picks = picks;
+  });
   return [...byStore.values()];
 }
 
 type Summary = ReturnType<typeof bestValue>;
 
-function describeTile(t: Tile, n: number): string {
-  const meta = [t.priceText ?? "price not shown", t.size, t.rating && `${t.rating}★`, t.sponsored && "sponsored"].filter(Boolean).join(" · ");
+function describeTile(t: Pick, n: number): string {
+  const meta = [t.priceText ?? "price not shown", t.size, t.rating && `${t.rating}★`, t.sponsored && "sponsored", t.match === "substitute" && "substitute"].filter(Boolean).join(" · ");
   return `  ${n}. ${t.title} — ${meta}\n     link: ${t.url}${t.image ? `\n     image: ${t.image}` : ""}`;
 }
 
 function summaryLines(summary: Summary, stores: StoreResult[], wanted: number): string[] {
   const currency = new Map(stores.map((s) => [s.store, currencyOf(s.items)]));
   const of = (s: Summary[number]) =>
-    `${s.found} of ${wanted} items, ${formatMoney(s.total, currency.get(s.store))}${s.missing.length ? ` (missing: ${s.missing.join(", ")})` : ""}`;
+    `${s.found} of ${wanted} items, ${formatMoney(s.total, currency.get(s.store))}${s.missing.length ? ` (missing: ${s.missing.join(", ")})` : ""}${s.substitutes?.length ? ` (substitutes only: ${s.substitutes.join(", ")})` : ""}`;
   const [best, ...rest] = summary;
   return [
     ...(best ? [`Best value: ${best.store} — ${of(best)}`] : []),
@@ -166,7 +195,7 @@ function storeLines(stores: StoreResult[], summary: Summary): string[] {
     .flatMap((s) => [
       `\n${s.store}:`,
       ...s.items.flatMap((i) => [
-        `- ${i.query}${i.qty > 1 ? ` ×${i.qty}` : ""}:${i.picks.length ? "" : " not found"}`,
+        `- ${i.query}${i.qty > 1 ? ` ×${i.qty}` : ""}:${i.picks.length ? (i.picks[0].match === "substitute" ? " no exact match, substitutes" : "") : " not found"}`,
         ...i.picks.slice(0, s.store === best ? PICKS : 1).map((t, n) => describeTile(t, n + 1)),
       ]),
     ]);
@@ -224,7 +253,8 @@ export function shopTool(deps: Deps) {
       if (!cart.items.length) return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
       const stores = cart.stores.map((id) => resolve(id)).filter((x): x is Store => !!x);
       const results = search.length ? await runAll(deps, stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
-      cart.addResults(storeResults(results, search));
+      const lanes = lanesOf(results);
+      cart.addResults(storeResults(lanes, await rankLanes(deps.judge, lanes), search));
       if (fresh) cart.scopeTo(bestValue(cart.view()).filter((x) => x.found > 0).slice(0, SCOPE).map((x) => x.store));
       const view = cart.view();
       const { text, summary } = render(view, results, cart.items);
