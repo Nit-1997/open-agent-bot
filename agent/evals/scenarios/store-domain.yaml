@@ -1,0 +1,18 @@
+id: store-domain
+proves: [M4]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "What's the current price of the Sony WH-1000XM5 headphones at B&H and at Newegg?"
+assert:
+  - { type: max_tool_calls, n: 3 }
+  - { type: text_matches, pattern: "B&H|bhphotovideo" }
+  - { type: text_matches, pattern: "Newegg" }
+  - { type: text_matches, pattern: "\\$\\d|block|couldn.t|unable|captcha" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 240 }

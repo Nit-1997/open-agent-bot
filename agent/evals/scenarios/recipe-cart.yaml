@@ -1,0 +1,19 @@
+id: recipe-cart
+proves: [M1]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Get me groceries for tacos for 6 people"
+assert:
+  - { type: must_call, tool: shop }
+  - { type: widget_present, kind: cart }
+  - { type: tool_arg_matches, tool: shop, pattern: "tortilla|taco shell" }
+  - { type: tool_arg_matches, tool: shop, pattern: "beef|chicken|pork|turkey|beans" }
+  - { type: max_tool_calls, n: 8 }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 300 }

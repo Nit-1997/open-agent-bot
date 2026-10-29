@@ -1,0 +1,21 @@
+id: dining
+proves: [M5]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Find a restaurant in Palo Alto for 8 people this Saturday. A couple of us are vegetarian and it needs to be reservable online."
+    if_asked: "Saturday at 7pm, 8 people, vegetarian options, reservable online, in Palo Alto"
+assert:
+  - { type: max_tool_calls, n: 14 }
+  - { type: text_matches, pattern: "vegetarian|veg" }
+  - { type: text_matches, pattern: "reserv|OpenTable|Resy|Tock" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 360 }
+future_assert:
+  - { type: widget_present, kind: ui }
+  - { type: widget_matches, kind: ui, pattern: "\"type\":\"cards\"" }
