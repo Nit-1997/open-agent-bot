@@ -62,7 +62,8 @@ export function researchTool(deps: Deps) {
         },
       );
       if (!outcome.ok) return fail(`research failed: ${outcome.error}. Continue yourself with web_search, fetch_page and create_artifact.`);
-      const checks = `${outcome.total} claims checked against their sources: ${outcome.supported} supported, ${outcome.flagged} flagged as unverified in the report${outcome.unchecked ? `, ${outcome.unchecked} not checked` : ""}.`;
+      const parts = [`${outcome.supported} supported`, outcome.removed && `${outcome.removed} unsupported removed`, outcome.flagged && `${outcome.flagged} flagged as unverified in the report`, outcome.unchecked && `${outcome.unchecked} not checked`].filter(Boolean);
+      const checks = `${outcome.total} claims checked against their sources: ${parts.join(", ")}.`;
       return ok(`artifact ${outcome.id} created: ${outcome.title}\nRead ${outcome.sources} sources. ${checks}\nTakeaway: ${outcome.takeaway}\nThe report is shown to the user. Reply in two or three sentences with the takeaway${outcome.flagged || outcome.unchecked ? " and say how many claims could not be confirmed" : ""}.`, { artifactId: outcome.id, title: outcome.title });
     },
   });

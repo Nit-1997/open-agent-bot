@@ -26,13 +26,13 @@ export type ResearchDeps = {
 };
 
 export type ResearchOutcome =
-  | { ok: true; id: string; title: string; takeaway: string; sources: number; supported: number; flagged: number; unchecked: number; total: number }
+  | { ok: true; id: string; title: string; takeaway: string; sources: number; supported: number; flagged: number; removed: number; unchecked: number; total: number }
   | { ok: false; error: string };
 
 const MAX_QUERIES = 4;
 const MAX_CANDIDATES = 20;
-const MAX_READS = 6;
-const READ_PARALLEL = 3;
+const MAX_READS = 4;
+const READ_PARALLEL = MAX_READS;
 const MIN_PAGE_CHARS = 200;
 
 type Plan = { title: string; decision: string; takeaway: string; outline: string[] };
@@ -48,6 +48,7 @@ Rules for facts:
 - Cite each such statement by linking its source in the same sentence, list item, or table cell: <a href="SOURCE URL">short source name</a>, using the exact source URLs given.
 - One fact per sentence where you can; don't merge facts from different sources into one sentence.
 - Pictures: only image URLs that appear in a source's images list.
+- Keep it focused: about 700 words of text, the facts that decide the question, not everything the sources say.
 - End with <ol class="sources"> listing the sources you used as links.
 Reply with only the HTML.`;
 
@@ -57,7 +58,17 @@ function sourcesText(docs: SourceDoc[]): string {
   return docs.map((d, i) => `[${i + 1}] ${d.url}\n${clip(d.text)}`).join("\n\n---\n\n");
 }
 
-function parsePlan(raw: string, question: string): Plan {
+function field(raw: string, key: string): string {
+  const m = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(raw);
+  if (!m) return "";
+  try {
+    return JSON.parse(`"${m[1]}"`) as string;
+  } catch {
+    return m[1];
+  }
+}
+
+export function parsePlan(raw: string, question: string): Plan {
   const json = /\{[\s\S]*\}/.exec(raw)?.[0];
   try {
     const p = JSON.parse(json ?? "") as Partial<Plan>;
@@ -68,6 +79,8 @@ function parsePlan(raw: string, question: string): Plan {
       outline: Array.isArray(p.outline) ? p.outline.map(String) : [],
     };
   } catch {
+    const title = field(raw, "title");
+    if (title) return { title: title.slice(0, 120), decision: field(raw, "decision") || question, takeaway: field(raw, "takeaway"), outline: [] };
     return { title: question.slice(0, 120), decision: question, takeaway: "", outline: [raw.slice(0, 2000)] };
   }
 }
@@ -97,7 +110,7 @@ export async function runResearch(input: ResearchInput, deps: ResearchDeps): Pro
 
     step("plan", "start");
     const brief = [`Question: ${input.question}`, input.decision && `Decision to support: ${input.decision}`, input.audience && `Audience: ${input.audience}`].filter(Boolean).join("\n");
-    const plan = parsePlan(await deps.complete({ system: PLAN_SYSTEM, user: `${brief}\n\nSources:\n\n${sourcesText(docs)}`, maxTokens: 2000, signal: deps.signal }), input.question);
+    const plan = parsePlan(await deps.complete({ system: PLAN_SYSTEM, user: `${brief}\n\nSources:\n\n${sourcesText(docs)}`, maxTokens: 4000, signal: deps.signal }), input.question);
     step("plan", "done");
 
     step("implement", "start");
@@ -116,7 +129,7 @@ export async function runResearch(input: ResearchInput, deps: ResearchDeps): Pro
 
     const saved = await deps.publish(plan.title, checked.html);
     if ("error" in saved) return { ok: false, error: saved.error };
-    return { ok: true, id: saved.id, title: plan.title, takeaway: plan.takeaway, sources: docs.length, supported: checked.supported, flagged: checked.flagged, unchecked: checked.unchecked, total: checked.total };
+    return { ok: true, id: saved.id, title: plan.title, takeaway: plan.takeaway, sources: docs.length, supported: checked.supported, flagged: checked.flagged, removed: checked.removed, unchecked: checked.unchecked, total: checked.total };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

@@ -10,14 +10,30 @@ import { nullJudge, numberJudge, REPORT, SOURCE_A, SOURCE_B } from "./fixtures.j
 const sources = [SOURCE_A, SOURCE_B];
 
 describe("verifyReport", () => {
-  it("flags the planted false claim and keeps the supported ones", async () => {
+  it("drops the planted false sentence and keeps the supported ones beside it", async () => {
     const r = await verifyReport(REPORT, sources, numberJudge());
-    expect(r.html).toContain('<span class="unverified" title="Not supported by the cited source">Heat pumps reach a COP of 5.0 in mild weather');
-    expect(r.html).not.toMatch(/unverified[^>]*>A typical install/);
-    expect(r.html).not.toMatch(/unverified[^>]*>A gas furnace/);
+    expect(r.html).not.toContain("COP of 5.0");
+    expect(r.html).toContain("A typical install costs $14,500 before incentives");
+    expect(r.html).not.toContain('class="unverified"');
     expect(r.claims.filter((c) => c.verdict === "unsupported").map((c) => c.text)).toEqual([expect.stringContaining("COP of 5.0")]);
-    expect(r).toMatchObject({ flagged: 1, unchecked: 0 });
+    expect(r).toMatchObject({ removed: 1, flagged: 0, unchecked: 0 });
     expect(r.supported).toBe(r.total - 1);
+  });
+
+  it("flags rather than drops a false claim that stands alone in its cell, paragraph or list", async () => {
+    const src = { url: "https://s.example.org/a", text: "The unit costs $100 and lasts 15 years." };
+    const html = `<p>It lasts 40 years <a href="${src.url}">[1]</a>.</p><ul><li>Costs $900 <a href="${src.url}">[1]</a>.</li></ul><table><tr><td>Price</td><td>$900 <a href="${src.url}">[1]</a></td></tr></table><div class="stat">$900</div>`;
+    const r = await verifyReport(html, [src], numberJudge());
+    expect(r).toMatchObject({ removed: 0, flagged: 4 });
+    expect(r.html.match(/class="unverified"/g)).toHaveLength(4);
+  });
+
+  it("drops a false list item when the list keeps others", async () => {
+    const src = { url: "https://s.example.org/a", text: "The unit costs $100 and lasts 15 years." };
+    const html = `<ul><li>Costs $100 <a href="${src.url}">[1]</a>.</li><li>Lasts 40 years <a href="${src.url}">[1]</a>.</li></ul><ol><li>Lasts 15 years <a href="${src.url}">[1]</a>.</li></ol>`;
+    const r = await verifyReport(html, [src], numberJudge());
+    expect(r.html).toBe(`<ul><li>Costs $100 <a href="${src.url}">[1]</a>.</li></ul><ol><li>Lasts 15 years <a href="${src.url}">[1]</a>.</li></ol>`);
+    expect(r).toMatchObject({ removed: 1, flagged: 0 });
   });
 
   it("checks table cells with their row label and normalizes cited urls", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { noJudge } from "../../src/judge/index.js";
 import { researchTool } from "../../src/tools/research.js";
-import { type ResearchDeps, runResearch, type WorkflowStep } from "../../src/workflows/research.js";
+import { parsePlan, type ResearchDeps, runResearch, type WorkflowStep } from "../../src/workflows/research.js";
 import { numberJudge, REPORT, SOURCE_A, SOURCE_B } from "./fixtures.js";
 
 const hit = (url: string) => ({ title: url, snippet: "", url });
@@ -27,7 +27,7 @@ function fakes(log: string[] = []): ResearchDeps & { steps: WorkflowStep[] } {
     judge: numberJudge(),
     publish: async (title, html) => {
       log.push(`publish:${title}`);
-      expect(html).toContain("unverified");
+      expect(html).not.toContain("COP of 5.0");
       return { id: "abcdefghijkl" };
     },
     emit: (s) => {
@@ -44,7 +44,7 @@ describe("runResearch", () => {
     const log: string[] = [];
     const deps = fakes(log);
     const out = await runResearch({ question: "heat pump or furnace?", queries: ["heat pump cost", "furnace cost"] }, deps);
-    expect(out).toMatchObject({ ok: true, id: "abcdefghijkl", title: "Heat pump vs furnace", takeaway: "Heat pump.", sources: 2, flagged: 1 });
+    expect(out).toMatchObject({ ok: true, id: "abcdefghijkl", title: "Heat pump vs furnace", takeaway: "Heat pump.", sources: 2, flagged: 0, removed: 1 });
     expect(deps.steps.map((s) => `${s.phase}:${s.status}`)).toEqual(PHASES);
     const order = ["research:start", "research:done", "plan:start", "plan", "plan:done", "implement:start", "implement", "implement:done", "verify:start", "verify:done", "publish:Heat pump vs furnace"];
     expect(log.filter((l) => order.includes(l))).toEqual(order);
@@ -79,8 +79,15 @@ describe("research tool", () => {
     });
     const r = await tool.execute("c1", { question: "q" }, undefined, (u) => updates.push(u), undefined as never);
     expect(r.isError).toBeFalsy();
-    expect(r.content[0]).toMatchObject({ text: expect.stringMatching(/^artifact abcdefghijkl created: T\nRead 2 sources\. 4 claims checked against their sources: 3 supported, 1 flagged/) });
+    expect(r.content[0]).toMatchObject({ text: expect.stringMatching(/^artifact abcdefghijkl created: T\nRead 2 sources\. 4 claims checked against their sources: 3 supported, 1 unsupported removed/) });
     const steps = updates.map((u) => (u as { details: { workflowStep: WorkflowStep } }).details.workflowStep);
     expect(steps.map((s) => `${s.phase}:${s.status}`)).toEqual(PHASES);
+  });
+});
+
+describe("parsePlan", () => {
+  it("keeps the title and takeaway when the plan reply was cut off mid-outline", () => {
+    const raw = '```json\n{"title": "Heat pump vs furnace", "decision": "Which to install", "takeaway": "A heat pump costs less to run \\"here\\".", "outline": ["costs [1]", "rebates [2';
+    expect(parsePlan(raw, "q")).toEqual({ title: "Heat pump vs furnace", decision: "Which to install", takeaway: 'A heat pump costs less to run "here".', outline: [] });
   });
 });
