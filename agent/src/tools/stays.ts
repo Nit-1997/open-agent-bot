@@ -5,7 +5,8 @@ import { stayMatch } from "../judge/criteria/stayMatch.js";
 import { type Fx, fx as liveFx } from "../lib/fx.js";
 import { formatMoney } from "../shop/currency.js";
 import { type OpenTab, type SourceResult, searchStays } from "../stays/search.js";
-import { STAY_SOURCES } from "../stays/sources/index.js";
+import { registry as defaultRegistry } from "../sources/index.js";
+import type { SourceRegistry } from "../sources/registry.js";
 import type { Stay, StayKind, StayQuery, StaySource } from "../stays/types.js";
 import { looseList } from "./args.js";
 import type { StaysData } from "./data.js";
@@ -17,7 +18,7 @@ const MAX_NIGHTS = 30;
 const SHOWN_PER_SOURCE = 5;
 const CURRENCY_SYMBOLS: Record<string, string> = { "€": "EUR", "£": "GBP", $: "USD", "₹": "INR", "¥": "JPY" };
 
-type Deps = { openTab: OpenTab; currency: string; sources?: StaySource[]; allowPrivateHosts?: boolean; judge?: Judge; fx?: Fx };
+type Deps = { openTab: OpenTab; currency: string; sources?: StaySource[]; region?: string; registry?: SourceRegistry; allowPrivateHosts?: boolean; judge?: Judge; fx?: Fx };
 
 type Budget = { amount: number; currency: string; explicit: boolean };
 type Wish = { label: string; criteria: YesNoCriteria; shared: Record<string, unknown> };
@@ -110,7 +111,7 @@ function sourceLines(r: StaysData["sources"][number], currency: string): string[
 }
 
 export function staysTool(deps: Deps) {
-  const all = deps.sources ?? STAY_SOURCES;
+  const all = deps.sources ?? (deps.registry ?? defaultRegistry).select<StaySource>({ vertical: "stays", region: deps.region });
   const rate = deps.fx ?? liveFx;
   const judge = deps.judge;
   const wantsHelp = judge

@@ -1,6 +1,6 @@
-import type { StaySource } from "../types.js";
+import { staySource } from "./define.js";
 
-export const expedia: StaySource = {
+export const expedia = staySource({
   id: "expedia",
   label: "Expedia",
   site: "expedia.com",
@@ -14,4 +14,4 @@ export const expedia: StaySource = {
     u.searchParams.set("rooms", String(q.rooms));
     return u.href;
   },
-};
+});

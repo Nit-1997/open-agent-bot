@@ -1,6 +1,5 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { BrowseAction } from "./browsePolicy.js";
 import {
   type FlightPrefs,
   LAYOVER_OPTIONS,
@@ -13,74 +12,20 @@ import {
   type TimeBucket,
 } from "../../../shared/flights.js";
 import type { AirportResult, FlightOption, FlightsData } from "./data.js";
+import { registry } from "../sources/index.js";
+import { type Browse, type FlightSource, googleFlightsUrl, parseGoogleFlights, priceBasis } from "../sources/flights/google.js";
 import { AIRPORTS, type Drive } from "./geo.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 export type { AirportResult };
+export { googleFlightsUrl, parseGoogleFlights, priceBasis };
 
 const MAX_ORIGINS = 4;
 const NEARBY = /^(home|nearby)$/i;
 const LAYOVER_IDS = LAYOVER_OPTIONS.map((o) => o.id);
 const TIME_IDS = TIME_OPTIONS.map((o) => o.id);
 
-function layover(line: string | undefined): Pick<FlightOption, "layoverMinutes" | "layoverAt"> {
-  const m = /^\s*(?:(\d+)\s*hrs?)?\s*(?:(\d+)\s*mins?)?\s+([A-Z]{3}(?:,\s*[A-Z]{3})*)\s*$/.exec(line ?? "");
-  if (!m) return {};
-  const minutes = m[1] || m[2] ? Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0) : undefined;
-  return { ...(minutes != null && { layoverMinutes: minutes }), layoverAt: m[3] };
-}
-
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME = String.raw`(\d{1,2}:\d{2}(?:\s?[ap]\.?m\.?)?(?:\+\d)?)`;
-const OPTION = new RegExp(
-  String.raw`${TIME}\s+[–-]\s+${TIME}\n([^\n]+)\n\s*\n(\d+ hrs?(?: \d+ mins?)?|\d+ mins?)\n\s*\n(Nonstop|\d+ stops?)\n[\s\S]{0,200}?\n[^\d\s]{1,4}\s?([\d,]+)\n`,
-  "gi",
-);
-
-type Query = { from: string; to: string; date: string; returnDate?: string; adults?: number };
-
-export function googleFlightsUrl(q: Query, locale: string, currency: string): string {
-  const parts = [`Flights from ${q.from} to ${q.to} on ${q.date}`];
-  parts.push(q.returnDate ? `returning ${q.returnDate}` : "one way");
-  if (q.adults && q.adults > 1) parts.push(`for ${q.adults} adults`);
-  const u = new URL("https://www.google.com/travel/flights");
-  u.searchParams.set("q", parts.join(" "));
-  u.searchParams.set("hl", locale);
-  u.searchParams.set("curr", currency);
-  return u.href;
-}
-
-export function parseGoogleFlights(text: string): FlightOption[] {
-  const seen = new Set<string>();
-  const out: FlightOption[] = [];
-  for (const m of text.matchAll(OPTION)) {
-    const [, departTime, arriveTime, airline, duration, stopsText, priceText] = m;
-    const key = `${departTime}|${arriveTime}|${airline}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const price = Number(priceText.replace(/,/g, ""));
-    const stops = /nonstop/i.test(stopsText) ? 0 : Number.parseInt(stopsText, 10);
-    const lines = m[0].split("\n");
-    const after = lines[lines.indexOf(stopsText) + 1];
-    out.push({
-      airline: airline.replace(/Operated by.*$/i, "").trim(),
-      departTime,
-      arriveTime,
-      duration,
-      stops,
-      ...(stops > 0 ? layover(after) : {}),
-      ...(Number.isFinite(price) ? { price } : {}),
-    });
-  }
-  return out;
-}
-
-export function priceBasis(text: string, roundTrip: boolean): string | undefined {
-  const m = /Prices include required taxes \+ fees for (\d+) (adults?)/i.exec(text);
-  if (!m) return undefined;
-  return `${roundTrip ? "Round-trip" : "One-way"} total for ${m[1]} ${m[2].toLowerCase()}, incl. taxes and fees`;
-}
-
 function summary(o: FlightOption, currency: string): string {
   const stops =
     o.stops === 0
@@ -89,10 +34,9 @@ function summary(o: FlightOption, currency: string): string {
   return `${o.origin ? `${o.origin}: ` : ""}${o.airline} ${o.departTime} – ${o.arriveTime}, ${o.duration}, ${stops}${o.price != null ? `, ${o.price} ${currency}` : ""}`;
 }
 
-type Attempt = { result: ToolResult; text: string; options: FlightOption[]; hardFail: boolean };
+type Attempt = Awaited<ReturnType<FlightSource["search"]>>;
 type Search = { code: string; url: string; last: Attempt };
-type Browse = (actions: BrowseAction[], opts?: { fresh?: boolean; live?: boolean }) => Promise<ToolResult>;
-type Deps = { locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null>; nearby?: () => Promise<string[]>; v2?: boolean };
+type Deps = { source: FlightSource; locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null>; nearby?: () => Promise<string[]>; v2?: boolean };
 type Params = { from: string; to: string; date: string; returnDate?: string; adults?: number; max_layover?: string; depart_times?: string };
 
 function readPrefs(params: Params): FlightPrefs {
@@ -107,16 +51,8 @@ function readPrefs(params: Params): FlightPrefs {
 }
 
 async function searchOrigin(deps: Deps, params: Params, code: string, opts: { fresh: boolean; live: boolean }): Promise<Search> {
-  const url = googleFlightsUrl({ ...params, from: code }, deps.locale, deps.currency);
-  const attempt = async (): Promise<Attempt> => {
-    const result = await deps.browse([{ op: "goto", url }, { op: "wait", ms: 3000 }, { op: "read" }], opts);
-    const text = result.content.map((c) => c.text).join("");
-    const hardFail = !!(result.isError || result.details?.blocked || result.details?.stopped);
-    return { result, text, options: hardFail ? [] : parseGoogleFlights(text), hardFail };
-  };
-  let last = await attempt();
-  if (!last.options.length) last = await attempt();
-  return { code, url, last };
+  const last = await deps.source.search({ ...params, from: code }, { locale: deps.locale, currency: deps.currency, browse: deps.browse, ...opts });
+  return { code, url: last.url, last };
 }
 
 async function airportResults(deps: Deps, searches: Search[], withRides: boolean): Promise<AirportResult[]> {
@@ -182,11 +118,13 @@ function modelText(data: FlightsData, ranked: RankedAirport<AirportResult>[], se
   ].join("\n");
 }
 
-export function flightsTool(deps: Deps) {
+export function flightsTool(args: Omit<Deps, "source"> & { source?: FlightSource }) {
+  const source = args.source ?? registry.select<FlightSource>({ vertical: "flights", capability: "search" })[0];
+  const deps: Deps = { ...args, source };
   return defineTool({
     name: "flights",
     label: "Flights",
-    description: `Search flights on Google Flights and show one flight card (with links for the user to book themselves); afterwards summarize briefly. Dates are YYYY-MM-DD. 'from' is one airport code or city, or up to ${MAX_ORIGINS} nearby airport codes separated by commas (e.g. "${deps.v2 ? "JFK, LGA, EWR" : "SJC, SFO, OAK"}") to compare them in one search; the card ranks airports by fare plus an estimated rideshare from the user's home. Pass the user's layover and departure-time preferences when known.`,
+    description: `Search flights on ${source.label} and show one flight card (with links for the user to book themselves); afterwards summarize briefly. Dates are YYYY-MM-DD. 'from' is one airport code or city, or up to ${MAX_ORIGINS} nearby airport codes separated by commas (e.g. "${deps.v2 ? "JFK, LGA, EWR" : "SJC, SFO, OAK"}") to compare them in one search; the card ranks airports by fare plus an estimated rideshare from the user's home. Pass the user's layover and departure-time preferences when known.`,
     parameters: Type.Object({
       from: Type.String({ minLength: 2, description: "airport code or city, or comma-separated nearby airport codes" }),
       to: Type.String({ minLength: 2 }),
@@ -238,7 +176,7 @@ export function flightsTool(deps: Deps) {
         prefs,
         ...(basis && { priceNote: basis }),
         searchUrl: best.searchUrl,
-        source: "Google Flights",
+        source: source.label,
       };
       return ok(modelText(data, ranked, searches, multi), { data });
     },

@@ -73,6 +73,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         return h ? nearbyAirports(h) : [];
       } : undefined;
   const v2 = deps.cfg.flags.promptV2;
+  const sourcesV2 = deps.cfg.flags.sourcesV2;
   const country = regionFor(deps.userContext).country;
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
   const openTab: OpenTab = async (live) => {
@@ -92,9 +93,9 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(withRules(imageSearchTool(search), RULES.imageSearch, v2), deps.budget, "images"),
     withBudget(musicTool({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }), deps.budget, "lookup"),
     withBudget(wikipediaTool(), deps.budget, "lookup"),
-    withBudget(fetchPageTool(), deps.budget, "read"),
+    withBudget(fetchPageTool({ structured: sourcesV2 }), deps.budget, "read"),
     withBudget(browseTool(browseDeps), deps.budget, "read"),
-    withBudget(withRules(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart, judge: deps.cfg.flags.jevRerank ? (deps.judge ?? noJudge) : undefined }), shopRules(country), v2), deps.budget, "shop"),
+    withBudget(withRules(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart, judge: deps.cfg.flags.jevRerank ? (deps.judge ?? noJudge) : undefined, sourcesV2, region: country, webSearch: sourcesV2 ? (query) => runSearch(search, query, "web", 8) : undefined }), shopRules(country), v2), deps.budget, "shop"),
     withRules(weatherTool({ defaultUnits: country === "US" ? "imperial" : "metric" }), RULES.weather, v2),
     withBudget(withRules(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
@@ -104,7 +105,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       nearby,
       v2,
     }), RULES.flights, v2), deps.budget, "flights"),
-    withBudget(withRules(staysTool({ openTab, currency: regionFor(deps.userContext).currency, judge: deps.cfg.flags.jevStays ? (deps.judge ?? noJudge) : undefined }), RULES.stays, v2), deps.budget, "stays"),
+    withBudget(withRules(staysTool({ openTab, region: country, currency: regionFor(deps.userContext).currency, judge: deps.cfg.flags.jevStays ? (deps.judge ?? noJudge) : undefined }), RULES.stays, v2), deps.budget, "stays"),
     withRules(showUiTool({
       findMusicArt: musicCover({ country }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,

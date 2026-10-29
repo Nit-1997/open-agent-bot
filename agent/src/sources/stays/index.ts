@@ -1,4 +1,4 @@
-import type { StaySource } from "../types.js";
+import type { StaySource } from "../../stays/types.js";
 import { airbnb } from "./airbnb.js";
 import { booking } from "./booking.js";
 import { expedia } from "./expedia.js";

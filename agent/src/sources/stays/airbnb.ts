@@ -1,5 +1,6 @@
-import { amount, cleanUrl, clip, count, currencyTag, httpImage, nightlyFromTotal } from "../parse.js";
-import type { Stay, StayQuery, StaySource } from "../types.js";
+import { staySource } from "./define.js";
+import { amount, cleanUrl, clip, count, currencyTag, httpImage, nightlyFromTotal } from "../../stays/parse.js";
+import type { Stay, StayQuery } from "../../stays/types.js";
 
 export type AirbnbCard = { title: string; name?: string; href?: string; image?: string; text: string };
 
@@ -36,7 +37,7 @@ export function parseAirbnbCard(c: AirbnbCard, q: StayQuery): Stay | null {
   };
 }
 
-export const airbnb: StaySource = {
+export const airbnb = staySource({
   id: "airbnb",
   label: "Airbnb",
   site: "airbnb.com",
@@ -51,4 +52,4 @@ export const airbnb: StaySource = {
     return u.href;
   },
   read: async (page, q) => (await page.evaluate(collect)).map((c) => parseAirbnbCard(c, q)).filter((s): s is Stay => s !== null),
-};
+});
