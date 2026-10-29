@@ -54,6 +54,19 @@ export const AIRPORTS: Record<string, Airport> = {
   MSY: { name: "New Orleans", lat: 29.9934, lon: -90.258 },
   RDU: { name: "Raleigh-Durham", lat: 35.8801, lon: -78.788 },
   HNL: { name: "Honolulu", lat: 21.3245, lon: -157.9251 },
+  LHR: { name: "London Heathrow", lat: 51.47, lon: -0.4543 },
+  LGW: { name: "London Gatwick", lat: 51.1537, lon: -0.1821 },
+  STN: { name: "London Stansted", lat: 51.885, lon: 0.235 },
+  LTN: { name: "London Luton", lat: 51.8747, lon: -0.3683 },
+  LCY: { name: "London City", lat: 51.5053, lon: 0.0553 },
+  CDG: { name: "Paris Charles de Gaulle", lat: 49.0097, lon: 2.5479 },
+  ORY: { name: "Paris Orly", lat: 48.7233, lon: 2.3794 },
+  BLR: { name: "Bengaluru", lat: 13.1986, lon: 77.7066 },
+  BOM: { name: "Mumbai", lat: 19.0896, lon: 72.8656 },
+  DEL: { name: "Delhi", lat: 28.5562, lon: 77.1 },
+  PNQ: { name: "Pune", lat: 18.5821, lon: 73.9197 },
+  HYD: { name: "Hyderabad", lat: 17.2403, lon: 78.4294 },
+  MAA: { name: "Chennai", lat: 12.99, lon: 80.1693 },
 };
 
 const EARTH_MILES = 3958.8;
@@ -66,6 +79,16 @@ export function milesBetween(a: LatLon, b: LatLon): number {
   const dLon = rad(b.lon - a.lon);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return 2 * EARTH_MILES * Math.asin(Math.sqrt(h));
+}
+
+const KM_PER_MILE = 1.609344;
+
+export function nearbyAirports(home: LatLon, km = 100): string[] {
+  return Object.entries(AIRPORTS)
+    .map(([code, a]) => ({ code, km: milesBetween(home, a) * KM_PER_MILE }))
+    .filter((a) => a.km <= km)
+    .sort((a, b) => a.km - b.km)
+    .map((a) => a.code);
 }
 
 export type Drive = { miles: number; minutes?: number; source: "road" | "estimate" };

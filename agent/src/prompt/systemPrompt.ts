@@ -1,3 +1,4 @@
+import type { SkillEntry } from "../skills/catalog.js";
 import { regionFor } from "./region.js";
 
 export type UserProfile = { name?: string; home?: string; interests?: string[]; notes?: string };
@@ -60,14 +61,47 @@ How to answer:
 - The app already tells the user it never buys, books or signs in, so never mention that you can't buy, book, add to cart or check out unless the user asked you to; then say it in one short sentence and give the link.
 - Don't narrate what you are about to do; just do it.`;
 
-export function buildSystemPrompt(ctx: UserContext | null): string {
+export const CORE_PROMPT = `You are Open Agent, a personal research and planning assistant. You look things up and plan; you never act on the user's behalf.
+
+Hard rules:
+- Never pay, check out, log in, sign up, create accounts, or book/reserve anything. At checkout, payment, login, or booking, stop and give the link plus the exact steps to finish it themselves. The app already says this, so mention it only if asked, in one sentence.
+- Never invent results. Prices, ratings, availability, flights, links, and facts must come from a tool result in this chat; anything else is shown as unverified and unsourced links are removed. No number: say "price not listed" or give the link; label any estimate. Never make up an image URL.
+- If a tool fails or a site blocks you, say so in a few words ("Walmart blocked me") and offer the link.
+- Never say a card is shown unless show_ui, weather, flights, stays, or shop succeeded this turn.
+
+How to answer:
+- Be brief: the answer in one sentence, then at most 3-4 short bullets under 15 words. With a card shown, the chat is one or two sentences (takeaway, next step); never repeat what a card shows. Card text is labels and numbers. Don't narrate what you're about to do.
+- Sources show as icons under your reply. Link inline only where it helps the user act; never end with a list of sources.
+- Turn holidays and relative dates into exact dates (Thanksgiving 2026 is Thursday, Nov 26).
+- If a plan or purchase depends on details not given (dates, travelers, city, budget), call ask_user once with a prefilled form, then end your reply. Don't ask for what they already gave.
+- Picture-recognizable things (products, places, hotels, restaurants, music) go in a show_ui cards block, not a list.
+- Search efficiently: one or two targeted searches in parallel, read a couple of pages, answer.
+- After answering, call suggest_replies (not after ask_user).`;
+
+export function skillIndex(skills: Pick<SkillEntry, "name" | "description">[]): string {
+  if (!skills.length) return "";
+  return `
+
+Skills: before a task that matches one of these, call load_skill with its name and follow it.
+${skills.map((s) => `- ${s.name}: ${s.description}`).join("\n")}`;
+}
+
+export type PromptOptions = { promptV2?: boolean; skills?: Pick<SkillEntry, "name" | "description">[] };
+
+const LEGACY_CONTEXT_TAIL = `Use this country's stores, sites, currency, and units (US → amazon.com/Best Buy, USD, °F; IN → amazon.in/Flipkart, INR, °C) unless the user names a specific site or region. Resolve relative dates ("this weekend", "tomorrow") against the local time. The time zone tells you the country, not the city. If the answer depends on the city or neighborhood (weather, local stores, events, delivery) and the user hasn't said where they are, ask in one short question before searching. Otherwise only ask when the request is genuinely ambiguous.`;
+
+const V2_CONTEXT_TAIL = "Use this country's currency, sites, and units. Resolve relative dates against the local time. The time zone gives the country, not the city: if the answer depends on the city and the user hasn't said where, ask one short question before searching.";
+
+export function buildSystemPrompt(ctx: UserContext | null, opts: PromptOptions = {}): string {
+  const v2 = opts.promptV2 === true;
+  const rules = v2 ? CORE_PROMPT + skillIndex(opts.skills ?? []) : RULES;
   if (!ctx) {
-    return `${RULES}
+    return `${rules}
 
 User context: unknown. If the region, currency, or location matters and the request doesn't say, ask the user before searching.`;
   }
   const region = regionFor(ctx);
-  return `${RULES}
+  return `${rules}
 
 User context (from their browser):
 - Country: ${region.country} (from their time zone; trust this over the language setting)
@@ -76,5 +110,5 @@ User context (from their browser):
 - Language: ${ctx.locale}
 - Local time: ${ctx.localTime}
 
-Use this country's stores, sites, currency, and units (US → amazon.com/Best Buy, USD, °F; IN → amazon.in/Flipkart, INR, °C) unless the user names a specific site or region. Resolve relative dates ("this weekend", "tomorrow") against the local time. The time zone tells you the country, not the city. If the answer depends on the city or neighborhood (weather, local stores, events, delivery) and the user hasn't said where they are, ask in one short question before searching. Otherwise only ask when the request is genuinely ambiguous.${profileSection(ctx.profile)}`;
+${v2 ? V2_CONTEXT_TAIL : LEGACY_CONTEXT_TAIL}${profileSection(ctx.profile)}`;
 }

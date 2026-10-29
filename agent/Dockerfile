@@ -5,6 +5,7 @@ RUN npm ci
 COPY shared /app/shared
 COPY agent/tsconfig.json ./
 COPY agent/src ./src
+COPY agent/skills ./skills
 RUN npm run build && npm prune --omit=dev
 ENV NODE_ENV=production
 EXPOSE 8000

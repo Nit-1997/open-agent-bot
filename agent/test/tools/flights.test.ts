@@ -120,4 +120,39 @@ describe("flights tool", () => {
     );
     expect(r.isError).toBe(true);
   });
+
+  it("expands 'nearby' to the airports near the user's home", async () => {
+    const urls: string[] = [];
+    const browse = async (a: Array<{ url?: string }>) => {
+      urls.push(a[0].url!);
+      return ok("");
+    };
+    await flightsTool({ locale: "en-US", currency: "USD", browse: browse as never, nearby: async () => ["SJC", "SFO", "OAK"] }).execute(
+      "c",
+      { from: "nearby", to: "BNA", date: "2026-12-12" },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    const codes = new Set(urls.map((u) => new URL(u).searchParams.get("q")!.split(" ")[2]));
+    expect([...codes].sort()).toEqual(["OAK", "SFO", "SJC"]);
+  });
+
+  it("asks for an airport when 'nearby' is used without a known home", async () => {
+    const r = await flightsTool({ locale: "en-US", currency: "USD", browse: async () => ok(""), nearby: async () => [] }).execute(
+      "c",
+      { from: "home", to: "BNA", date: "2026-12-12" },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain("Ask them which airport");
+  });
+
+  it("names no Bay Area example in the v2 description", () => {
+    const base = { locale: "en-US", currency: "USD", browse: async () => ok("") };
+    expect(flightsTool(base).description).toContain("SJC, SFO, OAK");
+    expect(flightsTool({ ...base, v2: true }).description).not.toContain("SJC");
+  });
 });

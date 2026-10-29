@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { storeFor } from "../../src/shop/stores.js";
+import { defaultStoresFor, storeFor } from "../../src/shop/stores.js";
 
 describe("storeFor", () => {
   it("maps names and domains to the same store", () => {
@@ -22,5 +22,21 @@ describe("storeFor", () => {
     const s = storeFor("www.rei.com");
     expect(s).toMatchObject({ id: "rei.com", label: "rei.com", home: "https://www.rei.com/" });
     expect(s.searchUrl).toBeUndefined();
+  });
+});
+
+describe("defaultStoresFor", () => {
+  it("picks stores by region and kind", () => {
+    expect(defaultStoresFor("US", "grocery")).toEqual(["shipt"]);
+    expect(defaultStoresFor("US", "general")).toEqual(["amazon", "target"]);
+    expect(defaultStoresFor("IN", "general")).toEqual(["amazon.in", "flipkart"]);
+    expect(defaultStoresFor("GB", "grocery")).toEqual(["amazon.co.uk"]);
+  });
+
+  it("returns stores that resolve to the right sites", () => {
+    expect(storeFor("amazon.in").home).toBe("https://www.amazon.in/");
+    expect(storeFor("amazon.co.uk").searchUrl!("tea")).toBe("https://www.amazon.co.uk/s?k=tea");
+    expect(storeFor("flipkart").home).toBe("https://www.flipkart.com/");
+    expect(storeFor("amazon.com").id).toBe("amazon");
   });
 });

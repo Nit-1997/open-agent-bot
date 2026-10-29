@@ -10,19 +10,23 @@ import { imageLoads } from "../artifacts/images.js";
 import { createArtifactTool } from "./createArtifact.js";
 import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
-import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon } from "./geo.js";
+import { AIRPORTS, type Drive, driveRoute, geocode, type LatLon, nearbyAirports } from "./geo.js";
 import type { Evidence } from "../grounding/evidence.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { OpenTab } from "../stays/search.js";
 import type { ActiveCart } from "../shop/cart.js";
-import { askUserTool } from "./askUser.js";
+import { askUserTool, FIELDS_HELP } from "./askUser.js";
+import { REPORT_GUIDE } from "../artifacts/reportKit.js";
 import { musicCover } from "./musicArt.js";
-import { showUiTool, suggestRepliesTool } from "./showWidget.js";
+import { BLOCKS_HELP, showUiTool, suggestRepliesTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
 import { imageSearchTool, matchingImage, search as runSearch, webSearchTool } from "./webSearch.js";
 import { musicTool, wikipediaTool } from "./lookup.js";
 import { shopTool } from "./shop.js";
 import { staysTool } from "./stays.js";
+import { loadSkillTool } from "./loadSkill.js";
+import { RULES, shopRules, withRules } from "./rules.js";
+import type { SkillEntry } from "../skills/catalog.js";
 
 export type ToolDeps = {
   cfg: AgentConfig;
@@ -34,6 +38,7 @@ export type ToolDeps = {
   evidence?: Evidence;
   frames?: FrameBus;
   cart?: ActiveCart;
+  skills?: SkillEntry[];
 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2 };
@@ -58,6 +63,12 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         return drives.get(code)!;
       }
     : undefined;
+  const nearby = home ? async () => {
+        const h = await home();
+        return h ? nearbyAirports(h) : [];
+      } : undefined;
+  const v2 = deps.cfg.flags.promptV2;
+  const country = regionFor(deps.userContext).country;
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
   const openTab: OpenTab = async (live) => {
     const page = await deps.pool.tab(deps.threadId, deps.userContext);
@@ -73,26 +84,29 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
   const browseDeps = { pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames };
   return [
     withBudget(webSearchTool(search), deps.budget, "search"),
-    withBudget(imageSearchTool(search), deps.budget, "images"),
-    withBudget(musicTool({ country: regionFor(deps.userContext).country }), deps.budget, "lookup"),
+    withBudget(withRules(imageSearchTool(search), RULES.imageSearch, v2), deps.budget, "images"),
+    withBudget(musicTool({ country }), deps.budget, "lookup"),
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browseTool(browseDeps), deps.budget, "read"),
-    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart }), deps.budget, "shop"),
-    weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),
-    withBudget(flightsTool({
+    withBudget(withRules(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart }), shopRules(country), v2), deps.budget, "shop"),
+    withRules(weatherTool({ defaultUnits: country === "US" ? "imperial" : "metric" }), RULES.weather, v2),
+    withBudget(withRules(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
       currency: regionFor(deps.userContext).currency,
       browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
       drive,
-    }), deps.budget, "flights"),
-    withBudget(staysTool({ openTab, currency: regionFor(deps.userContext).currency }), deps.budget, "stays"),
-    showUiTool({
-      findMusicArt: musicCover({ country: regionFor(deps.userContext).country }),
+      nearby,
+      v2,
+    }), RULES.flights, v2), deps.budget, "flights"),
+    withBudget(withRules(staysTool({ openTab, currency: regionFor(deps.userContext).currency }), RULES.stays, v2), deps.budget, "stays"),
+    withRules(showUiTool({
+      findMusicArt: musicCover({ country }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
-      findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }),
+      findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, v2, BLOCKS_HELP),
     suggestRepliesTool(),
-    askUserTool(),
-    createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }),
+    withRules(askUserTool(), RULES.askUser, v2, FIELDS_HELP),
+    withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, v2, REPORT_GUIDE),
+    ...(v2 ? [loadSkillTool(() => deps.skills ?? [])] : []),
   ];
 }

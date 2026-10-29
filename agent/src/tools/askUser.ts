@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import { ASK_FIELD_TYPES, validateWidget } from "../../../shared/widgets.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
-const FIELDS_HELP = `Fields, prefilled with your best guess so the user can just confirm:
+export const FIELDS_HELP = `Fields, prefilled with your best guess so the user can just confirm:
 - {type:"date_range", label, start:"YYYY-MM-DD", end:"YYYY-MM-DD"}
 - {type:"number", label, value?, min?, max?}
 - {type:"choice", label, options:[...2-8], value?}

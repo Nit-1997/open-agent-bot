@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import { fitWidget, UI_BLOCK_TYPES, type UiWidget, validateWidget } from "../../../shared/widgets.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
-const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at most 8 blocks, labels not sentences. Blocks, in display order:
+export const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at most 8 blocks, labels not sentences. Blocks, in display order:
 - {type:"heading", text}
 - {type:"text", text} (2 sentences max)
 - {type:"stats", items:[{label, value, note?}]} for a few key numbers
