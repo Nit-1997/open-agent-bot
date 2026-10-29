@@ -1,5 +1,20 @@
 export type ModelOption = { id: string; label: string; note?: string };
 
+export const FLAG_ENV = {
+  jevRerank: "JEV_RERANK",
+  promptV2: "PROMPT_V2",
+  jevStays: "JEV_STAYS",
+  jevMusic: "JEV_MUSIC",
+  turnBudget: "TURN_BUDGET",
+  sourcesV2: "SOURCES_V2",
+  codemode: "CODEMODE",
+  workspace: "WORKSPACE",
+  router: "ROUTER",
+  rpiv: "RPIV",
+} as const;
+
+export type Flags = Record<keyof typeof FLAG_ENV, boolean>;
+
 export type AgentConfig = {
   port: number;
   llmBaseUrl: string;
@@ -11,7 +26,15 @@ export type AgentConfig = {
   sharedSecret?: string;
   dataDir: string;
   models: ModelOption[];
+  jevModel: string;
+  flags: Flags;
 };
+
+const on = (v: string | undefined) => ["1", "true", "on", "yes"].includes((v ?? "").trim().toLowerCase());
+
+function parseFlags(env: NodeJS.ProcessEnv): Flags {
+  return Object.fromEntries(Object.entries(FLAG_ENV).map(([k, name]) => [k, on(env[name])])) as Flags;
+}
 
 function parseModels(raw: string | undefined, fallback: string): ModelOption[] {
   const listed = (raw ?? "")
@@ -35,5 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
     sharedSecret: env.AGENT_SHARED_SECRET || undefined,
     dataDir: env.AGENT_DATA_DIR ?? "/data/agent",
     models: parseModels(env.AGENT_MODELS, model),
+    jevModel: env.JEV_MODEL || "openrouter/typesafe/jev-1.14",
+    flags: parseFlags(env),
   };
 }

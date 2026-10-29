@@ -14,7 +14,28 @@ describe("loadConfig", () => {
       sharedSecret: undefined,
       dataDir: "/data/agent",
       models: [{ id: "chat-default", label: "chat-default" }],
+      jevModel: "openrouter/typesafe/jev-1.14",
+      flags: {
+        jevRerank: false,
+        promptV2: false,
+        jevStays: false,
+        jevMusic: false,
+        turnBudget: false,
+        sourcesV2: false,
+        codemode: false,
+        workspace: false,
+        router: false,
+        rpiv: false,
+      },
     });
+  });
+
+  it("reads feature flags and the Jev model", () => {
+    const cfg = loadConfig({ JEV_RERANK: "1", ROUTER: "true", CODEMODE: "off", JEV_MODEL: "typesafe/jev-latest" });
+    expect(cfg.flags.jevRerank).toBe(true);
+    expect(cfg.flags.router).toBe(true);
+    expect(cfg.flags.codemode).toBe(false);
+    expect(cfg.jevModel).toBe("typesafe/jev-latest");
   });
 
   it("treats LLM_API_KEY as optional, since providers can be added in the app", () => {
