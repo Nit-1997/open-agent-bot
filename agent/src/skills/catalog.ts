@@ -19,19 +19,22 @@ export function skillsDir(env: NodeJS.ProcessEnv = process.env, from: string = d
   return env.SKILLS_DIR ? resolve(env.SKILLS_DIR) : join(packageRoot(from), "skills");
 }
 
-const WORKSPACE_LINE = /^(\s*)\[workspace\] /;
+const FLAG_LINE = /^(\s*)\[(workspace|rpiv)\] /;
 
-function forFlags(body: string, workspace: boolean): string {
+function forFlags(body: string, flags: Record<string, boolean>): string {
   return body
     .split("\n")
-    .flatMap((line) => (WORKSPACE_LINE.test(line) ? (workspace ? [line.replace(WORKSPACE_LINE, "$1")] : []) : [line]))
+    .flatMap((line) => {
+      const m = FLAG_LINE.exec(line);
+      return m ? (flags[m[2]] ? [line.replace(FLAG_LINE, "$1")] : []) : [line];
+    })
     .join("\n");
 }
 
-export function loadSkillCatalog(dir: string, opts: { workspace?: boolean } = {}): SkillEntry[] {
+export function loadSkillCatalog(dir: string, opts: { workspace?: boolean; rpiv?: boolean } = {}): SkillEntry[] {
   const { skills } = loadSkillsFromDir({ dir, source: "open-agent" });
   return skills
     .filter((s) => s.name && s.description)
-    .map((s) => ({ name: s.name, description: s.description, body: forFlags(stripFrontmatter(readFileSync(s.filePath, "utf8")).trim(), opts.workspace === true) }))
+    .map((s) => ({ name: s.name, description: s.description, body: forFlags(stripFrontmatter(readFileSync(s.filePath, "utf8")).trim(), { workspace: opts.workspace === true, rpiv: opts.rpiv === true }) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

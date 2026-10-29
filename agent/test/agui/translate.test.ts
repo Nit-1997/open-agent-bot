@@ -209,4 +209,11 @@ describe("grounding", () => {
     const out = [...[assistantStart, delta("$7.49")].flatMap((e) => t.translate(e)), ...t.finish()];
     expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
   });
+
+  it("turns research tool updates into workflow_step events", () => {
+    const step = { workflow: "research", phase: "plan", status: "start" };
+    const update = { type: "tool_execution_update", toolCallId: "c", toolName: "research", args: {}, partialResult: { details: { workflowStep: step } } } as unknown as PiEvent;
+    const plain = { type: "tool_execution_update", toolCallId: "c", toolName: "browse", args: {}, partialResult: { details: {} } } as unknown as PiEvent;
+    expect(run([update, plain])).toEqual([{ type: EventType.CUSTOM, name: "workflow_step", value: step }]);
+  });
 });

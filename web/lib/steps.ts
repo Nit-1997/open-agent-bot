@@ -16,6 +16,22 @@ function list(v: unknown): string[] {
 
 export const RENDER_TOOLS = new Set(["show_ui", "show_widget", "ask_user", "suggest_replies"]);
 
+export type WorkflowStepEvent = {
+  workflow: "research";
+  phase: "research" | "plan" | "implement" | "verify";
+  status: "start" | "done";
+  detail?: { sources?: number; supported?: number; total?: number; unchecked?: number };
+};
+
+const PHASE_LABELS = { research: "Researching sources", plan: "Planning the report", implement: "Writing the report", verify: "Checking claims" };
+
+function workflowLabel(args: StepArgs): string {
+  const phase = String(args.phase) as WorkflowStepEvent["phase"];
+  const label = PHASE_LABELS[phase] ?? "Working";
+  const { supported, total } = args as { supported?: number; total?: number };
+  return phase === "verify" && typeof supported === "number" && typeof total === "number" ? `${label} (${supported} of ${total} supported)` : label;
+}
+
 export function stepLabel(name: string, args: StepArgs, done = true): string {
   const host = (u: unknown) => hostOf(String(u ?? "")) ?? "a page";
   switch (name) {
@@ -56,6 +72,10 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
       return `${args.action === "get" ? (done ? "Read" : "Reading") : done ? "Saved" : "Saving"} the ${String(args.kind ?? "plan")}`;
     case "create_artifact":
       return `${done ? "Wrote" : "Writing"} “${String(args.title ?? "page")}”`;
+    case "research":
+      return `${done ? "Researched" : "Researching"} “${String(args.question ?? "the question")}”`;
+    case "workflow_step":
+      return workflowLabel(args);
     default:
       return name;
   }
@@ -67,7 +87,7 @@ export function stepKind(name: string): "search" | "read" | "weather" | "flight"
   if (name === "fetch_page" || name === "browse") return "read";
   if (name === "weather") return "weather";
   if (name === "flights") return "flight";
-  if (name === "create_artifact") return "write";
+  if (name === "create_artifact" || name === "research") return "write";
   return "other";
 }
 

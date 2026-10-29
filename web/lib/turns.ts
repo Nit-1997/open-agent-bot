@@ -1,5 +1,5 @@
 import { dedupeSources, hostOf, linksIn, searchResults, type Source, toSource } from "./sources";
-import { RENDER_TOOLS, type StepArgs } from "./steps";
+import { RENDER_TOOLS, type StepArgs, type WorkflowStepEvent } from "./steps";
 
 type ToolCall = { id: string; function: { name: string; arguments: string } };
 
@@ -67,6 +67,7 @@ export function buildTurns(messages: readonly ChatMessage[]): Turn[] {
       const result = results.get(c.id);
       if (name === "show_widget") t.items.push({ kind: "widget", id: c.id, widget: args.widget });
       if (name === "create_artifact") t.items.push({ kind: "artifact", id: c.id, title: String(args.title ?? "Page"), result });
+      if (name === "research") t.items.push({ kind: "artifact", id: c.id, title: /artifact [\w-]{12} created: ([^\n]+)/.exec(result ?? "")?.[1] ?? "Report", result });
       if (RENDER_TOOLS.has(name)) continue;
       const found = name === "web_search" && result ? searchResults(result) : [];
       p.searched.push(...found);
@@ -85,4 +86,21 @@ export function buildTurns(messages: readonly ChatMessage[]): Turn[] {
     t.sources = dedupeSources([p.cited, p.opened, p.searched]).filter((s) => hostOf(s.url));
   }
   return turns;
+}
+
+const PHASES: WorkflowStepEvent["phase"][] = ["research", "plan", "implement", "verify"];
+
+export function withWorkflow(turns: Turn[], events: Record<string, WorkflowStepEvent[]>): Turn[] {
+  return turns.map((t) => {
+    const seen = events[t.id];
+    const at = t.steps.findIndex((s) => s.name === "research");
+    if (!seen?.length || at < 0) return t;
+    const call = t.steps[at];
+    const phases = PHASES.filter((p) => seen.some((e) => e.phase === p)).map((phase): Step => {
+      const detail = seen.filter((e) => e.phase === phase && e.detail).at(-1)?.detail;
+      const finished = call.done || seen.some((e) => e.phase === phase && e.status === "done");
+      return { id: `${call.id}-${phase}`, name: "workflow_step", args: { phase, ...detail }, done: finished, sites: [] };
+    });
+    return { ...t, steps: [...t.steps.slice(0, at), ...phases, ...t.steps.slice(at + 1)] };
+  });
 }
