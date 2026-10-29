@@ -11,6 +11,7 @@ import { registry as defaultRegistry } from "../sources/index.js";
 import type { SourceRegistry } from "../sources/registry.js";
 import { browserSearch } from "../sources/retail/browser.js";
 import { resolveStore } from "../sources/retail/resolve.js";
+import { defaultStoresFor } from "../shop/stores.js";
 import type { RetailCtx, RetailSource, Store } from "../sources/retail/types.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "./browserPool.js";
@@ -226,7 +227,11 @@ export function shopTool(deps: Deps) {
       let search: CartItem[];
       let fresh = false;
       if (params.new_cart || !cart.stores.length) {
-        if (!picked.length || !asked.length) return fail("pass stores and items");
+        if (!asked.length) return fail("pass items to add");
+        if (!picked.length) {
+          const region = deps.region ?? "US";
+          return fail(`pass stores for this new cart: the store the user named, else this region's defaults (groceries ${defaultStoresFor(region, "grocery").join(", ")}; other products ${defaultStoresFor(region, "general").join(", ")})`);
+        }
         cart.start(ids, asked);
         added = cart.items;
         search = cart.items;
