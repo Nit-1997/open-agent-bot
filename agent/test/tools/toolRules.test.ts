@@ -28,6 +28,9 @@ describe("tool descriptions behind promptV2", () => {
     expect(desc(on, "flights")).not.toContain("SJC");
     expect(desc(on, "stays")).toContain("Don't browse booking sites");
     expect(desc(on, "shop")).toContain("pass only the new items");
+    expect(desc(on, "shop").match(/pass only the new items|pass just the new items/g)).toHaveLength(1);
+    expect(desc(on, "shop")).toContain("Stores");
+    expect(desc(on, "flights").match(/rideshare/g)).toHaveLength(1);
     expect(desc(on, "show_ui")).toContain("one card per item");
     expect(desc(on, "ask_user")).toContain("don't search until they answer");
     expect(desc(on, "create_artifact")).toContain("load_skill research");

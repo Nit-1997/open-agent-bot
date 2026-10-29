@@ -74,7 +74,6 @@ How to answer:
 - Sources show as icons under your reply. Link inline only where it helps the user act; never end with a list of sources.
 - Turn holidays and relative dates into exact dates (Thanksgiving 2026 is Thursday, Nov 26).
 - If a plan or purchase depends on details not given (dates, travelers, city, budget), call ask_user once with a prefilled form, then end your reply. Don't ask for what they already gave.
-- Picture-recognizable things (products, places, hotels, restaurants, music) go in a show_ui cards block, not a list.
 - Search efficiently: one or two targeted searches in parallel, read a couple of pages, answer.
 - After answering, call suggest_replies (not after ask_user).`;
 
