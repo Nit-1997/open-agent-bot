@@ -1,0 +1,20 @@
+id: events
+proves: [M5]
+set: long-tail
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Find kid-friendly things to do near Palo Alto this weekend for a 6 and a 9 year old. Free or under $20 each."
+    if_asked: "This Saturday and Sunday, a 6 and a 9 year old, near Palo Alto, free or under $20 per person"
+assert:
+  - { type: max_tool_calls, n: 14 }
+  - { type: max_llm_turns, n: 12 }
+  - { type: widget_matches, kind: ui, pattern: "\"type\":\"cards\"" }
+  - { type: widget_matches, kind: ui, pattern: "kid|famil|child" }
+  - { type: widget_matches, kind: ui, pattern: "free|\\$\\d" }
+  - { type: text_matches, pattern: "kid|famil|child" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+  - { type: max_duration_s, n: 360 }

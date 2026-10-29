@@ -62,6 +62,16 @@ describe("assertions", () => {
     expect(ok({ type: "max_unverified_claims", n: 1, turn: 1 })).toBe(true);
   });
 
+  it("max_llm_turns sums run_stats and fails when they are missing", () => {
+    const stats = (llmTurns?: number) => ({ inputTokens: 0, outputTokens: 0, cacheRead: 0, costUsd: 0, jevCalls: 0, jevCostUsd: 0, toolCalls: 0, durationMs: 0, skills: [], ...(llmTurns !== undefined && { llmTurns }) });
+    const counted = [turn({ stats: stats(3) }), turn({ stats: stats(4) })];
+    expect(ok({ type: "max_llm_turns", n: 7 }, counted)).toBe(true);
+    expect(ok({ type: "max_llm_turns", n: 6 }, counted)).toBe(false);
+    expect(ok({ type: "max_llm_turns", n: 3, turn: 1 }, counted)).toBe(true);
+    expect(evaluate({ type: "max_llm_turns", n: 9 }, [turn({ stats: stats() })]).detail).toContain("no llmTurns");
+    expect(ok({ type: "max_llm_turns", n: 9 })).toBe(false);
+  });
+
   it("banned_phrases is case-insensitive and reports the match", () => {
     const r = evaluate({ type: "banned_phrases", patterns: ["I (have )?booked", "nothing"] }, turns);
     expect(r.ok).toBe(false);

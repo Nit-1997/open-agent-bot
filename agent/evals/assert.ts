@@ -38,6 +38,13 @@ function check(a: Assertion, turns: TurnRecord[]): { ok: boolean; detail: string
       const max = num(a, "n");
       return { ok: tools.length <= max, detail: `${tools.length} calls, max ${max}` };
     }
+    case "max_llm_turns": {
+      const max = num(a, "n");
+      const counts = turns.map((t) => t.stats?.llmTurns);
+      if (counts.some((n) => n === undefined)) return { ok: false, detail: "run_stats has no llmTurns" };
+      const n = counts.reduce((sum: number, x) => sum + (x ?? 0), 0);
+      return { ok: n <= max, detail: `${n} llm turns, max ${max}` };
+    }
     case "widget_present": {
       const kind = str(a, "kind");
       const n = widgets.filter((w) => w.kind === kind).length;

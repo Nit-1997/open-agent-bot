@@ -1,0 +1,21 @@
+id: gifts
+proves: [M5]
+set: long-tail
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Gift ideas for my dad, who loves cooking and good coffee. Budget $60."
+    if_asked: "For my dad's birthday, he loves cooking and coffee, up to $60, shop online"
+assert:
+  - { type: must_call, tool: shop }
+  - { type: max_tool_calls, n: 10 }
+  - { type: max_llm_turns, n: 10 }
+  - { type: widget_matches, kind: ui, pattern: "\"type\":\"cards\"" }
+  - { type: widget_matches, kind: ui, pattern: "coffee|cook|kitchen|chef|brew" }
+  - { type: widget_matches, kind: ui, pattern: "\\$(?:6[1-9]|[7-9]\\d|\\d{3,})", negate: true }
+  - { type: text_matches, pattern: "\\$\\d" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+  - { type: max_duration_s, n: 300 }

@@ -52,7 +52,7 @@ describe("pi skill loading", () => {
     const handle = await open(skillsDir());
     try {
       const names = handle.session.resourceLoader.getSkills().skills.map((s) => s.name).sort();
-      expect(names).toEqual(loadSkillCatalog(skillsDir()).map((s) => s.name));
+      expect(names).toEqual(loadSkillCatalog(skillsDir(), { codemode: true }).map((s) => s.name));
     } finally {
       await handle.dispose();
     }

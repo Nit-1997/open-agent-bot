@@ -1,4 +1,5 @@
 import { serve } from "@hono/node-server";
+import type { Model } from "@earendil-works/pi-ai";
 import { createApp, defaultModelRef } from "./app.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig, hasCap } from "./config.js";
@@ -42,6 +43,8 @@ const router: Router | undefined = cfg.flags.router
     }
   : undefined;
 
+const modelRef = (m: Model<any>) => `${m.provider}/${m.id}`;
+
 function modelFor(ref: string | undefined) {
   const fallback = defaultModelRef(cfg, hub);
   const model = (ref && hub.resolve(ref)) || (fallback && hub.resolve(fallback));
@@ -56,7 +59,8 @@ const store = new SessionStore({
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = workspace ? workspaceCart(workspace, threadId) : new ActiveCart();
-    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv }) : [];
+    const codemode = cfg.flags.codemode && hasCap(cfg, modelRef(modelFor(userContext?.model)), "codemode");
+    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv, codemode }) : [];
     const turnJudge = scopeJudge(judge);
     let hintNote: string | undefined;
     let current = modelFor(userContext?.model);
@@ -66,6 +70,7 @@ const store = new SessionStore({
       systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
       tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, judge: turnJudge, workspace, complete: completeWith(hub.runtime, () => current) }),
       ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
+      ...(cfg.flags.codemode && { codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode") }),
       ...(workspace && { history }),
       ...((workspace || router) && { contextNote: () => [workspace && workspaceNote(workspace, threadId), hintNote].filter(Boolean).join("\n\n") || undefined }),
     });
