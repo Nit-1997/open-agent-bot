@@ -19,6 +19,7 @@ import { fail, ok, type ToolResult } from "./result.js";
 export type { AirportResult };
 
 const MAX_ORIGINS = 4;
+const NEARBY = /^(home|nearby)$/i;
 const LAYOVER_IDS = LAYOVER_OPTIONS.map((o) => o.id);
 const TIME_IDS = TIME_OPTIONS.map((o) => o.id);
 
@@ -91,7 +92,7 @@ function summary(o: FlightOption, currency: string): string {
 type Attempt = { result: ToolResult; text: string; options: FlightOption[]; hardFail: boolean };
 type Search = { code: string; url: string; last: Attempt };
 type Browse = (actions: BrowseAction[], opts?: { fresh?: boolean; live?: boolean }) => Promise<ToolResult>;
-type Deps = { locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null> };
+type Deps = { locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null>; nearby?: () => Promise<string[]>; v2?: boolean };
 type Params = { from: string; to: string; date: string; returnDate?: string; adults?: number; max_layover?: string; depart_times?: string };
 
 function readPrefs(params: Params): FlightPrefs {
@@ -185,7 +186,7 @@ export function flightsTool(deps: Deps) {
   return defineTool({
     name: "flights",
     label: "Flights",
-    description: `Search flights on Google Flights and show one flight card (with links for the user to book themselves); afterwards summarize briefly. Dates are YYYY-MM-DD. 'from' is one airport code or city, or up to ${MAX_ORIGINS} nearby airport codes separated by commas (e.g. "SJC, SFO, OAK") to compare them in one search; the card ranks airports by fare plus an estimated rideshare from the user's home. Pass the user's layover and departure-time preferences when known.`,
+    description: `Search flights on Google Flights and show one flight card (with links for the user to book themselves); afterwards summarize briefly. Dates are YYYY-MM-DD. 'from' is one airport code or city, or up to ${MAX_ORIGINS} nearby airport codes separated by commas (e.g. "${deps.v2 ? "JFK, LGA, EWR" : "SJC, SFO, OAK"}") to compare them in one search; the card ranks airports by fare plus an estimated rideshare from the user's home. Pass the user's layover and departure-time preferences when known.`,
     parameters: Type.Object({
       from: Type.String({ minLength: 2, description: "airport code or city, or comma-separated nearby airport codes" }),
       to: Type.String({ minLength: 2 }),
@@ -199,7 +200,13 @@ export function flightsTool(deps: Deps) {
       if (!DATE.test(params.date) || (params.returnDate && !DATE.test(params.returnDate))) {
         return fail("dates must be YYYY-MM-DD");
       }
-      const origins = [...new Set(params.from.split(",").map((o) => o.trim()).filter(Boolean))].slice(0, MAX_ORIGINS);
+      const asked = params.from.split(",").map((o) => o.trim()).filter(Boolean);
+      const wantsNearby = asked.some((o) => NEARBY.test(o));
+      const nearby = wantsNearby ? await (deps.nearby?.() ?? Promise.resolve([])) : [];
+      if (wantsNearby && !nearby.length && asked.every((o) => NEARBY.test(o))) {
+        return fail("The user's home location is unknown, so there are no nearby airports to search. Ask them which airport to fly from.");
+      }
+      const origins = [...new Set(asked.flatMap((o) => (NEARBY.test(o) ? nearby : [o])))].slice(0, MAX_ORIGINS);
       if (!origins.length) return fail("from is empty");
       const prefs = readPrefs(params);
       const multi = origins.length > 1;

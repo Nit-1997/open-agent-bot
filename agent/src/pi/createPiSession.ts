@@ -25,6 +25,7 @@ export async function createPiSession(opts: {
   model: Model<any>;
   systemPrompt: string;
   tools: ToolDefinition<any, any, any>[];
+  skillsDir?: string;
 }): Promise<PiSessionHandle> {
   const dir = await mkdtemp(join(tmpdir(), "pi-session-"));
   const settingsManager = SettingsManager.inMemory();
@@ -34,6 +35,7 @@ export async function createPiSession(opts: {
     settingsManager,
     noExtensions: true,
     noSkills: true,
+    ...(opts.skillsDir && { additionalSkillPaths: [opts.skillsDir] }),
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,

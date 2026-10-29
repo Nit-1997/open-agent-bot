@@ -23,6 +23,9 @@ const KNOWN: Store[] = [
     scrolls: 6,
   },
   { id: "amazon", label: "Amazon", home: "https://www.amazon.com/", searchUrl: (s) => `https://www.amazon.com/s?k=${q(s)}` },
+  { id: "amazon.in", label: "Amazon India", home: "https://www.amazon.in/", searchUrl: (s) => `https://www.amazon.in/s?k=${q(s)}` },
+  { id: "amazon.co.uk", label: "Amazon UK", home: "https://www.amazon.co.uk/", searchUrl: (s) => `https://www.amazon.co.uk/s?k=${q(s)}` },
+  { id: "flipkart", label: "Flipkart", home: "https://www.flipkart.com/", searchUrl: (s) => `https://www.flipkart.com/search?q=${q(s)}` },
   { id: "target", label: "Target", home: "https://www.target.com/", searchUrl: (s) => `https://www.target.com/s?searchTerm=${q(s)}` },
   { id: "walmart", label: "Walmart", home: "https://www.walmart.com/", searchUrl: (s) => `https://www.walmart.com/search?q=${q(s)}` },
   { id: "costco", label: "Costco", home: "https://www.costco.com/", searchUrl: (s) => `https://www.costco.com/s?keyword=${q(s)}` },
@@ -35,9 +38,26 @@ const ALIASES: Record<string, string> = { "best buy": "bestbuy", "best-buy": "be
 
 export function storeFor(input: string): Store {
   const raw = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+  const exact = KNOWN.find((s) => s.id === raw);
+  if (exact) return exact;
   const name = ALIASES[raw] ?? raw.replace(/\.(com|co\.uk|ca|in)$/, "").replace(/\s+/g, "");
   const known = KNOWN.find((s) => s.id === name);
   if (known) return known;
   const domain = raw.includes(".") ? raw : `${name}.com`;
   return { id: domain, label: domain, home: `https://www.${domain}/` };
+}
+
+export type StoreKind = "grocery" | "general";
+
+export function defaultStoresFor(country: string, kind: StoreKind): string[] {
+  switch (country.toUpperCase()) {
+    case "US":
+      return kind === "grocery" ? ["shipt"] : ["amazon", "target"];
+    case "IN":
+      return ["amazon.in", "flipkart"];
+    case "GB":
+      return ["amazon.co.uk"];
+    default:
+      return ["amazon"];
+  }
 }

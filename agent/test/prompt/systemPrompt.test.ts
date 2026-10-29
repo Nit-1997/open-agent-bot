@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 
@@ -41,5 +42,16 @@ describe("buildSystemPrompt", () => {
 
   it("leaves the profile section out when there is none", () => {
     expect(buildSystemPrompt({ timeZone: "UTC", locale: "en-US", localTime: "2026-10-27T18:00" })).not.toContain("About the user");
+  });
+});
+
+describe("buildSystemPrompt with promptV2 off", () => {
+  const fixture = (n: string) => readFileSync(new URL(`../fixtures/${n}`, import.meta.url), "utf8");
+
+  it("matches the pre-v2 prompt exactly", () => {
+    const ctx = { timeZone: "America/Los_Angeles", locale: "en-US", localTime: "2026-10-27T18:00", profile: { name: "Nitin", home: "Sunnyvale, CA 94087", interests: ["Vegetarian"], notes: "Two cats." } };
+    expect(buildSystemPrompt(ctx)).toBe(fixture("legacyPrompt.us.txt"));
+    expect(buildSystemPrompt(ctx, { promptV2: false, skills: [{ name: "x", description: "y" }] })).toBe(fixture("legacyPrompt.us.txt"));
+    expect(buildSystemPrompt(null)).toBe(fixture("legacyPrompt.none.txt"));
   });
 });

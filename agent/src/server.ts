@@ -8,6 +8,7 @@ import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { ProviderHub } from "./providers/hub.js";
 import { LoginFlows } from "./providers/logins.js";
+import { loadSkillCatalog, skillsDir } from "./skills/catalog.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { BrowserPool } from "./tools/browserPool.js";
@@ -38,11 +39,13 @@ const store = new SessionStore({
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = new ActiveCart();
+    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir()) : [];
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: modelFor(userContext?.model),
-      systemPrompt: buildSystemPrompt(userContext),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart }),
+      systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills }),
+      ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
     });
     return {
       session: handle.session,

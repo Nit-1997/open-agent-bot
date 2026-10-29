@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
 import { renderData } from "../../src/render/registry.js";
 import { flightsTool, priceBasis } from "../../src/tools/flights.js";
-import { AIRPORTS, driveRoute, milesBetween } from "../../src/tools/geo.js";
+import { AIRPORTS, driveRoute, milesBetween, nearbyAirports } from "../../src/tools/geo.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";
 import { fail, ok } from "../../src/tools/result.js";
 
@@ -17,6 +17,22 @@ describe("geo", () => {
     expect(Math.round(milesBetween(SUNNYVALE, AIRPORTS.SJC))).toBeLessThan(10);
     expect(Math.round(milesBetween(SUNNYVALE, AIRPORTS.SFO))).toBeGreaterThan(20);
     expect(milesBetween(SUNNYVALE, AIRPORTS.OAK)).toBeGreaterThan(milesBetween(SUNNYVALE, AIRPORTS.SJC));
+  });
+
+  it("finds airports within 100 km of a home, closest first", () => {
+    const paloAlto = { lat: 37.4419, lon: -122.143 };
+    const near = nearbyAirports(paloAlto);
+    expect(near.slice(0, 3)).toEqual(["SJC", "SFO", "OAK"]);
+    expect(near).not.toContain("SMF");
+    expect(nearbyAirports(paloAlto, 10)).toEqual([]);
+  });
+
+  it("covers London, Paris, and the big Indian metros", () => {
+    expect(nearbyAirports({ lat: 51.5074, lon: -0.1278 })).toEqual(expect.arrayContaining(["LHR", "LCY", "LGW"]));
+    expect(nearbyAirports({ lat: 48.8566, lon: 2.3522 })).toEqual(expect.arrayContaining(["CDG", "ORY"]));
+    expect(nearbyAirports({ lat: 12.9716, lon: 77.5946 })).toEqual(["BLR"]);
+    expect(nearbyAirports({ lat: 19.076, lon: 72.8777 })).toEqual(["BOM"]);
+    expect(nearbyAirports({ lat: 28.6139, lon: 77.209 })).toEqual(["DEL"]);
   });
 
   it("gets real driving distance and time from OSRM", async () => {
