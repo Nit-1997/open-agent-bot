@@ -37,8 +37,8 @@ export type Ranker = (query: string, tiles: Tile[]) => Promise<Tile[] | null>;
 
 export const keywordRanker: Ranker = async (query, tiles) => rankTiles(query, tiles);
 
-export function jevRanker(judge: Judge, limit?: number): Ranker {
-  return (query, tiles) => judgeRank(judge, query, tiles, { limit });
+export function jevRanker(judge: Judge, limit?: number, batch?: boolean): Ranker {
+  return (query, tiles) => judgeRank(judge, query, tiles, { limit, batch });
 }
 
 export type Report = { n: number; exact1: number; ndcg3: number; fallbacks: number; ms: number };
@@ -89,7 +89,7 @@ async function main() {
   if (args.includes("--judge")) {
     const judge = await openJudge();
     const limit = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : undefined;
-    const r = await evaluate(rows, jevRanker(judge, limit));
+    const r = await evaluate(rows, jevRanker(judge, limit, args.includes("--batch")));
     const u = judge.usage();
     lines.push({ name: "jev re-rank", split, r, extra: `${u.calls} calls, $${u.costUsd.toFixed(4)}, ${Math.round(r.ms / rows.length)} ms/query` });
   }

@@ -59,13 +59,13 @@ export function shortlist(query: string, tiles: Tile[], limit = SHORTLIST): Tile
 
 const LEVEL_ORDER: Record<Match, number> = { exact: 0, substitute: 1 };
 
-export async function judgeRank(judge: Judge, query: string, tiles: Tile[], opts: { signal?: AbortSignal; limit?: number } = {}): Promise<Pick[] | null> {
+export async function judgeRank(judge: Judge, query: string, tiles: Tile[], opts: { signal?: AbortSignal; limit?: number; batch?: boolean } = {}): Promise<Pick[] | null> {
   const short = shortlist(query, tiles, opts.limit);
   if (!short.length) return [];
   const scored = await judge.score(
-    short.map((t, i) => ({ id: String(i), state: { query, product: t.title, ...(t.size && { size: t.size }) } })),
+    short.map((t, i) => ({ id: String(i), state: { ...(!opts.batch && { query }), product: t.title, ...(t.size && { size: t.size }) } })),
     productMatch,
-    { signal: opts.signal },
+    { signal: opts.signal, ...(opts.batch && { batch: { shared: { query } } }) },
   );
   if (!scored) return null;
   const price = (t: Tile) => t.price ?? Number.POSITIVE_INFINITY;

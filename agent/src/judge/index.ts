@@ -11,7 +11,7 @@ export type Scored<L extends string> = { id: string; level: L; p: number; probab
 
 type Item = { id: string; state: Record<string, unknown> };
 export type Usage = { calls: number; failures: number; costUsd: number };
-type CallOpts = { signal?: AbortSignal; sink?: Usage };
+type CallOpts = { signal?: AbortSignal; sink?: Usage; batch?: { shared: Record<string, unknown>; max?: number } };
 
 export interface Judge {
   readonly available: boolean;
@@ -25,10 +25,11 @@ type Runtime = Pick<ModelRuntime, "getAvailableOfType" | "classify">;
 type Context = Parameters<Runtime["classify"]>[1];
 type Question = Context["questions"][string];
 type Answer = Awaited<ReturnType<Runtime["classify"]>>["answers"][string];
-type Reply = { answer: Answer; tag: string; h: string; ms: number };
+type Reply = { answers: Record<string, Answer>; tag: string; h: string; ms: number };
 
 const DEFAULT_TIMEOUT_MS = 4000;
 const DEFAULT_CONCURRENCY = 4;
+const DEFAULT_BATCH = 20;
 const NONE = "none";
 const Q = "q";
 
@@ -69,7 +70,7 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
   const limit = createLimiter(opts.concurrency ?? DEFAULT_CONCURRENCY);
   const totals: Usage = { calls: 0, failures: 0, costUsd: 0 };
 
-  async function ask(criteria: { id: string; version: string }, state: Record<string, unknown>, question: Question, o?: CallOpts): Promise<Reply | null> {
+  async function ask(criteria: { id: string; version: string }, state: Record<string, unknown>, questions: Record<string, Question>, o?: CallOpts): Promise<Reply | null> {
     const signal = o?.signal;
     const sinks = [totals, ...(o?.sink ? [o.sink] : [])];
     const tag = `${criteria.id}@${criteria.version}`;
@@ -91,11 +92,10 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
         if (abort.aborted) onAbort();
         else abort.addEventListener("abort", onAbort, { once: true });
       });
-      const result = await Promise.race([opts.runtime.classify(classifier, { state: state as Context["state"], questions: { [Q]: question } }, { signal: abort }), aborted]);
+      const result = await Promise.race([opts.runtime.classify(classifier, { state: state as Context["state"], questions }, { signal: abort }), aborted]);
       for (const u of sinks) u.costUsd += result.usage?.cost?.total ?? 0;
       if (result.stopReason !== "stop") return fail(result.errorMessage?.slice(0, 120) ?? result.stopReason);
-      const answer = result.answers?.[Q];
-      return answer ? { answer, tag, h, ms: Date.now() - started } : fail("no answer");
+      return result.answers ? { answers: result.answers, tag, h, ms: Date.now() - started } : fail("no answer");
     } catch (err) {
       return fail(err instanceof Error ? err.message.slice(0, 120) : String(err));
     } finally {
@@ -103,9 +103,40 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
     }
   }
 
-  const note = (r: Reply, ans: string, p: number) => log(`[jev] ${JSON.stringify({ c: r.tag, h: r.h, ans, p: round(p), ms: r.ms })}`);
+  const one = async (criteria: { id: string; version: string }, state: Record<string, unknown>, question: Question, o?: CallOpts) => {
+    const r = await ask(criteria, state, { [Q]: question }, o);
+    const answer = r?.answers[Q];
+    return r && answer ? { answer, tag: r.tag, h: r.h, ms: r.ms } : null;
+  };
+
+  const note = (r: { tag: string; h: string; ms: number }, ans: string, p: number) => log(`[jev] ${JSON.stringify({ c: r.tag, h: r.h, ans, p: round(p), ms: r.ms })}`);
   const all = <T>(out: (T | null)[]) => (out.every((x) => x !== null) ? (out as T[]) : null);
   const chosen = (a: Answer) => (a.type === "choice" ? { choice: a.choice, p: a.probabilities?.[a.choice] ?? a.confidence ?? 0, probabilities: a.probabilities } : null);
+
+  async function scoreBatched<L extends string>(items: Item[], c: ScoreCriteria<L>, criteria: Record<string, string>, o: CallOpts): Promise<Scored<L>[] | null> {
+    const max = o.batch?.max ?? DEFAULT_BATCH;
+    const groups: Item[][] = [];
+    for (let i = 0; i < items.length; i += max) groups.push(items.slice(i, i + max));
+    const parts = await Promise.all(
+      groups.map((group) =>
+        limit(async () => {
+          const state = { ...o.batch?.shared, tiles: group.map((it, n) => ({ i: n, ...it.state })) };
+          const questions = Object.fromEntries(group.map((_, n) => [`t${n}`, { type: "choice", instructions: `${c.question} Judge only the product with i=${n} in tiles.`, criteria } as Question]));
+          const r = await ask(c, state, questions, o);
+          if (!r) return null;
+          const scored = group.map((it, n) => {
+            const pick = r.answers[`t${n}`] && chosen(r.answers[`t${n}`]);
+            if (!pick || !(pick.choice in c.levels)) return null;
+            note(r, pick.choice, pick.p);
+            return { id: it.id, level: pick.choice as L, p: pick.p, probabilities: pick.probabilities as Record<L, number> };
+          });
+          return all(scored);
+        }),
+      ),
+    );
+    const flat = all(parts);
+    return flat ? flat.flat() : null;
+  }
 
   return {
     available: true,
@@ -114,8 +145,12 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
     async score<L extends string>(items: Item[], c: ScoreCriteria<L>, o?: CallOpts) {
       const criteria = Object.fromEntries(Object.entries<Level>(c.levels).map(([k, v]) => [k, `${v.means} Not: ${v.not}`]));
       const question: Question = { type: "choice", instructions: c.question, criteria };
+      if (o?.batch && items.length > 1) {
+        const batched = await scoreBatched(items, c, criteria, o);
+        if (batched) return batched;
+      }
       const out = await Promise.all(items.map((item) => limit(async () => {
-        const r = await ask(c, item.state, question, o);
+        const r = await one(c, item.state, question, o);
         const pick = r && chosen(r.answer);
         if (!r || !pick || !(pick.choice in c.levels)) return null;
         note(r, pick.choice, pick.p);
@@ -127,7 +162,7 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
     async yesno(items: Item[], c: YesNoCriteria, o?: CallOpts) {
       const question: Question = { type: "bool", instructions: c.question, criteria: { true: c.yes, false: c.no } };
       const out = await Promise.all(items.map((item) => limit(async () => {
-        const r = await ask(c, item.state, question, o);
+        const r = await one(c, item.state, question, o);
         if (r?.answer.type !== "bool") return null;
         const p = r.answer.probability;
         note(r, p >= 0.5 ? "yes" : "no", p);
@@ -138,7 +173,7 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
 
     async choose(state: Record<string, unknown>, options: Record<string, string>, c: ChooseCriteria & { none?: string }, o?: CallOpts) {
       const criteria = { ...options, ...(c.none && { [NONE]: c.none }) };
-      const r = await limit(() => ask(c, state, { type: "choice", instructions: c.question, criteria }, o));
+      const r = await limit(() => one(c, state, { type: "choice", instructions: c.question, criteria }, o));
       const pick = r && chosen(r.answer);
       if (!r || !pick || !(pick.choice in criteria)) return null;
       note(r, pick.choice, pick.p);

@@ -21,8 +21,6 @@ const TABS = 4;
 const PICKS = 3;
 const SCOPE = 3;
 const RERANK_BUDGET_MS = 20000;
-const RERANK_CALLS = 100;
-const MIN_SHORTLIST = 5;
 
 type Item = { query: string; qty: number };
 type Job = { store: Store; item: Item };
@@ -121,13 +119,12 @@ async function rankLanes(judge: Judge | undefined, lanes: Lane[]): Promise<Pick[
   }
   const started = Date.now();
   const signal = AbortSignal.timeout(RERANK_BUDGET_MS);
-  const limit = Math.max(MIN_SHORTLIST, Math.min(SHORTLIST, Math.floor(RERANK_CALLS / Math.max(1, lanes.length))));
   let tiles = 0;
   const failed: string[] = [];
   const ranked = await Promise.all(
     lanes.map(async (l) => {
-      tiles += Math.min(l.tiles.length, limit);
-      const picks = await judgeRank(judge, l.item.query, l.tiles, { signal, limit }).catch(() => null);
+      tiles += Math.min(l.tiles.length, SHORTLIST);
+      const picks = await judgeRank(judge, l.item.query, l.tiles, { signal, batch: true }).catch(() => null);
       if (picks) return picks;
       failed.push(l.item.query);
       return keyword(l);

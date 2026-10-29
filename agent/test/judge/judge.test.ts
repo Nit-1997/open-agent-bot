@@ -117,6 +117,48 @@ describe("createJudge", () => {
   });
 });
 
+describe("batched score", () => {
+  const multi = (n: number, label = "exact") => ({
+    stopReason: "stop",
+    usage: { cost: { total: 0.0003 } },
+    answers: Object.fromEntries(Array.from({ length: n }, (_, i) => [`t${i}`, { type: "choice", choice: label, probabilities: { [label]: 0.8 }, confidence: 0.8 }])),
+  });
+
+  it("asks one question per tile in a single call and keeps item order", async () => {
+    const { runtime, calls } = fakeRuntime({ classify: async (ctx) => multi(Object.keys(ctx.questions).length) });
+    const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    const out = await judge.score(items(5), productMatch, { batch: { shared: { query: "milk" } } });
+    expect(out?.map((s) => s.id)).toEqual(["t0", "t1", "t2", "t3", "t4"]);
+    expect(calls).toHaveLength(1);
+    expect(Object.keys(calls[0].questions)).toEqual(["t0", "t1", "t2", "t3", "t4"]);
+    expect(calls[0].state.query).toBe("milk");
+    expect((calls[0].state.tiles as unknown[]).length).toBe(5);
+    expect(judge.usage().calls).toBe(1);
+  });
+
+  it("splits into several calls above the per-call cap", async () => {
+    const { runtime, calls } = fakeRuntime({ classify: async (ctx) => multi(Object.keys(ctx.questions).length) });
+    const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    const out = await judge.score(items(7), productMatch, { batch: { shared: {}, max: 3 } });
+    expect(out).toHaveLength(7);
+    expect(calls).toHaveLength(3);
+  });
+
+  it("falls back to one call per item when the batched call fails", async () => {
+    const { runtime, calls } = fakeRuntime({ classify: async (ctx) => (ctx.questions.t0 ? { stopReason: "error", answers: {} } : choice("substitute", 0.7)) });
+    const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    const out = await judge.score(items(3), productMatch, { batch: { shared: {} } });
+    expect(out?.map((s) => s.level)).toEqual(["substitute", "substitute", "substitute"]);
+    expect(calls).toHaveLength(4);
+  });
+
+  it("falls back when a tile is missing from the batched answer", async () => {
+    const { runtime } = fakeRuntime({ classify: async (ctx) => (ctx.questions.t0 ? multi(1) : choice("exact", 0.9)) });
+    const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    expect(await judge.score(items(2), productMatch, { batch: { shared: {} } })).toHaveLength(2);
+  });
+});
+
 describe("scopeJudge", () => {
   it("counts only its own calls and resets per turn", async () => {
     const { runtime } = fakeRuntime();

@@ -92,6 +92,9 @@ describe("CartCard match labels", () => {
     const badge = within(row).getByText("Substitute");
     expect(badge).toHaveAttribute("title", "substitute, 71%");
     expect(within(screen.getByRole("listitem", { name: "rice" })).queryByText("Substitute")).toBeNull();
+    expect(within(row).getByText(/not in total/)).toBeInTheDocument();
+    expect(subtotal()).toBe("$2.39");
+    expect(screen.getByText("1 substitute is not in this total")).toBeInTheDocument();
     expect(screen.getByLabelText("Match: exact, 94%")).toHaveAttribute("title", "exact, 94%");
     const ids = [...container.querySelectorAll("[id]")].map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);

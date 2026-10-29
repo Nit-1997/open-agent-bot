@@ -25,7 +25,7 @@ const hub = await ProviderHub.create({
   ...(cfg.llmApiKey && { litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey, models: cfg.models } }),
 });
 
-const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel });
+const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: 16 });
 console.log(`[jev] model=${cfg.jevModel} available=${judge.available} rerank=${cfg.flags.jevRerank}`);
 
 function modelFor(ref: string | undefined) {

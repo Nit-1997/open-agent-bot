@@ -56,8 +56,10 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
 
   const inCart = store.items.map((item, i) => ({ item, line: current[i], pick: item.picks[current[i].choice], i })).filter((x) => x.pick);
   const kept = inCart.filter((x) => !x.line.removed);
-  const subtotal = kept.reduce((sum, x) => sum + (x.pick.price ?? 0) * x.line.qty, 0);
-  const unpriced = kept.filter((x) => x.pick.price === undefined).length;
+  const counted = kept.filter((x) => x.pick.match !== "substitute");
+  const subtotal = counted.reduce((sum, x) => sum + (x.pick.price ?? 0) * x.line.qty, 0);
+  const unpriced = counted.filter((x) => x.pick.price === undefined).length;
+  const outside = kept.length - counted.length;
   const missing = store.items.filter((i) => !i.picks.length);
   const portal = portalOf(store.name);
 
@@ -126,6 +128,9 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                             <span id={`${rid}-substitute`} title={pick.why} className="ml-1.5 rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn-fg sm:text-[10px]">
                               Substitute
                             </span>
+                          )}
+                          {pick.match === "substitute" && (
+                            <span id={`${rid}-not-in-total`}> · not in total</span>
                           )}
                           {pick.match === "exact" && pick.why && (
                             <span id={`${rid}-why`} role="img" title={pick.why} aria-label={`Match: ${pick.why}`} className="ml-1.5 inline-block align-middle text-text-muted">
@@ -235,6 +240,11 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
           {unpriced > 0 && (
             <p id={`${id}-unpriced`} className="mt-1 text-xs text-text-muted">
               Plus {unpriced} without a listed price
+            </p>
+          )}
+          {outside > 0 && (
+            <p id={`${id}-substitutes-note`} className="mt-1 text-xs text-text-muted">
+              {outside} {outside === 1 ? "substitute is" : "substitutes are"} not in this total
             </p>
           )}
           <a
