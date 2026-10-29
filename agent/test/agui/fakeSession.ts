@@ -10,6 +10,15 @@ export function fakeSession(script: Script) {
   const fake = {
     prompts: [] as string[],
     abortCalls: 0,
+    activeTools: ["web_search", "stays", "flights", "shop", "show_ui"] as string[],
+    toolSets: [] as string[][],
+    getActiveToolNames() {
+      return [...fake.activeTools];
+    },
+    setActiveToolsByName(names: string[]) {
+      fake.activeTools = [...names];
+      fake.toolSets.push([...names]);
+    },
     subscribe(l: (e: PiEvent) => void) {
       listeners.add(l);
       return () => listeners.delete(l);

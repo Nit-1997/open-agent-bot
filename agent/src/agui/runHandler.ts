@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
+import type { Usage as JudgeUsage } from "../judge/index.js";
 import type { UserContext, UserProfile, Viewport } from "../prompt/systemPrompt.js";
 import type { HistoryMessage, SessionEntry, SessionStore } from "../session/sessionStore.js";
 import type { CartEdits } from "../shop/cart.js";
 import { applyEntityEdits, parseCartEdits, parseWorkspaceEdits, type WorkspaceEdits } from "../workspace/edits.js";
 import type { WorkspaceStore } from "../workspace/store.js";
+import { handoffText, isHandoff, type Route, type Router, skillNote } from "./router.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
 export const EMPTY_REPLY_NUDGE =
@@ -120,6 +122,9 @@ function createStatsCollector(now: () => number = Date.now) {
       totals.cacheRead += u.cacheRead ?? 0;
       totals.costUsd += u.cost?.total ?? 0;
     },
+    preload(names: string[]) {
+      for (const n of names) if (!skills.includes(n)) skills.push(n);
+    },
     toolStart(name: string, args: unknown) {
       totals.toolCalls++;
       const skill = (args as { name?: unknown } | undefined)?.name;
@@ -135,7 +140,20 @@ function runError(code: string, message: string): BaseEvent {
   return { type: EventType.RUN_ERROR, code, message } as BaseEvent;
 }
 
-export type RunOptions = { workspace?: WorkspaceStore };
+export type RunOptions = { workspace?: WorkspaceStore; router?: Router };
+
+const ROUTE_TURNS = 4;
+const ROUTE_TURN_CLIP = 300;
+
+function recentTurns(messages: Message[]) {
+  return restoreHistory(messages).slice(-ROUTE_TURNS).map((t) => ({ role: t.role, text: t.text.slice(0, ROUTE_TURN_CLIP) }));
+}
+
+async function timedRoute(router: Router, input: Parameters<Router["route"]>[0], o: { signal: AbortSignal; sink: JudgeUsage }): Promise<{ route: Route | null; ms: number }> {
+  const started = Date.now();
+  const route = await router.route(input, o).catch(() => null);
+  return { route, ms: Date.now() - started };
+}
 
 export async function* handleRun(input: RunAgentInput, store: SessionStore, signal: AbortSignal, opts: RunOptions = {}): AsyncIterable<BaseEvent> {
   const { threadId, runId } = input;
@@ -157,13 +175,36 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   const userContext = readUserContext(input);
   console.log(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(messageText(last).slice(0, 200))}`);
 
-  let entry: SessionEntry;
-  try {
-    entry = await store.getOrCreate(threadId, userContext, restoring ? restoreHistory(input.messages) : undefined);
-  } catch (err) {
-    yield runError("MODEL_ERROR", err instanceof Error ? err.message : String(err));
+  const stats = createStatsCollector();
+  const routerUsage: JudgeUsage = { calls: 0, failures: 0, costUsd: 0 };
+  const router = opts.router;
+  const routing = router
+    ? timedRoute(router, { message: messageText(last), lastTurns: recentTurns(input.messages), workspaceSummary: opts.workspace?.summary(threadId) || undefined }, { signal, sink: routerUsage })
+    : Promise.resolve({ route: null, ms: 0 });
+  const [{ route, ms: routeMs }, made] = await Promise.all([
+    routing,
+    store.getOrCreate(threadId, userContext, restoring ? restoreHistory(input.messages) : undefined).then(
+      (e) => ({ entry: e }),
+      (error: unknown) => ({ error }),
+    ),
+  ]);
+
+  if (router && isHandoff(route)) {
+    console.log(`[router] thread=${threadId} intent=${route.intent} p=${route.intentP.toFixed(2)} ms=${routeMs} handoff`);
+    const messageId = randomUUID();
+    yield { type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant" } as BaseEvent;
+    yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: handoffText(route.intent) } as BaseEvent;
+    yield { type: EventType.TEXT_MESSAGE_END, messageId } as BaseEvent;
+    yield { type: EventType.CUSTOM, name: "run_stats", value: stats.snapshot({ jevCalls: routerUsage.calls, jevCostUsd: routerUsage.costUsd }) } as BaseEvent;
+    yield { type: EventType.RUN_FINISHED, threadId, runId } as BaseEvent;
     return;
   }
+
+  if ("error" in made) {
+    yield runError("MODEL_ERROR", made.error instanceof Error ? made.error.message : String(made.error));
+    return;
+  }
+  const entry: SessionEntry = made.entry;
   if (entry.busy) {
     yield runError("THREAD_BUSY", "Still working on the last message.");
     return;
@@ -197,8 +238,24 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   if (edits) entry.cart?.applyEdits(edits);
   if (wsEdits && opts.workspace) applyEntityEdits(opts.workspace, threadId, wsEdits);
   entry.evidence?.add(messageText(last));
-  const stats = createStatsCollector();
-  const statsEvent = (): BaseEvent => ({ type: EventType.CUSTOM, name: "run_stats", value: stats.snapshot(entry.turnStats?.()) }) as BaseEvent;
+  const statsEvent = (): BaseEvent => {
+    const turn = entry.turnStats?.();
+    return { type: EventType.CUSTOM, name: "run_stats", value: stats.snapshot({ jevCalls: (turn?.jevCalls ?? 0) + routerUsage.calls, jevCostUsd: (turn?.jevCostUsd ?? 0) + routerUsage.costUsd }) } as BaseEvent;
+  };
+
+  const hintSkills = router && route ? router.skills(route.skills) : [];
+  const narrowTo = router && route?.tools && router.narrow(userContext?.model) ? route.tools : null;
+  const priorTools = narrowTo ? entry.session.getActiveToolNames() : null;
+  if (router && route) {
+    console.log(`[router] thread=${threadId} areas=${Object.entries(route.areas).filter(([, p]) => p >= 0.5).map(([a]) => a).join(",") || "none"} intent=${route.intent} ms=${routeMs} hints=${hintSkills.map((s) => s.name).join(",") || "none"} tools=${narrowTo ? "narrowed" : "all"}`);
+  } else if (router) {
+    console.log(`[router] thread=${threadId} no route ms=${routeMs}`);
+  }
+  if (hintSkills.length) {
+    entry.setHints?.(skillNote(hintSkills));
+    stats.preload(hintSkills.map((s) => s.name));
+  }
+  if (narrowTo && priorTools) entry.session.setActiveToolsByName(priorTools.filter((n) => narrowTo.includes(n)));
   const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {
     if (e.type === "tool_execution_start") stats.toolStart(e.toolName, e.args);
@@ -260,6 +317,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   } finally {
     if (!done) await entry.session.abort().catch(() => {});
     await running;
+    if (hintSkills.length) entry.setHints?.(undefined);
+    if (priorTools) entry.session.setActiveToolsByName(priorTools);
     signal.removeEventListener("abort", onAbort);
     unsubscribe();
     unwatch?.();

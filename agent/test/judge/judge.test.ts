@@ -175,6 +175,47 @@ describe("batched score", () => {
   });
 });
 
+describe("classify", () => {
+  const questions = {
+    lodging: { type: "bool" as const, question: "Lodging?", yes: "asks for hotels", no: "does not" },
+    intent: { type: "choice" as const, question: "Which?", options: { plan: "look up", buy: "pay" } },
+  };
+  const reply = (answers: Record<string, unknown>) => ({ stopReason: "stop", usage: { cost: { total: 0.00002 } }, answers });
+  const good = reply({ lodging: { type: "bool", probability: 0.8 }, intent: { type: "choice", choice: "plan", probabilities: { plan: 0.9 }, confidence: 0.9 } });
+
+  it("asks every question in one call and returns typed answers", async () => {
+    const { runtime, calls } = fakeRuntime({ classify: async () => good });
+    const log: string[] = [];
+    const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: (l) => log.push(l) });
+    const out = await judge.classify({ message: "hotel in Rome" }, { id: "route", version: "1" }, questions);
+    expect(out).toEqual({ lodging: { type: "bool", yes: true, p: 0.8 }, intent: { type: "choice", choice: "plan", p: 0.9 } });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].questions.lodging).toMatchObject({ type: "bool", criteria: { true: "asks for hotels", false: "does not" } });
+    expect(calls[0].questions.intent).toMatchObject({ type: "choice", criteria: { plan: "look up", buy: "pay" } });
+    expect(log[0]).toMatch(/"c":"route@1".*"ans":\{"lodging":0.8,"intent":"plan:0.9"\}/);
+    expect(judge.usage()).toMatchObject({ calls: 1, failures: 0 });
+  });
+
+  it("returns null when an answer is missing, has the wrong type or names an unknown choice", async () => {
+    for (const answers of [
+      { lodging: { type: "bool", probability: 0.8 } },
+      { lodging: { type: "choice", choice: "plan", probabilities: { plan: 1 } }, intent: good.answers.intent },
+      { lodging: good.answers.lodging, intent: { type: "choice", choice: "sell", probabilities: { sell: 1 } } },
+    ]) {
+      const judge = await createJudge({ runtime: fakeRuntime({ classify: async () => reply(answers) }).runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+      expect(await judge.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
+    }
+  });
+
+  it("returns null on timeout and on a provider error", async () => {
+    const hang = await createJudge({ runtime: fakeRuntime({ classify: () => new Promise(() => {}) }).runtime, model: "openrouter/typesafe/jev-1.14", timeoutMs: 20, log: () => {} });
+    expect(await hang.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
+    const bad = await createJudge({ runtime: fakeRuntime({ classify: async () => ({ stopReason: "error", errorMessage: "402", answers: {} }) }).runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    expect(await bad.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
+    expect(await noJudge.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
+  });
+});
+
 describe("scopeJudge", () => {
   it("counts only its own calls and resets per turn", async () => {
     const { runtime } = fakeRuntime();
