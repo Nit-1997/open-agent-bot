@@ -43,6 +43,21 @@ describe("skills directory", () => {
   });
 });
 
+describe("workspace lines", () => {
+  const body = (workspace: boolean, name: string) => loadSkillCatalog(skillsDir({}), { workspace }).find((x) => x.name === name)!.body;
+
+  it("appear in party and trip planning only when the workspace flag is on", () => {
+    for (const name of ["party-planning", "trip-planning"]) {
+      expect(body(false, name)).not.toContain("plan set");
+      expect(body(false, name)).not.toContain("[workspace]");
+      expect(body(true, name)).toContain("plan set");
+      expect(body(true, name)).not.toContain("[workspace]");
+    }
+    expect(body(true, "party-planning")).toContain("plan patch guests");
+    expect(body(true, "trip-planning")).toContain("Follow-ups patch it");
+  });
+});
+
 describe("skill content", () => {
   const by = Object.fromEntries(loadSkillCatalog(skillsDir({})).map((s) => [s.name, s.body]));
 

@@ -23,8 +23,8 @@ const SCOPE = 3;
 const RERANK_BUDGET_MS = 20000;
 
 type Item = { query: string; qty: number };
-type Job = { store: Store; item: Item };
-type JobResult = { store: Store; item: Item; tiles: Tile[]; blocked?: string; error?: string };
+export type Job = { store: Store; item: Item };
+export type JobResult = { store: Store; item: Item; tiles: Tile[]; blocked?: string; error?: string };
 
 type Deps = {
   pool: BrowserPool;
@@ -35,6 +35,7 @@ type Deps = {
   frames?: FrameBus;
   cart?: ActiveCart;
   judge?: Judge;
+  search?: (jobs: Job[]) => Promise<JobResult[]>;
 };
 
 type Lane = { label: string; home: string; item: Item; tiles: Tile[]; grouped: boolean };
@@ -250,12 +251,16 @@ export function shopTool(deps: Deps) {
         added = cart.add(asked);
         search = added;
       }
-      if (!cart.items.length) return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
+      if (!cart.items.length) {
+        cart.save();
+        return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
+      }
       const stores = cart.stores.map((id) => resolve(id)).filter((x): x is Store => !!x);
-      const results = search.length ? await runAll(deps, stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
+      const results = search.length ? await (deps.search ?? ((jobs) => runAll(deps, jobs)))(stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
       const lanes = lanesOf(results);
       cart.addResults(storeResults(lanes, await rankLanes(deps.judge, lanes), search));
       if (fresh) cart.scopeTo(bestValue(cart.view()).filter((x) => x.found > 0).slice(0, SCOPE).map((x) => x.store));
+      cart.save();
       const view = cart.view();
       const { text, summary } = render(view, results, cart.items);
       const n = cart.items.length;

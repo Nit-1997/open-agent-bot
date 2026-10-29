@@ -44,6 +44,7 @@ agent/src/
                        browserGuard.ts (blocks private-network requests), budget.ts
   shop/                catalog tile extraction, ranking and the per-chat cart
   stays/               hotel and rental search: one file per site in sources/
+  workspace/           per-chat saved plan state (SQLite): store, summary, edits, cart binding
   grounding/           checks prices, ratings and links against tool evidence
   render/              tool data → widget payloads
   artifacts/           report storage, PDF export, and the report kit (reportKit.ts: CSS

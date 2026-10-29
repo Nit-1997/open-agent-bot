@@ -231,6 +231,48 @@ export const StayListSchema = Type.Object({
   ),
 });
 
+const Text = Type.String({ maxLength: 2000 });
+const DateStr = Type.String({ minLength: 4, maxLength: 40 });
+const Name = Type.String({ maxLength: 500 });
+
+const Place = Type.Object({
+  name: Name,
+  url: Type.Optional(Type.String({ minLength: 1 })),
+  price: Type.Optional(Type.Number({ minimum: 0 })),
+  note: Type.Optional(Text),
+});
+
+export const EventEntitySchema = Type.Object({
+  title: Name,
+  date: Type.Optional(DateStr),
+  guests: Type.Integer({ minimum: 1, maximum: 100000 }),
+  budget: Type.Optional(Type.Number({ minimum: 0 })),
+  currency: Type.Optional(Type.String({ maxLength: 8 })),
+  location: Type.Optional(Name),
+  theme: Type.Optional(Name),
+  menu: Type.Optional(Type.Array(Name, { maxItems: 60 })),
+  timeline: Type.Optional(Type.Array(Type.Object({ when: Name, what: Text }), { maxItems: 60 })),
+  notes: Type.Optional(Text),
+});
+
+export const TripEntitySchema = Type.Object({
+  destination: Name,
+  start: DateStr,
+  end: DateStr,
+  travelers: Type.Integer({ minimum: 1, maximum: 1000 }),
+  budget: Type.Optional(Type.Number({ minimum: 0 })),
+  stays: Type.Array(Place, { maxItems: 30 }),
+  days: Type.Array(Type.Object({ date: DateStr, items: Type.Array(Text, { maxItems: 30 }) }), { maxItems: 60 }),
+});
+
+export const ShortlistEntitySchema = Type.Object({ title: Name, items: Type.Array(Place, { maxItems: 60 }) });
+
+export const PlanSchema = Type.Union([
+  Type.Object({ kind: Type.Literal("plan"), entity: Type.Literal("event"), id: Str, version: Type.Number(), value: EventEntitySchema }),
+  Type.Object({ kind: Type.Literal("plan"), entity: Type.Literal("trip"), id: Str, version: Type.Number(), value: TripEntitySchema }),
+  Type.Object({ kind: Type.Literal("plan"), entity: Type.Literal("shortlist"), id: Str, version: Type.Number(), value: ShortlistEntitySchema }),
+]);
+
 export const FollowupsSchema = Type.Object({
   kind: Type.Literal("followups"),
   replies: Type.Array(S(40), { minItems: 1, maxItems: 4 }),
@@ -245,6 +287,7 @@ export const WidgetSchemas = {
   followups: FollowupsSchema,
   cart: CartSchema,
   stay_list: StayListSchema,
+  plan: PlanSchema,
 } as const;
 
 export type WeatherCard = Static<typeof WeatherCardSchema>;
@@ -259,7 +302,8 @@ export type AskWidget = Omit<Static<typeof AskSchema>, "fields"> & { fields: Ask
 export type Followups = Static<typeof FollowupsSchema>;
 export type Cart = Static<typeof CartSchema>;
 export type StayList = Static<typeof StayListSchema>;
-export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget | Followups | Cart | StayList;
+export type Plan = Static<typeof PlanSchema>;
+export type WidgetPayload = WeatherCard | FlightList | UiWidget | GroundingNote | AskWidget | Followups | Cart | StayList | Plan;
 export type WidgetKind = WidgetPayload["kind"];
 
 export const WIDGET_KINDS = Object.keys(WidgetSchemas) as WidgetKind[];

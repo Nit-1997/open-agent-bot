@@ -9,6 +9,7 @@ import { buildTurns, type ChatMessage } from "@/lib/turns";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import type { CartEdits } from "@/components/widgets/CartCard";
+import { cartContextValue, type PlanEdits, type WorkspaceEdits, withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
 import type { BrowserFrame } from "./LiveBrowser";
 import { QUIET_ANSWER, TurnView } from "./TurnView";
 
@@ -33,13 +34,25 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
     lastRef.current = lastId;
   }, [lastId]);
   const [frames, setFrames] = useState<Record<string, BrowserFrame>>({});
-  const [cartEdits, setCartEdits] = useState<CartEdits | null>(null);
+  const [edits, setEdits] = useState<WorkspaceEdits>({});
+  const onCartEdit = useCallback((cart: CartEdits) => setEdits((e) => withCartEdits(e, cart)), []);
+  const onPlanEdit = useCallback((plan: PlanEdits) => setEdits((e) => withPlanEdits(e, plan)), []);
   const latestCart = useMemo(() => {
     for (const t of [...turns].reverse())
       for (const it of [...t.items].reverse()) if (it.kind === "widget" && (it.widget as { kind?: string } | null)?.kind === "cart") return it.id;
     return undefined;
   }, [turns]);
-  useAgentContext({ description: "cart_edits", value: cartEdits ? JSON.stringify(cartEdits) : "" });
+  const latestPlans = useMemo(() => {
+    const latest = new Map<string, string>();
+    for (const t of turns)
+      for (const it of t.items) {
+        const w = it.kind === "widget" ? (it.widget as { kind?: string; entity?: string; id?: string } | null) : null;
+        if (w?.kind === "plan") latest.set(`${w.entity}:${w.id}`, it.id);
+      }
+    return new Set(latest.values());
+  }, [turns]);
+  useAgentContext({ description: "cart_edits", value: cartContextValue(edits) });
+  useAgentContext({ description: "workspace_edits", value: workspaceContextValue(edits) });
 
   useEffect(() => {
     const sub = agent.subscribe({
@@ -80,7 +93,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
     setSending(true);
     try {
       await copilotkit.runAgent({ agent });
-      setCartEdits(null);
+      setEdits({});
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
@@ -132,7 +145,9 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
                   onAnswer={send}
                   frame={frames[t.id]}
                   latestCart={latestCart}
-                  onCartEdit={setCartEdits}
+                  onCartEdit={onCartEdit}
+                  latestPlans={latestPlans}
+                  onPlanEdit={onPlanEdit}
                 />
               </div>
             ))}

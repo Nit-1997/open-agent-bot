@@ -4,6 +4,8 @@ import type { ActiveCart } from "../shop/cart.js";
 import type { PiSession } from "../pi/createPiSession.js";
 import type { UserContext } from "../prompt/systemPrompt.js";
 
+export type HistoryMessage = { role: "user" | "assistant"; text: string };
+
 export type SessionEntry = {
   session: PiSession;
   busy: boolean;
@@ -22,12 +24,12 @@ export class SessionStore {
   private pending = new Map<string, Promise<SessionEntry>>();
   private readonly idleMs: number;
   private readonly now: () => number;
-  private readonly create: (threadId: string, ctx: UserContext | null) => Promise<SessionEntry>;
+  private readonly create: (threadId: string, ctx: UserContext | null, history?: HistoryMessage[]) => Promise<SessionEntry>;
 
   constructor(opts: {
     idleMs: number;
     now?: () => number;
-    create: (threadId: string, ctx: UserContext | null) => Promise<SessionEntry>;
+    create: (threadId: string, ctx: UserContext | null, history?: HistoryMessage[]) => Promise<SessionEntry>;
   }) {
     this.idleMs = opts.idleMs;
     this.now = opts.now ?? Date.now;
@@ -38,7 +40,7 @@ export class SessionStore {
     return this.entries.get(threadId);
   }
 
-  async getOrCreate(threadId: string, ctx: UserContext | null): Promise<SessionEntry> {
+  async getOrCreate(threadId: string, ctx: UserContext | null, history?: HistoryMessage[]): Promise<SessionEntry> {
     const existing = this.entries.get(threadId);
     if (existing) {
       existing.lastUsed = this.now();
@@ -46,7 +48,7 @@ export class SessionStore {
     }
     let p = this.pending.get(threadId);
     if (!p) {
-      p = this.create(threadId, ctx).then((e) => {
+      p = this.create(threadId, ctx, history).then((e) => {
         e.lastUsed = this.now();
         this.entries.set(threadId, e);
         this.pending.delete(threadId);
