@@ -57,6 +57,6 @@ export const googleHotels = staySource({
   label: "Google Hotels",
   site: "google.com",
   lists: ["hotel", "rental"],
-  searchUrl: (q) => searchFor(q, `hotels in ${q.location}`),
+  searchUrl: (q) => searchFor(q, `${q.brands?.length ? `${q.brands.join(" or ")} ` : ""}hotels in ${q.location}`),
   read: async (page, q) => (await page.evaluate(collect)).map((c) => parseGoogleCard(c, q)).filter((s): s is Stay => s !== null),
 });

@@ -36,7 +36,7 @@ const paris = (rows: Listing[]): StaySource => staySource({
   label: "PARIS",
   site: "paris.test",
   lists: ["hotel"],
-  searchUrl: (q) => `https://paris.test/s?curr=${q.currency}`,
+  searchUrl: (q) => `https://paris.test/s?curr=${q.currency}${q.brands ? `&brands=${q.brands.join("|")}` : ""}`,
   read: async () => rows.map((r, i) => ({ ...r, url: `https://paris.test/${i}`, ...(r.nightly != null && { total: r.nightly * 3 }) })),
 });
 
@@ -155,6 +155,12 @@ describe("stays wants", () => {
       },
     };
   }
+
+  it("passes wished-for brands to the sources so their hotels are searched for", async () => {
+    const { run, tab } = parisTool(rows, { judge: judgeFor() });
+    await run({ wants: { brand: ["Marriott", "Hyatt"], area: "the Louvre" } });
+    expect(tab.opened[0]).toBe("https://paris.test/s?curr=USD&brands=Marriott|Hyatt");
+  });
 
   it("is not in the schema, and changes nothing, without a judge", () => {
     const { tool } = parisTool(rows);

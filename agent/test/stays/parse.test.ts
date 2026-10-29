@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { parseAirbnbCard } from "../../src/sources/stays/airbnb.js";
 import { parseBookingCard } from "../../src/sources/stays/booking.js";
-import { parseGoogleCard } from "../../src/sources/stays/googleHotels.js";
+import { googleHotels, parseGoogleCard } from "../../src/sources/stays/googleHotels.js";
 import { amount, cleanUrl, count } from "../../src/stays/parse.js";
 import type { StayQuery } from "../../src/stays/types.js";
 
 const q: StayQuery = { location: "Las Vegas", checkin: "2026-11-12", checkout: "2026-11-15", nights: 3, adults: 2, rooms: 1, currency: "USD" };
+
+describe("google hotels search", () => {
+  it("names the wished-for chains in the search so their hotels come back", () => {
+    const query = (x: StayQuery) => new URL(googleHotels.searchUrl(x)).searchParams.get("q");
+    expect(query(q)).toBe("hotels in Las Vegas");
+    expect(query({ ...q, brands: ["Marriott", "Hyatt"] })).toBe("Marriott or Hyatt hotels in Las Vegas");
+  });
+});
 
 describe("stay parsing helpers", () => {
   it("reads amounts and review counts", () => {

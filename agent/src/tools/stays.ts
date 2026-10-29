@@ -66,8 +66,10 @@ export async function withinBudget(stays: Stay[], budget: Budget | undefined, li
   return { stays: kept, unconverted };
 }
 
+const brandsOf = (wants: Wants | undefined) => looseList<string>(wants?.brand).map((b) => String(b).trim()).filter(Boolean);
+
 function wishesOf(wants: Wants | undefined, location: string): Wish[] {
-  const brands = looseList<string>(wants?.brand).map((b) => String(b).trim()).filter(Boolean);
+  const brands = brandsOf(wants);
   const area = typeof wants?.area === "string" ? wants.area.trim() : "";
   const vibe = typeof wants?.vibe === "string" ? wants.vibe.trim() : "";
   return [
@@ -161,6 +163,7 @@ export function staysTool(deps: Deps) {
         adults: Math.min(Math.max(Math.round(params.adults ?? 2), 1), 16),
         rooms: Math.min(Math.max(Math.round(params.rooms ?? 1), 1), 8),
         currency: budget?.explicit ? budget.currency : deps.currency,
+        ...(judge && brandsOf(params.wants as Wants | undefined).length && { brands: brandsOf(params.wants as Wants | undefined) }),
       };
       const sources = pickSources(all, looseList<string>(params.sources).map(String), (params.type as StayKind | "any" | undefined) ?? "any");
       const results: SourceResult[] = await searchStays(sources, q, deps.openTab, { allowPrivateHosts: deps.allowPrivateHosts });

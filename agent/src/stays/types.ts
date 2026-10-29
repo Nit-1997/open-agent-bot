@@ -12,6 +12,7 @@ export type StayQuery = {
   adults: number;
   rooms: number;
   currency: string;
+  brands?: string[];
 };
 
 export type Stay = {
