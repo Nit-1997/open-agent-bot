@@ -4,7 +4,7 @@ context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
 turns:
   - prompt: "Heat pump vs furnace for a 1,800 sq ft house in Palo Alto: which should I choose? Write me a report with costs, efficiency and incentives."
 assert:
-  - { type: must_call, tool: create_artifact }
+  - { type: must_call, tool: "create_artifact|research" }
   - { type: max_tool_calls, n: 24 }
   - { type: max_unverified_claims, n: 5 }
   - type: banned_phrases

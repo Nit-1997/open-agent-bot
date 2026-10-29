@@ -26,7 +26,8 @@ function check(a: Assertion, turns: TurnRecord[]): { ok: boolean; detail: string
   switch (a.type) {
     case "must_call": {
       const tool = str(a, "tool");
-      const n = tools.filter((t) => t.name === tool).length;
+      const names = tool.split("|");
+      const n = tools.filter((t) => names.includes(t.name)).length;
       return { ok: n > 0, detail: `${tool} called ${n}x` };
     }
     case "must_not_call": {

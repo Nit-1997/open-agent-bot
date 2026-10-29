@@ -28,6 +28,11 @@ const turns = [t1, t2];
 const ok = (a: Parameters<typeof evaluate>[0], ts = turns) => evaluate(a, ts).ok;
 
 describe("assertions", () => {
+  it("must_call accepts alternatives separated by |", () => {
+    expect(ok({ type: "must_call", tool: "research|stays" })).toBe(true);
+    expect(ok({ type: "must_call", tool: "research|create_artifact" })).toBe(false);
+  });
+
   it("negates any assertion and labels it", () => {
     expect(ok({ type: "widget_matches", kind: "stay_list", pattern: "wide", negate: true })).toBe(true);
     expect(ok({ type: "widget_matches", kind: "stay_list", pattern: "€320", negate: true })).toBe(false);

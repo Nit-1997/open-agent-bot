@@ -118,6 +118,12 @@ describe("codemode sandbox guards", () => {
     expect(r.text).toContain("rejected: tools.show_ui does not exist");
   }, 60000);
 
+  it("shows a number a script returns, so math done in a script reaches the model", async () => {
+    const r = await run(`return (129.99*3 + 45.5*2)*1.08;`, []);
+    expect(r.failed).toBe(false);
+    expect(r.text).toContain("519.44");
+  }, 60000);
+
   it("runs an allow-listed tool", async () => {
     const hits: string[] = [];
     const r = await run(`return await tools.weather({ q: "Paris" });`, [fakeTool("weather", hits), fakeTool("show_ui", hits)]);
