@@ -105,6 +105,7 @@ export type RunStats = {
   jevCalls: number;
   jevCostUsd: number;
   toolCalls: number;
+  llmTurns: number;
   durationMs: number;
   skills: string[];
 };
@@ -113,7 +114,8 @@ type Usage = { input?: number; output?: number; cacheRead?: number; cost?: { tot
 
 function createStatsCollector(now: () => number = Date.now) {
   const startedAt = now();
-  const totals = { inputTokens: 0, outputTokens: 0, cacheRead: 0, costUsd: 0, toolCalls: 0 };
+  const totals = { inputTokens: 0, outputTokens: 0, cacheRead: 0, costUsd: 0, toolCalls: 0, llmTurns: 0 };
+  const script = { calls: 0, costUsd: 0 };
   const skills: string[] = [];
   return {
     usage(u: Usage) {
@@ -121,6 +123,14 @@ function createStatsCollector(now: () => number = Date.now) {
       totals.outputTokens += u.output ?? 0;
       totals.cacheRead += u.cacheRead ?? 0;
       totals.costUsd += u.cost?.total ?? 0;
+      totals.llmTurns++;
+    },
+    scriptCost(u: Usage) {
+      script.costUsd += u.cost?.total ?? 0;
+    },
+    scriptCalls(result: unknown) {
+      const calls = (result as { details?: { calls?: { name?: string }[] } } | undefined)?.details?.calls;
+      script.calls += (calls ?? []).filter((c) => c.name?.startsWith("models.")).length;
     },
     preload(names: string[]) {
       for (const n of names) if (!skills.includes(n)) skills.push(n);
@@ -131,7 +141,7 @@ function createStatsCollector(now: () => number = Date.now) {
       if (name === "load_skill" && typeof skill === "string" && !skills.includes(skill)) skills.push(skill);
     },
     snapshot(turn?: { jevCalls: number; jevCostUsd: number }): RunStats {
-      return { ...totals, jevCalls: turn?.jevCalls ?? 0, jevCostUsd: turn?.jevCostUsd ?? 0, durationMs: now() - startedAt, skills: [...skills] };
+      return { ...totals, jevCalls: (turn?.jevCalls ?? 0) + script.calls, jevCostUsd: (turn?.jevCostUsd ?? 0) + script.costUsd, durationMs: now() - startedAt, skills: [...skills] };
     },
   };
 }
@@ -260,11 +270,13 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {
     if (e.type === "tool_execution_start") stats.toolStart(e.toolName, e.args);
     if (e.type === "tool_execution_start") console.log(`[run] thread=${threadId} tool=${e.toolName} args=${JSON.stringify(e.args).slice(0, 300)}`);
+    if (e.type === "tool_execution_end" && e.toolName === "codemode") stats.scriptCalls(e.result);
     if (e.type === "tool_execution_end") console.log(`[run] thread=${threadId} tool=${e.toolName} error=${e.isError} result=${JSON.stringify(e.result?.content?.[0]?.text ?? "").slice(0, 200)}`);
     if (e.type === "message_end") {
       const m = e.message as { role?: string; stopReason?: string; errorMessage?: string; usage?: Usage & { input: number; output: number; cacheRead: number } };
       if (m.role === "assistant" && m.usage) stats.usage(m.usage);
       if (m.role === "assistant" && m.usage) console.log(`[run] thread=${threadId} usage in=${m.usage.input} out=${m.usage.output} cacheRead=${m.usage.cacheRead}`);
+      if (m.role === "toolResult" && m.usage) stats.scriptCost(m.usage);
       if (m.role === "assistant" && m.stopReason === "error") modelError = m.errorMessage ?? "The model returned an error.";
     }
     push(translator.translate(e));

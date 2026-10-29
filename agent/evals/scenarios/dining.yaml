@@ -1,5 +1,6 @@
 id: dining
 proves: [M5]
+set: long-tail
 context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
 turns:
   - prompt: "Find a restaurant in Palo Alto for 8 people this Saturday. A couple of us are vegetarian and it needs to be reservable online."
@@ -9,6 +10,9 @@ assert:
   - { type: text_matches, pattern: "vegetarian|veg" }
   - { type: text_matches, pattern: "reserv|OpenTable|Resy|Tock" }
   - { type: max_unverified_claims, n: 2 }
+  - { type: max_llm_turns, n: 12 }
+  - { type: widget_matches, kind: ui, pattern: "vegetarian|veg" }
+  - { type: widget_matches, kind: ui, pattern: "reserv|OpenTable|Resy|Tock" }
   - type: banned_phrases
     patterns:
       - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"

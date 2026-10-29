@@ -76,6 +76,23 @@ describe("run_stats", () => {
     expect(out.at(-2)).toMatchObject({ type: EventType.CUSTOM, name: "run_stats" });
   });
 
+  it("adds classifier calls and cost from codemode scripts to the jev counters and counts llm turns", async () => {
+    let turn = 0;
+    const script: Script = async (emit) => {
+      emit(ev.assistantStart);
+      if (turn === 0) {
+        emit({ type: "tool_execution_end", toolCallId: "c1", toolName: "codemode", isError: false, result: { content: [], details: { calls: [{ name: "weather" }, { name: "models.classify" }, { name: "models.classify" }] } } } as unknown as PiEvent);
+        emit({ type: "message_end", message: { role: "toolResult", usage: { input: 5, output: 1, cost: { total: 0.004 } } } } as unknown as PiEvent);
+      } else emit(ev.delta("Answer."));
+      emit(assistantEndWith(usage(10, 2, 0, 0.1)));
+      turn++;
+    };
+    const { store } = setup(script, undefined, undefined, undefined, undefined, { turnStats: () => ({ jevCalls: 1, jevCostUsd: 0.001 }) });
+    const out = await collect(handleRun(input(), store, new AbortController().signal));
+    const stats = customEvents(out).find((e) => e.name === "run_stats");
+    expect(stats?.value).toMatchObject({ jevCalls: 3, jevCostUsd: 0.005, costUsd: 0.2, llmTurns: 2 });
+  });
+
   it("defaults cost and jev stats to zero when they are not reported", async () => {
     const script: Script = async (emit) => {
       emit(ev.assistantStart);

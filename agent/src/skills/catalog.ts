@@ -19,7 +19,9 @@ export function skillsDir(env: NodeJS.ProcessEnv = process.env, from: string = d
   return env.SKILLS_DIR ? resolve(env.SKILLS_DIR) : join(packageRoot(from), "skills");
 }
 
-const FLAG_LINE = /^(\s*)\[(workspace|rpiv)\] /;
+const CODEMODE_ONLY = new Set(["judging"]);
+
+const FLAG_LINE = /^(\s*)\[(workspace|rpiv|codemode)\] /;
 
 function forFlags(body: string, flags: Record<string, boolean>): string {
   return body
@@ -31,10 +33,10 @@ function forFlags(body: string, flags: Record<string, boolean>): string {
     .join("\n");
 }
 
-export function loadSkillCatalog(dir: string, opts: { workspace?: boolean; rpiv?: boolean } = {}): SkillEntry[] {
+export function loadSkillCatalog(dir: string, opts: { workspace?: boolean; rpiv?: boolean; codemode?: boolean } = {}): SkillEntry[] {
   const { skills } = loadSkillsFromDir({ dir, source: "open-agent" });
   return skills
-    .filter((s) => s.name && s.description)
-    .map((s) => ({ name: s.name, description: s.description, body: forFlags(stripFrontmatter(readFileSync(s.filePath, "utf8")).trim(), { workspace: opts.workspace === true, rpiv: opts.rpiv === true }) }))
+    .filter((s) => s.name && s.description && (opts.codemode === true || !CODEMODE_ONLY.has(s.name)))
+    .map((s) => ({ name: s.name, description: s.description, body: forFlags(stripFrontmatter(readFileSync(s.filePath, "utf8")).trim(), { workspace: opts.workspace === true, rpiv: opts.rpiv === true, codemode: opts.codemode === true }) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

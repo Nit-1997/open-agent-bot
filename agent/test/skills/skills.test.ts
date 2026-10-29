@@ -43,6 +43,23 @@ describe("skills directory", () => {
   });
 });
 
+describe("codemode skills", () => {
+  const catalog = (codemode: boolean) => loadSkillCatalog(skillsDir({}), { codemode });
+
+  it("lists the judging skill only when codemode is available", () => {
+    expect(catalog(false).map((s) => s.name)).not.toContain("judging");
+    expect(catalog(true).map((s) => s.name)).toContain("judging");
+    expect(skillIndex(catalog(false))).not.toContain("judging");
+  });
+
+  it("shows the party budget line only when codemode is available", () => {
+    const body = (c: boolean) => catalog(c).find((s) => s.name === "party-planning")!.body;
+    expect(body(false)).not.toContain("codemode");
+    expect(body(true)).toContain("codemode script");
+    expect(body(true)).not.toContain("[codemode]");
+  });
+});
+
 describe("workspace lines", () => {
   const body = (workspace: boolean, name: string) => loadSkillCatalog(skillsDir({}), { workspace }).find((x) => x.name === name)!.body;
 

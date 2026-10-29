@@ -241,18 +241,20 @@ export function parseScenario(raw: unknown, file: string): Scenario {
   const v = raw as Partial<Scenario> | null;
   if (!v || typeof v.id !== "string" || !v.context || !Array.isArray(v.turns) || !v.turns.length) throw new Error(`${file}: scenario needs id, context and turns`);
   const list = (x: unknown): Assertion[] => (Array.isArray(x) ? (x as Assertion[]) : []);
-  return { id: v.id, proves: v.proves ?? [], context: v.context, turns: v.turns, assert: list(v.assert), future_assert: list((v as Record<string, unknown>).future_assert) };
+  return { id: v.id, proves: v.proves ?? [], ...(typeof v.set === "string" && { set: v.set }), context: v.context, turns: v.turns, assert: list(v.assert), future_assert: list((v as Record<string, unknown>).future_assert) };
 }
 
-export function loadScenarios(dir: string, only?: string[]): Scenario[] {
+export function loadScenarios(dir: string, only?: string[], set?: string): Scenario[] {
   const all = readdirSync(dir)
     .filter((f) => f.endsWith(".yaml"))
     .sort()
     .map((f) => parseScenario(parseYaml(readFileSync(join(dir, f), "utf8")), f));
-  if (!only) return all;
-  const missing = only.filter((id) => !all.some((s) => s.id === id));
+  const inSet = set ? all.filter((s) => s.set === set) : all;
+  if (set && !inSet.length) throw new Error(`no scenarios in set "${set}"`);
+  if (!only) return inSet;
+  const missing = only.filter((id) => !inSet.some((s) => s.id === id));
   if (missing.length) throw new Error(`unknown scenario(s): ${missing.join(", ")}`);
-  return all.filter((s) => only.includes(s.id));
+  return inSet.filter((s) => only.includes(s.id));
 }
 
 export function readSecret(envFile: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
@@ -278,6 +280,7 @@ async function main() {
     options: {
       model: { type: "string", default: "chat-default" },
       only: { type: "string" },
+      set: { type: "string" },
       runs: { type: "string", default: "1" },
       label: { type: "string", default: "adhoc" },
       url: { type: "string", default: "http://localhost:8000/agui" },
@@ -293,7 +296,7 @@ async function main() {
   const model = values.model as string;
   const label = values.label as string;
   const runs = Number(values.runs);
-  const scenarios = loadScenarios(join(evalsDir, "scenarios"), values.only?.split(",").map((s) => s.trim()).filter(Boolean));
+  const scenarios = loadScenarios(join(evalsDir, "scenarios"), values.only?.split(",").map((s) => s.trim()).filter(Boolean), values.set);
   const secret = readSecret(values["env-file"] as string);
   const date = new Date().toISOString().slice(0, 10);
   const outDir = join(evalsDir, "results", `${date}-${label}-${model}`);

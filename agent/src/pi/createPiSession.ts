@@ -5,6 +5,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
   type ContextEvent,
+  createCodemodeExtension,
   type ExtensionAPI,
   createAgentSession,
   DefaultResourceLoader,
@@ -13,6 +14,8 @@ import {
   SettingsManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+
+const CODEMODE = "codemode";
 
 export type PiSession = AgentSession;
 
@@ -61,22 +64,29 @@ export async function createPiSession(opts: {
   skillsDir?: string;
   history?: SeedMessage[];
   contextNote?: () => string | undefined;
+  codemode?: (model: Model<any>) => boolean;
 }): Promise<PiSessionHandle> {
   const dir = await mkdtemp(join(tmpdir(), "pi-session-"));
   const settingsManager = SettingsManager.inMemory();
+  if (opts.codemode) settingsManager.applyOverrides({ defaultTools: ["+codemode"] });
   const resourceLoader = new DefaultResourceLoader({
     cwd: dir,
     agentDir: dir,
     settingsManager,
     noExtensions: true,
-    ...(opts.contextNote && {
+    ...((opts.contextNote || opts.codemode) && {
       extensionFactories: [
-        (pi: ExtensionAPI) => {
-          pi.on("context", (event) => {
-            const note = opts.contextNote?.();
-            return note ? { messages: withNote(event.messages, note) } : undefined;
-          });
-        },
+        ...(opts.contextNote
+          ? [
+              (pi: ExtensionAPI) => {
+                pi.on("context", (event) => {
+                  const note = opts.contextNote?.();
+                  return note ? { messages: withNote(event.messages, note) } : undefined;
+                });
+              },
+            ]
+          : []),
+        ...(opts.codemode ? [createCodemodeExtension({ mode: "on" })] : []),
       ],
     }),
     noSkills: true,
@@ -104,11 +114,19 @@ export async function createPiSession(opts: {
     settingsManager,
   });
 
+  const syncCodemode = (model: Model<any>) => {
+    if (!opts.codemode) return;
+    const active = session.getActiveToolNames().filter((n) => n !== CODEMODE);
+    session.setActiveToolsByName(opts.codemode(model) ? [...active, CODEMODE] : active);
+  };
+  syncCodemode(opts.model);
+
   return {
     session,
     setModel: async (model) => {
       if (session.model?.provider === model.provider && session.model?.id === model.id) return;
       await session.setModel(model);
+      syncCodemode(model);
     },
     dispose: async () => {
       session.dispose();

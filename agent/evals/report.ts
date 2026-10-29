@@ -4,6 +4,7 @@ export type ScenarioSummary = {
   runs: number;
   passes: number;
   toolCalls: number;
+  llmTurns?: number | null;
   seconds: number;
   costUsd: number | null;
   inputTokens: number | null;
@@ -17,7 +18,7 @@ const meanOrNull = (xs: number[]) => (xs.length ? mean(xs) : null);
 export function mergeStats(all: Array<RunStats | undefined>): RunStats | undefined {
   const present = all.filter((s): s is RunStats => !!s);
   if (!present.length) return undefined;
-  const sum = (k: Exclude<keyof RunStats, "skills">) => present.reduce((n, s) => n + s[k], 0);
+  const sum = (k: Exclude<keyof RunStats, "skills" | "llmTurns">) => present.reduce((n, s) => n + s[k], 0);
   return {
     inputTokens: sum("inputTokens"),
     outputTokens: sum("outputTokens"),
@@ -26,6 +27,7 @@ export function mergeStats(all: Array<RunStats | undefined>): RunStats | undefin
     jevCalls: sum("jevCalls"),
     jevCostUsd: sum("jevCostUsd"),
     toolCalls: sum("toolCalls"),
+    ...(present.some((s) => s.llmTurns !== undefined) && { llmTurns: present.reduce((n, s) => n + (s.llmTurns ?? 0), 0) }),
     durationMs: sum("durationMs"),
     skills: [...new Set(present.flatMap((s) => s.skills))],
   };
@@ -45,6 +47,7 @@ export function summarize(runs: RunRecord[], meta: { model: string; label: strin
       runs: rs.length,
       passes: rs.filter((r) => r.passed).length,
       toolCalls: round(mean(rs.map(toolCount)), 1),
+      llmTurns: roundOrNull(meanOrNull(stats.filter((s) => s.llmTurns !== undefined).map((s) => s.llmTurns as number)), 1),
       seconds: round(mean(rs.map(seconds)), 1),
       costUsd: roundOrNull(meanOrNull(stats.map((s) => s.costUsd)), 4),
       inputTokens: roundOrNull(meanOrNull(stats.map((s) => s.inputTokens)), 0),
@@ -79,8 +82,8 @@ function verdict(now: ScenarioSummary, before?: ScenarioSummary): string {
 export function renderReport(runs: RunRecord[], summary: Summary, baseline?: Summary): string {
   const ids = [...new Set(runs.map((r) => r.scenario))];
   const lines = [`# Eval report: ${summary.model}`, "", `label: ${summary.label} | date: ${summary.date} | baseline: ${baseline ? `${baseline.label} (${baseline.date})` : "none"}`, ""];
-  lines.push("| Scenario | Runs | Failed assertions | Tool calls | Seconds | Cost $ | Input tokens | vs baseline |");
-  lines.push("|---|---|---|---|---|---|---|---|");
+  lines.push("| Scenario | Runs | Failed assertions | Tool calls | LLM turns | Seconds | Cost $ | Input tokens | vs baseline |");
+  lines.push("|---|---|---|---|---|---|---|---|---|");
   for (const id of ids) {
     const rs = runs.filter((r) => r.scenario === id);
     const s = summary.scenarios[id];
@@ -93,7 +96,7 @@ export function renderReport(runs: RunRecord[], summary: Summary, baseline?: Sum
     }
     const failed = [...failures].map(([l, n]) => (rs.length > 1 ? `${l} x${n}` : l)).join("; ") || "-";
     lines.push(
-      `| ${id} | ${perRun} | ${cell(failed)} | ${delta(s.toolCalls, b?.toolCalls ?? null, 1)} | ${delta(s.seconds, b?.seconds ?? null, 1)} | ${delta(s.costUsd, b?.costUsd ?? null, 4, "$")} | ${delta(s.inputTokens, b?.inputTokens ?? null, 0)} | ${verdict(s, b)} |`,
+      `| ${id} | ${perRun} | ${cell(failed)} | ${delta(s.toolCalls, b?.toolCalls ?? null, 1)} | ${delta(s.llmTurns ?? null, b?.llmTurns ?? null, 1)} | ${delta(s.seconds, b?.seconds ?? null, 1)} | ${delta(s.costUsd, b?.costUsd ?? null, 4, "$")} | ${delta(s.inputTokens, b?.inputTokens ?? null, 0)} | ${verdict(s, b)} |`,
     );
   }
   const total = ids.reduce((n, id) => n + summary.scenarios[id].passes, 0);

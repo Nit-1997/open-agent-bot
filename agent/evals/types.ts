@@ -3,6 +3,7 @@ export type Assertion = { type: string; turn?: number; [key: string]: unknown };
 export type Scenario = {
   id: string;
   proves: string[];
+  set?: string;
   context: { timeZone: string; locale: string; home: string };
   turns: Array<{ prompt: string; if_asked?: string }>;
   assert: Assertion[];
@@ -17,6 +18,7 @@ export type RunStats = {
   jevCalls: number;
   jevCostUsd: number;
   toolCalls: number;
+  llmTurns?: number;
   durationMs: number;
   skills: string[];
 };

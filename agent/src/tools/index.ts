@@ -51,6 +51,12 @@ export type ToolDeps = {
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2, research: 2 };
 
+export const CODEMODE_TOOLS: ReadonlySet<string> = new Set(["web_search", "fetch_page", "wikipedia", "music", "weather", "shop", "stays", "flights"]);
+
+export function scopeToCodemode(tools: ToolDefinition<any, any, any>[]): ToolDefinition<any, any, any>[] {
+  return tools.map((t) => (CODEMODE_TOOLS.has(t.name) ? t : { ...t, exposure: "model-only" as const }));
+}
+
 function memo<T>(fn: () => Promise<T>): () => Promise<T> {
   let p: Promise<T> | undefined;
   return () => (p ??= fn());
@@ -91,7 +97,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     };
   };
   const browseDeps = { pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames };
-  return [
+  const tools: ToolDefinition<any, any, any>[] = [
     withBudget(webSearchTool(search), deps.budget, "search"),
     withBudget(withRules(imageSearchTool(search), RULES.imageSearch, v2), deps.budget, "images"),
     withBudget(musicTool({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }), deps.budget, "lookup"),
@@ -120,4 +126,5 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     ...(v2 ? [loadSkillTool(() => deps.skills ?? [])] : []),
     ...(deps.cfg.flags.workspace && deps.workspace ? [planTool({ store: deps.workspace, threadId: deps.threadId })] : []),
   ];
+  return deps.cfg.flags.codemode ? scopeToCodemode(tools) : tools;
 }
