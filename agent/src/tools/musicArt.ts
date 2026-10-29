@@ -1,3 +1,6 @@
+import type { Judge } from "../judge/index.js";
+import { coverMatch } from "../judge/criteria/coverMatch.js";
+import { type ITunes, pickMusic } from "./lookup.js";
 import { timeoutSignal } from "./net.js";
 
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
@@ -63,27 +66,42 @@ export function coverQueries(name: string): string[] {
   return [...new Set([clean, key.slice(0, 3).join(" "), key.slice(0, 2).join(" "), key[0] ?? ""].filter(Boolean))];
 }
 
-async function appleCover(name: string, country: string, f: typeof fetch): Promise<string | undefined> {
-  for (const q of coverQueries(name)) {
-    const hit = await appleSearch(q, country, f);
-    if (hit) return hit;
+async function appleCover(card: MusicCard, country: string, f: typeof fetch, judge?: Judge): Promise<string | undefined> {
+  const queries = coverQueries(card.title);
+  const artist = card.subtitle?.replace(/[^\p{L}\p{N}' -]+/gu, " ").replace(/\s+/g, " ").trim();
+  for (const q of artist ? [...new Set([`${queries[0]} ${artist}`, ...queries])] : queries) {
+    const hit = await pickAlbum(await appleSearch(q, country, f), card, judge);
+    if (hit) return large(hit.artworkUrl100);
   }
-  return undefined;
+  if (!artist) return undefined;
+  const song = `${queries[0]} ${artist}`;
+  return large((await pickMusic(await appleSearch(song, country, f, "song"), song, "song", judge))?.artworkUrl100);
 }
 
-async function appleSearch(name: string, country: string, f: typeof fetch): Promise<string | undefined> {
+const large = (art: string | undefined) => art?.replace(/\/\d+x\d+bb\./, "/600x600bb.");
+
+async function pickAlbum(results: ITunesAlbum[], card: MusicCard, judge?: Judge): Promise<ITunesAlbum | undefined> {
+  const albums = results.filter((r) => r.artworkUrl100);
+  if (judge?.available && albums.length) {
+    const options = Object.fromEntries(albums.map((r, i) => [`c${i}`, `${r.collectionName ?? ""} by ${r.artistName ?? ""}`]));
+    const verdict = await judge.choose({ card: [card.title, card.subtitle].filter(Boolean).join(" — ") }, options, coverMatch);
+    if (verdict) return verdict.choice == null ? undefined : albums[Number(verdict.choice.slice(1))];
+  }
+  return confidentAlbum(albums, card.title);
+}
+
+async function appleSearch(name: string, country: string, f: typeof fetch, entity: "album" | "song" = "album"): Promise<ITunes[]> {
   const url = new URL("https://itunes.apple.com/search");
   url.searchParams.set("term", name);
-  url.searchParams.set("entity", "album");
+  url.searchParams.set("entity", entity);
   url.searchParams.set("limit", "8");
   url.searchParams.set("country", country);
   const res = await f(url, { signal: timeoutSignal(6000), headers: UA });
-  if (!res.ok) return undefined;
-  const hit = confidentAlbum(((await res.json()) as { results?: ITunesAlbum[] }).results ?? [], name);
-  return hit?.artworkUrl100?.replace(/\/\d+x\d+bb\./, "/600x600bb.");
+  if (!res.ok) return [];
+  return ((await res.json()) as { results?: ITunes[] }).results ?? [];
 }
 
-export function musicCover(deps: { country: string; fetch?: typeof fetch }) {
+export function musicCover(deps: { country: string; fetch?: typeof fetch; judge?: Judge }) {
   const f = deps.fetch ?? fetch;
   return async (card: MusicCard): Promise<string | undefined> => {
     const spotify = spotifyItemUrl(card.url);
@@ -91,6 +109,6 @@ export function musicCover(deps: { country: string; fetch?: typeof fetch }) {
       const cover = await spotifyCover(spotify, f).catch(() => undefined);
       if (cover) return cover;
     }
-    return appleCover(card.title, deps.country, f).catch(() => undefined);
+    return appleCover(card, deps.country, f, deps.judge).catch(() => undefined);
   };
 }

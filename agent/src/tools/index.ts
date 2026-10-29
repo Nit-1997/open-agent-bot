@@ -106,7 +106,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     }), RULES.flights, v2), deps.budget, "flights"),
     withBudget(withRules(staysTool({ openTab, currency: regionFor(deps.userContext).currency, judge: deps.cfg.flags.jevStays ? (deps.judge ?? noJudge) : undefined }), RULES.stays, v2), deps.budget, "stays"),
     withRules(showUiTool({
-      findMusicArt: musicCover({ country }),
+      findMusicArt: musicCover({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
       findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, v2, BLOCKS_HELP),
     suggestRepliesTool(),
