@@ -11,7 +11,7 @@ type ShopData = {
   summary: Array<{ store: string; total: number; missing: string[] }>;
 };
 
-const CART_FIELDS = ["title", "price", "priceText", "image", "url", "size", "rating", "sponsored"];
+const CART_FIELDS = ["title", "price", "priceText", "image", "url", "size", "rating", "sponsored", "match", "why"];
 
 const renderers: Record<string, (data: any) => unknown> = {
   shop: (d: ShopData) => {

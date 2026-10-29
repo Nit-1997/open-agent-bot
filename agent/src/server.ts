@@ -6,6 +6,7 @@ import { FrameBus } from "./browser/frames.js";
 import { ActiveCart } from "./shop/cart.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
+import { createJudge, scopeJudge } from "./judge/index.js";
 import { ProviderHub } from "./providers/hub.js";
 import { LoginFlows } from "./providers/logins.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
@@ -24,6 +25,9 @@ const hub = await ProviderHub.create({
   ...(cfg.llmApiKey && { litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey, models: cfg.models } }),
 });
 
+const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel });
+console.log(`[jev] model=${cfg.jevModel} available=${judge.available} rerank=${cfg.flags.jevRerank}`);
+
 function modelFor(ref: string | undefined) {
   const fallback = defaultModelRef(cfg, hub);
   const model = (ref && hub.resolve(ref)) || (fallback && hub.resolve(fallback));
@@ -38,17 +42,25 @@ const store = new SessionStore({
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = new ActiveCart();
+    const turnJudge = scopeJudge(judge);
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: modelFor(userContext?.model),
       systemPrompt: buildSystemPrompt(userContext),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, judge: turnJudge }),
     });
     return {
       session: handle.session,
       busy: false,
       lastUsed: Date.now(),
-      onRunStart: () => budget.reset(),
+      onRunStart: () => {
+        budget.reset();
+        turnJudge.reset();
+      },
+      turnStats: () => {
+        const u = turnJudge.usage();
+        return { jevCalls: u.calls, jevCostUsd: u.costUsd };
+      },
       evidence,
       frames,
       cart,

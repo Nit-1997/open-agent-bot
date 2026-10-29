@@ -15,6 +15,7 @@ import type { Evidence } from "../grounding/evidence.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { OpenTab } from "../stays/search.js";
 import type { ActiveCart } from "../shop/cart.js";
+import { type Judge, noJudge } from "../judge/index.js";
 import { askUserTool } from "./askUser.js";
 import { musicCover } from "./musicArt.js";
 import { showUiTool, suggestRepliesTool } from "./showWidget.js";
@@ -34,6 +35,7 @@ export type ToolDeps = {
   evidence?: Evidence;
   frames?: FrameBus;
   cart?: ActiveCart;
+  judge?: Judge;
 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2 };
@@ -78,7 +80,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browseTool(browseDeps), deps.budget, "read"),
-    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart }), deps.budget, "shop"),
+    withBudget(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart, judge: deps.cfg.flags.jevRerank ? (deps.judge ?? noJudge) : undefined }), deps.budget, "shop"),
     weatherTool({ defaultUnits: regionFor(deps.userContext).country === "US" ? "imperial" : "metric" }),
     withBudget(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
