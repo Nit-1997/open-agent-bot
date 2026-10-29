@@ -15,7 +15,7 @@ export type Route = {
 };
 
 export const AREA_THRESHOLD = 0.5;
-export const POLICY_THRESHOLD = 0.8;
+export const POLICY_THRESHOLD = 0.85;
 export const ROUTE_TIMEOUT_MS = 2500;
 
 const TURN_CLIP = 300;

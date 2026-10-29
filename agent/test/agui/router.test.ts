@@ -110,8 +110,9 @@ describe("skill and tool hints", () => {
 describe("policy hand-off", () => {
   const r = (intent: Route["intent"], intentP: number) => ({ intent, intentP }) as Route;
 
-  it("applies only to buy, book and login at 0.8 or more", () => {
-    expect(isHandoff(r("buy", 0.8))).toBe(true);
+  it("applies only to buy, book and login at 0.85 or more", () => {
+    expect(isHandoff(r("buy", 0.85))).toBe(true);
+    expect(isHandoff(r("book", 0.8))).toBe(false);
     expect(isHandoff(r("book", 0.95))).toBe(true);
     expect(isHandoff(r("login", 0.99))).toBe(true);
     expect(isHandoff(r("buy", 0.79))).toBe(false);
@@ -232,7 +233,7 @@ describe("handleRun with the router", () => {
     }
   });
 
-  it("prompts the model for plan intent and for hand-off intents below 0.8", async () => {
+  it("prompts the model for plan intent and for hand-off intents below 0.85", async () => {
     for (const r of [planRoute(), planRoute({ intent: "buy", intentP: 0.6 })]) {
       const h = harness(r);
       const out = await collect(handleRun(runInput("find me a hotel I can book"), h.store, new AbortController().signal, { router: h.router }));
