@@ -27,6 +27,7 @@ export type AgentConfig = {
   dataDir: string;
   models: ModelOption[];
   jevModel: string;
+  jevConcurrency: number;
   flags: Flags;
   modelCaps: Record<string, string[]>;
 };
@@ -78,6 +79,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
     dataDir: env.AGENT_DATA_DIR ?? "/data/agent",
     models: parseModels(env.AGENT_MODELS, model),
     jevModel: env.JEV_MODEL || "openrouter/typesafe/jev-1.14",
+    jevConcurrency: Math.max(1, Number(env.JEV_CONCURRENCY) || 64),
     flags: parseFlags(env),
     modelCaps: parseCaps(env.AGENT_MODEL_CAPS),
   };

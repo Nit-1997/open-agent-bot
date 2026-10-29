@@ -29,7 +29,7 @@ const hub = await ProviderHub.create({
   ...(cfg.llmApiKey && { litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey, models: cfg.models } }),
 });
 
-const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: 16 });
+const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: cfg.jevConcurrency });
 console.log(`[jev] model=${cfg.jevModel} available=${judge.available} rerank=${cfg.flags.jevRerank}`);
 
 const routerSkills = cfg.flags.router && cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace }) : [];

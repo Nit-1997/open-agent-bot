@@ -25,6 +25,7 @@ describe("loadConfig", () => {
       dataDir: "/data/agent",
       models: [{ id: "chat-default", label: "chat-default" }],
       jevModel: "openrouter/typesafe/jev-1.14",
+      jevConcurrency: 64,
       flags: {
         jevRerank: false,
         promptV2: false,
