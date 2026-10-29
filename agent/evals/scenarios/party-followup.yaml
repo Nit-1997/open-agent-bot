@@ -1,0 +1,26 @@
+id: party-followup
+proves: [M6]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Plan an 8th birthday party for 12 kids, budget $300"
+    if_asked: "12 kids, Saturday Nov 14 at home, $300 total, pizza and cake, shop at Target"
+  - prompt: "make it 16 kids"
+assert:
+  - { type: must_call, tool: shop, turn: 1 }
+  - { type: widget_present, kind: cart, turn: 1 }
+  - { type: max_tool_calls, n: 14, turn: 1 }
+  - { type: must_call, tool: shop, turn: 2 }
+  - { type: tool_arg_matches, tool: shop, pattern: "\"qty\"", turn: 2 }
+  - { type: must_not_call, tool: browse, turn: 2 }
+  - { type: max_tool_calls, n: 4, turn: 2 }
+  - { type: text_matches, pattern: "16", turn: 2 }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 480 }
+future_assert:
+  - { type: must_call, tool: plan, turn: 2 }

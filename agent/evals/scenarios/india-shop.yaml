@@ -1,0 +1,18 @@
+id: india-shop
+proves: [M4]
+context: { timeZone: Asia/Kolkata, locale: en-IN, home: "Bengaluru, Karnataka" }
+turns:
+  - prompt: "What's the best phone under ₹30,000 right now?"
+assert:
+  - { type: max_tool_calls, n: 12 }
+  - { type: text_matches, pattern: "₹|INR|Rs\\.?\\s?\\d" }
+  - { type: text_matches, pattern: "amazon\\.in|flipkart" }
+  - { type: banned_phrases, patterns: ["\\$\\s?\\d"] }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 300 }

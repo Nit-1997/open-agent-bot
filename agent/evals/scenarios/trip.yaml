@@ -1,0 +1,25 @@
+id: trip
+proves: [M2, M6]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Plan a 3-day trip to Lake Tahoe for 2 adults next weekend. I need places to stay, the weather forecast and a day-by-day plan."
+    if_asked: "Fri to Mon next weekend, 2 adults, mid-range budget, driving from home, no skiing needed"
+assert:
+  - { type: must_call, tool: stays }
+  - { type: must_call, tool: weather }
+  - { type: widget_present, kind: stay_list }
+  - { type: widget_present, kind: weather_card }
+  - { type: max_tool_calls, n: 18 }
+  - { type: text_matches, pattern: "day 1" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 420 }
+future_assert:
+  - { type: tool_arg_matches, tool: load_skill, pattern: "trip-planning" }
+  - { type: widget_present, kind: ui }
+  - { type: must_call, tool: plan }

@@ -73,6 +73,42 @@ export function readCartEdits(input: RunAgentInput): CartEdits | null {
   }
 }
 
+export type RunStats = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheRead: number;
+  costUsd: number;
+  jevCalls: number;
+  jevCostUsd: number;
+  toolCalls: number;
+  durationMs: number;
+  skills: string[];
+};
+
+type Usage = { input?: number; output?: number; cacheRead?: number; cost?: { total?: number } };
+
+function createStatsCollector(now: () => number = Date.now) {
+  const startedAt = now();
+  const totals = { inputTokens: 0, outputTokens: 0, cacheRead: 0, costUsd: 0, toolCalls: 0 };
+  const skills: string[] = [];
+  return {
+    usage(u: Usage) {
+      totals.inputTokens += u.input ?? 0;
+      totals.outputTokens += u.output ?? 0;
+      totals.cacheRead += u.cacheRead ?? 0;
+      totals.costUsd += u.cost?.total ?? 0;
+    },
+    toolStart(name: string, args: unknown) {
+      totals.toolCalls++;
+      const skill = (args as { name?: unknown } | undefined)?.name;
+      if (name === "load_skill" && typeof skill === "string" && !skills.includes(skill)) skills.push(skill);
+    },
+    snapshot(turn?: { jevCalls: number; jevCostUsd: number }): RunStats {
+      return { ...totals, jevCalls: turn?.jevCalls ?? 0, jevCostUsd: turn?.jevCostUsd ?? 0, durationMs: now() - startedAt, skills: [...skills] };
+    },
+  };
+}
+
 function runError(code: string, message: string): BaseEvent {
   return { type: EventType.RUN_ERROR, code, message } as BaseEvent;
 }
@@ -134,12 +170,16 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   const edits = readCartEdits(input);
   if (edits) entry.cart?.applyEdits(edits);
   entry.evidence?.add(messageText(last));
+  const stats = createStatsCollector();
+  const statsEvent = (): BaseEvent => ({ type: EventType.CUSTOM, name: "run_stats", value: stats.snapshot(entry.turnStats?.()) }) as BaseEvent;
   const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {
+    if (e.type === "tool_execution_start") stats.toolStart(e.toolName, e.args);
     if (e.type === "tool_execution_start") console.log(`[run] thread=${threadId} tool=${e.toolName} args=${JSON.stringify(e.args).slice(0, 300)}`);
     if (e.type === "tool_execution_end") console.log(`[run] thread=${threadId} tool=${e.toolName} error=${e.isError} result=${JSON.stringify(e.result?.content?.[0]?.text ?? "").slice(0, 200)}`);
     if (e.type === "message_end") {
-      const m = e.message as { role?: string; stopReason?: string; errorMessage?: string; usage?: { input: number; output: number; cacheRead: number } };
+      const m = e.message as { role?: string; stopReason?: string; errorMessage?: string; usage?: Usage & { input: number; output: number; cacheRead: number } };
+      if (m.role === "assistant" && m.usage) stats.usage(m.usage);
       if (m.role === "assistant" && m.usage) console.log(`[run] thread=${threadId} usage in=${m.usage.input} out=${m.usage.output} cacheRead=${m.usage.cacheRead}`);
       if (m.role === "assistant" && m.stopReason === "error") modelError = m.errorMessage ?? "The model returned an error.";
     }
@@ -187,6 +227,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     for (const e of translator.finish()) yield e;
     if (signal.aborted) return;
     console.log(`[run] thread=${threadId} done error=${modelError ?? "none"}`);
+    yield statsEvent();
     if (modelError) yield runError("MODEL_ERROR", modelError);
     else yield { type: EventType.RUN_FINISHED, threadId, runId } as BaseEvent;
   } finally {

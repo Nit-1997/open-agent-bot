@@ -14,6 +14,7 @@ export type SessionEntry = {
   setModel?: (id: string) => Promise<void>;
   frames?: FrameBus;
   cart?: ActiveCart;
+  turnStats?: () => { jevCalls: number; jevCostUsd: number };
 };
 
 export class SessionStore {

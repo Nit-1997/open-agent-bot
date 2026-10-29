@@ -51,7 +51,10 @@ describe("reports lead with a picture", () => {
 
   it("copies the first picture up as the hero when a product report has pictures lower down", async () => {
     let saved = "";
-    const tool = createArtifactTool({ save: async (_t: string, html: string) => ((saved = html), { id: "a1" }) } as never, images);
+    const tool = createArtifactTool({ save: async (_t: string, html: string) => {
+        saved = html;
+        return { id: "a1" };
+      } } as never, images);
     const res = await run(tool, { title: "Miata", html: `<header class="hero"><h1>Miata</h1></header>${filler}<article class="option">${pic}</article>` });
     expect(res.isError).toBeUndefined();
     expect(saved.indexOf("miata.jpg")).toBeLessThan(saved.indexOf("xxxx"));

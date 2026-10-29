@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { EMPTY_REPLY_NUDGE, handleRun, readUserContext } from "../../src/agui/runHandler.js";
 import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
+import type { PiEvent } from "../../src/agui/translate.js";
 import { Evidence } from "../../src/grounding/evidence.js";
 import type { UserContext } from "../../src/prompt/systemPrompt.js";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
@@ -14,7 +15,7 @@ const say: Script = async (emit) => {
   emit(ev.assistantEnd());
 };
 
-function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string) => Promise<void>, frames?: FrameBus, cart?: ActiveCart) {
+function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string) => Promise<void>, frames?: FrameBus, cart?: ActiveCart, extra: Partial<SessionEntry> = {}) {
   const session = fakeSession(script);
   const runStarts = { count: 0 };
   const contexts: Array<UserContext | null> = [];
@@ -22,7 +23,7 @@ function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string
     idleMs: 60000,
     create: async (_t, ctx): Promise<SessionEntry> => {
       contexts.push(ctx);
-      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence, setModel, frames, cart };
+      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence, setModel, frames, cart, ...extra };
     },
   });
   return { session, store, contexts, runStarts };
@@ -47,6 +48,57 @@ async function collect(it: AsyncIterable<BaseEvent>) {
   return out;
 }
 
+const customEvents = (out: BaseEvent[]) => out.filter((e) => e.type === EventType.CUSTOM) as unknown as Array<{ name: string; value: Record<string, unknown> }>;
+
+const usage = (input: number, output: number, cacheRead: number, total?: number) => ({ input, output, cacheRead, ...(total !== undefined && { cost: { total } }) });
+const assistantEndWith = (u: object) => ({ type: "message_end", message: { role: "assistant", stopReason: "stop", usage: u } }) as unknown as PiEvent;
+const toolStart = (toolName: string, args: unknown) => ({ type: "tool_execution_start", toolCallId: `c-${toolName}`, toolName, args }) as unknown as PiEvent;
+
+describe("run_stats", () => {
+  it("sums usage across the run including the nudge, counts tools and collects loaded skills, just before RUN_FINISHED", async () => {
+    let turn = 0;
+    const script: Script = async (emit) => {
+      emit(ev.assistantStart);
+      if (turn === 0) {
+        emit(toolStart("load_skill", { name: "trip-planning" }));
+        emit(toolStart("stays", { q: "x" }));
+        emit(toolStart("load_skill", { name: "trip-planning" }));
+      } else emit(ev.delta("Answer."));
+      emit(assistantEndWith(usage(100 * (turn + 1), 10, 5, 0.25)));
+      turn++;
+    };
+    const { store } = setup(script, undefined, undefined, undefined, undefined, { turnStats: () => ({ jevCalls: 3, jevCostUsd: 0.01 }) });
+    const out = await collect(handleRun(input(), store, new AbortController().signal));
+    const stats = customEvents(out).find((e) => e.name === "run_stats");
+    expect(stats?.value).toMatchObject({ inputTokens: 300, outputTokens: 20, cacheRead: 10, costUsd: 0.5, jevCalls: 3, jevCostUsd: 0.01, toolCalls: 3, skills: ["trip-planning"] });
+    expect(typeof stats?.value.durationMs).toBe("number");
+    expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
+    expect(out.at(-2)).toMatchObject({ type: EventType.CUSTOM, name: "run_stats" });
+  });
+
+  it("defaults cost and jev stats to zero when they are not reported", async () => {
+    const script: Script = async (emit) => {
+      emit(ev.assistantStart);
+      emit(ev.delta("hi"));
+      emit(assistantEndWith(usage(7, 3, 0)));
+    };
+    const { store } = setup(script);
+    const out = await collect(handleRun(input(), store, new AbortController().signal));
+    expect(customEvents(out).find((e) => e.name === "run_stats")?.value).toMatchObject({ costUsd: 0, jevCalls: 0, jevCostUsd: 0, inputTokens: 7, outputTokens: 3, toolCalls: 0, skills: [] });
+  });
+
+  it("emits run_stats before RUN_ERROR on a model error", async () => {
+    const script: Script = async (emit) => {
+      emit(ev.assistantStart);
+      emit(ev.assistantEnd("error", "boom"));
+    };
+    const { store } = setup(script);
+    const out = await collect(handleRun(input(), store, new AbortController().signal));
+    expect(out.at(-1)?.type).toBe(EventType.RUN_ERROR);
+    expect(out.at(-2)).toMatchObject({ type: EventType.CUSTOM, name: "run_stats" });
+  });
+});
+
 describe("handleRun", () => {
   it("applies the user's cart edits sent with the message before the agent runs", async () => {
     const cart = new ActiveCart();
@@ -67,7 +119,7 @@ describe("handleRun", () => {
     };
     const { store } = setup(script, undefined, undefined, frames);
     const out = await collect(handleRun(input(), store, new AbortController().signal));
-    const custom = out.filter((e) => e.type === EventType.CUSTOM) as unknown as Array<{ name: string; value: unknown }>;
+    const custom = customEvents(out).filter((e) => e.name !== "run_stats");
     expect(custom).toEqual([{ type: EventType.CUSTOM, name: "browser_frame", value: { url: "https://www.shipt.com/x", data: "abc" } }]);
     expect(frames.size).toBe(0);
     expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
@@ -106,6 +158,7 @@ describe("handleRun", () => {
       EventType.TEXT_MESSAGE_START,
       EventType.TEXT_MESSAGE_CONTENT,
       EventType.TEXT_MESSAGE_END,
+      EventType.CUSTOM,
       EventType.RUN_FINISHED,
     ]);
     expect(session.prompts).toEqual(["hello"]);

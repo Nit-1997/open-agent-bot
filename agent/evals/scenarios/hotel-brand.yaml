@@ -1,0 +1,25 @@
+id: hotel-brand
+proves: [M3]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Find me a Marriott or Hyatt near the Louvre in Paris for Dec 10-13, 2 adults, under €400 a night"
+    if_asked: "Dec 10 to Dec 13, 2 adults, 1 room, under €400 per night, Marriott or Hyatt, near the Louvre"
+assert:
+  - { type: must_call, tool: stays }
+  - { type: widget_present, kind: stay_list }
+  - { type: max_tool_calls, n: 10 }
+  - { type: text_matches, pattern: "Marriott|Hyatt" }
+  - { type: text_matches, pattern: "€|EUR" }
+  - { type: widget_matches, kind: stay_list, pattern: "€|EUR" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 300 }
+future_assert:
+  - { type: tool_arg_matches, tool: stays, pattern: "Marriott|Hyatt" }
+  - { type: tool_arg_matches, tool: stays, pattern: "EUR" }
+  - { type: tool_result_matches, tool: stays, pattern: "Marriott|Hyatt" }

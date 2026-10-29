@@ -1,0 +1,22 @@
+id: party
+proves: [M1, M2, M5, M6]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Plan an 8th birthday party for 12 kids, budget $300"
+    if_asked: "12 kids, Saturday Nov 14 at home, $300 total, pizza and cake, shop at Target"
+assert:
+  - { type: must_call, tool: shop }
+  - { type: must_not_call, tool: browse }
+  - { type: max_tool_calls, n: 14 }
+  - { type: widget_present, kind: cart }
+  - { type: text_matches, pattern: "\\$\\d" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 300 }
+future_assert:
+  - { type: tool_arg_matches, tool: load_skill, pattern: "party-planning" }

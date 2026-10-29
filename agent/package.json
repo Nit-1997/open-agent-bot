@@ -10,10 +10,12 @@
   },
   "scripts": {
     "lint": "biome lint",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.evals.json",
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/agent/src/server.js"
+    "start": "node dist/agent/src/server.js",
+    "eval": "tsx evals/run.ts",
+    "eval:rank": "tsx evals/rank.ts"
   },
   "dependencies": {
     "@ag-ui/core": "^1.0.3",
@@ -30,7 +32,9 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
     "@types/node": "^26.6.5",
+    "tsx": "4.20.6",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "yaml": "2.9.0"
   }
 }

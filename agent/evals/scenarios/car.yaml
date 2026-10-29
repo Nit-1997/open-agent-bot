@@ -1,0 +1,16 @@
+id: car
+proves: [regression guard]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Find me a mid-size SUV rental in Maui for Dec 6-13 and a good snorkel set to buy for the trip"
+assert:
+  - { type: max_tool_calls, n: 16 }
+  - { type: widget_matches, kind: ui, pattern: "https?://" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 420 }

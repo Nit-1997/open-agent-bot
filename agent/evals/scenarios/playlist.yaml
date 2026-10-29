@@ -1,0 +1,19 @@
+id: playlist
+proves: [M3]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "Make me an 80s road-trip playlist"
+assert:
+  - { type: must_call, tool: music }
+  - { type: widget_present, kind: ui }
+  - { type: widget_matches, kind: ui, pattern: "\"shape\":\"square\"" }
+  - { type: widget_matches, kind: ui, pattern: "\"image\":\"https?://" }
+  - { type: max_tool_calls, n: 12 }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 300 }

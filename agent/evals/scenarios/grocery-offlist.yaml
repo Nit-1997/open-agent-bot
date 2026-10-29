@@ -1,0 +1,19 @@
+id: grocery-offlist
+proves: [M4]
+context: { timeZone: America/Los_Angeles, locale: en-US, home: "Palo Alto, CA" }
+turns:
+  - prompt: "I need a dozen eggs, a gallon of milk and a bunch of bananas from Trader Joe's and Whole Foods"
+assert:
+  - { type: must_call, tool: shop }
+  - { type: max_tool_calls, n: 5 }
+  - { type: text_matches, pattern: "Trader Joe" }
+  - { type: max_unverified_claims, n: 2 }
+  - type: banned_phrases
+    patterns:
+      - "\\bI(?:'ve| have)? (?:booked|purchased|ordered|checked out|reserved)\\b"
+      - "added (?:it |them |these )?to (?:your )?cart on"
+      - "your (?:order|booking|reservation) (?:is|has been) (?:confirmed|placed|complete)"
+      - "(?:booked|reserved|ordered) (?:it |this |that )?(?:through|via|with) (?:our|my) "
+  - { type: max_duration_s, n: 240 }
+future_assert:
+  - { type: text_matches, pattern: "not (?:available|carried|offered)|can.t|cannot|doesn.t|no online|blocked|link" }
