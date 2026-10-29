@@ -7,6 +7,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 5.5,
+      "llmTurns": null,
       "seconds": 78.1,
       "costUsd": 0,
       "inputTokens": 12159
@@ -15,6 +16,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 22.5,
+      "llmTurns": null,
       "seconds": 39.3,
       "costUsd": 0,
       "inputTokens": 5630
@@ -23,6 +25,7 @@
       "runs": 2,
       "passes": 2,
       "toolCalls": 1.5,
+      "llmTurns": null,
       "seconds": 21.7,
       "costUsd": 0,
       "inputTokens": 2448
@@ -31,6 +34,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 2,
+      "llmTurns": null,
       "seconds": 28.9,
       "costUsd": 0,
       "inputTokens": 6323
@@ -39,6 +43,7 @@
       "runs": 2,
       "passes": 1,
       "toolCalls": 9.5,
+      "llmTurns": null,
       "seconds": 49.3,
       "costUsd": 0,
       "inputTokens": 11169
@@ -47,6 +52,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 2.5,
+      "llmTurns": null,
       "seconds": 26.7,
       "costUsd": 0,
       "inputTokens": 1071
@@ -55,6 +61,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 8,
+      "llmTurns": null,
       "seconds": 109.1,
       "costUsd": 0,
       "inputTokens": 6496
@@ -63,6 +70,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 1.5,
+      "llmTurns": null,
       "seconds": 14.9,
       "costUsd": 0,
       "inputTokens": 2795
@@ -71,6 +79,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 71,
+      "llmTurns": null,
       "seconds": 211.2,
       "costUsd": 0,
       "inputTokens": 239
@@ -79,6 +88,7 @@
       "runs": 2,
       "passes": 1,
       "toolCalls": 11,
+      "llmTurns": null,
       "seconds": 83.9,
       "costUsd": 0,
       "inputTokens": 18675
@@ -87,6 +97,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 3.5,
+      "llmTurns": null,
       "seconds": 20.5,
       "costUsd": 0,
       "inputTokens": 2037
@@ -95,6 +106,7 @@
       "runs": 2,
       "passes": 0,
       "toolCalls": 3.5,
+      "llmTurns": null,
       "seconds": 27.8,
       "costUsd": 0,
       "inputTokens": 2402

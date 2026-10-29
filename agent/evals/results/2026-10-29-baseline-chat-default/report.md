@@ -2,20 +2,20 @@
 
 label: baseline | date: 2026-10-29 | baseline: none
 
-| Scenario | Runs | Failed assertions | Tool calls | Seconds | Cost $ | Input tokens | vs baseline |
-|---|---|---|---|---|---|---|---|
-| car | FAIL FAIL | widget_matches(kind=ui, pattern=https?://) x2 | 5.5 | 78.1 | $0.0000 | 12159 | new |
-| dining | FAIL FAIL | max_tool_calls(n=14) x2 | 22.5 | 39.3 | $0.0000 | 5630 | new |
-| grocery-offlist | pass pass | - | 1.5 | 21.7 | $0.0000 | 2448 | new |
-| hotel-brand | FAIL FAIL | widget_matches(kind=stay_list, pattern=€\|EUR) x2; not tool_result_matches(tool=stays, pattern=up to \$400) x2; max_unverified_claims(n=2) x1 | 2.0 | 28.9 | $0.0000 | 6323 | new |
-| india-shop | FAIL pass | max_tool_calls(n=12) x1 | 9.5 | 49.3 | $0.0000 | 11169 | new |
-| party | FAIL FAIL | widget_present(kind=cart) x2; max_unverified_claims(n=2) x1; must_call(tool=shop) x1 | 2.5 | 26.7 | $0.0000 | 1071 | new |
-| party-followup | FAIL FAIL | must_call(tool=shop) @turn 1 x1; widget_present(kind=cart) @turn 1 x2; must_call(tool=shop) @turn 2 x1; tool_arg_matches(tool=shop, pattern="qty") @turn 2 x1; max_unverified_claims(n=2) x1 | 8.0 | 109.1 | $0.0000 | 6496 | new |
-| playlist | FAIL FAIL | widget_present(kind=ui) x2; widget_matches(kind=ui, pattern=mzstatic\.com) x2; widget_matches(kind=ui, pattern="image":"https?://) x2 | 1.5 | 14.9 | $0.0000 | 2795 | new |
-| recipe-cart | FAIL FAIL | must_call(tool=shop) x1; widget_present(kind=cart) x1; tool_arg_matches(tool=shop, pattern=tortilla\|taco shell) x1; tool_arg_matches(tool=shop, pattern=beef\|chicken\|pork\|turkey\|beans) x1; error: turn 1 timed out after 420s x1; max_tool_calls(n=8) x1; max_duration_s(n=300) x1 | 71.0 | 211.2 | $0.0000 | 239 | new |
-| research | pass FAIL | must_call(tool=create_artifact) x1 | 11.0 | 83.9 | $0.0000 | 18675 | new |
-| store-domain | FAIL FAIL | max_tool_calls(n=3) x1; text_matches(pattern=B&H\|bhphotovideo) x1 | 3.5 | 20.5 | $0.0000 | 2037 | new |
-| trip | FAIL FAIL | widget_present(kind=ui) x2; must_call(tool=stays) x1; must_call(tool=weather) x1; widget_present(kind=stay_list) x1; widget_present(kind=weather_card) x1 | 3.5 | 27.8 | $0.0000 | 2402 | new |
+| Scenario | Runs | Failed assertions | Tool calls | LLM turns | Seconds | Cost $ | Input tokens | vs baseline |
+|---|---|---|---|---|---|---|---|---|
+| car | FAIL FAIL | widget_matches(kind=ui, pattern=https?://) x2 | 5.5 | n/a | 78.1 | $0.0000 | 12159 | new |
+| dining | FAIL FAIL | max_tool_calls(n=14) x2; widget_matches(kind=ui, pattern=vegetarian\|veg) x2; widget_matches(kind=ui, pattern=reserv\|OpenTable\|Resy\|Tock) x2 | 22.5 | n/a | 39.3 | $0.0000 | 5630 | new |
+| grocery-offlist | pass pass | - | 1.5 | n/a | 21.7 | $0.0000 | 2448 | new |
+| hotel-brand | FAIL FAIL | widget_matches(kind=stay_list, pattern=€\|EUR) x2; not tool_result_matches(tool=stays, pattern=up to \$400) x2; max_unverified_claims(n=2) x1 | 2.0 | n/a | 28.9 | $0.0000 | 6323 | new |
+| india-shop | FAIL pass | max_tool_calls(n=12) x1 | 9.5 | n/a | 49.3 | $0.0000 | 11169 | new |
+| party | FAIL FAIL | widget_present(kind=cart) x2; max_unverified_claims(n=2) x1; must_call(tool=shop) x1 | 2.5 | n/a | 26.7 | $0.0000 | 1071 | new |
+| party-followup | FAIL FAIL | must_call(tool=shop) @turn 1 x1; widget_present(kind=cart) @turn 1 x2; must_call(tool=shop) @turn 2 x1; tool_arg_matches(tool=shop, pattern=qty) @turn 2 x1; max_unverified_claims(n=2) x1 | 8.0 | n/a | 109.1 | $0.0000 | 6496 | new |
+| playlist | FAIL FAIL | widget_present(kind=ui) x2; widget_matches(kind=ui, pattern=mzstatic\.com) x2; widget_matches(kind=ui, pattern="image":"https?://) x2 | 1.5 | n/a | 14.9 | $0.0000 | 2795 | new |
+| recipe-cart | FAIL FAIL | must_call(tool=shop) x1; widget_present(kind=cart) x1; tool_arg_matches(tool=shop, pattern=tortilla\|taco shell) x1; tool_arg_matches(tool=shop, pattern=beef\|chicken\|pork\|turkey\|beans) x1; error: turn 1 timed out after 420s x1; max_tool_calls(n=8) x1; max_duration_s(n=300) x1 | 71.0 | n/a | 211.2 | $0.0000 | 239 | new |
+| research | pass FAIL | must_call(tool=create_artifact) x1 | 11.0 | n/a | 83.9 | $0.0000 | 18675 | new |
+| store-domain | FAIL FAIL | max_tool_calls(n=3) x1; text_matches(pattern=B&H\|bhphotovideo) x1 | 3.5 | n/a | 20.5 | $0.0000 | 2037 | new |
+| trip | FAIL FAIL | widget_present(kind=ui) x2; must_call(tool=stays) x1; must_call(tool=weather) x1; widget_present(kind=stay_list) x1; widget_present(kind=weather_card) x1 | 3.5 | n/a | 27.8 | $0.0000 | 2402 | new |
 
 Passed 4 of 24 runs.
 
@@ -27,8 +27,12 @@ Passed 4 of 24 runs.
   - widget_matches(kind=ui, pattern=https?://): /https?:/// on 0 ui widget(s)
 - dining run 1
   - max_tool_calls(n=14): 21 calls, max 14
+  - widget_matches(kind=ui, pattern=vegetarian|veg): /vegetarian|veg/ on 0 ui widget(s)
+  - widget_matches(kind=ui, pattern=reserv|OpenTable|Resy|Tock): /reserv|OpenTable|Resy|Tock/ on 0 ui widget(s)
 - dining run 2
   - max_tool_calls(n=14): 24 calls, max 14
+  - widget_matches(kind=ui, pattern=vegetarian|veg): /vegetarian|veg/ on 0 ui widget(s)
+  - widget_matches(kind=ui, pattern=reserv|OpenTable|Resy|Tock): /reserv|OpenTable|Resy|Tock/ on 0 ui widget(s)
 - hotel-brand run 1
   - widget_matches(kind=stay_list, pattern=€|EUR): /€|EUR/ on 1 stay_list widget(s)
   - not tool_result_matches(tool=stays, pattern=up to \$400): negated: /up to \$400/ on 1 stays result(s)
@@ -48,7 +52,7 @@ Passed 4 of 24 runs.
   - must_call(tool=shop) @turn 1: shop called 0x
   - widget_present(kind=cart) @turn 1: cart shown 0x; saw [grounding_note]
   - must_call(tool=shop) @turn 2: shop called 0x
-  - tool_arg_matches(tool=shop, pattern="qty") @turn 2: /"qty"/ on 0 shop call(s)
+  - tool_arg_matches(tool=shop, pattern=qty) @turn 2: /qty/ on 0 shop call(s)
   - max_unverified_claims(n=2): 5 unverified, max 2
 - party-followup run 2
   - widget_present(kind=cart) @turn 1: cart shown 0x; saw [ask, ui]

@@ -2,20 +2,20 @@
 
 label: baseline | date: 2026-10-29 | baseline: none
 
-| Scenario | Runs | Failed assertions | Tool calls | Seconds | Cost $ | Input tokens | vs baseline |
-|---|---|---|---|---|---|---|---|
-| car | pass pass | - | 5.5 | 27.6 | $0.1694 | 74335 | new |
-| dining | pass pass | - | 7.0 | 23.1 | $0.1675 | 73597 | new |
-| grocery-offlist | pass pass | - | 3.5 | 31.6 | $0.1118 | 50326 | new |
-| hotel-brand | FAIL FAIL | not tool_result_matches(tool=stays, pattern=up to \$400) x2 | 2.0 | 22.8 | $0.0838 | 35706 | new |
-| india-shop | pass pass | - | 7.5 | 30.8 | $0.2245 | 101038 | new |
-| party | pass pass | - | 5.0 | 70.5 | $0.1936 | 82574 | new |
-| party-followup | FAIL FAIL | must_call(tool=shop) @turn 2 x2; tool_arg_matches(tool=shop, pattern="qty") @turn 2 x2; max_unverified_claims(n=2) x1 | 7.0 | 93.4 | $0.2853 | 120271 | new |
-| playlist | pass pass | - | 3.5 | 23.7 | $0.1206 | 45949 | new |
-| recipe-cart | pass pass | - | 2.0 | 32.4 | $0.1219 | 56618 | new |
-| research | pass pass | - | 13.0 | 52.9 | $0.3746 | 157584 | new |
-| store-domain | FAIL FAIL | max_tool_calls(n=3) x2 | 8.0 | 29.1 | $0.1703 | 77237 | new |
-| trip | pass pass | - | 6.5 | 31.2 | $0.1528 | 64165 | new |
+| Scenario | Runs | Failed assertions | Tool calls | LLM turns | Seconds | Cost $ | Input tokens | vs baseline |
+|---|---|---|---|---|---|---|---|---|
+| car | pass pass | - | 5.5 | n/a | 27.6 | $0.1694 | 74335 | new |
+| dining | pass pass | - | 7.0 | n/a | 23.1 | $0.1675 | 73597 | new |
+| grocery-offlist | pass pass | - | 3.5 | n/a | 31.6 | $0.1118 | 50326 | new |
+| hotel-brand | FAIL FAIL | not tool_result_matches(tool=stays, pattern=up to \$400) x2 | 2.0 | n/a | 22.8 | $0.0838 | 35706 | new |
+| india-shop | pass pass | - | 7.5 | n/a | 30.8 | $0.2245 | 101038 | new |
+| party | pass pass | - | 5.0 | n/a | 70.5 | $0.1936 | 82574 | new |
+| party-followup | FAIL FAIL | must_call(tool=shop) @turn 2 x2; tool_arg_matches(tool=shop, pattern=qty) @turn 2 x2; max_unverified_claims(n=2) x1 | 7.0 | n/a | 93.4 | $0.2853 | 120271 | new |
+| playlist | pass pass | - | 3.5 | n/a | 23.7 | $0.1206 | 45949 | new |
+| recipe-cart | pass pass | - | 2.0 | n/a | 32.4 | $0.1219 | 56618 | new |
+| research | pass pass | - | 13.0 | n/a | 52.9 | $0.3746 | 157584 | new |
+| store-domain | FAIL FAIL | max_tool_calls(n=3) x2 | 8.0 | n/a | 29.1 | $0.1703 | 77237 | new |
+| trip | pass pass | - | 6.5 | n/a | 31.2 | $0.1528 | 64165 | new |
 
 Passed 18 of 24 runs.
 
@@ -27,11 +27,11 @@ Passed 18 of 24 runs.
   - not tool_result_matches(tool=stays, pattern=up to \$400): negated: /up to \$400/ on 1 stays result(s)
 - party-followup run 1
   - must_call(tool=shop) @turn 2: shop called 0x
-  - tool_arg_matches(tool=shop, pattern="qty") @turn 2: /"qty"/ on 0 shop call(s)
+  - tool_arg_matches(tool=shop, pattern=qty) @turn 2: /qty/ on 0 shop call(s)
   - max_unverified_claims(n=2): 4 unverified, max 2
 - party-followup run 2
   - must_call(tool=shop) @turn 2: shop called 0x
-  - tool_arg_matches(tool=shop, pattern="qty") @turn 2: /"qty"/ on 0 shop call(s)
+  - tool_arg_matches(tool=shop, pattern=qty) @turn 2: /qty/ on 0 shop call(s)
 - store-domain run 1
   - max_tool_calls(n=3): 8 calls, max 3
 - store-domain run 2

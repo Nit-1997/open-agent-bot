@@ -1,5 +1,5 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { defaultStoresFor } from "../shop/stores.js";
+import { defaultStoresFor, storeFor } from "../shop/stores.js";
 
 export function withRules<T extends ToolDefinition<any, any, any>>(tool: T, rules: string | ((base: string) => string), on: boolean, drop?: string): T {
   if (!on) return tool;
@@ -29,7 +29,9 @@ export function shopRules(country: string): (base: string) => string {
   return (base) => {
     const at = base.indexOf("Stores");
     const stores = at < 0 ? "" : ` ${base.slice(at)}`;
-    return `Build the chat's one shopping cart from stores' real catalogs, browsing as a guest. First call: items with qty and 1-3 stores; it keeps the best-value stores. For follow-ups ("add tortillas", "make it for 6") pass only the new items, no stores. remove drops items; pass stores again only to switch stores, new_cart only for an unrelated list. Use the store the user named, else the defaults for their region: groceries ${list(defaultStoresFor(country, "grocery"))}; other products ${list(defaultStoresFor(country, "general"))}.${stores}
+    const market = defaultStoresFor(country, "grocery").find((id) => storeFor(id).marketplace);
+    const viaMarket = market ? ` Groceries from a store ${market} carries: pass ${market}, which reads that store's real prices; the store's own site usually blocks guests.` : "";
+    return `Build the chat's one shopping cart from stores' real catalogs, browsing as a guest. First call: items with qty and 1-3 stores; it keeps the best-value stores. For follow-ups ("add tortillas", "make it for 6") pass only the new items, no stores. remove drops items; pass stores again only to switch stores, new_cart only for an unrelated list. Use the store the user named, else the defaults for their region: groceries ${list(defaultStoresFor(country, "grocery"))}; other products ${list(defaultStoresFor(country, "general"))}.${viaMarket}${stores}
 
 It shows its own cart card (products, prices, links, best value), so don't repeat products in show_ui and never use image_search pictures for products. For recipes skip pantry basics. Reply in a sentence or two: best-value store, how much cheaper than the next, missing items.`;
   };

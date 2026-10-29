@@ -9,7 +9,17 @@ function isRunInput(x: unknown): x is RunAgentInput {
   return !!v && typeof v.threadId === "string" && typeof v.runId === "string" && Array.isArray(v.messages);
 }
 
-export function aguiRoutes(deps: { store: SessionStore; authorized: (secret: string | undefined) => boolean; run?: RunOptions }) {
+const HEARTBEAT_MS = 15_000;
+const HEARTBEAT = new TextEncoder().encode(": ping\n\n");
+
+export function aguiRoutes(deps: {
+  store: SessionStore;
+  authorized: (secret: string | undefined) => boolean;
+  run?: RunOptions;
+  heartbeatMs?: number;
+  handle?: typeof handleRun;
+}) {
+  const handle = deps.handle ?? handleRun;
   const app = new Hono();
 
   app.post("/agui", async (c) => {
@@ -23,14 +33,24 @@ export function aguiRoutes(deps: { store: SessionStore; authorized: (secret: str
     const ac = new AbortController();
     c.req.raw.signal?.addEventListener("abort", () => ac.abort(), { once: true });
     const textEncoder = new TextEncoder();
+    const sse = encoder.getContentType().startsWith("text/event-stream");
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
+        const ping = () => {
+          try {
+            controller.enqueue(HEARTBEAT);
+          } catch {
+            clearInterval(beat);
+          }
+        };
+        const beat = sse ? setInterval(ping, deps.heartbeatMs ?? HEARTBEAT_MS) : undefined;
         try {
-          for await (const event of handleRun(body, deps.store, ac.signal, deps.run)) {
+          for await (const event of handle(body, deps.store, ac.signal, deps.run)) {
             controller.enqueue(textEncoder.encode(encoder.encode(event)));
           }
         } finally {
+          clearInterval(beat);
           try {
             controller.close();
           } catch {}

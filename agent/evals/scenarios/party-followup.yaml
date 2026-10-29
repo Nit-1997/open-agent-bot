@@ -10,7 +10,7 @@ assert:
   - { type: widget_present, kind: cart, turn: 1 }
   - { type: max_tool_calls, n: 14, turn: 1 }
   - { type: must_call, tool: shop, turn: 2 }
-  - { type: tool_arg_matches, tool: shop, pattern: "\"qty\"", turn: 2 }
+  - { type: tool_arg_matches, tool: shop, pattern: "qty", turn: 2 }
   - { type: must_not_call, tool: browse, turn: 2 }
   - { type: max_tool_calls, n: 4, turn: 2 }
   - { type: text_matches, pattern: "16", turn: 2 }

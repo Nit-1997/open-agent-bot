@@ -41,6 +41,8 @@ describe("tool descriptions behind promptV2", () => {
     expect(desc(tools(true), "shop")).toContain("groceries amazon.in, flipkart");
     const us = tools(true, { ...ctx, timeZone: "America/Los_Angeles", locale: "en-US" });
     expect(desc(us, "shop")).toContain("groceries shipt; other products amazon, target");
+    expect(desc(us, "shop")).toContain("Groceries from a store shipt carries: pass shipt");
+    expect(desc(tools(true), "shop")).not.toContain("Groceries from a store");
   });
 });
 
