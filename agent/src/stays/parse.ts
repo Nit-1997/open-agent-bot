@@ -35,7 +35,21 @@ export function cleanUrl(raw: string | undefined, keep: string[]): string | unde
   }
 }
 
-export const httpImage = (src: string | undefined) => (src && /^https?:\/\//.test(src) ? src : undefined);
+const SYMBOL_CURRENCY: Array<[RegExp, string]> = [
+  [/€|\bEUR\b/, "EUR"],
+  [/£|\bGBP\b/, "GBP"],
+  [/₹|\bINR\b/, "INR"],
+  [/\bUSD\b/, "USD"],
+];
+const DOLLAR_CURRENCIES = new Set(["USD", "CAD", "AUD", "NZD", "SGD", "MXN", "HKD"]);
+
+export function currencyTag(text: string | undefined, q: StayQuery): { currency?: string } {
+  const t = text ?? "";
+  const found = SYMBOL_CURRENCY.find(([re]) => re.test(t))?.[1] ?? (/\$/.test(t) && !DOLLAR_CURRENCIES.has(q.currency) ? "USD" : undefined);
+  return found && found !== q.currency ? { currency: found } : {};
+}
+
+export const httpImage =(src: string | undefined) => (src && /^https?:\/\//.test(src) ? src : undefined);
 
 export const clip = (s: string | undefined, max: number) => {
   const t = (s ?? "").replace(/\s+/g, " ").trim();

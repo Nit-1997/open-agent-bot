@@ -138,6 +138,31 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
     return flat ? flat.flat() : null;
   }
 
+  async function yesnoBatched(items: Item[], c: YesNoCriteria, question: Question, o: CallOpts): Promise<{ id: string; yes: boolean; p: number }[] | null> {
+    const max = o.batch?.max ?? DEFAULT_BATCH;
+    const groups: Item[][] = [];
+    for (let i = 0; i < items.length; i += max) groups.push(items.slice(i, i + max));
+    const parts = await Promise.all(
+      groups.map((group) =>
+        limit(async () => {
+          const state = { ...o.batch?.shared, tiles: group.map((it, n) => ({ i: n, ...it.state })) };
+          const questions = Object.fromEntries(group.map((_, n) => [`t${n}`, { ...question, instructions: `${c.question} Judge only the item with i=${n} in tiles.` } as Question]));
+          const r = await ask(c, state, questions, o);
+          if (!r) return null;
+          const judged = group.map((it, n) => {
+            const a = r.answers[`t${n}`];
+            if (a?.type !== "bool") return null;
+            note(r, a.probability >= 0.5 ? "yes" : "no", a.probability);
+            return { id: it.id, yes: a.probability >= 0.5, p: a.probability };
+          });
+          return all(judged);
+        }),
+      ),
+    );
+    const flat = all(parts);
+    return flat ? flat.flat() : null;
+  }
+
   return {
     available: true,
     usage: () => ({ ...totals }),
@@ -161,6 +186,10 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
 
     async yesno(items: Item[], c: YesNoCriteria, o?: CallOpts) {
       const question: Question = { type: "bool", instructions: c.question, criteria: { true: c.yes, false: c.no } };
+      if (o?.batch && items.length > 1) {
+        const batched = await yesnoBatched(items, c, question, o);
+        if (batched) return batched;
+      }
       const out = await Promise.all(items.map((item) => limit(async () => {
         const r = await one(c, item.state, question, o);
         if (r?.answer.type !== "bool") return null;

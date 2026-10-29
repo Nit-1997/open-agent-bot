@@ -1,4 +1,4 @@
-import { amount, cleanUrl, clip, count, httpImage, nightlyFromTotal } from "../parse.js";
+import { amount, cleanUrl, clip, count, currencyTag, httpImage, nightlyFromTotal } from "../parse.js";
 import type { Stay, StayQuery, StaySource } from "../types.js";
 
 export type AirbnbCard = { title: string; name?: string; href?: string; image?: string; text: string };
@@ -22,13 +22,14 @@ export function parseAirbnbCard(c: AirbnbCard, q: StayQuery): Stay | null {
   const title = clip(titleIsType ? (c.name ?? c.title) : c.title, 120);
   if (!title || !url) return null;
   const typed = TYPE_IN_PLACE.exec(titleIsType ? c.title : (typeLine ?? ""));
-  const total = amount(/([$€£₹][\d,]+(?:\.\d+)?)\s*(?:total|for \d+ nights?)/i.exec(c.text)?.[1]);
+  const totalText = /([$€£₹][\d,]+(?:\.\d+)?)\s*(?:total|for \d+ nights?)/i.exec(c.text)?.[1];
+  const total = amount(totalText);
   const rating = /(\d(?:\.\d+)?) out of 5 average rating,\s*([\d,]+) reviews?/i.exec(c.text);
   return {
     title,
     url,
     ...(httpImage(c.image) && { image: c.image }),
-    ...(total != null && { total, nightly: nightlyFromTotal(total, q) }),
+    ...(total != null && { total, nightly: nightlyFromTotal(total, q), ...currencyTag(totalText, q) }),
     ...(rating && { rating: Number(rating[1]), ratingScale: 5 as const, reviews: count(rating[2]) }),
     ...(typed && { kind: typed[1], area: clip(typed[2], 60) }),
     ...(/Guest favorite/i.test(c.text) && { badge: "Guest favorite" }),

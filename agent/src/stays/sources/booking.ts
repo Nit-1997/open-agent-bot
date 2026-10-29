@@ -1,4 +1,4 @@
-import { amount, cleanUrl, clip, count, httpImage, nightlyFromTotal } from "../parse.js";
+import { amount, cleanUrl, clip, count, currencyTag, httpImage, nightlyFromTotal } from "../parse.js";
 import type { Stay, StayQuery, StaySource } from "../types.js";
 
 export type BookingCard = { title: string; href?: string; price: string; score: string; image?: string; area: string };
@@ -25,7 +25,7 @@ export function parseBookingCard(c: BookingCard, q: StayQuery): Stay | null {
     title,
     url,
     ...(httpImage(c.image) && { image: c.image }),
-    ...(total != null && { total, nightly: nightlyFromTotal(total, q) }),
+    ...(total != null && { total, nightly: nightlyFromTotal(total, q), ...currencyTag(c.price, q) }),
     ...(score && { rating: Number(score[1]), ratingScale: 10 as const, ...(reviews && { reviews: count(reviews[1]) }) }),
     ...(clip(c.area, 60) && { area: clip(c.area, 60) }),
   };

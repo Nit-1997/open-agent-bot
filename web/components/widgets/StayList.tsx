@@ -1,7 +1,7 @@
 "use client";
 
 import type { StayList as StayListWidget } from "@shared/widgets";
-import { Star } from "lucide-react";
+import { Check, Star } from "lucide-react";
 import { useState } from "react";
 import { money } from "@/lib/format";
 import { Favicon } from "@/components/chat/Favicon";
@@ -31,8 +31,9 @@ function ratingText(s: Stay): string | undefined {
 }
 
 function StayCard({ id, stay, currency, locale, showSource, folded }: { id: string; stay: Stay; currency: string; locale: string; showSource: boolean; folded: boolean }) {
-  const nightly = money(stay.nightly, currency, locale);
-  const total = money(stay.total, currency, locale);
+  const own = stay.currency ?? currency;
+  const nightly = money(stay.nightly, own, locale);
+  const total = money(stay.total, own, locale);
   const rating = ratingText(stay);
   const details = [stay.kind, stay.area].filter(Boolean).join(" · ");
   return (
@@ -59,6 +60,20 @@ function StayCard({ id, stay, currency, locale, showSource, folded }: { id: stri
           {details && (
             <span id={`${id}-details`} className="line-clamp-1 text-xs text-text-secondary">
               {details}
+            </span>
+          )}
+          {stay.met && stay.met.length > 0 && (
+            <span id={`${id}-wishes`} className="mt-1 flex flex-wrap gap-1">
+              {stay.met.map((m, i) => (
+                <span
+                  id={`${id}-wish-${i}`}
+                  key={m}
+                  className="inline-flex items-center gap-0.5 rounded-full bg-surface px-1.5 py-0.5 text-[11px] font-medium text-text-secondary"
+                >
+                  <Check id={`${id}-wish-${i}-check`} aria-hidden="true" size={10} />
+                  {m}
+                </span>
+              ))}
             </span>
           )}
         </span>
@@ -111,7 +126,7 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
   const tagged = (s: Source): Stay[] => s.stays.map((x) => ({ ...x, source: s.label }));
   const all = read
     .flatMap(tagged)
-    .sort((a, b) => (a.nightly ?? Infinity) - (b.nightly ?? Infinity))
+    .sort((a, b) => (b.met?.length ?? 0) - (a.met?.length ?? 0) || (a.nightly ?? Infinity) - (b.nightly ?? Infinity))
     .slice(0, ALL_LIMIT);
   const shown = tab === ALL ? all : tagged(read.find((s) => s.id === tab) ?? read[0] ?? widget.sources[0]);
   const guests = `${widget.adults} ${widget.adults === 1 ? "guest" : "guests"}`;
