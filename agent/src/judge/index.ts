@@ -7,6 +7,9 @@ export type ScoreCriteria<L extends string> = { id: string; version: string; que
 export type YesNoCriteria = { id: string; version: string; question: string; yes: string; no: string };
 export type ChooseCriteria = { id: string; version: string; question: string };
 
+export type MultiQuestion = { type: "bool"; question: string; yes: string; no: string } | { type: "choice"; question: string; options: Record<string, string> };
+export type MultiAnswer = { type: "bool"; yes: boolean; p: number } | { type: "choice"; choice: string; p: number };
+
 export type Scored<L extends string> = { id: string; level: L; p: number; probabilities: Record<L, number> };
 
 type Item = { id: string; state: Record<string, unknown> };
@@ -18,6 +21,7 @@ export interface Judge {
   score<L extends string>(items: Item[], c: ScoreCriteria<L>, o?: CallOpts): Promise<Scored<L>[] | null>;
   yesno(items: Item[], c: YesNoCriteria, o?: CallOpts): Promise<{ id: string; yes: boolean; p: number }[] | null>;
   choose(state: Record<string, unknown>, options: Record<string, string>, c: ChooseCriteria & { none?: string }, o?: CallOpts): Promise<{ choice: string | null; p: number } | null>;
+  classify(state: Record<string, unknown>, c: { id: string; version: string }, questions: Record<string, MultiQuestion>, o?: CallOpts): Promise<Record<string, MultiAnswer> | null>;
   usage(): Usage;
 }
 
@@ -40,6 +44,7 @@ export const noJudge: Judge = {
   score: unavailable,
   yesno: unavailable,
   choose: unavailable,
+  classify: unavailable,
   usage: () => ({ calls: 0, failures: 0, costUsd: 0 }),
 };
 
@@ -171,6 +176,28 @@ export async function createJudge(opts: { runtime: Runtime; model: string; timeo
       return all(out);
     },
 
+    async classify(state: Record<string, unknown>, c: { id: string; version: string }, questions: Record<string, MultiQuestion>, o?: CallOpts) {
+      const wire = Object.fromEntries(
+        Object.entries(questions).map(([key, q]): [string, Question] => [key, q.type === "bool" ? { type: "bool", instructions: q.question, criteria: { true: q.yes, false: q.no } } : { type: "choice", instructions: q.question, criteria: q.options }]),
+      );
+      const r = await limit(() => ask(c, state, wire, o));
+      if (!r) return null;
+      const out: Record<string, MultiAnswer> = {};
+      for (const [key, q] of Object.entries(questions)) {
+        const a = r.answers[key];
+        if (q.type === "bool") {
+          if (a?.type !== "bool") return null;
+          out[key] = { type: "bool", yes: a.probability >= 0.5, p: a.probability };
+        } else {
+          const pick = a && chosen(a);
+          if (!pick || !(pick.choice in q.options)) return null;
+          out[key] = { type: "choice", choice: pick.choice, p: pick.p };
+        }
+      }
+      log(`[jev] ${JSON.stringify({ c: r.tag, h: r.h, ans: Object.fromEntries(Object.entries(out).map(([k, a]) => [k, a.type === "bool" ? round(a.p) : `${a.choice}:${round(a.p)}`])), ms: r.ms })}`);
+      return out;
+    },
+
     async choose(state: Record<string, unknown>, options: Record<string, string>, c: ChooseCriteria & { none?: string }, o?: CallOpts) {
       const criteria = { ...options, ...(c.none && { [NONE]: c.none }) };
       const r = await limit(() => one(c, state, { type: "choice", instructions: c.question, criteria }, o));
@@ -191,6 +218,7 @@ export function scopeJudge(base: Judge): Judge & { reset(): void } {
     score: (items, c, o) => base.score(items, c, { ...o, sink }),
     yesno: (items, c, o) => base.yesno(items, c, { ...o, sink }),
     choose: (state, options, c, o) => base.choose(state, options, c, { ...o, sink }),
+    classify: (state, c, q, o) => base.classify(state, c, q, { ...o, sink }),
     usage: () => ({ ...sink }),
     reset: () => {
       sink = { calls: 0, failures: 0, costUsd: 0 };

@@ -12,6 +12,7 @@ export type SessionEntry = {
   lastUsed: number;
   dispose: () => Promise<void>;
   onRunStart?: () => void;
+  setHints?: (note: string | undefined) => void;
   evidence?: Evidence;
   setModel?: (id: string) => Promise<void>;
   frames?: FrameBus;
