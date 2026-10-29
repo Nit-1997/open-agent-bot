@@ -27,6 +27,15 @@ describe("ProviderHub", () => {
     expect(hub.resolve("litellm/chat-default")).toMatchObject({ contextWindow: 32768, maxTokens: 4096 });
   });
 
+  it("takes per-token prices for gateway models from LiteLLM so runs report their cost", async () => {
+    const f = fakeFetch([
+      [/model\/info/, () => json({ data: [{ model_name: "chat-sonnet-5.5", model_info: { input_cost_per_token: 2e-6, output_cost_per_token: 1e-5, cache_read_input_token_cost: 1e-7 } }] })],
+    ]);
+    const { hub } = await make(undefined, { fetch: f });
+    expect(hub.resolve("litellm/chat-sonnet-5.5")?.cost).toEqual({ input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 });
+    expect(hub.resolve("litellm/chat-default")?.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+  });
+
   it("lists the curated providers, with the LiteLLM gateway seeded and ready", async () => {
     const { hub } = await make();
     const list = hub.list();

@@ -1,0 +1,103 @@
+{
+  "model": "chat-sonnet-5.5",
+  "label": "baseline",
+  "date": "2026-10-29",
+  "scenarios": {
+    "car": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 5.5,
+      "seconds": 27.6,
+      "costUsd": 0.1694,
+      "inputTokens": 74335
+    },
+    "dining": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 7,
+      "seconds": 23.1,
+      "costUsd": 0.1675,
+      "inputTokens": 73597
+    },
+    "grocery-offlist": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 3.5,
+      "seconds": 31.6,
+      "costUsd": 0.1118,
+      "inputTokens": 50326
+    },
+    "hotel-brand": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 2,
+      "seconds": 22.8,
+      "costUsd": 0.0838,
+      "inputTokens": 35706
+    },
+    "india-shop": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 7.5,
+      "seconds": 30.8,
+      "costUsd": 0.2245,
+      "inputTokens": 101038
+    },
+    "party": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 5,
+      "seconds": 70.5,
+      "costUsd": 0.1936,
+      "inputTokens": 82574
+    },
+    "party-followup": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 7,
+      "seconds": 93.4,
+      "costUsd": 0.2853,
+      "inputTokens": 120271
+    },
+    "playlist": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 3.5,
+      "seconds": 23.7,
+      "costUsd": 0.1206,
+      "inputTokens": 45949
+    },
+    "recipe-cart": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 2,
+      "seconds": 32.4,
+      "costUsd": 0.1219,
+      "inputTokens": 56618
+    },
+    "research": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 13,
+      "seconds": 52.9,
+      "costUsd": 0.3746,
+      "inputTokens": 157584
+    },
+    "store-domain": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 8,
+      "seconds": 29.1,
+      "costUsd": 0.1703,
+      "inputTokens": 77237
+    },
+    "trip": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 6.5,
+      "seconds": 31.2,
+      "costUsd": 0.1528,
+      "inputTokens": 64165
+    }
+  }
+}

@@ -28,6 +28,12 @@ const turns = [t1, t2];
 const ok = (a: Parameters<typeof evaluate>[0], ts = turns) => evaluate(a, ts).ok;
 
 describe("assertions", () => {
+  it("negates any assertion and labels it", () => {
+    expect(ok({ type: "widget_matches", kind: "stay_list", pattern: "wide", negate: true })).toBe(true);
+    expect(ok({ type: "widget_matches", kind: "stay_list", pattern: "€320", negate: true })).toBe(false);
+    expect(evaluate({ type: "must_call", tool: "browse", negate: true }, turns).label).toBe("not must_call(tool=browse)");
+  });
+
   it("must_call and must_not_call, whole scenario and scoped to a turn", () => {
     expect(ok({ type: "must_call", tool: "shop" })).toBe(true);
     expect(ok({ type: "must_call", tool: "shop", turn: 1 })).toBe(false);

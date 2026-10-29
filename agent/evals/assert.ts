@@ -15,9 +15,9 @@ const num = (a: Assertion, key: string): number => {
 const matcher = (pattern: string) => new RegExp(pattern, "i");
 
 export function labelOf(a: Assertion): string {
-  const { type, turn, ...rest } = a;
+  const { type, turn, negate, ...rest } = a;
   const parts = Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "string" ? v : Array.isArray(v) ? `${v.length} patterns` : JSON.stringify(v)}`);
-  return `${type}${parts.length ? `(${parts.join(", ")})` : ""}${turn ? ` @turn ${turn}` : ""}`;
+  return `${negate ? "not " : ""}${type}${parts.length ? `(${parts.join(", ")})` : ""}${turn ? ` @turn ${turn}` : ""}`;
 }
 
 function check(a: Assertion, turns: TurnRecord[]): { ok: boolean; detail: string } {
@@ -91,7 +91,8 @@ export function evaluate(a: Assertion, turns: TurnRecord[]): AssertionResult {
   const label = labelOf(a);
   const scoped = a.turn === undefined ? turns : turns.filter((_, i) => i === a.turn! - 1);
   try {
-    return { label, ...check(a, scoped) };
+    const r = check(a, scoped);
+    return a.negate ? { label, ok: !r.ok, detail: `negated: ${r.detail}` } : { label, ...r };
   } catch (err) {
     return { label, ok: false, detail: err instanceof Error ? err.message : String(err) };
   }

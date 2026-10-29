@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { parse as parseYaml } from "yaml";
@@ -225,6 +225,18 @@ export async function runScenario(scenario: Scenario, runIndex: number, deps: Ru
   };
 }
 
+export function rescore(record: RunRecord, scenario: Scenario, price?: { input: number; output: number; cacheRead: number }): RunRecord {
+  const turns = price
+    ? record.turns.map((t) =>
+        t.stats && !t.stats.costUsd
+          ? { ...t, stats: { ...t.stats, costUsd: (t.stats.inputTokens * price.input + t.stats.outputTokens * price.output + t.stats.cacheRead * price.cacheRead) / 1e6 } }
+          : t,
+      )
+    : record.turns;
+  const failed = evaluateAll(scenario.assert, turns).filter((r) => !r.ok);
+  return { ...record, turns, passed: !record.error && failed.length === 0, failed, future: evaluateAll(scenario.future_assert, turns) };
+}
+
 export function parseScenario(raw: unknown, file: string): Scenario {
   const v = raw as Partial<Scenario> | null;
   if (!v || typeof v.id !== "string" || !v.context || !Array.isArray(v.turns) || !v.turns.length) throw new Error(`${file}: scenario needs id, context and turns`);
@@ -273,8 +285,11 @@ async function main() {
       "timeout-s": { type: "string", default: "420" },
       "env-file": { type: "string", default: resolve(evalsDir, "../../deploy-config/.env-agent") },
       "write-baseline": { type: "boolean", default: false },
+      rescore: { type: "string" },
+      price: { type: "string" },
     },
   });
+  if (values.rescore) return rescoreDir(values.rescore, values.price, values["write-baseline"] === true);
   const model = values.model as string;
   const label = values.label as string;
   const runs = Number(values.runs);
@@ -305,6 +320,37 @@ async function main() {
   console.log(`\n${report}`);
   console.log(`wrote ${outDir}`);
   if (values["write-baseline"]) {
+    await mkdir(dirname(baselinePath), { recursive: true });
+    await writeFile(baselinePath, `${JSON.stringify(summary, null, 2)}\n`);
+    console.log(`wrote baseline ${baselinePath}`);
+  }
+}
+
+async function rescoreDir(dir: string, priceArg: string | undefined, writeBaseline: boolean) {
+  const [input, output, cacheRead] = (priceArg ?? "").split(",").map(Number);
+  const price = priceArg ? { input, output, cacheRead: cacheRead || 0 } : undefined;
+  const scenarios = loadScenarios(join(evalsDir, "scenarios"));
+  const records = readFileSync(join(dir, "runs.jsonl"), "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as RunRecord)
+    .map((r) => {
+      const s = scenarios.find((x) => x.id === r.scenario);
+      return s ? rescore(r, s, price) : r;
+    })
+    .sort((a, b) => a.scenario.localeCompare(b.scenario) || a.run - b.run);
+  await writeFile(join(dir, "runs.jsonl"), records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const model = records[0].model;
+  const name = basename(dir);
+  const date = name.slice(0, 10);
+  const label = name.slice(11, name.endsWith(`-${model}`) ? -model.length - 1 : undefined) || "rescored";
+  const summary = summarize(records, { model, label, date });
+  const baselinePath = join(evalsDir, "baseline", `${model}.json`);
+  const baseline = !writeBaseline && existsSync(baselinePath) ? (JSON.parse(readFileSync(baselinePath, "utf8")) as Summary) : undefined;
+  const report = renderReport(records, summary, baseline);
+  await writeFile(join(dir, "report.md"), report);
+  console.log(report);
+  if (writeBaseline) {
     await mkdir(dirname(baselinePath), { recursive: true });
     await writeFile(baselinePath, `${JSON.stringify(summary, null, 2)}\n`);
     console.log(`wrote baseline ${baselinePath}`);

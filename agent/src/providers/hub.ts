@@ -9,7 +9,8 @@ import { type CatalogEntry, catalogEntry, CLOUD, LOCAL, LOCAL_KINDS, type LocalK
 type AnyModel = Model<any>;
 type Complete = (model: AnyModel, context: Context, options?: { maxTokens?: number; signal?: AbortSignal }) => Promise<AssistantMessage>;
 
-export type SeedModel = { id: string; label: string; note?: string; contextWindow?: number; maxTokens?: number };
+type Cost = { input: number; output: number; cacheRead: number; cacheWrite: number };
+export type SeedModel = { id: string; label: string; note?: string; contextWindow?: number; maxTokens?: number; cost?: Cost };
 type Custom = { kind: LocalKind | "litellm"; label: string; baseUrl: string; models: SeedModel[] };
 type Settings = { custom: Record<string, Custom>; enabled: Record<string, string[]>; hidden: string[] };
 
@@ -36,7 +37,27 @@ export type TestResult = { ok: boolean; toolCall: boolean; latencyMs: number; co
 const LOCAL_MODEL = { reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens: 4096 };
 const MAX_OUTPUT_TOKENS = 32_000;
 
-type LiteLlmInfo = { data?: Array<{ model_name?: string; model_info?: { max_input_tokens?: number | null; max_output_tokens?: number | null } | null }> };
+type LiteLlmModelInfo = {
+  max_input_tokens?: number | null;
+  max_output_tokens?: number | null;
+  input_cost_per_token?: number | null;
+  output_cost_per_token?: number | null;
+  cache_read_input_token_cost?: number | null;
+  cache_creation_input_token_cost?: number | null;
+};
+type LiteLlmInfo = { data?: Array<{ model_name?: string; model_info?: LiteLlmModelInfo | null }> };
+
+const perMillion = (n: number | null | undefined) => Number(((n ?? 0) * 1e6).toFixed(6));
+
+function gatewayCost(i: LiteLlmModelInfo): Cost | undefined {
+  if (!i.input_cost_per_token && !i.output_cost_per_token) return undefined;
+  return {
+    input: perMillion(i.input_cost_per_token),
+    output: perMillion(i.output_cost_per_token),
+    cacheRead: perMillion(i.cache_read_input_token_cost),
+    cacheWrite: perMillion(i.cache_creation_input_token_cost),
+  };
+}
 
 async function withGatewayLimits(f: typeof fetch, gateway: { baseUrl: string; apiKey: string; models: SeedModel[] }): Promise<SeedModel[]> {
   try {
@@ -49,6 +70,7 @@ async function withGatewayLimits(f: typeof fetch, gateway: { baseUrl: string; ap
         ...m,
         ...(i?.max_input_tokens && { contextWindow: i.max_input_tokens }),
         ...(i?.max_output_tokens && { maxTokens: Math.min(i.max_output_tokens, MAX_OUTPUT_TOKENS) }),
+        ...(i && gatewayCost(i) && { cost: gatewayCost(i) }),
       };
     });
   } catch {
@@ -123,6 +145,7 @@ export class ProviderHub {
         ...LOCAL_MODEL,
         ...(m.contextWindow && { contextWindow: m.contextWindow }),
         ...(m.maxTokens && { maxTokens: m.maxTokens }),
+        ...(m.cost && { cost: m.cost }),
       })),
     });
   }

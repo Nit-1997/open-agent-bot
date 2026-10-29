@@ -11,6 +11,7 @@ assert:
   - { type: text_matches, pattern: "Marriott|Hyatt" }
   - { type: text_matches, pattern: "€|EUR" }
   - { type: widget_matches, kind: stay_list, pattern: "€|EUR" }
+  - { type: tool_result_matches, tool: stays, pattern: "up to \\$400", negate: true }
   - { type: max_unverified_claims, n: 2 }
   - type: banned_phrases
     patterns:

@@ -6,7 +6,8 @@ turns:
 assert:
   - { type: must_call, tool: music }
   - { type: widget_present, kind: ui }
-  - { type: widget_matches, kind: ui, pattern: "\"shape\":\"square\"" }
+  - { type: widget_matches, kind: ui, pattern: "\"shape\":\"wide\"", negate: true }
+  - { type: widget_matches, kind: ui, pattern: "mzstatic\\.com" }
   - { type: widget_matches, kind: ui, pattern: "\"image\":\"https?://" }
   - { type: max_tool_calls, n: 12 }
   - { type: max_unverified_claims, n: 2 }

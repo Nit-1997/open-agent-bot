@@ -10,7 +10,7 @@ assert:
   - { type: widget_present, kind: stay_list }
   - { type: widget_present, kind: weather_card }
   - { type: max_tool_calls, n: 18 }
-  - { type: text_matches, pattern: "day 1" }
+  - { type: widget_present, kind: ui }
   - { type: max_unverified_claims, n: 2 }
   - type: banned_phrases
     patterns:
@@ -21,5 +21,4 @@ assert:
   - { type: max_duration_s, n: 420 }
 future_assert:
   - { type: tool_arg_matches, tool: load_skill, pattern: "trip-planning" }
-  - { type: widget_present, kind: ui }
   - { type: must_call, tool: plan }

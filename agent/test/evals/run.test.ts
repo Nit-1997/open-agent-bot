@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateAll } from "../../evals/assert.js";
 import { renderReport, summarize } from "../../evals/report.js";
-import { buildInput, createTurnCollector, loadScenarios, pool, readSecret, runScenario } from "../../evals/run.js";
+import { buildInput, createTurnCollector, loadScenarios, pool, readSecret, rescore, runScenario } from "../../evals/run.js";
 import type { RunRecord, Scenario } from "../../evals/types.js";
 
 const ev = (e: object) => `data: ${JSON.stringify(e)}\n\n`;
@@ -216,5 +216,24 @@ describe("report", () => {
     const summary = summarize([r], { model: "m1", label: "x", date: "d" });
     expect(summary.scenarios.car.costUsd).toBeNull();
     expect(renderReport([r], summary)).toContain("n/a");
+  });
+});
+
+describe("rescore", () => {
+  it("re-grades a saved run with the current assertions and fills missing cost from a price", () => {
+    const record: RunRecord = {
+      scenario: "s",
+      model: "m",
+      run: 0,
+      threadId: "t",
+      turns: [{ prompt: "p", tools: [{ name: "shop", args: {}, result: "ok" }], widgets: [], unverifiedClaims: 0, text: "hi", askedUser: false, durationMs: 1, stats: { ...stats, costUsd: 0, inputTokens: 1_000_000, outputTokens: 100_000, cacheRead: 0 } }],
+      passed: false,
+      failed: [{ label: "old", ok: false, detail: "" }],
+      future: [],
+    };
+    const out = rescore(record, scenario({ assert: [{ type: "must_call", tool: "shop" }] }), { input: 2, output: 10, cacheRead: 0.1 });
+    expect(out.passed).toBe(true);
+    expect(out.failed).toEqual([]);
+    expect(out.turns[0].stats?.costUsd).toBeCloseTo(3);
   });
 });
