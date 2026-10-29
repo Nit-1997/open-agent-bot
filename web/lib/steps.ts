@@ -52,6 +52,8 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
       return `${done ? "Checked" : "Checking"} weather in ${String(args.location ?? "…")}`;
     case "flights":
       return `${done ? "Searched" : "Searching"} flights ${String(args.from ?? "?")} → ${String(args.to ?? "?")}`;
+    case "plan":
+      return `${args.action === "get" ? (done ? "Read" : "Reading") : done ? "Saved" : "Saving"} the ${String(args.kind ?? "plan")}`;
     case "create_artifact":
       return `${done ? "Wrote" : "Writing"} “${String(args.title ?? "page")}”`;
     default:

@@ -1,3 +1,4 @@
+import type { CartEntity } from "../../../shared/workspace.js";
 import type { Tile } from "./extract.js";
 import type { StoreResult } from "./rank.js";
 
@@ -7,11 +8,40 @@ export type CartEdits = { removed?: string[]; qty?: Record<string, number>; pick
 const key = (q: string) => q.trim().toLowerCase().replace(/\s+/g, " ");
 
 export class ActiveCart {
+  onSave?: (state: CartEntity) => void;
   stores: string[] = [];
   scope: string[] = [];
   items: CartItem[] = [];
   private homes = new Map<string, string>();
   private picks = new Map<string, Map<string, Tile[]>>();
+
+  static from(state: CartEntity): ActiveCart {
+    const cart = new ActiveCart();
+    cart.load(state);
+    return cart;
+  }
+
+  load(state: CartEntity): void {
+    this.stores = [...state.stores];
+    this.scope = [...state.scope];
+    this.items = state.items.map((i) => ({ ...i }));
+    this.homes = new Map(Object.entries(state.homes));
+    this.picks = new Map(Object.entries(state.picks).map(([store, m]) => [store, new Map(Object.entries(m).map(([k, v]) => [k, v as unknown as Tile[]]))]));
+  }
+
+  snapshot(): CartEntity {
+    return {
+      stores: [...this.stores],
+      scope: [...this.scope],
+      items: this.items.map((i) => ({ ...i })),
+      homes: Object.fromEntries(this.homes),
+      picks: Object.fromEntries([...this.picks].map(([store, m]) => [store, Object.fromEntries(m)])),
+    } as CartEntity;
+  }
+
+  save(): void {
+    this.onSave?.(this.snapshot());
+  }
 
   get empty(): boolean {
     return !this.items.length;
@@ -77,6 +107,7 @@ export class ActiveCart {
         if (list && n > 0) m.set(key(q), [list[n], ...list.filter((_, i) => i !== n)]);
       }
     }
+    this.save();
   }
 
   view(): StoreResult[] {

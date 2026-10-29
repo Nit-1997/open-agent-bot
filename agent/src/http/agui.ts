@@ -1,7 +1,7 @@
 import type { RunAgentInput } from "@ag-ui/core";
 import { EventEncoder } from "@ag-ui/encoder";
 import { Hono } from "hono";
-import { handleRun } from "../agui/runHandler.js";
+import { handleRun, type RunOptions } from "../agui/runHandler.js";
 import type { SessionStore } from "../session/sessionStore.js";
 
 function isRunInput(x: unknown): x is RunAgentInput {
@@ -9,7 +9,7 @@ function isRunInput(x: unknown): x is RunAgentInput {
   return !!v && typeof v.threadId === "string" && typeof v.runId === "string" && Array.isArray(v.messages);
 }
 
-export function aguiRoutes(deps: { store: SessionStore; authorized: (secret: string | undefined) => boolean }) {
+export function aguiRoutes(deps: { store: SessionStore; authorized: (secret: string | undefined) => boolean; run?: RunOptions }) {
   const app = new Hono();
 
   app.post("/agui", async (c) => {
@@ -27,7 +27,7 @@ export function aguiRoutes(deps: { store: SessionStore; authorized: (secret: str
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
-          for await (const event of handleRun(body, deps.store, ac.signal)) {
+          for await (const event of handleRun(body, deps.store, ac.signal, deps.run)) {
             controller.enqueue(textEncoder.encode(encoder.encode(event)));
           }
         } finally {

@@ -27,6 +27,8 @@ import { staysTool } from "./stays.js";
 import { loadSkillTool } from "./loadSkill.js";
 import { RULES, shopRules, withRules } from "./rules.js";
 import type { SkillEntry } from "../skills/catalog.js";
+import type { WorkspaceStore } from "../workspace/store.js";
+import { planTool } from "./plan.js";
 
 export type ToolDeps = {
   cfg: AgentConfig;
@@ -39,6 +41,7 @@ export type ToolDeps = {
   frames?: FrameBus;
   cart?: ActiveCart;
   skills?: SkillEntry[];
+  workspace?: WorkspaceStore;
 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2 };
@@ -108,5 +111,6 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withRules(askUserTool(), RULES.askUser, v2, FIELDS_HELP),
     withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, v2, REPORT_GUIDE),
     ...(v2 ? [loadSkillTool(() => deps.skills ?? [])] : []),
+    ...(deps.cfg.flags.workspace && deps.workspace ? [planTool({ store: deps.workspace, threadId: deps.threadId })] : []),
   ];
 }

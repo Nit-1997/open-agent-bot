@@ -19,10 +19,19 @@ export function skillsDir(env: NodeJS.ProcessEnv = process.env, from: string = d
   return env.SKILLS_DIR ? resolve(env.SKILLS_DIR) : join(packageRoot(from), "skills");
 }
 
-export function loadSkillCatalog(dir: string): SkillEntry[] {
+const WORKSPACE_LINE = /^(\s*)\[workspace\] /;
+
+function forFlags(body: string, workspace: boolean): string {
+  return body
+    .split("\n")
+    .flatMap((line) => (WORKSPACE_LINE.test(line) ? (workspace ? [line.replace(WORKSPACE_LINE, "$1")] : []) : [line]))
+    .join("\n");
+}
+
+export function loadSkillCatalog(dir: string, opts: { workspace?: boolean } = {}): SkillEntry[] {
   const { skills } = loadSkillsFromDir({ dir, source: "open-agent" });
   return skills
     .filter((s) => s.name && s.description)
-    .map((s) => ({ name: s.name, description: s.description, body: stripFrontmatter(readFileSync(s.filePath, "utf8")).trim() }))
+    .map((s) => ({ name: s.name, description: s.description, body: forFlags(stripFrontmatter(readFileSync(s.filePath, "utf8")).trim(), opts.workspace === true) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

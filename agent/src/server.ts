@@ -4,6 +4,7 @@ import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig } from "./config.js";
 import { FrameBus } from "./browser/frames.js";
 import { ActiveCart } from "./shop/cart.js";
+import { workspaceCart, workspaceNote } from "./workspace/cart.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { ProviderHub } from "./providers/hub.js";
@@ -19,6 +20,7 @@ const SESSION_IDLE_MS = 30 * 60 * 1000;
 
 const cfg = loadConfig(process.env);
 const artifacts = new ArtifactStore(cfg.artifactsDir);
+const workspace = cfg.flags.workspace ? (await import("./workspace/store.js")).WorkspaceStore.at(cfg.dataDir) : undefined;
 const pool = new BrowserPool();
 const hub = await ProviderHub.create({
   dataDir: cfg.dataDir,
@@ -34,18 +36,19 @@ function modelFor(ref: string | undefined) {
 
 const store = new SessionStore({
   idleMs: SESSION_IDLE_MS,
-  create: async (threadId, userContext) => {
+  create: async (threadId, userContext, history) => {
     const budget = new ToolBudget(PER_REPLY_LIMITS);
     const evidence = new Evidence();
     const frames = new FrameBus();
-    const cart = new ActiveCart();
-    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir()) : [];
+    const cart = workspace ? workspaceCart(workspace, threadId) : new ActiveCart();
+    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace }) : [];
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: modelFor(userContext?.model),
       systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
-      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills }),
+      tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, workspace }),
       ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
+      ...(workspace && { history, contextNote: () => workspaceNote(workspace, threadId) }),
     });
     return {
       session: handle.session,
@@ -71,7 +74,7 @@ const store = new SessionStore({
 setInterval(() => void store.sweep(), 60_000).unref();
 
 const logins = new LoginFlows((id, ui) => hub.login(id, ui));
-const app = createApp({ cfg, store, artifacts, hub, logins });
+const app = createApp({ cfg, store, artifacts, hub, logins, run: { workspace } });
 serve({ fetch: app.fetch, port: cfg.port, hostname: "0.0.0.0" }, (info) => {
   console.log(`agent listening on :${info.port}`);
 });
@@ -83,7 +86,7 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
     stopping = true;
     void store
       .disposeAll()
-      .then(() => Promise.allSettled([pool.closeAll(), artifacts.close()]))
+      .then(() => Promise.allSettled([pool.closeAll(), artifacts.close(), workspace?.close()]))
       .finally(() => process.exit(0));
   });
 }

@@ -6,6 +6,7 @@ import { ActivitySteps } from "./ActivitySteps";
 import { Followups } from "./Followups";
 import { type BrowserFrame, LiveBrowser } from "./LiveBrowser";
 import type { CartEdits } from "@/components/widgets/CartCard";
+import type { PlanEdits } from "@/lib/workspaceEdits";
 import { Markdown } from "./Markdown";
 import { SourcesRow } from "./SourcesRow";
 
@@ -24,6 +25,8 @@ export function TurnView(props: {
   frame?: BrowserFrame;
   latestCart?: string;
   onCartEdit?: (e: CartEdits) => void;
+  latestPlans?: ReadonlySet<string>;
+  onPlanEdit?: (e: PlanEdits) => void;
 }) {
   const { turn, running } = props;
   const id = `turn-${turn.id}`;
@@ -56,7 +59,7 @@ export function TurnView(props: {
           {turn.items.map((item) => {
             if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
             if (item.kind === "widget" && isFollowups(item.widget)) return null;
-            if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} answered={props.answered} onAnswer={(text) => props.onAnswer(text, true)} staleCart={item.id !== props.latestCart} onCartEdit={props.onCartEdit} />;
+            if (item.kind === "widget") return <WidgetRenderer key={item.id} toolCallId={item.id} args={{ widget: item.widget }} locale={props.locale} answered={props.answered} onAnswer={(text) => props.onAnswer(text, true)} staleCart={item.id !== props.latestCart} onCartEdit={props.onCartEdit} stalePlan={!props.latestPlans?.has(item.id)} onPlanEdit={props.onPlanEdit} />;
             if (item.result === undefined) {
               return (
                 <div id={`${id}-artifact-pending-${item.id}`} key={item.id} role="status" aria-label="Writing the report" className="flex h-40 animate-pulse items-center justify-center rounded-2xl border border-border bg-surface text-sm text-text-muted">

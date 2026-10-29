@@ -21,8 +21,8 @@ const PICKS = 3;
 const SCOPE = 3;
 
 type Item = { query: string; qty: number };
-type Job = { store: Store; item: Item };
-type JobResult = { store: Store; item: Item; tiles: Tile[]; blocked?: string; error?: string };
+export type Job = { store: Store; item: Item };
+export type JobResult = { store: Store; item: Item; tiles: Tile[]; blocked?: string; error?: string };
 
 type Deps = {
   pool: BrowserPool;
@@ -32,6 +32,7 @@ type Deps = {
   storeFor?: (name: string) => Store | undefined;
   frames?: FrameBus;
   cart?: ActiveCart;
+  search?: (jobs: Job[]) => Promise<JobResult[]>;
 };
 
 function items(v: unknown): Item[] {
@@ -221,11 +222,15 @@ export function shopTool(deps: Deps) {
         added = cart.add(asked);
         search = added;
       }
-      if (!cart.items.length) return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
+      if (!cart.items.length) {
+        cart.save();
+        return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
+      }
       const stores = cart.stores.map((id) => resolve(id)).filter((x): x is Store => !!x);
-      const results = search.length ? await runAll(deps, stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
+      const results = search.length ? await (deps.search ?? ((jobs) => runAll(deps, jobs)))(stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
       cart.addResults(storeResults(results, search));
       if (fresh) cart.scopeTo(bestValue(cart.view()).filter((x) => x.found > 0).slice(0, SCOPE).map((x) => x.store));
+      cart.save();
       const view = cart.view();
       const { text, summary } = render(view, results, cart.items);
       const n = cart.items.length;

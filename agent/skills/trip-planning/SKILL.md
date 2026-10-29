@@ -13,4 +13,5 @@ description: Load for trips, flights, hotels, rentals, or what to do in a place.
    - weather: trips are outdoors, so check it with start_date/end_date.
    - wikipedia once with every sight or landmark name.
 4. Things to do and places to visit: a show_ui cards block with shape "wide", one card per place with a short note, its link, and place ("name, city") for the map link. Hotels and rentals come from the stays card; don't repeat them.
+   [workspace] Record the trip with plan set (kind trip: destination, start, end, travelers, budget, stays shortlist, days). Follow-ups patch it ("add a traveler", "shift a day"); re-run only the tool whose inputs changed.
 5. Reply with the best flight value and best stay pick in a sentence or two. Booking is theirs: point to the card links.

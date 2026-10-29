@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
 import type { UserContext, UserProfile, Viewport } from "../prompt/systemPrompt.js";
-import type { SessionEntry, SessionStore } from "../session/sessionStore.js";
+import type { HistoryMessage, SessionEntry, SessionStore } from "../session/sessionStore.js";
 import type { CartEdits } from "../shop/cart.js";
+import { applyEntityEdits, parseCartEdits, parseWorkspaceEdits, type WorkspaceEdits } from "../workspace/edits.js";
+import type { WorkspaceStore } from "../workspace/store.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
 export const EMPTY_REPLY_NUDGE =
@@ -56,21 +58,41 @@ export function readUserContext(input: RunAgentInput): UserContext | null {
   return null;
 }
 
-export function readCartEdits(input: RunAgentInput): CartEdits | null {
-  const item = input.context?.find((c) => c.description === "cart_edits");
-  if (!item?.value) return null;
+function contextValue(input: RunAgentInput, description: string): unknown {
+  const item = input.context?.find((c) => c.description === description);
+  if (!item?.value) return undefined;
   try {
-    const v = typeof item.value === "string" ? JSON.parse(item.value) : item.value;
-    if (!v || typeof v !== "object") return null;
-    const strings = (x: unknown) => (Array.isArray(x) ? x.filter((s): s is string => typeof s === "string").slice(0, 50) : undefined);
-    return {
-      removed: strings(v.removed),
-      qty: v.qty && typeof v.qty === "object" ? (v.qty as Record<string, number>) : undefined,
-      picks: v.picks && typeof v.picks === "object" ? (v.picks as Record<string, Record<string, string>>) : undefined,
-    };
+    return typeof item.value === "string" ? JSON.parse(item.value) : item.value;
   } catch {
-    return null;
+    return undefined;
   }
+}
+
+export function readCartEdits(input: RunAgentInput): CartEdits | null {
+  return parseCartEdits(contextValue(input, "cart_edits")) ?? null;
+}
+
+export function readWorkspaceEdits(input: RunAgentInput): WorkspaceEdits | null {
+  return parseWorkspaceEdits(contextValue(input, "workspace_edits"));
+}
+
+const HISTORY_LIMIT = 40;
+const HISTORY_CLIP = 4000;
+
+export function restoreHistory(messages: Message[]): HistoryMessage[] {
+  const lastUser = messages.map((m) => m.role).lastIndexOf("user");
+  const turns = messages.slice(0, Math.max(lastUser, 0)).flatMap((m): HistoryMessage[] => {
+    const text = messageText(m).trim().slice(0, HISTORY_CLIP);
+    return (m.role === "user" || m.role === "assistant") && text ? [{ role: m.role, text }] : [];
+  });
+  const merged = turns.reduce<HistoryMessage[]>((out, t) => {
+    const prev = out.at(-1);
+    if (prev?.role === t.role) prev.text = `${prev.text}\n\n${t.text}`;
+    else out.push({ ...t });
+    return out;
+  }, []);
+  const recent = merged.slice(-HISTORY_LIMIT);
+  return recent[0]?.role === "assistant" ? recent.slice(1) : recent;
 }
 
 export type RunStats = {
@@ -113,7 +135,9 @@ function runError(code: string, message: string): BaseEvent {
   return { type: EventType.RUN_ERROR, code, message } as BaseEvent;
 }
 
-export async function* handleRun(input: RunAgentInput, store: SessionStore, signal: AbortSignal): AsyncIterable<BaseEvent> {
+export type RunOptions = { workspace?: WorkspaceStore };
+
+export async function* handleRun(input: RunAgentInput, store: SessionStore, signal: AbortSignal, opts: RunOptions = {}): AsyncIterable<BaseEvent> {
   const { threadId, runId } = input;
   yield { type: EventType.RUN_STARTED, threadId, runId } as BaseEvent;
 
@@ -124,7 +148,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     return;
   }
 
-  if (!store.get(threadId) && userMessages.length > 1) {
+  const restoring = !store.get(threadId) && userMessages.length > 1;
+  if (restoring && !opts.workspace) {
     yield runError("SESSION_EXPIRED", SESSION_EXPIRED_MESSAGE);
     return;
   }
@@ -134,7 +159,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
 
   let entry: SessionEntry;
   try {
-    entry = await store.getOrCreate(threadId, userContext);
+    entry = await store.getOrCreate(threadId, userContext, restoring ? restoreHistory(input.messages) : undefined);
   } catch (err) {
     yield runError("MODEL_ERROR", err instanceof Error ? err.message : String(err));
     return;
@@ -167,8 +192,10 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     }
   }
 
-  const edits = readCartEdits(input);
+  const wsEdits = opts.workspace ? readWorkspaceEdits(input) : null;
+  const edits = wsEdits ? wsEdits.cart : readCartEdits(input);
   if (edits) entry.cart?.applyEdits(edits);
+  if (wsEdits && opts.workspace) applyEntityEdits(opts.workspace, threadId, wsEdits);
   entry.evidence?.add(messageText(last));
   const stats = createStatsCollector();
   const statsEvent = (): BaseEvent => ({ type: EventType.CUSTOM, name: "run_stats", value: stats.snapshot(entry.turnStats?.()) }) as BaseEvent;
