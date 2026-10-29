@@ -3,16 +3,18 @@ import type { Page } from "playwright";
 import { Type } from "typebox";
 import type { UserContext } from "../prompt/systemPrompt.js";
 import { ActiveCart, type CartItem } from "../shop/cart.js";
-import { extractTiles, type Tile } from "../shop/extract.js";
+import type { Tile } from "../shop/extract.js";
 import { currencyOf, formatMoney } from "../shop/currency.js";
 import { bestValue, judgeRank, type Pick, rankTiles, SHORTLIST, type StoreResult } from "../shop/rank.js";
 import type { Judge } from "../judge/index.js";
-import { type Store, storeFor as defaultStoreFor } from "../shop/stores.js";
+import { registry as defaultRegistry } from "../sources/index.js";
+import type { SourceRegistry } from "../sources/registry.js";
+import { browserSearch } from "../sources/retail/browser.js";
+import { resolveStore } from "../sources/retail/resolve.js";
+import type { RetailCtx, RetailSource, Store } from "../sources/retail/types.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "./browserPool.js";
 import { looseList } from "./args.js";
-import { BOT_WALL, isBlockedUrl } from "./browsePolicy.js";
-import { publicHttpUrlError } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 const MAX_STORES = 3;
@@ -36,6 +38,11 @@ type Deps = {
   cart?: ActiveCart;
   judge?: Judge;
   search?: (jobs: Job[]) => Promise<JobResult[]>;
+  sourcesV2?: boolean;
+  region?: string;
+  registry?: SourceRegistry;
+  fetch?: typeof fetch;
+  webSearch?: RetailCtx["webSearch"];
 };
 
 type Lane = { label: string; home: string; item: Item; tiles: Tile[]; grouped: boolean };
@@ -47,38 +54,11 @@ function items(v: unknown): Item[] {
     .slice(0, MAX_ITEMS);
 }
 
-async function searchBox(page: Page, store: Store, query: string): Promise<void> {
-  await page.goto(store.home, { waitUntil: "domcontentloaded", timeout: 20000 });
-  const box = page.locator('input[type="search"], input[name*="search" i], input[placeholder*="search" i], input[aria-label*="search" i], input[name="q"]').first();
-  await box.fill(query, { timeout: 8000 });
-  await box.press("Enter");
-  await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
-}
-
-async function settle(page: Page, scrolls: number): Promise<void> {
-  await page.waitForLoadState("networkidle", { timeout: 6000 }).catch(() => {});
-  for (let i = 0; i < scrolls; i++) {
-    await page.mouse.wheel(0, 1000);
-    await page.waitForTimeout(600);
-  }
-}
-
-async function runJob(page: Page, job: Job, allowPrivateHosts?: boolean): Promise<JobResult> {
+async function runJob(page: Page, job: Job, deps: Deps): Promise<JobResult> {
   const { store, item } = job;
-  const target = store.searchUrl?.(item.query) ?? store.home;
-  const urlError = publicHttpUrlError(target, { allowPrivateHosts });
-  if (urlError) return { store, item, tiles: [], error: urlError };
-  try {
-    if (store.searchUrl) await page.goto(target, { waitUntil: "domcontentloaded", timeout: 20000 });
-    else await searchBox(page, store, item.query);
-    if (isBlockedUrl(page.url())) return { store, item, tiles: [], blocked: page.url() };
-    await settle(page, store.scrolls ?? 3);
-    const head = await page.evaluate(() => `${document.title}\n${document.body?.innerText.slice(0, 1500) ?? ""}`);
-    if (BOT_WALL.test(head)) return { store, item, tiles: [], blocked: target };
-    return { store, item, tiles: await extractTiles(page, { groupSelector: store.groupSelector, groupFromHref: store.groupFromHref }) };
-  } catch (err) {
-    return { store, item, tiles: [], error: err instanceof Error ? err.message.split("\n")[0] : String(err) };
-  }
+  const search = store.search ?? ((q, ctx) => browserSearch(store, q, ctx));
+  const r = await search({ query: item.query }, { page, allowPrivateHosts: deps.allowPrivateHosts, fetch: deps.fetch, webSearch: deps.webSearch });
+  return { store, item, tiles: r.tiles, ...(r.blocked && { blocked: r.blocked }), ...(r.error && { error: r.error }) };
 }
 
 async function runAll(deps: Deps, jobs: Job[]): Promise<JobResult[]> {
@@ -90,7 +70,7 @@ async function runAll(deps: Deps, jobs: Job[]): Promise<JobResult[]> {
     try {
       while (next < jobs.length) {
         const i = next++;
-        results[i] = await runJob(page, jobs[i], deps.allowPrivateHosts);
+        results[i] = await runJob(page, jobs[i], deps);
       }
     } finally {
       await stop?.();
@@ -208,14 +188,23 @@ function render(stores: StoreResult[], results: JobResult[], wanted: Item[]): { 
   return { text: lines.join("\n").trim(), summary };
 }
 
+const LEGACY_STORES_HELP = "Stores: shipt (compares the nearby stores it carries, such as Target, Safeway, Sprouts), amazon, target, walmart, costco, bestbuy, kroger, safeway, or any store's domain. Stores that block automated browsers come back as blocked with a link.";
+
+function v2StoresHelp(registry: SourceRegistry, region?: string): string {
+  const listed = registry.select<RetailSource>({ vertical: "retail", region }).map((s) => `${s.id}${s.note ? ` (${s.note})` : ""}`);
+  return `Stores for the user's region: ${listed.join(", ")}. Any other store's domain also works: its product pages are read for prices. A store that blocks automated access comes back as blocked with a link for the user: give them the link, and don't retry it with fetch_page, browse or web_search.`;
+}
+
 export function shopTool(deps: Deps) {
-  const resolve = deps.storeFor ?? defaultStoreFor;
+  const registry = deps.registry ?? defaultRegistry;
+  const resolve = deps.storeFor ?? ((name: string) => resolveStore(registry, name, { jsonld: !!deps.sourcesV2 }));
   const fallbackCart = new ActiveCart();
+  const storesHelp = deps.sourcesV2 ? v2StoresHelp(registry, deps.region) : LEGACY_STORES_HELP;
   return defineTool({
     name: "shop",
     label: "Shop",
     description:
-      "Build and update the user's shopping cart from stores' real catalogs, browsing as a guest. The chat has one active cart: the first call searches every item at the stores you pass and keeps the best-value stores; later calls add items to that same cart and search only the new items at those same stores (pass just the new items, no stores). Pass stores again only when the user wants different stores (the whole list is re-checked there), remove to drop items, and new_cart:true only when the user starts an unrelated list. Returns the full cart per store: best matching catalog products (title, price, size, rating, product link, catalog image), items not found, and the best-value store. Stores: shipt (compares the nearby stores it carries, such as Target, Safeway, Sprouts), amazon, target, walmart, costco, bestbuy, kroger, safeway, or any store's domain. Stores that block automated browsers come back as blocked with a link.",
+      `Build and update the user's shopping cart from stores' real catalogs, browsing as a guest. The chat has one active cart: the first call searches every item at the stores you pass and keeps the best-value stores; later calls add items to that same cart and search only the new items at those same stores (pass just the new items, no stores). Pass stores again only when the user wants different stores (the whole list is re-checked there), remove to drop items, and new_cart:true only when the user starts an unrelated list. Returns the full cart per store: best matching catalog products (title, price, size, rating, product link, catalog image), items not found, and the best-value store. ${storesHelp}`,
     parameters: Type.Object({
       stores: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "1-3 stores for a new cart or to switch stores, e.g. [\"shipt\"] or [\"amazon\", \"bestbuy\"]" })),
       items: Type.Optional(

@@ -40,3 +40,18 @@ describe("tool descriptions behind promptV2", () => {
     expect(desc(us, "shop")).toContain("groceries shipt; other products amazon, target");
   });
 });
+
+describe("shop description behind sourcesV2", () => {
+  const withFlag = (on: boolean) =>
+    buildTools({ cfg: loadConfig({ SOURCES_V2: on ? "1" : "0" } as NodeJS.ProcessEnv), artifacts: {} as never, pool: {} as never, threadId: "t", userContext: ctx, budget: new ToolBudget(PER_REPLY_LIMITS) });
+
+  it("lists the stores for the user's region from the registry", () => {
+    const d = desc(withFlag(true), "shop");
+    expect(d).toContain("Stores for the user's region: amazon, amazon.in, flipkart.");
+    expect(d).not.toContain("walmart");
+  });
+
+  it("keeps the fixed store list when off", () => {
+    expect(desc(withFlag(false), "shop")).toContain("Stores: shipt (compares the nearby stores it carries, such as Target, Safeway, Sprouts), amazon");
+  });
+});

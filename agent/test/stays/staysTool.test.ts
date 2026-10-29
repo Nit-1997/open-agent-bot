@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
 import { renderData } from "../../src/render/registry.js";
 import type { OpenTab } from "../../src/stays/search.js";
+import { staySource } from "../../src/sources/stays/define.js";
 import type { StaySource } from "../../src/stays/types.js";
 import { pickSources, staysTool } from "../../src/tools/stays.js";
 
@@ -28,7 +29,7 @@ function fakeTab(pages: Record<string, string>): { openTab: OpenTab; opened: str
   return { openTab, opened, live };
 }
 
-const source = (id: string, lists: StaySource["lists"], titles: string[], read = true): StaySource => ({
+const source = (id: string, lists: StaySource["lists"], titles: string[], read = true): StaySource => staySource({
   id,
   label: id.toUpperCase(),
   site: `${id}.test`,

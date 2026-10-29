@@ -1,4 +1,6 @@
 import type { Page } from "playwright";
+import type { Source } from "../sources/types.js";
+import type { OpenTab, SourceResult } from "./search.js";
 
 export type StayKind = "hotel" | "rental";
 
@@ -28,8 +30,9 @@ export type Stay = {
   met?: string[];
 };
 
-export type StaySource = {
-  id: string;
+export type StayCtx = { openTab: OpenTab; live: boolean; allowPrivateHosts?: boolean };
+
+export type StaySource = Source<StayQuery, SourceResult, StayCtx> & {
   label: string;
   site: string;
   lists: StayKind[];

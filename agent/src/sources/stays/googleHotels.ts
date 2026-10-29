@@ -1,5 +1,6 @@
-import { amount, clip, count, currencyTag, httpImage, totalFromNightly } from "../parse.js";
-import type { Stay, StayQuery, StaySource } from "../types.js";
+import { staySource } from "./define.js";
+import { amount, clip, count, currencyTag, httpImage, totalFromNightly } from "../../stays/parse.js";
+import type { Stay, StayQuery } from "../../stays/types.js";
 
 export type GoogleCard = { name: string; priceLabel: string; text: string; image?: string };
 
@@ -51,11 +52,11 @@ export function parseGoogleCard(c: GoogleCard, q: StayQuery): Stay | null {
   };
 }
 
-export const googleHotels: StaySource = {
+export const googleHotels = staySource({
   id: "google_hotels",
   label: "Google Hotels",
   site: "google.com",
   lists: ["hotel", "rental"],
   searchUrl: (q) => searchFor(q, `hotels in ${q.location}`),
   read: async (page, q) => (await page.evaluate(collect)).map((c) => parseGoogleCard(c, q)).filter((s): s is Stay => s !== null),
-};
+});

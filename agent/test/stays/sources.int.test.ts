@@ -1,8 +1,8 @@
 import { type Browser, chromium, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { airbnb } from "../../src/stays/sources/airbnb.js";
-import { booking } from "../../src/stays/sources/booking.js";
-import { googleHotels } from "../../src/stays/sources/googleHotels.js";
+import { airbnb } from "../../src/sources/stays/airbnb.js";
+import { booking } from "../../src/sources/stays/booking.js";
+import { googleHotels } from "../../src/sources/stays/googleHotels.js";
 import type { StayQuery } from "../../src/stays/types.js";
 
 const q: StayQuery = { location: "Las Vegas", checkin: "2026-11-12", checkout: "2026-11-15", nights: 3, adults: 2, rooms: 1, currency: "USD" };

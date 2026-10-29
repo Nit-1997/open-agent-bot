@@ -2,6 +2,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fail, ok, type ToolResult } from "./result.js";
 import { BLOCKING_STATUSES, fetchPublic, type Lookup, publicHttpUrlError, readCapped, timeoutSignal } from "./net.js";
+import { structuredLines, parseJsonLd } from "../sources/jsonld.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 
 const MAX_BODY_BYTES = 5_000_000;
@@ -12,7 +13,7 @@ export function httpErrorText(status: number, host: string): string {
     : `HTTP ${status} from ${host}`;
 }
 
-export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup } = {}) {
+export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup; structured?: boolean } = {}) {
   const f = deps.fetch ?? fetch;
   return defineTool({
     name: "fetch_page",
@@ -34,7 +35,9 @@ export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup } = 
         if (type === "text/html" || type === "application/xhtml+xml") {
           const page = await readCapped(res, MAX_BODY_BYTES);
           const body = truncate(htmlToText(page));
-          return ok(`url: ${at}\n\n${body}${imagesText(page, at, body)}`);
+          const records = deps.structured ? structuredLines(parseJsonLd(page, at)) : [];
+          const structured = records.length ? `\n\nstructured:\n${records.join("\n")}` : "";
+          return ok(`url: ${at}\n\n${body}${imagesText(page, at, body)}${structured}`);
         }
         if (type === "text/plain" || type === "application/json" || type.endsWith("+json")) {
           return ok(`url: ${at}\n\n${truncate(await readCapped(res, MAX_BODY_BYTES))}`);

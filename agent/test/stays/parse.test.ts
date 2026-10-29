@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { parseAirbnbCard } from "../../src/stays/sources/airbnb.js";
-import { parseBookingCard } from "../../src/stays/sources/booking.js";
-import { parseGoogleCard } from "../../src/stays/sources/googleHotels.js";
+import { parseAirbnbCard } from "../../src/sources/stays/airbnb.js";
+import { parseBookingCard } from "../../src/sources/stays/booking.js";
+import { parseGoogleCard } from "../../src/sources/stays/googleHotels.js";
 import { amount, cleanUrl, count } from "../../src/stays/parse.js";
 import type { StayQuery } from "../../src/stays/types.js";
 

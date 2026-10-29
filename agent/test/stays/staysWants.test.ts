@@ -4,6 +4,7 @@ import { type Judge, noJudge, type YesNoCriteria } from "../../src/judge/index.j
 import { stayMatch } from "../../src/judge/criteria/stayMatch.js";
 import { renderData } from "../../src/render/registry.js";
 import type { OpenTab } from "../../src/stays/search.js";
+import { staySource } from "../../src/sources/stays/define.js";
 import type { StaySource } from "../../src/stays/types.js";
 import { parseBudget, staysTool } from "../../src/tools/stays.js";
 
@@ -30,7 +31,7 @@ function fakeTab(): { openTab: OpenTab; opened: string[] } {
   return { openTab, opened };
 }
 
-const paris = (rows: Listing[]): StaySource => ({
+const paris = (rows: Listing[]): StaySource => staySource({
   id: "paris",
   label: "PARIS",
   site: "paris.test",
