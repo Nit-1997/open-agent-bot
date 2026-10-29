@@ -1,0 +1,103 @@
+{
+  "model": "chat-default",
+  "label": "baseline",
+  "date": "2026-10-29",
+  "scenarios": {
+    "car": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 5.5,
+      "seconds": 78.1,
+      "costUsd": 0,
+      "inputTokens": 12159
+    },
+    "dining": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 22.5,
+      "seconds": 39.3,
+      "costUsd": 0,
+      "inputTokens": 5630
+    },
+    "grocery-offlist": {
+      "runs": 2,
+      "passes": 2,
+      "toolCalls": 1.5,
+      "seconds": 21.7,
+      "costUsd": 0,
+      "inputTokens": 2448
+    },
+    "hotel-brand": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 2,
+      "seconds": 28.9,
+      "costUsd": 0,
+      "inputTokens": 6323
+    },
+    "india-shop": {
+      "runs": 2,
+      "passes": 1,
+      "toolCalls": 9.5,
+      "seconds": 49.3,
+      "costUsd": 0,
+      "inputTokens": 11169
+    },
+    "party": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 2.5,
+      "seconds": 26.7,
+      "costUsd": 0,
+      "inputTokens": 1071
+    },
+    "party-followup": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 8,
+      "seconds": 109.1,
+      "costUsd": 0,
+      "inputTokens": 6496
+    },
+    "playlist": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 1.5,
+      "seconds": 14.9,
+      "costUsd": 0,
+      "inputTokens": 2795
+    },
+    "recipe-cart": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 71,
+      "seconds": 211.2,
+      "costUsd": 0,
+      "inputTokens": 239
+    },
+    "research": {
+      "runs": 2,
+      "passes": 1,
+      "toolCalls": 11,
+      "seconds": 83.9,
+      "costUsd": 0,
+      "inputTokens": 18675
+    },
+    "store-domain": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 3.5,
+      "seconds": 20.5,
+      "costUsd": 0,
+      "inputTokens": 2037
+    },
+    "trip": {
+      "runs": 2,
+      "passes": 0,
+      "toolCalls": 3.5,
+      "seconds": 27.8,
+      "costUsd": 0,
+      "inputTokens": 2402
+    }
+  }
+}
