@@ -1,0 +1,9 @@
+id: cities-fanout
+proves: [M5]
+context: { timeZone: Europe/London, locale: en-GB, home: "London, UK" }
+turns:
+  - prompt: "I'm picking a city for a long weekend, 6 to 8 November. Check the forecast for all 12 of these: Lisbon, Seville, Valencia, Barcelona, Nice, Rome, Naples, Athens, Valletta, Split, Dubrovnik, Palermo. Drop any city with more than a 50% chance of rain on any of the three days, rank the rest by average daily high, and give me the top 3 with their numbers."
+assert:
+  - { type: must_call, tool: "weather|codemode" }
+  - { type: text_matches, pattern: "°" }
+  - { type: max_duration_s, n: 300 }
