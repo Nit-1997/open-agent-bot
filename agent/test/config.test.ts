@@ -3,13 +3,12 @@ import { hasCap, loadConfig } from "../src/config.js";
 
 describe("loadConfig", () => {
   it("reads model capabilities and matches gateway refs with or without the litellm prefix", () => {
-    const cfg = loadConfig({ AGENT_MODEL_CAPS: "chat-sonnet-5.5=frontier,codemode|chat-default=small|openai/gpt-x=frontier" });
+    const cfg = loadConfig({ AGENT_MODEL_CAPS: "chat-sonnet-5.5=frontier,codemode|openai/gpt-x=frontier" });
     expect(cfg.modelCaps["chat-sonnet-5.5"]).toEqual(["frontier", "codemode"]);
     expect(hasCap(cfg, "litellm/chat-sonnet-5.5", "codemode")).toBe(true);
-    expect(hasCap(cfg, "chat-default", "small")).toBe(true);
     expect(hasCap(cfg, "chat-default", "codemode")).toBe(false);
     expect(hasCap(cfg, "openai/gpt-x", "frontier")).toBe(true);
-    expect(hasCap(cfg, undefined, "small")).toBe(false);
+    expect(hasCap(cfg, undefined, "codemode")).toBe(false);
   });
 
   it("applies defaults", () => {
@@ -35,7 +34,6 @@ describe("loadConfig", () => {
         sourcesV2: false,
         codemode: false,
         workspace: false,
-        router: false,
         rpiv: false,
       },
       modelCaps: {},
@@ -43,9 +41,9 @@ describe("loadConfig", () => {
   });
 
   it("reads feature flags and the Jev model", () => {
-    const cfg = loadConfig({ JEV_RERANK: "1", ROUTER: "true", CODEMODE: "off", JEV_MODEL: "typesafe/jev-latest" });
+    const cfg = loadConfig({ JEV_RERANK: "1", WORKSPACE: "true", CODEMODE: "off", JEV_MODEL: "typesafe/jev-latest" });
     expect(cfg.flags.jevRerank).toBe(true);
-    expect(cfg.flags.router).toBe(true);
+    expect(cfg.flags.workspace).toBe(true);
     expect(cfg.flags.codemode).toBe(false);
     expect(cfg.jevModel).toBe("typesafe/jev-latest");
   });

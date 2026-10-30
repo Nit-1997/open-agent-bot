@@ -3,7 +3,6 @@ import type { Model } from "@earendil-works/pi-ai";
 import { createApp, defaultModelRef } from "./app.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig, hasCap } from "./config.js";
-import { route as routeTurn, type Router } from "./agui/router.js";
 import { FrameBus } from "./browser/frames.js";
 import { ActiveCart } from "./shop/cart.js";
 import { workspaceCart, workspaceNote } from "./workspace/cart.js";
@@ -34,15 +33,6 @@ const hub = await ProviderHub.create({
 const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: cfg.jevConcurrency });
 console.log(`[jev] model=${cfg.jevModel} available=${judge.available} rerank=${cfg.flags.jevRerank}`);
 
-const routerSkills = cfg.flags.router && cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv }) : [];
-const router: Router | undefined = cfg.flags.router
-  ? {
-      route: (input, o) => routeTurn(judge, input, o),
-      skills: (names) => routerSkills.filter((s) => names.includes(s.name)),
-      narrow: (ref) => hasCap(cfg, ref ?? defaultModelRef(cfg, hub) ?? undefined, "small"),
-    }
-  : undefined;
-
 const modelRef = (m: Model<any>) => `${m.provider}/${m.id}`;
 
 function modelFor(ref: string | undefined) {
@@ -62,7 +52,6 @@ const store = new SessionStore({
     const codemode = cfg.flags.codemode && hasCap(cfg, modelRef(modelFor(userContext?.model)), "codemode");
     const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv, codemode }) : [];
     const turnJudge = scopeJudge(judge);
-    let hintNote: string | undefined;
     let current = modelFor(userContext?.model);
     const handle = await createPiSession({
       runtime: hub.runtime,
@@ -72,15 +61,12 @@ const store = new SessionStore({
       ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
       ...(cfg.flags.codemode && { codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode") }),
       ...(workspace && { history }),
-      ...((workspace || router) && { contextNote: () => [workspace && workspaceNote(workspace, threadId), hintNote].filter(Boolean).join("\n\n") || undefined }),
+      ...(workspace && { contextNote: () => workspaceNote(workspace, threadId) }),
     });
     return {
       session: handle.session,
       busy: false,
       lastUsed: Date.now(),
-      setHints: (note) => {
-        hintNote = note;
-      },
       onRunStart: () => {
         budget.reset();
         turnJudge.reset();
@@ -109,7 +95,7 @@ const store = new SessionStore({
 setInterval(() => void store.sweep(), 60_000).unref();
 
 const logins = new LoginFlows((id, ui) => hub.login(id, ui));
-const app = createApp({ cfg, store, artifacts, hub, logins, run: { workspace, router } });
+const app = createApp({ cfg, store, artifacts, hub, logins, run: { workspace } });
 serve({ fetch: app.fetch, port: cfg.port, hostname: "0.0.0.0" }, (info) => {
   console.log(`agent listening on :${info.port}`);
 });

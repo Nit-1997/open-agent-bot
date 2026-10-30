@@ -9,7 +9,6 @@ export const FLAG_ENV = {
   sourcesV2: "SOURCES_V2",
   codemode: "CODEMODE",
   workspace: "WORKSPACE",
-  router: "ROUTER",
   rpiv: "RPIV",
 } as const;
 
@@ -32,7 +31,7 @@ export type AgentConfig = {
   modelCaps: Record<string, string[]>;
 };
 
-export type ModelCap = "frontier" | "small" | "codemode";
+export type ModelCap = "frontier" | "codemode";
 
 function parseCaps(raw: string | undefined): Record<string, string[]> {
   return Object.fromEntries(
