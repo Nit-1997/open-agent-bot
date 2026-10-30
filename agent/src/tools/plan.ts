@@ -49,6 +49,44 @@ function planResult(kind: EntityKind, id: string, version: number, value: unknow
   return ok(text, widget.ok ? { widget: widget.value } : {});
 }
 
+type Target = { store: WorkspaceStore; threadId: string; kind: EntityKind; id: string };
+
+const describe = (kind: EntityKind, id: string, version: number, value: unknown) =>
+  `${kind} "${id}" (version ${version}): ${JSON.stringify(value)}`;
+
+function getEntity({ store, threadId, kind, id }: Target, byId: boolean): ToolResult {
+  if (byId) {
+    const found = store.get(threadId, kind, id);
+    return found ? ok(describe(kind, id, found.version, found.value)) : fail(`No ${kind} "${id}" is saved in this chat.`);
+  }
+  const all = store.list(threadId, kind);
+  return all.length ? ok(all.map((e) => describe(kind, e.id, e.version, e.value)).join("\n")) : fail(`No ${kind} is saved in this chat.`);
+}
+
+function setEntity({ store, threadId, kind, id }: Target, raw: unknown): ToolResult {
+  const value = looseJson(raw);
+  const valid = validateEntity(kind, value);
+  if (!valid.ok) return fail(`Invalid ${kind}: ${valid.errors.join("; ")}`);
+  return planResult(kind, id, store.put(threadId, kind, id, value), value, "Saved");
+}
+
+function patchEntity({ store, threadId, kind, id }: Target, rawOps: unknown): ToolResult {
+  const current = store.get(threadId, kind, id);
+  if (!current) return fail(`No ${kind} "${id}" is saved yet; use set first.`);
+  const ops = readOps(rawOps);
+  if (typeof ops === "string") return fail(ops);
+  const patched = applyPatch(current.value, ops);
+  if (!patched.ok) return fail(`Patch failed: ${patched.error}`);
+  const valid = validateEntity(kind, patched.value);
+  if (!valid.ok) return fail(`Patch makes the ${kind} invalid: ${valid.errors.join("; ")}`);
+  try {
+    return planResult(kind, id, store.put(threadId, kind, id, patched.value, current.version), patched.value, "Updated");
+  } catch (err) {
+    if (err instanceof VersionConflict) return fail(`${kind} "${id}" changed meanwhile; get it and patch again.`);
+    throw err;
+  }
+}
+
 export function planTool(deps: { store: WorkspaceStore; threadId: string }) {
   const { store, threadId } = deps;
   return defineTool({
@@ -64,41 +102,10 @@ export function planTool(deps: { store: WorkspaceStore; threadId: string }) {
     }),
     async execute(_id, params): Promise<ToolResult> {
       if (!isEntityKind(params.kind)) return fail(`kind must be one of ${ENTITY_KINDS.join(", ")}`);
-      const kind = params.kind;
-      const id = params.id?.trim() || DEFAULT_ID;
-      if (params.action === "get") {
-        if (params.id) {
-          const found = store.get(threadId, kind, id);
-          return found
-            ? ok(`${kind} "${id}" (version ${found.version}): ${JSON.stringify(found.value)}`)
-            : fail(`No ${kind} "${id}" is saved in this chat.`);
-        }
-        const all = store.list(threadId, kind);
-        return all.length
-          ? ok(all.map((e) => `${kind} "${e.id}" (version ${e.version}): ${JSON.stringify(e.value)}`).join("\n"))
-          : fail(`No ${kind} is saved in this chat.`);
-      }
-      if (kind === "cart") return fail("The cart is changed with the shop tool, not plan.");
-      if (params.action === "set") {
-        const value = looseJson(params.value);
-        const valid = validateEntity(kind, value);
-        if (!valid.ok) return fail(`Invalid ${kind}: ${valid.errors.join("; ")}`);
-        return planResult(kind, id, store.put(threadId, kind, id, value), value, "Saved");
-      }
-      const current = store.get(threadId, kind, id);
-      if (!current) return fail(`No ${kind} "${id}" is saved yet; use set first.`);
-      const ops = readOps(params.ops);
-      if (typeof ops === "string") return fail(ops);
-      const patched = applyPatch(current.value, ops);
-      if (!patched.ok) return fail(`Patch failed: ${patched.error}`);
-      const valid = validateEntity(kind, patched.value);
-      if (!valid.ok) return fail(`Patch makes the ${kind} invalid: ${valid.errors.join("; ")}`);
-      try {
-        return planResult(kind, id, store.put(threadId, kind, id, patched.value, current.version), patched.value, "Updated");
-      } catch (err) {
-        if (err instanceof VersionConflict) return fail(`${kind} "${id}" changed meanwhile; get it and patch again.`);
-        throw err;
-      }
+      const at: Target = { store, threadId, kind: params.kind, id: params.id?.trim() || DEFAULT_ID };
+      if (params.action === "get") return getEntity(at, !!params.id);
+      if (at.kind === "cart") return fail("The cart is changed with the shop tool, not plan.");
+      return params.action === "set" ? setEntity(at, params.value) : patchEntity(at, params.ops);
     },
   });
 }

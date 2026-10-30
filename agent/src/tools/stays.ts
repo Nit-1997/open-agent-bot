@@ -141,6 +141,47 @@ function sourceLines(r: StaysData["sources"][number], currency: string): string[
   return [`${r.label}: no listings read. Link for the user: ${r.url}`];
 }
 
+const clamp = (n: number, min: number, max: number) => Math.min(Math.max(Math.round(n), min), max);
+
+function nightsOrError(checkin: string, checkout: string): number | string {
+  if (!DATE.test(checkin) || !DATE.test(checkout)) return "checkin and checkout must be YYYY-MM-DD";
+  const nights = nightsBetween(checkin, checkout);
+  if (!(nights >= 1)) return "checkout must be after checkin";
+  if (nights > MAX_NIGHTS) return `ask for at most ${MAX_NIGHTS} nights at a time`;
+  return nights;
+}
+
+async function applyWishes(judge: Judge, wishes: Wish[], data: StaysData, budget: Budget | undefined): Promise<string> {
+  if (!(await markWishes(judge, wishes, data.sources))) {
+    log.info(`[stays] wants fallback: judge unavailable, price ranking kept (${wishes.map((w) => w.criteria.id).join(",")})`);
+    return "Preferences (brand, area, vibe) could not be checked automatically, so listings are in price order. Check names yourself before saying a listing matches.";
+  }
+  for (const s of data.sources) s.stays = rankByWishes(s.stays);
+  const brand = wishes.find((w) => w.criteria === stayMatch.brand);
+  if (!brand || data.sources.some((s) => s.stays.some((x) => x.met?.includes(brand.label)))) return "";
+  const under = budget ? ` under ${formatMoney(budget.amount, budget.currency)}/night` : "";
+  return `No ${brand.label.replace(/\//g, " or ")}${under} in these results.`;
+}
+
+function resultText(data: StaysData, q: StayQuery, budget: Budget | undefined, unconverted: boolean, wishNote: string): string {
+  const found = data.sources.reduce((n, s) => n + s.stays.length, 0);
+  const budgetText = budget ? `, up to ${formatMoney(budget.amount, budget.currency)}/night` : "";
+  const head = `Stays in ${q.location}, ${q.checkin} to ${q.checkout} (${q.nights} ${q.nights === 1 ? "night" : "nights"}), ${q.adults} ${q.adults === 1 ? "adult" : "adults"}${budgetText}.`;
+  const note = found
+    ? "(Note for you, do not repeat to the user: a stays card with these listings, photos and links is already displayed. Summarize the best options in a sentence or two; don't list them again or put them in show_ui.)"
+    : "No listings could be read. Give the user the links below.";
+  const fxNote = unconverted
+    ? "Some prices are in a different currency and the exchange rate could not be fetched, so the budget was not applied. Say that, and check the prices against the budget yourself."
+    : "";
+  return [
+    head,
+    ...(fxNote ? [fxNote] : []),
+    ...(wishNote ? [wishNote] : []),
+    note,
+    ...data.sources.flatMap((s) => ["", ...sourceLines(s, q.currency)]),
+  ].join("\n");
+}
+
 export function staysTool(deps: Deps) {
   const all = deps.sources ?? (deps.registry ?? defaultRegistry).select<StaySource>({ vertical: "stays", region: deps.region });
   const rate = deps.fx ?? liveFx;
@@ -199,35 +240,26 @@ export function staysTool(deps: Deps) {
       ),
     }),
     async execute(_id, params): Promise<ToolResult> {
-      if (!DATE.test(params.checkin) || !DATE.test(params.checkout)) return fail("checkin and checkout must be YYYY-MM-DD");
-      const nights = nightsBetween(params.checkin, params.checkout);
-      if (!(nights >= 1)) return fail("checkout must be after checkin");
-      if (nights > MAX_NIGHTS) return fail(`ask for at most ${MAX_NIGHTS} nights at a time`);
+      const nights = nightsOrError(params.checkin, params.checkout);
+      if (typeof nights === "string") return fail(nights);
       const budget = parseBudget(params.max_price, deps.currency);
+      const wants = params.wants as Wants | undefined;
+      const brands = judge ? brandsOf(wants) : [];
       const q: StayQuery = {
         location: params.location.trim(),
         checkin: params.checkin,
         checkout: params.checkout,
         nights,
-        adults: Math.min(Math.max(Math.round(params.adults ?? 2), 1), 16),
-        rooms: Math.min(Math.max(Math.round(params.rooms ?? 1), 1), 8),
+        adults: clamp(params.adults ?? 2, 1, 16),
+        rooms: clamp(params.rooms ?? 1, 1, 8),
         currency: budget?.explicit ? budget.currency : deps.currency,
-        ...(judge && brandsOf(params.wants as Wants | undefined).length && { brands: brandsOf(params.wants as Wants | undefined) }),
+        ...(brands.length && { brands }),
       };
-      const sources = pickSources(
-        all,
-        looseList<string>(params.sources).map(String),
-        (params.type as StayKind | "any" | undefined) ?? "any",
-      );
+      const kind = (params.type as StayKind | "any" | undefined) ?? "any";
+      const sources = pickSources(all, looseList<string>(params.sources).map(String), kind);
       const results: SourceResult[] = await searchStays(sources, q, deps.openTab, { allowPrivateHosts: deps.allowPrivateHosts });
-      let unconverted = false;
-      const filtered = await Promise.all(
-        results.map(async (r) => {
-          const f = await withinBudget(r.stays, budget, q.currency, rate);
-          unconverted ||= f.unconverted;
-          return f.stays;
-        }),
-      );
+      const filtered = await Promise.all(results.map((r) => withinBudget(r.stays, budget, q.currency, rate)));
+      const unconverted = filtered.some((f) => f.unconverted);
       const data: StaysData = {
         kind: "stays",
         location: q.location,
@@ -243,43 +275,12 @@ export function staysTool(deps: Deps) {
           site: r.source.site,
           url: r.url,
           status: r.status,
-          stays: filtered[i],
+          stays: filtered[i].stays,
         })),
       };
-      const wishes = judge ? wishesOf(params.wants as Wants | undefined, q.location) : [];
-      let wishNote = "";
-      if (wishes.length) {
-        if (await markWishes(judge as Judge, wishes, data.sources)) {
-          for (const s of data.sources) s.stays = rankByWishes(s.stays);
-          const brand = wishes.find((w) => w.criteria === stayMatch.brand);
-          const anyBrand = data.sources.some((s) => s.stays.some((x) => x.met?.includes(brand?.label ?? "")));
-          if (brand && !anyBrand) {
-            const under = budget && !unconverted ? ` under ${formatMoney(budget.amount, budget.currency)}/night` : "";
-            wishNote = `No ${brand.label.replace(/\//g, " or ")}${under} in these results.`;
-          }
-        } else {
-          log.info(`[stays] wants fallback: judge unavailable, price ranking kept (${wishes.map((w) => w.criteria.id).join(",")})`);
-          wishNote =
-            "Preferences (brand, area, vibe) could not be checked automatically, so listings are in price order. Check names yourself before saying a listing matches.";
-        }
-      }
-      const found = data.sources.reduce((n, s) => n + s.stays.length, 0);
-      const budgetText = budget ? `, up to ${formatMoney(budget.amount, budget.currency)}/night` : "";
-      const head = `Stays in ${q.location}, ${q.checkin} to ${q.checkout} (${nights} ${nights === 1 ? "night" : "nights"}), ${q.adults} ${q.adults === 1 ? "adult" : "adults"}${budgetText}.`;
-      const note = found
-        ? "(Note for you, do not repeat to the user: a stays card with these listings, photos and links is already displayed. Summarize the best options in a sentence or two; don't list them again or put them in show_ui.)"
-        : "No listings could be read. Give the user the links below.";
-      const fxNote = unconverted
-        ? "Some prices are in a different currency and the exchange rate could not be fetched, so the budget was not applied. Say that, and check the prices against the budget yourself."
-        : "";
-      const lines = [
-        head,
-        ...(fxNote ? [fxNote] : []),
-        ...(wishNote ? [wishNote] : []),
-        note,
-        ...data.sources.flatMap((s) => ["", ...sourceLines(s, q.currency)]),
-      ];
-      return ok(lines.join("\n"), { data });
+      const wishes = judge ? wishesOf(wants, q.location) : [];
+      const wishNote = judge && wishes.length ? await applyWishes(judge, wishes, data, unconverted ? undefined : budget) : "";
+      return ok(resultText(data, q, budget, unconverted, wishNote), { data });
     },
   });
 }

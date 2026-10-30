@@ -46,6 +46,66 @@ async function settle(page: Page) {
 
 type BrowseDeps = { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean; frames?: FrameBus };
 
+async function perform(page: Page, a: BrowseAction, loc: Locator | undefined): Promise<number | undefined> {
+  switch (a.op) {
+    case "goto":
+      return (await page.goto(a.url, { waitUntil: "domcontentloaded", timeout: 20000 }))?.status();
+    case "click":
+      await loc!.click({ timeout: 10000 });
+      await settle(page);
+      return undefined;
+    case "type":
+      await loc!.fill(a.value, { timeout: 10000 });
+      if (a.submit) {
+        await loc!.press("Enter");
+        await settle(page);
+      }
+      return undefined;
+    case "select":
+      await loc!.selectOption(a.value, { timeout: 10000 });
+      await settle(page);
+      return undefined;
+    case "wait":
+      await page.waitForTimeout(Math.min(Math.max(a.ms, 0), 5000));
+      return undefined;
+    case "read":
+      return undefined;
+  }
+}
+
+async function leaveIfForbidden(page: Page, allowPrivateHosts: boolean | undefined): Promise<ToolResult | undefined> {
+  const landedError = publicHttpUrlError(page.url(), { allowPrivateHosts });
+  if (landedError && page.url() !== "about:blank") {
+    await page.goto("about:blank").catch(() => {});
+    return fail(`stopped: ${landedError}`);
+  }
+  if (isBlockedUrl(page.url())) {
+    const url = page.url();
+    await page.goBack().catch(() => {});
+    return handoff("reached a login, cart, checkout, or payment page", url);
+  }
+  return undefined;
+}
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+};
+
+async function readPage(page: Page, lastStatus: number | undefined): Promise<ToolResult> {
+  const url = page.url();
+  const html = await page.content();
+  const body = htmlToText(html);
+  if ((lastStatus && BLOCKING_STATUSES.has(lastStatus)) || (BOT_WALL.test(body.slice(0, 2000)) && body.length < 3000)) {
+    return ok(`blocked by ${hostOf(url)}: ${url}`, { blocked: true, url });
+  }
+  const shown = truncate(body);
+  return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${shown}${imagesText(html, url, shown)}`, { url });
+}
+
 export async function runBrowse(
   deps: BrowseDeps,
   actions: BrowseAction[],
@@ -63,60 +123,11 @@ export async function runBrowse(
       const verdict = checkAction(a, { url: page.url(), target }, { allowPrivateHosts: deps.allowPrivateHosts });
       if (!verdict.allowed) return handoff(verdict.reason, a.op === "goto" ? a.url : page.url());
 
-      switch (a.op) {
-        case "goto": {
-          const res = await page.goto(a.url, { waitUntil: "domcontentloaded", timeout: 20000 });
-          lastStatus = res?.status();
-          break;
-        }
-        case "click":
-          await loc!.click({ timeout: 10000 });
-          await settle(page);
-          break;
-        case "type":
-          await loc!.fill(a.value, { timeout: 10000 });
-          if (a.submit) {
-            await loc!.press("Enter");
-            await settle(page);
-          }
-          break;
-        case "select":
-          await loc!.selectOption(a.value, { timeout: 10000 });
-          await settle(page);
-          break;
-        case "wait":
-          await page.waitForTimeout(Math.min(Math.max(a.ms, 0), 5000));
-          break;
-        case "read":
-          break;
-      }
-      const landedError = publicHttpUrlError(page.url(), { allowPrivateHosts: deps.allowPrivateHosts });
-      if (landedError && page.url() !== "about:blank") {
-        await page.goto("about:blank").catch(() => {});
-        return fail(`stopped: ${landedError}`);
-      }
-      if (isBlockedUrl(page.url())) {
-        const url = page.url();
-        await page.goBack().catch(() => {});
-        return handoff("reached a login, cart, checkout, or payment page", url);
-      }
+      lastStatus = (await perform(page, a, loc)) ?? lastStatus;
+      const stopped = await leaveIfForbidden(page, deps.allowPrivateHosts);
+      if (stopped) return stopped;
     }
-
-    const url = page.url();
-    const host = (() => {
-      try {
-        return new URL(url).hostname;
-      } catch {
-        return url;
-      }
-    })();
-    const html = await page.content();
-    const body = htmlToText(html);
-    if ((lastStatus && BLOCKING_STATUSES.has(lastStatus)) || (BOT_WALL.test(body.slice(0, 2000)) && body.length < 3000)) {
-      return ok(`blocked by ${host}: ${url}`, { blocked: true, url });
-    }
-    const shown = truncate(body);
-    return ok(`url: ${url}\ntitle: ${await page.title()}\n\n${shown}${imagesText(html, url, shown)}`, { url });
+    return await readPage(page, lastStatus);
   } catch (err) {
     return fail(`browse failed on ${page.url()}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
   } finally {

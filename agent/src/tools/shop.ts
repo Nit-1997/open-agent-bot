@@ -268,6 +268,33 @@ function storesHelp(registry: SourceRegistry, region?: string): string {
   return `Stores for the user's region: ${listed.join(", ")}. Any other store's domain also works: its product pages are read for prices. A store that blocks automated access comes back as blocked with a link for the user: give them the link, and don't retry it with fetch_page, browse or web_search.`;
 }
 
+type CartUpdate = { added: CartItem[]; search: CartItem[]; fresh: boolean };
+
+function updateCart(cart: ActiveCart, req: { ids: string[]; asked: CartItem[]; newCart: boolean; region: string }): CartUpdate | string {
+  const { ids, asked, region } = req;
+  if (req.newCart || !cart.stores.length) {
+    if (!asked.length) return "pass items to add";
+    if (!ids.length) {
+      return `pass stores for this new cart: the store the user named, else this region's defaults (groceries ${defaultStoresFor(region, "grocery").join(", ")}; other products ${defaultStoresFor(region, "general").join(", ")})`;
+    }
+    cart.start(ids, asked);
+    return { added: cart.items, search: cart.items, fresh: true };
+  }
+  const switching = ids.length > 0 && !(ids.length === cart.stores.length && ids.every((id) => cart.stores.includes(id)));
+  const added = cart.add(asked);
+  if (!switching) return { added, search: added, fresh: false };
+  cart.start(
+    ids,
+    cart.items.map((i) => ({ ...i })),
+  );
+  return { added, search: cart.items, fresh: true };
+}
+
+function cartHead(n: number, at: string, added: CartItem[]): string {
+  const addedText = added.length ? ` Added: ${added.map((i) => i.query).join(", ")}.` : "";
+  return `Cart: ${n} ${n === 1 ? "item" : "items"} at ${at}.${addedText} Later additions stay at these stores.`;
+}
+
 export function shopTool(deps: Deps) {
   const registry = deps.registry ?? defaultRegistry;
   const resolve = deps.storeFor ?? ((name: string) => resolveStore(registry, name));
@@ -299,34 +326,9 @@ export function shopTool(deps: Deps) {
         .slice(0, MAX_STORES);
       const ids = picked.map((x) => x.id);
       if (params.remove) cart.remove(looseList<string>(params.remove).map(String));
-      const switching = ids.length > 0 && !(ids.length === cart.stores.length && ids.every((id) => cart.stores.includes(id)));
-      let added: CartItem[];
-      let search: CartItem[];
-      let fresh = false;
-      if (params.new_cart || !cart.stores.length) {
-        if (!asked.length) return fail("pass items to add");
-        if (!picked.length) {
-          const region = deps.region ?? "US";
-          return fail(
-            `pass stores for this new cart: the store the user named, else this region's defaults (groceries ${defaultStoresFor(region, "grocery").join(", ")}; other products ${defaultStoresFor(region, "general").join(", ")})`,
-          );
-        }
-        cart.start(ids, asked);
-        added = cart.items;
-        search = cart.items;
-        fresh = true;
-      } else if (switching) {
-        added = cart.add(asked);
-        cart.start(
-          ids,
-          cart.items.map((i) => ({ ...i })),
-        );
-        search = cart.items;
-        fresh = true;
-      } else {
-        added = cart.add(asked);
-        search = added;
-      }
+      const update = updateCart(cart, { ids, asked, newCart: !!params.new_cart, region: deps.region ?? "US" });
+      if (typeof update === "string") return fail(update);
+      const { added, search, fresh } = update;
       if (!cart.items.length) {
         cart.save();
         return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
@@ -352,11 +354,12 @@ export function shopTool(deps: Deps) {
       cart.save();
       const view = cart.view();
       const { text: body, summary } = render(view, results, cart.items);
-      const routedNote =
-        via?.routed.map((x) => `${x.label} blocked direct browsing, so its prices were read through ${market?.label}.`).join(" ") ?? "";
-      const text = [routedNote, body].filter(Boolean).join("\n");
-      const n = cart.items.length;
-      const head = `Cart: ${n} ${n === 1 ? "item" : "items"} at ${cart.scope.join(", ") || stores.map((x) => x.label).join(", ")}.${added.length && !fresh ? ` Added: ${added.map((i) => i.query).join(", ")}.` : ""} Later additions stay at these stores.`;
+      const routed = via?.routed
+        .map((x) => `${x.label} blocked direct browsing, so its prices were read through ${market?.label}.`)
+        .join(" ");
+      const at = cart.scope.join(", ") || stores.map((x) => x.label).join(", ");
+      const head = cartHead(cart.items.length, at, fresh ? [] : added);
+      const text = [routed, body].filter(Boolean).join("\n");
       return ok(`${head}\n${text || "No products read from any store."}`, { data: { kind: "shop", stores: view, summary } });
     },
   });
