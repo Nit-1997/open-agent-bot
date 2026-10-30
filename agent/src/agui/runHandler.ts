@@ -229,7 +229,11 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     if (e.type === "message_end") {
       const m = e.message as { role?: string; stopReason?: string; errorMessage?: string; usage?: Usage & { input: number; output: number; cacheRead: number } };
       if (m.role === "assistant" && m.usage) stats.usage(m.usage);
-      if (m.role === "assistant" && m.usage) console.log(`[run] thread=${threadId} usage in=${m.usage.input} out=${m.usage.output} cacheRead=${m.usage.cacheRead}`);
+      if (m.role === "assistant" && m.usage) {
+        const parts = (e.message as { content?: { type: string; text?: string; thinking?: string }[] }).content ?? [];
+        const chars = (type: string) => parts.filter((c) => c.type === type).reduce((n, c) => n + (c.text ?? c.thinking ?? "").length, 0);
+        console.log(`[run] thread=${threadId} usage in=${m.usage.input} out=${m.usage.output} cacheRead=${m.usage.cacheRead} text=${chars("text")} thinking=${chars("thinking")}`);
+      }
       if (m.role === "toolResult" && m.usage) stats.scriptCost(m.usage);
       if (m.role === "assistant" && m.stopReason === "error") modelError = m.errorMessage ?? "The model returned an error.";
     }
