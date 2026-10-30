@@ -80,12 +80,12 @@ function annotate(result: ToolResult, lines: string[]): ToolResult {
   return { ...result, content };
 }
 
-export function withBudget<T extends ToolDefinition<any, any, any>>(tool: T, budget: Budget, group: string): T {
+export function withBudget<T extends ToolDefinition<any, any, any>>(tool: T, budget: Budget, group: string, exhausted?: string): T {
   const wrapped: ToolDefinition<any, any, any> = {
     ...tool,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const r = budget.take(group);
-      if (!r.ok) return fail(`Budget for ${tool.name} in this reply is used up ${r.reason}. ${ANSWER_NOW}`);
+      if (!r.ok) return fail(exhausted ?? `Budget for ${tool.name} in this reply is used up ${r.reason}. ${ANSWER_NOW}`);
       const result = await tool.execute(toolCallId, params, signal, onUpdate, ctx);
       return annotate(result as ToolResult, [r.nudge, r.suffix].filter((x): x is string => !!x));
     },

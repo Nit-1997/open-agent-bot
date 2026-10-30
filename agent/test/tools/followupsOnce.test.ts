@@ -11,7 +11,9 @@ describe("suggest_replies", () => {
       const tool = buildTools({ cfg: loadConfig({}), artifacts: {} as never, pool: {} as never, threadId: "t", userContext: ctx, budget }).find((t) => t.name === "suggest_replies")!;
       const call = () => tool.execute("c", { replies: ["Cheaper", "Closer"] } as never, undefined, undefined, {} as never);
       expect((await call()).isError).toBeFalsy();
-      expect((await call()).isError).toBe(true);
+      const again = await call();
+      expect(again.isError).toBe(true);
+      expect((again.content[0] as { text: string }).text).toContain("Your reply is complete");
       budget.reset();
       expect((await call()).isError).toBeFalsy();
     }

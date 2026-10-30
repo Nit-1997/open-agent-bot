@@ -248,6 +248,8 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   if (edits) entry.cart?.applyEdits(edits);
   if (wsEdits && opts.workspace) applyEntityEdits(opts.workspace, threadId, wsEdits);
   entry.evidence?.add(messageText(last));
+  if (restoring) for (const m of restoreHistory(input.messages)) entry.evidence?.add(m.text);
+  if (opts.workspace) entry.evidence?.add(opts.workspace.summary(threadId));
   const statsEvent = (): BaseEvent => {
     const turn = entry.turnStats?.();
     return { type: EventType.CUSTOM, name: "run_stats", value: stats.snapshot({ jevCalls: (turn?.jevCalls ?? 0) + routerUsage.calls, jevCostUsd: (turn?.jevCostUsd ?? 0) + routerUsage.costUsd }) } as BaseEvent;

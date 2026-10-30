@@ -8,6 +8,7 @@ import { type HistoryMessage, type SessionEntry, SessionStore } from "../../src/
 import { workspaceCart, workspaceNote } from "../../src/workspace/cart.js";
 import { parseWorkspaceEdits } from "../../src/workspace/edits.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
+import { Evidence } from "../../src/grounding/evidence.js";
 import { ev, fakeSession, type Script } from "./fakeSession.js";
 
 const say: Script = async (emit) => {
@@ -76,6 +77,20 @@ describe("session restore", () => {
     await collect(handleRun(input({ messages: prior }), store, new AbortController().signal, { workspace }));
     expect(store.get("t1")?.cart?.items).toEqual([{ query: "pizza", qty: 3 }]);
     expect(workspaceNote(workspace, "t1")).toContain("12 guests");
+  });
+
+  it("counts the restored chat and the saved workspace as evidence, so their numbers aren't flagged", async () => {
+    const workspace = new WorkspaceStore(join(mkdtempSync(join(tmpdir(), "run-")), "w.sqlite"));
+    open.push(workspace);
+    workspace.put("t1", "event", "main", party);
+    const evidence = new Evidence();
+    const store = new SessionStore({
+      idleMs: 60000,
+      create: async (): Promise<SessionEntry> => ({ session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {}, evidence }),
+    });
+    const history = [msg("m1", "user", "plan a party"), msg("m2", "assistant", "The cart comes to $17.22."), msg("m4", "user", "how many guests now?")];
+    await collect(handleRun(input({ messages: history }), store, new AbortController().signal, { workspace }));
+    expect(evidence.unverified("It's for 12 guests, budget $300, and the cart is $17.22.")).toEqual([]);
   });
 
   it("does not seed history for a brand-new chat or an existing session", async () => {

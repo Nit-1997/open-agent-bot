@@ -121,7 +121,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       findMusicArt: musicCover({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
       findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, v2, BLOCKS_HELP),
-    withBudget(suggestRepliesTool(), deps.budget, "followups"),
+    withBudget(suggestRepliesTool(), deps.budget, "followups", "Follow-ups are already shown for this reply. Your reply is complete: stop without writing more."),
     withRules(askUserTool(), RULES.askUser, v2, FIELDS_HELP),
     withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, v2, REPORT_GUIDE),
     ...(deps.cfg.flags.rpiv && deps.complete ? [withBudget(researchTool({ search, artifacts: deps.artifacts, images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }, complete: deps.complete, judge: deps.judge, evidence: deps.evidence }), deps.budget, "research")] : []),
