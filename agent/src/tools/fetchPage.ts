@@ -26,10 +26,15 @@ export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup } = 
       if (urlError) return fail(urlError);
       const url = new URL(params.url);
       try {
-        const { res, url: at } = await fetchPublic(f, url.href, {
-          signal: timeoutSignal(15000, signal),
-          headers: { "user-agent": "Mozilla/5.0 (compatible; OpenAgent/0.1)", accept: "text/html,text/plain,application/json" },
-        }, { lookup: deps.lookup });
+        const { res, url: at } = await fetchPublic(
+          f,
+          url.href,
+          {
+            signal: timeoutSignal(15000, signal),
+            headers: { "user-agent": "Mozilla/5.0 (compatible; OpenAgent/0.1)", accept: "text/html,text/plain,application/json" },
+          },
+          { lookup: deps.lookup },
+        );
         if (!res.ok) return fail(httpErrorText(res.status, new URL(at).host));
         const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
         if (type === "text/html" || type === "application/xhtml+xml") {

@@ -31,14 +31,15 @@ function fakeTab(): { openTab: OpenTab; opened: string[] } {
   return { openTab, opened };
 }
 
-const paris = (rows: Listing[]): StaySource => staySource({
-  id: "paris",
-  label: "PARIS",
-  site: "paris.test",
-  lists: ["hotel"],
-  searchUrl: (q) => `https://paris.test/s?curr=${q.currency}${q.brands ? `&brands=${q.brands.join("|")}` : ""}`,
-  read: async () => rows.map((r, i) => ({ ...r, url: `https://paris.test/${i}`, ...(r.nightly != null && { total: r.nightly * 3 }) })),
-});
+const paris = (rows: Listing[]): StaySource =>
+  staySource({
+    id: "paris",
+    label: "PARIS",
+    site: "paris.test",
+    lists: ["hotel"],
+    searchUrl: (q) => `https://paris.test/s?curr=${q.currency}${q.brands ? `&brands=${q.brands.join("|")}` : ""}`,
+    read: async () => rows.map((r, i) => ({ ...r, url: `https://paris.test/${i}`, ...(r.nightly != null && { total: r.nightly * 3 }) })),
+  });
 
 type Extra = Partial<Parameters<typeof staysTool>[0]>;
 
@@ -46,9 +47,23 @@ function parisTool(rows: Listing[], extra: Extra = {}, currency = "USD") {
   const tab = fakeTab();
   const tool = staysTool({ openTab: tab.openTab, currency, sources: [paris(rows)], ...extra });
   const run = async (params: Record<string, unknown>) => {
-    const r = await tool.execute("c", { location: "Paris", checkin: "2026-12-10", checkout: "2026-12-13", ...params } as never, undefined, undefined, {} as never);
+    const r = await tool.execute(
+      "c",
+      { location: "Paris", checkin: "2026-12-10", checkout: "2026-12-13", ...params } as never,
+      undefined,
+      undefined,
+      {} as never,
+    );
     const text = (r.content[0] as { text: string }).text;
-    const data = (r.details as { data: { currency: string; maxNightly?: number; sources: Array<{ stays: Array<{ title: string; met?: string[]; currency?: string }> }> } }).data;
+    const data = (
+      r.details as {
+        data: {
+          currency: string;
+          maxNightly?: number;
+          sources: Array<{ stays: Array<{ title: string; met?: string[]; currency?: string }> }>;
+        };
+      }
+    ).data;
     return { r, text, data, titles: data.sources[0].stays.map((s) => s.title) };
   };
   return { tool, run, tab };
@@ -57,7 +72,12 @@ function parisTool(rows: Listing[], extra: Extra = {}, currency = "USD") {
 const rateOf = (table: Record<string, number>) => async (from: string, to: string) => (from === to ? 1 : (table[`${from}${to}`] ?? null));
 
 describe("stays max_price currency", () => {
-  const rows: Listing[] = [{ title: "Cheap", nightly: 350 }, { title: "Edge", nightly: 400 }, { title: "Dear", nightly: 450 }, { title: "Unpriced" }];
+  const rows: Listing[] = [
+    { title: "Cheap", nightly: 350 },
+    { title: "Edge", nightly: 400 },
+    { title: "Dear", nightly: 450 },
+    { title: "Unpriced" },
+  ];
 
   it("filters a plain number in the user's currency like before", async () => {
     const { titles, text, data } = await parisTool(rows).run({ max_price: 400 });
@@ -79,8 +99,14 @@ describe("stays max_price currency", () => {
   });
 
   it("converts listings that came back in another currency before comparing", async () => {
-    const mixed: Listing[] = [{ title: "Dollar fair", nightly: 420, currency: "USD" }, { title: "Dollar dear", nightly: 480, currency: "USD" }, { title: "Euro fair", nightly: 390 }];
-    const { titles, text, data } = await parisTool(mixed, { fx: rateOf({ USDEUR: 0.9 }) }).run({ max_price: { amount: 400, currency: "EUR" } });
+    const mixed: Listing[] = [
+      { title: "Dollar fair", nightly: 420, currency: "USD" },
+      { title: "Dollar dear", nightly: 480, currency: "USD" },
+      { title: "Euro fair", nightly: 390 },
+    ];
+    const { titles, text, data } = await parisTool(mixed, { fx: rateOf({ USDEUR: 0.9 }) }).run({
+      max_price: { amount: 400, currency: "EUR" },
+    });
     expect(titles).toEqual(["Dollar fair", "Euro fair"]);
     expect(text).toContain("Dollar fair — $420.00/night");
     expect(text).toContain("Euro fair — €390.00/night");
@@ -88,13 +114,19 @@ describe("stays max_price currency", () => {
   });
 
   it("converts listings in euros against a budget in the user's own currency", async () => {
-    const euro: Listing[] = [{ title: "Fits", nightly: 400, currency: "EUR" }, { title: "Too much", nightly: 420, currency: "EUR" }];
+    const euro: Listing[] = [
+      { title: "Fits", nightly: 400, currency: "EUR" },
+      { title: "Too much", nightly: 420, currency: "EUR" },
+    ];
     const { titles } = await parisTool(euro, { fx: rateOf({ EURUSD: 1.1 }) }).run({ max_price: 450 });
     expect(titles).toEqual(["Fits"]);
   });
 
   it("skips the price filter and says so when no rate can be fetched", async () => {
-    const mixed: Listing[] = [{ title: "Dollar dear", nightly: 900, currency: "USD" }, { title: "Euro fair", nightly: 390 }];
+    const mixed: Listing[] = [
+      { title: "Dollar dear", nightly: 900, currency: "USD" },
+      { title: "Euro fair", nightly: 390 },
+    ];
     const { titles, text, data } = await parisTool(mixed, { fx: async () => null }).run({ max_price: { amount: 400, currency: "EUR" } });
     expect(titles).toEqual(["Dollar dear", "Euro fair"]);
     expect(text).toContain("exchange rate could not be fetched, so the budget was not applied");
@@ -177,9 +209,21 @@ describe("stays wants", () => {
 
   it("ranks listings meeting all wishes first, then by wishes met, then by price, and shows what each meets", async () => {
     const log: string[] = [];
-    const { titles, text, data } = await parisTool(rows, { judge: judgeFor(log) }, "EUR").run({ wants: { brand: ["Marriott", "Hyatt"], area: "the Louvre" } });
-    expect(titles).toEqual(["Hotel du Louvre, Paris, a Hyatt hotel", "Courtyard by Marriott Paris Gare de Lyon", "Hyatt Regency Paris Etoile", "Hotel Indie"]);
-    expect(data.sources[0].stays.map((s) => s.met)).toEqual([["Marriott/Hyatt", "near the Louvre"], ["Marriott/Hyatt"], ["Marriott/Hyatt"], []]);
+    const { titles, text, data } = await parisTool(rows, { judge: judgeFor(log) }, "EUR").run({
+      wants: { brand: ["Marriott", "Hyatt"], area: "the Louvre" },
+    });
+    expect(titles).toEqual([
+      "Hotel du Louvre, Paris, a Hyatt hotel",
+      "Courtyard by Marriott Paris Gare de Lyon",
+      "Hyatt Regency Paris Etoile",
+      "Hotel Indie",
+    ]);
+    expect(data.sources[0].stays.map((s) => s.met)).toEqual([
+      ["Marriott/Hyatt", "near the Louvre"],
+      ["Marriott/Hyatt"],
+      ["Marriott/Hyatt"],
+      [],
+    ]);
     expect(text).toContain("matches: ✓ Marriott/Hyatt · ✓ near the Louvre");
     expect(log).toHaveLength(2);
     expect(log[0]).toContain('"brands":["Marriott","Hyatt"]');
@@ -194,8 +238,14 @@ describe("stays wants", () => {
   });
 
   it("says plainly when no listing meets the brand under budget", async () => {
-    const few: Listing[] = [{ title: "Hotel Indie", nightly: 150 }, { title: "Hyatt Regency Paris Etoile", nightly: 650 }];
-    const { text } = await parisTool(few, { judge: judgeFor() }, "EUR").run({ max_price: { amount: 400, currency: "EUR" }, wants: { brand: ["Marriott", "Hyatt"] } });
+    const few: Listing[] = [
+      { title: "Hotel Indie", nightly: 150 },
+      { title: "Hyatt Regency Paris Etoile", nightly: 650 },
+    ];
+    const { text } = await parisTool(few, { judge: judgeFor() }, "EUR").run({
+      max_price: { amount: 400, currency: "EUR" },
+      wants: { brand: ["Marriott", "Hyatt"] },
+    });
     expect(text).toContain("No Marriott or Hyatt under €400.00/night in these results.");
   });
 
@@ -209,7 +259,12 @@ describe("stays wants", () => {
     const spy = vi.spyOn(console, "log").mockImplementation((l: string) => void logs.push(l));
     try {
       const { titles, text, data } = await parisTool(rows, { judge: noJudge }, "EUR").run({ wants: { brand: ["Hyatt"] } });
-      expect(titles).toEqual(["Hotel Indie", "Courtyard by Marriott Paris Gare de Lyon", "Hyatt Regency Paris Etoile", "Hotel du Louvre, Paris, a Hyatt hotel"]);
+      expect(titles).toEqual([
+        "Hotel Indie",
+        "Courtyard by Marriott Paris Gare de Lyon",
+        "Hyatt Regency Paris Etoile",
+        "Hotel du Louvre, Paris, a Hyatt hotel",
+      ]);
       expect(data.sources[0].stays.every((s) => s.met === undefined)).toBe(true);
       expect(text).not.toContain("matches:");
       expect(text).toContain("could not be checked automatically");

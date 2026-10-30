@@ -16,7 +16,12 @@ beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "artifacts-"));
   artifacts = new ArtifactStore(dir);
   ({ id } = await artifacts.save("Diwali Plan!", "<html><body><h1>Plan</h1></body></html>"));
-  const store = new SessionStore({ idleMs: 1000, create: async () => { throw new Error("unused"); } });
+  const store = new SessionStore({
+    idleMs: 1000,
+    create: async () => {
+      throw new Error("unused");
+    },
+  });
   app = createApp({ cfg: loadConfig({ LLM_API_KEY: "k" }), store, artifacts });
 });
 afterAll(async () => {

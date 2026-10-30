@@ -15,9 +15,15 @@ beforeAll(async () => {
     const url = new URL(req.url ?? "/", "http://x");
     res.setHeader("content-type", "text/html; charset=utf-8");
     if (url.pathname === "/") {
-      res.end(page(`<form action="/search"><input id="q" name="q" type="text"><button id="go" type="submit">Search</button></form>`, "Shop"));
+      res.end(
+        page(`<form action="/search"><input id="q" name="q" type="text"><button id="go" type="submit">Search</button></form>`, "Shop"),
+      );
     } else if (url.pathname === "/search") {
-      res.end(page(`<h1>Results for ${url.searchParams.get("q")}</h1><p>Sony WH-1000XM5 — in stock — ₹26,990</p><a id="co" href="/checkout">Proceed to checkout</a><a id="cart" href="/cart">View basket</a>`));
+      res.end(
+        page(
+          `<h1>Results for ${url.searchParams.get("q")}</h1><p>Sony WH-1000XM5 — in stock — ₹26,990</p><a id="co" href="/checkout">Proceed to checkout</a><a id="cart" href="/cart">View basket</a>`,
+        ),
+      );
     } else if (url.pathname === "/captcha") {
       res.end(page("<h1>Are you a robot?</h1><p>Complete the CAPTCHA</p>"));
     } else if (url.pathname === "/forbidden") {
@@ -38,11 +44,21 @@ afterAll(async () => {
 
 const text = (r: { content: Array<{ text?: string }> }) => r.content[0].text ?? "";
 const run = (threadId: string, actions: unknown[]) =>
-  browseTool({ pool, threadId, userContext: null, allowPrivateHosts: true }).execute("c", { actions } as never, undefined, undefined, {} as never);
+  browseTool({ pool, threadId, userContext: null, allowPrivateHosts: true }).execute(
+    "c",
+    { actions } as never,
+    undefined,
+    undefined,
+    {} as never,
+  );
 
 describe("browse (real Chromium)", () => {
   it("types into search and reads results", async () => {
-    const r = await run("t1", [{ op: "goto", url: `${base}/` }, { op: "type", selector: "#q", value: "sony xm5", submit: true }, { op: "read" }]);
+    const r = await run("t1", [
+      { op: "goto", url: `${base}/` },
+      { op: "type", selector: "#q", value: "sony xm5", submit: true },
+      { op: "read" },
+    ]);
     expect(r.isError).toBeFalsy();
     expect(text(r)).toContain("Results for sony xm5");
     expect(text(r)).toContain("₹26,990");
@@ -78,7 +94,10 @@ describe("browse (real Chromium)", () => {
   });
 
   it("caps actions at 10", async () => {
-    const r = await run("t5", Array.from({ length: 11 }, () => ({ op: "read" })));
+    const r = await run(
+      "t5",
+      Array.from({ length: 11 }, () => ({ op: "read" })),
+    );
     expect(r.isError).toBe(true);
     expect(text(r)).toBe("too many actions (max 10 per call)");
   });

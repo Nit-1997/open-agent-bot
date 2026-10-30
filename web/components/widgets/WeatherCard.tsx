@@ -16,7 +16,10 @@ export function WeatherCard({ toolCallId, widget }: { toolCallId: string; widget
           </p>
         </div>
         {typical && (
-          <span id={`${id}-badge`} className="shrink-0 rounded-full bg-warn-bg px-2.5 py-1 text-[12px] sm:text-[11px] font-medium text-warn-fg">
+          <span
+            id={`${id}-badge`}
+            className="shrink-0 rounded-full bg-warn-bg px-2.5 py-1 text-[12px] sm:text-[11px] font-medium text-warn-fg"
+          >
             Typical, not a forecast
           </span>
         )}

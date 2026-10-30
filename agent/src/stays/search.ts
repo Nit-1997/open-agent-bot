@@ -23,7 +23,13 @@ async function settle(page: Page): Promise<void> {
   }
 }
 
-export async function searchSource(source: StaySource, q: StayQuery, openTab: OpenTab, live: boolean, opts: { allowPrivateHosts?: boolean } = {}): Promise<SourceResult> {
+export async function searchSource(
+  source: StaySource,
+  q: StayQuery,
+  openTab: OpenTab,
+  live: boolean,
+  opts: { allowPrivateHosts?: boolean } = {},
+): Promise<SourceResult> {
   const url = source.searchUrl(q);
   if (!source.read) return { source, url, status: "link", stays: [] };
   const urlError = publicHttpUrlError(url, opts);
@@ -44,7 +50,12 @@ export async function searchSource(source: StaySource, q: StayQuery, openTab: Op
   }
 }
 
-export async function searchStays(sources: StaySource[], q: StayQuery, openTab: OpenTab, opts: { allowPrivateHosts?: boolean } = {}): Promise<SourceResult[]> {
+export async function searchStays(
+  sources: StaySource[],
+  q: StayQuery,
+  openTab: OpenTab,
+  opts: { allowPrivateHosts?: boolean } = {},
+): Promise<SourceResult[]> {
   let firstLive = true;
   return Promise.all(
     sources.map((s) => {

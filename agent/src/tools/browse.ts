@@ -46,7 +46,11 @@ async function settle(page: Page) {
 
 type BrowseDeps = { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean; frames?: FrameBus };
 
-export async function runBrowse(deps: BrowseDeps, actions: BrowseAction[], opts: { fresh?: boolean; live?: boolean } = {}): Promise<ToolResult> {
+export async function runBrowse(
+  deps: BrowseDeps,
+  actions: BrowseAction[],
+  opts: { fresh?: boolean; live?: boolean } = {},
+): Promise<ToolResult> {
   if (actions.length > MAX_ACTIONS) return fail(`too many actions (max ${MAX_ACTIONS} per call)`);
   const page = opts.fresh ? await deps.pool.tab(deps.threadId, deps.userContext) : await deps.pool.page(deps.threadId, deps.userContext);
   const stopWatch = deps.frames && opts.live !== false ? await watch(page, deps.frames).catch(() => undefined) : undefined;

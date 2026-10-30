@@ -19,7 +19,8 @@ describe("artifacts route", () => {
 
   it("proxies pdf with attachment disposition", async () => {
     const fetchMock = vi.fn(
-      async () => new Response("%PDF", { headers: { "content-type": "application/pdf", "content-disposition": 'attachment; filename="plan.pdf"' } }),
+      async () =>
+        new Response("%PDF", { headers: { "content-type": "application/pdf", "content-disposition": 'attachment; filename="plan.pdf"' } }),
     );
     vi.stubGlobal("fetch", fetchMock);
     const res = await call("abcdefghijkl", "?format=pdf");

@@ -24,7 +24,9 @@ describe.skipIf(!live)("parallel tool calls through LiteLLM (live)", () => {
       if (e.type === "tool_execution_end" && e.isError) errors.push(JSON.stringify(e.result).slice(0, 200));
     });
     try {
-      await handle.session.prompt("Run three separate web searches in parallel right now: samosa recipe, chakli recipe, diwali games. Then reply 'done'.");
+      await handle.session.prompt(
+        "Run three separate web searches in parallel right now: samosa recipe, chakli recipe, diwali games. Then reply 'done'.",
+      );
       expect(errors).toEqual([]);
       expect(queries.length).toBeGreaterThanOrEqual(3);
     } finally {

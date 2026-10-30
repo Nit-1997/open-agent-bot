@@ -6,7 +6,22 @@ import { withRetry } from "../lib/retry.js";
 
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
 const SPOTIFY_ITEM = /^\/(?:intl-[a-z-]+\/)?(playlist|album|track|artist)\/([A-Za-z0-9]+)/;
-const FILLER = new Set(["playlist", "playlists", "spotify", "apple", "music", "songs", "song", "mix", "the", "and", "for", "of", "by", "best"]);
+const FILLER = new Set([
+  "playlist",
+  "playlists",
+  "spotify",
+  "apple",
+  "music",
+  "songs",
+  "song",
+  "mix",
+  "the",
+  "and",
+  "for",
+  "of",
+  "by",
+  "best",
+]);
 
 type MusicCard = { title: string; url?: string; subtitle?: string };
 
@@ -62,14 +77,21 @@ export function confidentAlbum(results: ITunesAlbum[], name: string): ITunesAlbu
 }
 
 export function coverQueries(name: string): string[] {
-  const clean = name.replace(/\([^)]*\)|\[[^\]]*\]/g, " ").replace(/[^\p{L}\p{N}' ]+/gu, " ").replace(/\s+/g, " ").trim();
+  const clean = name
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+    .replace(/[^\p{L}\p{N}' ]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   const key = [...words(clean)];
   return [...new Set([clean, key.slice(0, 3).join(" "), key.slice(0, 2).join(" "), key[0] ?? ""].filter(Boolean))];
 }
 
 async function appleCover(card: MusicCard, country: string, f: typeof fetch, judge?: Judge): Promise<string | undefined> {
   const queries = coverQueries(card.title);
-  const artist = card.subtitle?.replace(/[^\p{L}\p{N}' -]+/gu, " ").replace(/\s+/g, " ").trim();
+  const artist = card.subtitle
+    ?.replace(/[^\p{L}\p{N}' -]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   for (const q of artist ? [...new Set([`${queries[0]} ${artist}`, ...queries])] : queries) {
     const hit = await pickAlbum(await appleSearch(q, country, f), card, judge);
     if (hit) return large(hit.artworkUrl100);

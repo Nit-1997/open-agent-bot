@@ -41,11 +41,17 @@ describe("fx", () => {
 
   it("returns null on an HTTP error, a bad body, an unknown currency, or a hang", async () => {
     const log: string[] = [];
-    expect(await createFx({ fetch: fakeFetch([[/frankfurter/, () => new Response("no", { status: 500 })]]), log: (l) => log.push(l) })("EUR", "USD")).toBeNull();
+    expect(
+      await createFx({ fetch: fakeFetch([[/frankfurter/, () => new Response("no", { status: 500 })]]), log: (l) => log.push(l) })(
+        "EUR",
+        "USD",
+      ),
+    ).toBeNull();
     expect(log[0]).toContain("HTTP 500");
     expect(await createFx({ fetch: fakeFetch([[/frankfurter/, () => json({ rates: {} })]]), log: () => {} })("EUR", "USD")).toBeNull();
     expect(await createFx({ fetch: fakeFetch([[/frankfurter/, rates]]) })("EUR", "XXX")).toBeNull();
-    const hang = ((_: unknown, init?: RequestInit) => new Promise((_res, rej) => init?.signal?.addEventListener("abort", () => rej(new Error("timeout"))))) as typeof fetch;
+    const hang = ((_: unknown, init?: RequestInit) =>
+      new Promise((_res, rej) => init?.signal?.addEventListener("abort", () => rej(new Error("timeout"))))) as typeof fetch;
     expect(await createFx({ fetch: hang, timeoutMs: 20, log: () => {} })("EUR", "USD")).toBeNull();
   });
 

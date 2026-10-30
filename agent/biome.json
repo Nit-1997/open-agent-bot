@@ -1,15 +1,13 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": [
-      "src/**/*.ts",
-      "evals/**/*.ts",
-      "test/**/*.ts",
-      "../shared/**/*.ts"
-    ]
+    "includes": ["src/**/*.ts", "evals/**/*.ts", "test/**/*.ts", "../shared/**/*.ts"]
   },
   "formatter": {
-    "enabled": false
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
   },
   "assist": {
     "enabled": false
@@ -27,6 +25,14 @@
       "performance": {
         "useDomNodeTextContent": "off"
       }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
     }
   }
 }

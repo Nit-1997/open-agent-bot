@@ -9,7 +9,10 @@ export function truncate(s: string, max = MAX_PAGE_CHARS): string {
   return s.length <= max ? s : `${s.slice(0, max)}\n[truncated]`;
 }
 
-function blockText(root: { querySelectorAll: (s: string) => Iterable<any>; ownerDocument?: any; textContent: string | null }, doc: any): string {
+function blockText(
+  root: { querySelectorAll: (s: string) => Iterable<any>; ownerDocument?: any; textContent: string | null },
+  doc: any,
+): string {
   const walker = doc.createTreeWalker(root, 4);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) n.textContent = n.textContent.replace(/\s+/g, " ");
   for (const el of root.querySelectorAll(BLOCKS)) el.after(doc.createTextNode("\n"));
@@ -56,7 +59,8 @@ function ldProducts(v: unknown, out: Array<{ name?: string; image?: unknown }> =
   else if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     const type = o["@type"];
-    if (type === "Product" || (Array.isArray(type) && type.includes("Product"))) out.push({ name: o.name as string | undefined, image: o.image });
+    if (type === "Product" || (Array.isArray(type) && type.includes("Product")))
+      out.push({ name: o.name as string | undefined, image: o.image });
     for (const [k, x] of Object.entries(o)) if (k !== "image") ldProducts(x, out);
   }
   return out;
@@ -75,7 +79,15 @@ export function pageImages(html: string, base: string, limit = MAX_IMAGES): Page
   const add = (alt: string | null | undefined, src: string | null | undefined) => {
     const a = (alt ?? "").replace(/\s+/g, " ").trim();
     const s = absolute(src, base);
-    if (!s || a.length < 6 || SKIP_ALT.test(a) || /\.svg(\?|$)/i.test(s) || SKIP_SRC.test(new URL(s).pathname) || found.some((f) => f.src === s)) return;
+    if (
+      !s ||
+      a.length < 6 ||
+      SKIP_ALT.test(a) ||
+      /\.svg(\?|$)/i.test(s) ||
+      SKIP_SRC.test(new URL(s).pathname) ||
+      found.some((f) => f.src === s)
+    )
+      return;
     found.push({ alt: a.slice(0, 80), src: s });
   };
   const meta = (p: string) => document.querySelector(`meta[property="${p}"],meta[name="${p}"]`)?.getAttribute("content");
@@ -86,9 +98,12 @@ export function pageImages(html: string, base: string, limit = MAX_IMAGES): Page
     } catch {}
   }
   for (const img of document.querySelectorAll("img")) {
-    const w = Number(img.getAttribute("width")), h = Number(img.getAttribute("height"));
+    const w = Number(img.getAttribute("width")),
+      h = Number(img.getAttribute("height"));
     if ((w && w < 50) || (h && h < 50)) continue;
-    const src = [img.getAttribute("src"), img.getAttribute("data-src"), img.getAttribute("srcset")].find((x) => x && !x.startsWith("data:"));
+    const src = [img.getAttribute("src"), img.getAttribute("data-src"), img.getAttribute("srcset")].find(
+      (x) => x && !x.startsWith("data:"),
+    );
     add(img.getAttribute("alt"), src);
   }
   return found.slice(0, limit);

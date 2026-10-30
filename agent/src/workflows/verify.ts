@@ -4,7 +4,15 @@ import type { Judge } from "../judge/index.js";
 export type SourceDoc = { url: string; text: string };
 type Verdict = "supported" | "unsupported" | "unchecked";
 type ClaimResult = { text: string; url: string; verdict: Verdict };
-type VerifyOutcome = { html: string; claims: ClaimResult[]; total: number; supported: number; flagged: number; removed: number; unchecked: number };
+type VerifyOutcome = {
+  html: string;
+  claims: ClaimResult[];
+  total: number;
+  supported: number;
+  flagged: number;
+  removed: number;
+  unchecked: number;
+};
 
 const UNIT = /<(p|li|td|figcaption|blockquote)\b[^>]*>([\s\S]*?)<\/\1>|<div class="stat">([\s\S]*?)<\/div>/gi;
 const SOURCES_LIST = /<ol class="sources"[\s\S]*?<\/ol>/i;
@@ -17,8 +25,14 @@ const WORD = /[a-z0-9][a-z0-9.,%$]*/g;
 export const SOURCE_CHARS = 8000;
 const MAX_CLAIMS = 100;
 
-const decode = (s: string) => s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, d, h, n) => (d ? String.fromCodePoint(Number(d)) : h ? String.fromCodePoint(Number.parseInt(h, 16)) : (ENTITIES[n.toLowerCase()] ?? m)));
-const plain = (html: string) => decode(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+const decode = (s: string) =>
+  s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (m, d, h, n) =>
+    d ? String.fromCodePoint(Number(d)) : h ? String.fromCodePoint(Number.parseInt(h, 16)) : (ENTITIES[n.toLowerCase()] ?? m),
+  );
+const plain = (html: string) =>
+  decode(html.replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
 const hrefs = (html: string) => [...html.matchAll(/href="([^"]+)"/gi)].map((m) => decode(m[1]));
 
 function urlKey(raw: string): string {
@@ -31,7 +45,9 @@ function urlKey(raw: string): string {
 }
 
 function balanced(html: string): boolean {
-  return BALANCED.every((t) => (html.match(new RegExp(`<${t}\\b`, "gi")) ?? []).length === (html.match(new RegExp(`</${t}>`, "gi")) ?? []).length);
+  return BALANCED.every(
+    (t) => (html.match(new RegExp(`<${t}\\b`, "gi")) ?? []).length === (html.match(new RegExp(`</${t}>`, "gi")) ?? []).length,
+  );
 }
 
 function sentences(inner: string): string[] {
@@ -79,7 +95,13 @@ function units(html: string): Unit[] {
   return out;
 }
 
-const tokens = (s: string) => new Set(s.toLowerCase().match(WORD)?.map((w) => w.replace(/[.,]+$/, "")) ?? []);
+const tokens = (s: string) =>
+  new Set(
+    s
+      .toLowerCase()
+      .match(WORD)
+      ?.map((w) => w.replace(/[.,]+$/, "")) ?? [],
+  );
 
 function pickSource(claim: { text: string; urls: string[] }, docs: { key: string; tokens: Set<string> }[]): number {
   const cited = docs.map((d, i) => (claim.urls.some((u) => urlKey(u) === d.key) ? i : -1)).filter((i) => i >= 0);
@@ -113,7 +135,12 @@ const mark = (html: string, verdict: Verdict) =>
       ? `<span class="unchecked" title="Not checked against a source">${html}</span>`
       : html;
 
-export async function verifyReport(html: string, sources: SourceDoc[], judge: Judge, opts: { signal?: AbortSignal; maxClaims?: number } = {}): Promise<VerifyOutcome> {
+export async function verifyReport(
+  html: string,
+  sources: SourceDoc[],
+  judge: Judge,
+  opts: { signal?: AbortSignal; maxClaims?: number } = {},
+): Promise<VerifyOutcome> {
   const found = units(html);
   const docs = sources.map((s) => ({ key: urlKey(s.url), tokens: tokens(s.text.slice(0, SOURCE_CHARS)) }));
   const flat: { unit: number; piece: number; source: number; text: string; url: string }[] = [];
@@ -127,12 +154,20 @@ export async function verifyReport(html: string, sources: SourceDoc[], judge: Ju
 
   const verdicts = new Map<number, Verdict>();
   const bySource = new Map<number, number[]>();
-  for (const [i, c] of flat.slice(0, opts.maxClaims ?? MAX_CLAIMS).entries()) bySource.set(c.source, [...(bySource.get(c.source) ?? []), i]);
+  for (const [i, c] of flat.slice(0, opts.maxClaims ?? MAX_CLAIMS).entries())
+    bySource.set(c.source, [...(bySource.get(c.source) ?? []), i]);
   await Promise.all(
     [...bySource].map(async ([source, idx]) => {
       const text = sources[source].text.slice(0, SOURCE_CHARS);
-      const items = idx.map((i) => ({ id: String(i), state: idx.length === 1 ? { claim: flat[i].text, source: text } : { claim: flat[i].text } }));
-      const result = judge.available ? await judge.yesno(items, claimSupported, { signal: opts.signal, ...(idx.length > 1 && { batch: { shared: { source: text } } }) }).catch(() => null) : null;
+      const items = idx.map((i) => ({
+        id: String(i),
+        state: idx.length === 1 ? { claim: flat[i].text, source: text } : { claim: flat[i].text },
+      }));
+      const result = judge.available
+        ? await judge
+            .yesno(items, claimSupported, { signal: opts.signal, ...(idx.length > 1 && { batch: { shared: { source: text } } }) })
+            .catch(() => null)
+        : null;
       for (const [n, i] of idx.entries()) verdicts.set(i, result ? (result[n].yes ? "supported" : "unsupported") : "unchecked");
     }),
   );
@@ -164,5 +199,13 @@ export async function verifyReport(html: string, sources: SourceDoc[], judge: Ju
 
   const claims = flat.map((c, i): ClaimResult => ({ text: c.text, url: c.url, verdict: verdicts.get(i) ?? "unchecked" }));
   const count = (v: Verdict) => claims.filter((c) => c.verdict === v).length;
-  return { html: out, claims, total: claims.length, supported: count("supported"), flagged: count("unsupported") - removed, removed, unchecked: count("unchecked") };
+  return {
+    html: out,
+    claims,
+    total: claims.length,
+    supported: count("supported"),
+    flagged: count("unsupported") - removed,
+    removed,
+    unchecked: count("unchecked"),
+  };
 }

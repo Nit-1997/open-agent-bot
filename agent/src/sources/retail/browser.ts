@@ -6,7 +6,11 @@ import type { RetailCtx, RetailQuery, RetailResult, RetailSource, Store } from "
 
 async function searchBox(page: Page, store: Store, query: string): Promise<void> {
   await page.goto(store.home, { waitUntil: "domcontentloaded", timeout: 20000 });
-  const box = page.locator('input[type="search"], input[name*="search" i], input[placeholder*="search" i], input[aria-label*="search" i], input[name="q"]').first();
+  const box = page
+    .locator(
+      'input[type="search"], input[name*="search" i], input[placeholder*="search" i], input[aria-label*="search" i], input[name="q"]',
+    )
+    .first();
   await box.fill(query, { timeout: 8000 });
   await box.press("Enter");
   await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});

@@ -37,6 +37,10 @@ export function loadSkillCatalog(dir: string, opts: { codemode?: boolean } = {})
   const { skills } = loadSkillsFromDir({ dir, source: "open-agent" });
   return skills
     .filter((s) => s.name && s.description && (opts.codemode === true || !CODEMODE_ONLY.has(s.name)))
-    .map((s) => ({ name: s.name, description: s.description, body: forCodemode(stripFrontmatter(readFileSync(s.filePath, "utf8")).trim(), opts.codemode === true) }))
+    .map((s) => ({
+      name: s.name,
+      description: s.description,
+      body: forCodemode(stripFrontmatter(readFileSync(s.filePath, "utf8")).trim(), opts.codemode === true),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

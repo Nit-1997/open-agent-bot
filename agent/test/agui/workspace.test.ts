@@ -40,7 +40,16 @@ function setup() {
 const msg = (id: string, role: string, content: string) => ({ id, role, content }) as never;
 
 function input(over: Partial<RunAgentInput> = {}): RunAgentInput {
-  return { threadId: "t1", runId: "r1", messages: [msg("m1", "user", "hello")], tools: [], context: [], state: {}, forwardedProps: {}, ...over } as RunAgentInput;
+  return {
+    threadId: "t1",
+    runId: "r1",
+    messages: [msg("m1", "user", "hello")],
+    tools: [],
+    context: [],
+    state: {},
+    forwardedProps: {},
+    ...over,
+  } as RunAgentInput;
 }
 
 async function collect(it: AsyncIterable<BaseEvent>) {
@@ -50,7 +59,12 @@ async function collect(it: AsyncIterable<BaseEvent>) {
 }
 
 const party = { title: "8th birthday", guests: 12, date: "2026-11-14", budget: 300 };
-const prior = [msg("m1", "user", "plan a party"), msg("m2", "assistant", "Here is the plan."), msg("m3", "tool", "ignored"), msg("m4", "user", "make it 16 kids")];
+const prior = [
+  msg("m1", "user", "plan a party"),
+  msg("m2", "assistant", "Here is the plan."),
+  msg("m3", "tool", "ignored"),
+  msg("m4", "user", "make it 16 kids"),
+];
 
 describe("session restore", () => {
   it("creates the session with the prior user and assistant text and prompts with the last message", async () => {
@@ -58,7 +72,15 @@ describe("session restore", () => {
     const out = await collect(handleRun(input({ messages: prior }), store, new AbortController().signal, { workspace }));
     expect(out.map((e) => e.type)).toContain(EventType.RUN_FINISHED);
     expect(out.some((e) => e.type === EventType.RUN_ERROR)).toBe(false);
-    expect(created).toEqual([{ threadId: "t1", history: [{ role: "user", text: "plan a party" }, { role: "assistant", text: "Here is the plan." }] }]);
+    expect(created).toEqual([
+      {
+        threadId: "t1",
+        history: [
+          { role: "user", text: "plan a party" },
+          { role: "assistant", text: "Here is the plan." },
+        ],
+      },
+    ]);
     expect(session.prompts).toEqual(["make it 16 kids"]);
   });
 
@@ -80,9 +102,19 @@ describe("session restore", () => {
     const evidence = new Evidence();
     const store = new SessionStore({
       idleMs: 60000,
-      create: async (): Promise<SessionEntry> => ({ session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {}, evidence }),
+      create: async (): Promise<SessionEntry> => ({
+        session: fakeSession(say),
+        busy: false,
+        lastUsed: 0,
+        dispose: async () => {},
+        evidence,
+      }),
     });
-    const history = [msg("m1", "user", "plan a party"), msg("m2", "assistant", "The cart comes to $17.22."), msg("m4", "user", "how many guests now?")];
+    const history = [
+      msg("m1", "user", "plan a party"),
+      msg("m2", "assistant", "The cart comes to $17.22."),
+      msg("m4", "user", "how many guests now?"),
+    ];
     await collect(handleRun(input({ messages: history }), store, new AbortController().signal, { workspace }));
     expect(evidence.unverified("It's for 12 guests, budget $300, and the cart is $17.22.")).toEqual([]);
   });
@@ -116,16 +148,45 @@ describe("workspace_edits", () => {
   it("applies cart, event and trip edits before the turn and they show in the next summary", async () => {
     const { store, workspace, session } = setup();
     workspace.put("t1", "event", "main", party);
-    workspace.put("t1", "trip", "main", { destination: "Tahoe", start: "2026-12-01", end: "2026-12-04", travelers: 2, stays: [], days: [] });
+    workspace.put("t1", "trip", "main", {
+      destination: "Tahoe",
+      start: "2026-12-01",
+      end: "2026-12-04",
+      travelers: 2,
+      stays: [],
+      days: [],
+    });
     const cart = workspaceCart(workspace, "t1");
-    cart.start(["target"], [{ query: "pizza", qty: 3 }, { query: "cake", qty: 1 }]);
+    cart.start(
+      ["target"],
+      [
+        { query: "pizza", qty: 3 },
+        { query: "cake", qty: 1 },
+      ],
+    );
     cart.save();
     let seen: string | undefined;
     session.prompt = async () => {
       seen = workspaceNote(workspace, "t1");
     };
-    await collect(handleRun(input({ context: ctx({ cart: { removed: ["cake"], qty: { pizza: 5 } }, event: { guests: 16, date: "2026-11-21", budget: 350 }, trip: { travelers: 3, end: "2026-12-05" } }) }), store, new AbortController().signal, { workspace }));
-    expect(workspace.get("t1", "event", "main")).toMatchObject({ version: 2, value: { guests: 16, date: "2026-11-21", budget: 350, title: "8th birthday" } });
+    await collect(
+      handleRun(
+        input({
+          context: ctx({
+            cart: { removed: ["cake"], qty: { pizza: 5 } },
+            event: { guests: 16, date: "2026-11-21", budget: 350 },
+            trip: { travelers: 3, end: "2026-12-05" },
+          }),
+        }),
+        store,
+        new AbortController().signal,
+        { workspace },
+      ),
+    );
+    expect(workspace.get("t1", "event", "main")).toMatchObject({
+      version: 2,
+      value: { guests: 16, date: "2026-11-21", budget: 350, title: "8th birthday" },
+    });
     expect(workspace.get("t1", "trip", "main")?.value).toMatchObject({ travelers: 3, end: "2026-12-05", start: "2026-12-01" });
     expect((workspace.get("t1", "cart", "main")!.value as { items: unknown }).items).toEqual([{ query: "pizza", qty: 5 }]);
     expect(seen).toContain("16 guests");
@@ -134,7 +195,9 @@ describe("workspace_edits", () => {
 
   it("drops invalid sections, strips unknown fields and returns null when nothing is left", () => {
     expect(parseWorkspaceEdits({ event: { guests: -2, date: "tomorrow", budget: "lots" }, trip: { travelers: 0 } })).toBeNull();
-    expect(parseWorkspaceEdits({ event: { guests: 16, date: "2026-11-21T10:00", extra: 1 } })).toEqual({ event: { guests: 16, date: "2026-11-21T10:00" } });
+    expect(parseWorkspaceEdits({ event: { guests: 16, date: "2026-11-21T10:00", extra: 1 } })).toEqual({
+      event: { guests: 16, date: "2026-11-21T10:00" },
+    });
     expect(parseWorkspaceEdits({ event: { guests: 16.4 } })).toBeNull();
     expect(parseWorkspaceEdits("nope")).toBeNull();
     expect(parseWorkspaceEdits({ cart: { removed: ["a", 3], qty: { a: 2 } }, trip: { budget: 900 } })).toEqual({ trip: { budget: 900 } });
@@ -144,7 +207,9 @@ describe("workspace_edits", () => {
 
   it("reads them from the AG-UI context, as a string or an object", () => {
     expect(readWorkspaceEdits(input({ context: ctx({ event: { guests: 9 } }) }))).toEqual({ event: { guests: 9 } });
-    expect(readWorkspaceEdits(input({ context: [{ description: "workspace_edits", value: { trip: { start: "2026-12-01" } } as never }] }))).toEqual({ trip: { start: "2026-12-01" } });
+    expect(
+      readWorkspaceEdits(input({ context: [{ description: "workspace_edits", value: { trip: { start: "2026-12-01" } } as never }] })),
+    ).toEqual({ trip: { start: "2026-12-01" } });
     expect(readWorkspaceEdits(input({ context: [{ description: "workspace_edits", value: "{bad" }] }))).toBeNull();
   });
 });

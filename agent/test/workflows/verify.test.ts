@@ -32,7 +32,9 @@ describe("verifyReport", () => {
     const src = { url: "https://s.example.org/a", text: "The unit costs $100 and lasts 15 years." };
     const html = `<ul><li>Costs $100 <a href="${src.url}">[1]</a>.</li><li>Lasts 40 years <a href="${src.url}">[1]</a>.</li></ul><ol><li>Lasts 15 years <a href="${src.url}">[1]</a>.</li></ol>`;
     const r = await verifyReport(html, [src], numberJudge());
-    expect(r.html).toBe(`<ul><li>Costs $100 <a href="${src.url}">[1]</a>.</li></ul><ol><li>Lasts 15 years <a href="${src.url}">[1]</a>.</li></ol>`);
+    expect(r.html).toBe(
+      `<ul><li>Costs $100 <a href="${src.url}">[1]</a>.</li></ul><ol><li>Lasts 15 years <a href="${src.url}">[1]</a>.</li></ol>`,
+    );
     expect(r).toMatchObject({ removed: 1, flagged: 0 });
   });
 
@@ -76,8 +78,18 @@ describe("verifyReport", () => {
 
 describe.skipIf(!process.env.OPENROUTER_API_KEY)("verify with live Jev", () => {
   it("flags the planted COP claim and passes the true ones", { timeout: 120000 }, async () => {
-    const runtime = await ModelRuntime.create({ authPath: join(mkdtempSync(join(tmpdir(), "verify-")), "auth.json"), modelsPath: null, refreshOnCreate: false, allowModelNetwork: false });
-    const judge = await createJudge({ runtime, model: process.env.JEV_MODEL ?? "openrouter/typesafe/jev-1.14", log: () => {}, timeoutMs: 20000 });
+    const runtime = await ModelRuntime.create({
+      authPath: join(mkdtempSync(join(tmpdir(), "verify-")), "auth.json"),
+      modelsPath: null,
+      refreshOnCreate: false,
+      allowModelNetwork: false,
+    });
+    const judge = await createJudge({
+      runtime,
+      model: process.env.JEV_MODEL ?? "openrouter/typesafe/jev-1.14",
+      log: () => {},
+      timeoutMs: 20000,
+    });
     expect(judge.available).toBe(true);
     const r = await verifyReport(REPORT, sources, judge);
     console.log(`[verify] ${JSON.stringify(r.claims)} cost $${judge.usage().costUsd.toFixed(5)} calls ${judge.usage().calls}`);

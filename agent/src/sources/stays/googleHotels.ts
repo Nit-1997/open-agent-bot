@@ -15,8 +15,15 @@ function collect(): GoogleCard[] {
     while (el.parentElement && onlyThis(el.parentElement)) el = el.parentElement;
     if (seen.has(el)) continue;
     seen.add(el);
-    const named = [...el.querySelectorAll("a[aria-label]")].map((x) => x.getAttribute("aria-label") ?? "").find((l) => l && !l.startsWith("Prices") && !/^(Open|Save|Photo)/.test(l));
-    cards.push({ name: named ?? "", priceLabel: label ?? "", text: (el as HTMLElement).innerText.replace(/\s+/g, " "), image: el.querySelector("img")?.src });
+    const named = [...el.querySelectorAll("a[aria-label]")]
+      .map((x) => x.getAttribute("aria-label") ?? "")
+      .find((l) => l && !l.startsWith("Prices") && !/^(Open|Save|Photo)/.test(l));
+    cards.push({
+      name: named ?? "",
+      priceLabel: label ?? "",
+      text: (el as HTMLElement).innerText.replace(/\s+/g, " "),
+      image: el.querySelector("img")?.src,
+    });
   }
   return cards;
 }

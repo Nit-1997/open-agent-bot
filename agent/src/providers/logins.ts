@@ -58,7 +58,11 @@ export class LoginFlows {
             clear();
             reject(new Error(message));
           };
-          flow.state.prompt = { type: p.type, message: p.message, ...("placeholder" in p && p.placeholder && { placeholder: p.placeholder }) };
+          flow.state.prompt = {
+            type: p.type,
+            message: p.message,
+            ...("placeholder" in p && p.placeholder && { placeholder: p.placeholder }),
+          };
           flow.pending = {
             resolve: (v) => {
               clear();

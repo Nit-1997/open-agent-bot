@@ -33,7 +33,10 @@ export function Onboarding({ models, onDone }: { models: ModelList | null; onDon
         <div id="onboarding-card" key={step} className="w-full animate-rise rounded-[22px] border border-border bg-bg p-6 sm:p-8">
           <div id="onboarding-top" className="flex items-center justify-between">
             <span id="onboarding-orb" aria-hidden="true" className="orb h-9 w-9 animate-breathe" />
-            <span id="onboarding-step" className="eyebrow">{`Step ${String(step + 1).padStart(2, "0")} / ${String(STEPS.length).padStart(2, "0")}`}</span>
+            <span
+              id="onboarding-step"
+              className="eyebrow"
+            >{`Step ${String(step + 1).padStart(2, "0")} / ${String(STEPS.length).padStart(2, "0")}`}</span>
           </div>
           <h1 id="onboarding-title" className="mt-8 font-display text-[40px] leading-[1.08] text-text-primary">
             {STEPS[step].title}
@@ -45,11 +48,22 @@ export function Onboarding({ models, onDone }: { models: ModelList | null; onDon
             {step === 0 && <NameField id="onboarding-name" value={draft} onChange={setDraft} autoFocus />}
             {step === 1 && <HomeField id="onboarding-home" value={draft} onChange={setDraft} autoFocus />}
             {step === 2 && <InterestsField id="onboarding-interests" value={draft} onChange={setDraft} />}
-            {step === 3 && <ModelOptions id="onboarding-model" models={models} value={draft.defaultModel} onChange={(id) => setDraft({ ...draft, defaultModel: id })} />}
+            {step === 3 && (
+              <ModelOptions
+                id="onboarding-model"
+                models={models}
+                value={draft.defaultModel}
+                onChange={(id) => setDraft({ ...draft, defaultModel: id })}
+              />
+            )}
           </div>
           <div id="onboarding-progress" className="mt-10 flex gap-1.5" aria-hidden="true">
             {STEPS.map((_, i) => (
-              <span id={`onboarding-progress-${i}`} key={i} className={`h-1 flex-1 rounded-full transition ${i <= step ? "bg-charcoal" : "bg-surface-accent"}`} />
+              <span
+                id={`onboarding-progress-${i}`}
+                key={i}
+                className={`h-1 flex-1 rounded-full transition ${i <= step ? "bg-charcoal" : "bg-surface-accent"}`}
+              />
             ))}
           </div>
           <div id="onboarding-actions" className="mt-6 flex items-center justify-between">

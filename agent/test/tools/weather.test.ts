@@ -39,7 +39,12 @@ describe("weather", () => {
     expect(data.kind).toBe("weather");
     const widget = renderData(data);
     expect(validateWidget(widget)).toMatchObject({ ok: true });
-    expect(widget).toMatchObject({ location: "Pune, India", units: "metric", current: { temp: 27.4 }, days: [{ condition: "Rain", precipChance: 60 }, {}] });
+    expect(widget).toMatchObject({
+      location: "Pune, India",
+      units: "metric",
+      current: { temp: 27.4 },
+      days: [{ condition: "Rain", precipChance: 60 }, {}],
+    });
     const fc = new URL(f.calls[1]);
     expect(fc.searchParams.get("forecast_days")).toBe("2");
     expect(fc.searchParams.get("timezone")).toBe("auto");
@@ -67,7 +72,13 @@ describe("weather", () => {
   describe("specific dates", () => {
     const today = () => "2026-10-27";
     const exec = (f: typeof fetch, params: Record<string, unknown>) =>
-      weatherTool({ fetch: f, today, defaultUnits: "imperial" }).execute("c", { location: "Las Vegas", ...params } as never, undefined, undefined, {} as never);
+      weatherTool({ fetch: f, today, defaultUnits: "imperial" }).execute(
+        "c",
+        { location: "Las Vegas", ...params } as never,
+        undefined,
+        undefined,
+        {} as never,
+      );
 
     it("asks the forecast for exactly those dates when they are within 16 days", async () => {
       const f = routes();
@@ -113,10 +124,34 @@ describe("weather", () => {
         [/geocoding-api/, () => geo.clone()],
         [
           /archive-api.*start_date=2025/,
-          () => json({ daily: { time: ["2025-11-25", "2025-11-26"], temperature_2m_max: [60, null], temperature_2m_min: [40, null], precipitation_sum: [0, null], weather_code: [0, null] } }),
+          () =>
+            json({
+              daily: {
+                time: ["2025-11-25", "2025-11-26"],
+                temperature_2m_max: [60, null],
+                temperature_2m_min: [40, null],
+                precipitation_sum: [0, null],
+                weather_code: [0, null],
+              },
+            }),
         ],
-        [/archive-api.*start_date=2024/, () => json({ daily: { time: ["2024-11-25"], temperature_2m_max: [62], temperature_2m_min: [42], precipitation_sum: [0], weather_code: [0] } })],
-        [/archive-api.*start_date=2023/, () => json({ daily: { time: [], temperature_2m_max: [], temperature_2m_min: [], precipitation_sum: [], weather_code: [] } })],
+        [
+          /archive-api.*start_date=2024/,
+          () =>
+            json({
+              daily: {
+                time: ["2024-11-25"],
+                temperature_2m_max: [62],
+                temperature_2m_min: [42],
+                precipitation_sum: [0],
+                weather_code: [0],
+              },
+            }),
+        ],
+        [
+          /archive-api.*start_date=2023/,
+          () => json({ daily: { time: [], temperature_2m_max: [], temperature_2m_min: [], precipitation_sum: [], weather_code: [] } }),
+        ],
       ]);
       const r = await exec(f, { start_date: "2026-11-25", end_date: "2026-11-26" });
       const days = (r.details as { data: { days: unknown[] } }).data.days;

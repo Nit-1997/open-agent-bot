@@ -3,7 +3,13 @@ import { createArtifactTool, leadsWithPicture } from "../../src/tools/createArti
 import { musicListsToCards, showUiTool } from "../../src/tools/showWidget.js";
 
 const run = (tool: { execute: unknown }, params: unknown) =>
-  (tool.execute as (...a: unknown[]) => Promise<{ content: { text: string }[]; details: Record<string, unknown>; isError?: boolean }>)("c", params, undefined, undefined, {});
+  (tool.execute as (...a: unknown[]) => Promise<{ content: { text: string }[]; details: Record<string, unknown>; isError?: boolean }>)(
+    "c",
+    params,
+    undefined,
+    undefined,
+    {},
+  );
 
 describe("music lists become picture cards", () => {
   it("turns a list of Spotify playlists into square cards with a source", () => {
@@ -30,7 +36,12 @@ describe("music lists become picture cards", () => {
     const tool = showUiTool({ findImage: async (name) => `https://img.example/${encodeURIComponent(name)}.jpg`, isSourced: () => false });
     const res = await run(tool, {
       title: "Diwali playlists",
-      blocks: [{ type: "list", items: [{ title: "Diwali Party", url: "https://open.spotify.com/playlist/1" }, { title: "Bollywood Hits playlist" }] }],
+      blocks: [
+        {
+          type: "list",
+          items: [{ title: "Diwali Party", url: "https://open.spotify.com/playlist/1" }, { title: "Bollywood Hits playlist" }],
+        },
+      ],
     });
     const widget = res.details.widget as { blocks: { type: string; items: { image?: string }[] }[] };
     expect(widget.blocks[0].type).toBe("cards");
@@ -51,11 +62,19 @@ describe("reports lead with a picture", () => {
 
   it("copies the first picture up as the hero when a product report has pictures lower down", async () => {
     let saved = "";
-    const tool = createArtifactTool({ save: async (_t: string, html: string) => {
-        saved = html;
-        return { id: "a1" };
-      } } as never, images);
-    const res = await run(tool, { title: "Miata", html: `<header class="hero"><h1>Miata</h1></header>${filler}<article class="option">${pic}</article>` });
+    const tool = createArtifactTool(
+      {
+        save: async (_t: string, html: string) => {
+          saved = html;
+          return { id: "a1" };
+        },
+      } as never,
+      images,
+    );
+    const res = await run(tool, {
+      title: "Miata",
+      html: `<header class="hero"><h1>Miata</h1></header>${filler}<article class="option">${pic}</article>`,
+    });
     expect(res.isError).toBeUndefined();
     expect(saved.indexOf("miata.jpg")).toBeLessThan(saved.indexOf("xxxx"));
   });

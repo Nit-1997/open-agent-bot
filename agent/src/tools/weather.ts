@@ -32,7 +32,13 @@ type Forecast = {
 };
 
 type Archive = {
-  daily: { time: string[]; temperature_2m_max: number[]; temperature_2m_min: number[]; precipitation_sum: number[]; weather_code: number[] };
+  daily: {
+    time: string[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+    precipitation_sum: number[];
+    weather_code: number[];
+  };
 };
 
 const FORECAST_DAYS = 16;
@@ -69,8 +75,15 @@ function pastDays(archives: Archive[], date: string): PastDay[] {
   const md = date.slice(5);
   return archives.flatMap((a) => {
     const i = a.daily.time.findIndex((t) => t.slice(5) === md);
-    const day = { hi: a.daily.temperature_2m_max[i], lo: a.daily.temperature_2m_min[i], rain: a.daily.precipitation_sum[i], code: a.daily.weather_code[i] };
-    return i >= 0 && finite(day.hi) && finite(day.lo) ? [{ ...day, rain: finite(day.rain) ? day.rain : 0, code: finite(day.code) ? day.code : -1 }] : [];
+    const day = {
+      hi: a.daily.temperature_2m_max[i],
+      lo: a.daily.temperature_2m_min[i],
+      rain: a.daily.precipitation_sum[i],
+      code: a.daily.weather_code[i],
+    };
+    return i >= 0 && finite(day.hi) && finite(day.lo)
+      ? [{ ...day, rain: finite(day.rain) ? day.rain : 0, code: finite(day.code) ? day.code : -1 }]
+      : [];
   });
 }
 
@@ -155,7 +168,9 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
           };
           const summary = [
             `Typical weather (not a forecast) for ${location}, ${range.start} to ${range.end}, averaged over ${data.basis}. A real forecast is only available within ${FORECAST_DAYS} days.`,
-            ...data.days.map((d) => `${d.date}: ${d.low}–${d.high}${deg}, usually ${d.condition}, rain in ${d.precipChance}% of past years`),
+            ...data.days.map(
+              (d) => `${d.date}: ${d.low}–${d.high}${deg}, usually ${d.condition}, rain in ${d.precipChance}% of past years`,
+            ),
           ].join("\n");
           return ok(summary, { data });
         }

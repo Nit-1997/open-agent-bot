@@ -2,7 +2,15 @@
 
 import { airlineHost } from "@/lib/airlines";
 import { Favicon } from "../chat/Favicon";
-import { type FlightPrefs, LAYOVER_OPTIONS, type LayoverPref, matchesPrefs, rankAirports, TIME_OPTIONS, type TimeBucket } from "@shared/flights";
+import {
+  type FlightPrefs,
+  LAYOVER_OPTIONS,
+  type LayoverPref,
+  matchesPrefs,
+  rankAirports,
+  TIME_OPTIONS,
+  type TimeBucket,
+} from "@shared/flights";
 import type { FlightList as FlightListData } from "@shared/widgets";
 import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
@@ -83,7 +91,12 @@ function Filters({ id, prefs, onChange }: { id: string; prefs: FlightPrefs; onCh
 }
 
 function Badge({ id, tone, children }: { id: string; tone: "agent" | "good" | "plain"; children: React.ReactNode }) {
-  const cls = tone === "agent" ? "bg-charcoal text-on-charcoal" : tone === "good" ? "bg-success-bg text-success-fg" : "bg-surface-accent text-text-secondary";
+  const cls =
+    tone === "agent"
+      ? "bg-charcoal text-on-charcoal"
+      : tone === "good"
+        ? "bg-success-bg text-success-fg"
+        : "bg-surface-accent text-text-secondary";
   return (
     <span id={id} className={`rounded-full px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold ${cls}`}>
       {children}
@@ -110,7 +123,11 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
 
   return (
     <section id={id} className="w-full overflow-hidden rounded-2xl border border-border bg-paper">
-      <header id={`${id}-header`} style={{ background: "var(--accent-gradient)" }} className="flex items-center justify-between gap-3 px-4 py-3.5 text-text-primary">
+      <header
+        id={`${id}-header`}
+        style={{ background: "var(--accent-gradient)" }}
+        className="flex items-center justify-between gap-3 px-4 py-3.5 text-text-primary"
+      >
         <div id={`${id}-route`} className="min-w-0">
           <h3 id={`${id}-title`} className="truncate text-lg font-semibold">{`${widget.from} → ${widget.to}`}</h3>
           <p id={`${id}-subtitle`} className="text-xs text-text-secondary">
@@ -141,7 +158,11 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
               const aid = `${id}-airport-${i}`;
               if (a.status === "failed") {
                 return (
-                  <li id={aid} key={a.code} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm text-text-muted">
+                  <li
+                    id={aid}
+                    key={a.code}
+                    className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm text-text-muted"
+                  >
                     <span id={`${aid}-code`} className="font-mono font-medium">
                       {a.code}
                     </span>
@@ -225,7 +246,10 @@ export function FlightList({ toolCallId, widget, locale }: { toolCallId: string;
               <li id={fid} key={i} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 px-4 py-2.5">
                 <div id={`${fid}-times`} className="flex items-baseline gap-2">
                   {airports && f.origin && (
-                    <span id={`${fid}-origin`} className="rounded-md bg-surface-accent px-1.5 py-0.5 font-mono text-[11px] sm:text-[10px] font-medium text-text-secondary">
+                    <span
+                      id={`${fid}-origin`}
+                      className="rounded-md bg-surface-accent px-1.5 py-0.5 font-mono text-[11px] sm:text-[10px] font-medium text-text-secondary"
+                    >
                       {f.origin}
                     </span>
                   )}

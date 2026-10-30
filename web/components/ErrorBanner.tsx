@@ -6,12 +6,7 @@ const TEXT: Record<RunErrorKind, string> = {
   UNKNOWN: "Something went wrong talking to the agent.",
 };
 
-export function ErrorBanner(props: {
-  kind: RunErrorKind;
-  message?: string;
-  onRetry: () => void;
-  onDismiss: () => void;
-}) {
+export function ErrorBanner(props: { kind: RunErrorKind; message?: string; onRetry: () => void; onDismiss: () => void }) {
   const showRetry = props.kind === "MODEL_ERROR" || props.kind === "UNKNOWN";
   return (
     <div
@@ -24,7 +19,12 @@ export function ErrorBanner(props: {
         {props.message ? ` ${props.message}` : ""}
       </span>
       {showRetry && (
-        <button id="error-banner-retry" type="button" onClick={props.onRetry} className="rounded-full bg-charcoal px-3 py-1 text-xs font-medium text-on-charcoal">
+        <button
+          id="error-banner-retry"
+          type="button"
+          onClick={props.onRetry}
+          className="rounded-full bg-charcoal px-3 py-1 text-xs font-medium text-on-charcoal"
+        >
           Retry
         </button>
       )}

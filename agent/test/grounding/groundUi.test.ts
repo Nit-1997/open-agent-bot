@@ -13,7 +13,12 @@ const card = (blocks: UiWidget["blocks"]): UiWidget => ({ kind: "ui", title: "Di
 
 describe("groundUi", () => {
   it("leaves a fully sourced card untouched", () => {
-    const w = card([{ type: "list", items: [{ title: "Diya 12ct", value: "$6.99", badge: "In stock", url: "https://www.target.com/p/diya/-/A-84311898" }] }]);
+    const w = card([
+      {
+        type: "list",
+        items: [{ title: "Diya 12ct", value: "$6.99", badge: "In stock", url: "https://www.target.com/p/diya/-/A-84311898" }],
+      },
+    ]);
     expect(groundUi(w, evidence())).toEqual(w);
   });
 
@@ -29,7 +34,13 @@ describe("groundUi", () => {
   it("removes links that no source contained", () => {
     const w = card([
       { type: "list", items: [{ title: "Made-up product", url: "https://www.target.com/p/fake/-/A-1" }] },
-      { type: "links", items: [{ label: "Target", url: "https://www.target.com/p/diya/-/A-84311898" }, { label: "Fake", url: "https://fake.example/x" }] },
+      {
+        type: "links",
+        items: [
+          { label: "Target", url: "https://www.target.com/p/diya/-/A-84311898" },
+          { label: "Fake", url: "https://fake.example/x" },
+        ],
+      },
       { type: "links", items: [{ label: "Fake 2", url: "https://fake.example/y" }] },
     ]);
     const g = groundUi(w, evidence());
@@ -46,7 +57,12 @@ describe("groundUi", () => {
       {
         type: "cards",
         items: [
-          { title: "Diya 12ct", price: "$6.99", image: "https://target.scene7.com/is/image/Target/diya?wid=800", url: "https://www.target.com/p/diya/-/A-84311898" },
+          {
+            title: "Diya 12ct",
+            price: "$6.99",
+            image: "https://target.scene7.com/is/image/Target/diya?wid=800",
+            url: "https://www.target.com/p/diya/-/A-84311898",
+          },
           { title: "Lantern", price: "$5.99", image: "https://cdn.fake.example/lantern.jpg", url: "https://www.target.com/p/fake/-/A-2" },
         ],
       },
@@ -55,7 +71,12 @@ describe("groundUi", () => {
     expect(g.blocks[0]).toEqual({
       type: "cards",
       items: [
-        { title: "Diya 12ct", price: "$6.99", image: "https://target.scene7.com/is/image/Target/diya?wid=800", url: "https://www.target.com/p/diya/-/A-84311898" },
+        {
+          title: "Diya 12ct",
+          price: "$6.99",
+          image: "https://target.scene7.com/is/image/Target/diya?wid=800",
+          url: "https://www.target.com/p/diya/-/A-84311898",
+        },
         { title: "Lantern", price: "$5.99" },
       ],
     });
@@ -66,7 +87,13 @@ describe("groundUi", () => {
   it("drops an image block whose picture no source returned", () => {
     const e = evidence();
     e.add("image: https://upload.wikimedia.org/belem.jpg");
-    const g = groundUi(card([{ type: "image", url: "https://upload.wikimedia.org/belem.jpg", caption: "Belém" }, { type: "image", url: "https://made.up/x.jpg" }]), e);
+    const g = groundUi(
+      card([
+        { type: "image", url: "https://upload.wikimedia.org/belem.jpg", caption: "Belém" },
+        { type: "image", url: "https://made.up/x.jpg" },
+      ]),
+      e,
+    );
     expect(g.blocks).toEqual([{ type: "image", url: "https://upload.wikimedia.org/belem.jpg", caption: "Belém" }]);
   });
 

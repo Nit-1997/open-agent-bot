@@ -26,8 +26,16 @@ function fakeFetch(calls: string[]) {
     if (url.startsWith("https://itunes.apple.com/search")) {
       return json({
         results: [
-          { collectionName: "Thinking Thunderz Live", artistName: "Random Band", artworkUrl100: "https://is1.mzstatic.com/random/100x100bb.jpg" },
-          { collectionName: "Bollywood Diwali Hits", artistName: "Various Artists", artworkUrl100: "https://is1.mzstatic.com/diwali/100x100bb.jpg" },
+          {
+            collectionName: "Thinking Thunderz Live",
+            artistName: "Random Band",
+            artworkUrl100: "https://is1.mzstatic.com/random/100x100bb.jpg",
+          },
+          {
+            collectionName: "Bollywood Diwali Hits",
+            artistName: "Various Artists",
+            artworkUrl100: "https://is1.mzstatic.com/diwali/100x100bb.jpg",
+          },
         ],
       });
     }
@@ -43,7 +51,10 @@ describe("music cover art", () => {
 
   it("uses Spotify's official cover when the card links to a playlist", async () => {
     const calls: string[] = [];
-    const cover = await musicCover({ country: "US", fetch: fakeFetch(calls) })({ title: "Diwali Party", url: "https://open.spotify.com/playlist/37i9dQ" });
+    const cover = await musicCover({ country: "US", fetch: fakeFetch(calls) })({
+      title: "Diwali Party",
+      url: "https://open.spotify.com/playlist/37i9dQ",
+    });
     expect(cover).toBe("https://image-cdn.scdn.co/diwali.jpg");
     expect(calls[0]).toContain("oembed?url=https%3A%2F%2Fopen.spotify.com%2Fplaylist%2F37i9dQ");
   });
@@ -55,7 +66,10 @@ describe("music cover art", () => {
 
   it("lets Jev pick the album whose cover depicts the card", async () => {
     const { judge, seen } = choosingJudge((o) => Object.keys(o).find((k) => o[k].includes("Diwali")));
-    const cover = await musicCover({ country: "US", fetch: fakeFetch([]), judge })({ title: "Festival of Lights mix", subtitle: "Bollywood" });
+    const cover = await musicCover({ country: "US", fetch: fakeFetch([]), judge })({
+      title: "Festival of Lights mix",
+      subtitle: "Bollywood",
+    });
     expect(cover).toBe("https://is1.mzstatic.com/diwali/600x600bb.jpg");
     expect(Object.values(seen[0])).toEqual(["Thinking Thunderz Live by Random Band", "Bollywood Diwali Hits by Various Artists"]);
   });
@@ -63,7 +77,9 @@ describe("music cover art", () => {
   it("tries the shorter queries when Jev says none fit, and gives no picture if none ever do", async () => {
     const calls: string[] = [];
     const { judge, seen } = choosingJudge(() => null);
-    expect(await musicCover({ country: "US", fetch: fakeFetch(calls), judge })({ title: "Happy Diwali Bollywood Party Songs" })).toBeUndefined();
+    expect(
+      await musicCover({ country: "US", fetch: fakeFetch(calls), judge })({ title: "Happy Diwali Bollywood Party Songs" }),
+    ).toBeUndefined();
     expect(seen.length).toBe(coverQueries("Happy Diwali Bollywood Party Songs").length);
   });
 
@@ -80,26 +96,57 @@ describe("music cover art", () => {
       const url = new URL(String(input));
       calls.push(url.searchParams.get("entity") ?? "");
       if (url.searchParams.get("entity") === "song") {
-        return json({ results: [{ trackName: "Take On Me", artistName: "a-ha", collectionName: "Hunting High and Low", artworkUrl100: "https://is1.mzstatic.com/hhl/100x100bb.jpg" }] });
+        return json({
+          results: [
+            {
+              trackName: "Take On Me",
+              artistName: "a-ha",
+              collectionName: "Hunting High and Low",
+              artworkUrl100: "https://is1.mzstatic.com/hhl/100x100bb.jpg",
+            },
+          ],
+        });
       }
-      return json({ results: [{ collectionName: "Take On Me (Epic Orchestral Version)", artistName: "Alala", artworkUrl100: "https://is1.mzstatic.com/alala/100x100bb.jpg" }] });
+      return json({
+        results: [
+          {
+            collectionName: "Take On Me (Epic Orchestral Version)",
+            artistName: "Alala",
+            artworkUrl100: "https://is1.mzstatic.com/alala/100x100bb.jpg",
+          },
+        ],
+      });
     }) as typeof fetch;
     const { judge } = choosingJudge((o) => (Object.values(o)[0].includes("Hunting") ? "c0" : null));
-    expect(await musicCover({ country: "US", fetch: f, judge })({ title: "Take On Me", subtitle: "a-ha" })).toBe("https://is1.mzstatic.com/hhl/600x600bb.jpg");
+    expect(await musicCover({ country: "US", fetch: f, judge })({ title: "Take On Me", subtitle: "a-ha" })).toBe(
+      "https://is1.mzstatic.com/hhl/600x600bb.jpg",
+    );
     expect(calls.at(-1)).toBe("song");
   });
 
   it("falls back to word matching when Jev is unavailable or fails", async () => {
     const { judge } = choosingJudge(() => undefined);
-    expect(await musicCover({ country: "US", fetch: fakeFetch([]), judge })({ title: "Bollywood Diwali Hits playlist" })).toBe("https://is1.mzstatic.com/diwali/600x600bb.jpg");
+    expect(await musicCover({ country: "US", fetch: fakeFetch([]), judge })({ title: "Bollywood Diwali Hits playlist" })).toBe(
+      "https://is1.mzstatic.com/diwali/600x600bb.jpg",
+    );
   });
 
   it("searches with a cleaned name, then just the core words", () => {
-    expect(coverQueries("Happy Diwali! Bollywood Party Songs (Spotify editorial)")).toEqual(["Happy Diwali Bollywood Party Songs", "happy diwali bollywood", "happy diwali", "happy"]);
+    expect(coverQueries("Happy Diwali! Bollywood Party Songs (Spotify editorial)")).toEqual([
+      "Happy Diwali Bollywood Party Songs",
+      "happy diwali bollywood",
+      "happy diwali",
+      "happy",
+    ]);
   });
 
   it("gives no picture rather than a weak match", () => {
-    expect(confidentAlbum([{ collectionName: "Thinking Thunderz Live", artistName: "Random Band", artworkUrl100: "x" }], "Happy Diwali Bollywood Party Songs")).toBeUndefined();
+    expect(
+      confidentAlbum(
+        [{ collectionName: "Thinking Thunderz Live", artistName: "Random Band", artworkUrl100: "x" }],
+        "Happy Diwali Bollywood Party Songs",
+      ),
+    ).toBeUndefined();
   });
 
   it("show_ui fills music cards from cover art, never the general image search", async () => {
@@ -112,10 +159,26 @@ describe("music cover art", () => {
       findMusicArt: musicCover({ country: "US", fetch: fakeFetch([]) }),
       isSourced: () => false,
     });
-    const res = await (tool.execute as (...a: unknown[]) => Promise<{ details: { widget: { blocks: { items: { image?: string }[] }[] } } }>)("c", {
-      title: "Diwali playlists",
-      blocks: [{ type: "list", items: [{ title: "Diwali Party", url: "https://open.spotify.com/playlist/37i9dQ" }, { title: "Happy Diwali Bollywood Party Songs playlist" }] }],
-    }, undefined, undefined, {});
+    const res = await (
+      tool.execute as (...a: unknown[]) => Promise<{ details: { widget: { blocks: { items: { image?: string }[] }[] } } }>
+    )(
+      "c",
+      {
+        title: "Diwali playlists",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              { title: "Diwali Party", url: "https://open.spotify.com/playlist/37i9dQ" },
+              { title: "Happy Diwali Bollywood Party Songs playlist" },
+            ],
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      {},
+    );
     const [spotify, named] = res.details.widget.blocks[0].items;
     expect(spotify.image).toBe("https://image-cdn.scdn.co/diwali.jpg");
     expect(named.image).toBe("https://is1.mzstatic.com/diwali/600x600bb.jpg");
@@ -123,11 +186,35 @@ describe("music cover art", () => {
   });
 
   it("prefers the real cover over a picture the agent picked for a music card", async () => {
-    const tool = showUiTool({ findImage: async () => undefined, findMusicArt: musicCover({ country: "US", fetch: fakeFetch([]) }), isSourced: () => true });
-    const res = await (tool.execute as (...a: unknown[]) => Promise<{ details: { widget: { blocks: { items: { image?: string }[] }[] } } }>)("c", {
-      title: "Diwali",
-      blocks: [{ type: "cards", items: [{ title: "Diwali Party", source: "Spotify", url: "https://open.spotify.com/playlist/37i9dQ", image: "https://encrypted-tbn0.gstatic.com/images?q=logo" }] }],
-    }, undefined, undefined, {});
+    const tool = showUiTool({
+      findImage: async () => undefined,
+      findMusicArt: musicCover({ country: "US", fetch: fakeFetch([]) }),
+      isSourced: () => true,
+    });
+    const res = await (
+      tool.execute as (...a: unknown[]) => Promise<{ details: { widget: { blocks: { items: { image?: string }[] }[] } } }>
+    )(
+      "c",
+      {
+        title: "Diwali",
+        blocks: [
+          {
+            type: "cards",
+            items: [
+              {
+                title: "Diwali Party",
+                source: "Spotify",
+                url: "https://open.spotify.com/playlist/37i9dQ",
+                image: "https://encrypted-tbn0.gstatic.com/images?q=logo",
+              },
+            ],
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      {},
+    );
     expect(res.details.widget.blocks[0].items[0].image).toBe("https://image-cdn.scdn.co/diwali.jpg");
   });
 });

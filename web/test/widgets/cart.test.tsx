@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { Cart } from "@shared/widgets";
 import { CartCard } from "@/components/widgets/CartCard";
 
-const pick = (title: string, price: number, size?: string) => ({ title, price, priceText: `$${price.toFixed(2)}`, url: `https://www.shipt.com/p/${encodeURIComponent(title)}`, image: `https://img.shipt.com/${encodeURIComponent(title)}.webp`, ...(size && { size }) });
+const pick = (title: string, price: number, size?: string) => ({
+  title,
+  price,
+  priceText: `$${price.toFixed(2)}`,
+  url: `https://www.shipt.com/p/${encodeURIComponent(title)}`,
+  image: `https://img.shipt.com/${encodeURIComponent(title)}.webp`,
+  ...(size && { size }),
+});
 
 const cart: Cart = {
   kind: "cart",
@@ -19,7 +26,13 @@ const cart: Cart = {
         { query: "cilantro", qty: 1, picks: [] },
       ],
     },
-    { name: "Safeway (Shipt)", total: 6.5, url: "https://www.shipt.com/", missing: [], items: [{ query: "rice", qty: 1, picks: [pick("Signature Rice 2 lb", 3.5)] }] },
+    {
+      name: "Safeway (Shipt)",
+      total: 6.5,
+      url: "https://www.shipt.com/",
+      missing: [],
+      items: [{ query: "rice", qty: 1, picks: [pick("Signature Rice 2 lb", 3.5)] }],
+    },
   ],
 };
 
@@ -31,7 +44,10 @@ describe("CartCard", () => {
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(["Target (Shipt)$4.37Best value", "Safeway (Shipt)$6.50"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("link", { name: "Good & Gather Rice 32oz" })).toHaveAttribute("href", "https://www.shipt.com/p/Good%20%26%20Gather%20Rice%2032oz");
+    expect(screen.getByRole("link", { name: "Good & Gather Rice 32oz" })).toHaveAttribute(
+      "href",
+      "https://www.shipt.com/p/Good%20%26%20Gather%20Rice%2032oz",
+    );
     expect(screen.getByRole("img", { name: "Good & Gather Rice 32oz" })).toBeInTheDocument();
     expect(screen.getByText("Not found: cilantro")).toBeInTheDocument();
     expect(subtotal()).toBe("$4.37");
@@ -123,7 +139,11 @@ describe("CartCard edits", () => {
     fireEvent.click(within(rice).getByRole("button", { name: "Increase quantity" }));
     fireEvent.click(within(rice).getByRole("button", { name: "Swap" }));
     fireEvent.click(within(rice).getByRole("button", { name: /Instant Rice 14oz/ }));
-    expect(onEdit).toHaveBeenLastCalledWith({ removed: ["black beans"], qty: { rice: 2 }, picks: { "Target (Shipt)": { rice: "Instant Rice 14oz" } } });
+    expect(onEdit).toHaveBeenLastCalledWith({
+      removed: ["black beans"],
+      qty: { rice: 2 },
+      picks: { "Target (Shipt)": { rice: "Instant Rice 14oz" } },
+    });
   });
 
   it("marks an older cart as replaced and locks it", () => {
@@ -137,7 +157,16 @@ describe("CartCard currency", () => {
   it("shows totals in the store's currency", () => {
     const inr: Cart = {
       kind: "cart",
-      stores: [{ name: "Amazon", total: 350, currency: "INR", url: "https://www.amazon.in/", missing: [], items: [{ query: "rice", qty: 1, picks: [{ title: "Rice 1kg", price: 350, priceText: "₹350", url: "https://www.amazon.in/r" }] }] }],
+      stores: [
+        {
+          name: "Amazon",
+          total: 350,
+          currency: "INR",
+          url: "https://www.amazon.in/",
+          missing: [],
+          items: [{ query: "rice", qty: 1, picks: [{ title: "Rice 1kg", price: 350, priceText: "₹350", url: "https://www.amazon.in/r" }] }],
+        },
+      ],
     };
     render(<CartCard toolCallId="inr" widget={inr} locale="en-IN" />);
     expect(screen.getAllByRole("tab")[0].textContent).toContain("₹350.00");

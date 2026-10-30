@@ -161,7 +161,10 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
                           </span>
                         )}
                         {it.badge && (
-                          <span id={`${iid}-badge`} className="rounded-full bg-surface px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-text-secondary">
+                          <span
+                            id={`${iid}-badge`}
+                            className="rounded-full bg-surface px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-text-secondary"
+                          >
                             {m(`${iid}-badge`, it.badge)}
                           </span>
                         )}
@@ -188,23 +191,23 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
           )}
           <Collapsible id={id} items={block.items}>
             {(items) => (
-                <ul id={`${id}-items`} className="mt-1 space-y-1">
-                  {items.map((it, i) => (
-                    <li id={`${id}-${i}`} key={i}>
-                      <label id={`${id}-${i}-label`} className="flex items-start gap-2 text-sm">
-                        <input id={`${id}-${i}-check`} type="checkbox" className="mt-0.5 accent-mist-500" />
-                        <span id={`${id}-${i}-text`}>
-                          {m(`${id}-${i}-text`, it.text)}
-                          {it.note && (
-                            <span id={`${id}-${i}-note`} className="ml-1 text-xs text-text-muted">
-                              {m(`${id}-${i}-note`, it.note)}
-                            </span>
-                          )}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+              <ul id={`${id}-items`} className="mt-1 space-y-1">
+                {items.map((it, i) => (
+                  <li id={`${id}-${i}`} key={i}>
+                    <label id={`${id}-${i}-label`} className="flex items-start gap-2 text-sm">
+                      <input id={`${id}-${i}-check`} type="checkbox" className="mt-0.5 accent-mist-500" />
+                      <span id={`${id}-${i}-text`}>
+                        {m(`${id}-${i}-text`, it.text)}
+                        {it.note && (
+                          <span id={`${id}-${i}-note`} className="ml-1 text-xs text-text-muted">
+                            {m(`${id}-${i}-note`, it.note)}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
             )}
           </Collapsible>
         </div>
@@ -255,11 +258,15 @@ export function UiCard({ toolCallId, widget }: { toolCallId: string; widget: UiW
       {(flags.length > 0 || removed > 0) && (
         <footer id={`${id}-grounding`} className="mt-3 border-t border-border pt-2 text-xs text-warn-fg">
           {flags.length > 0 && (
-            <p id={`${id}-grounding-unverified`}>Values marked with ? weren&apos;t found in the sources I read. Check the store before relying on them.</p>
+            <p id={`${id}-grounding-unverified`}>
+              Values marked with ? weren&apos;t found in the sources I read. Check the store before relying on them.
+            </p>
           )}
           {removed > 0 && (
             <p id={`${id}-grounding-links`}>
-              {removed === 1 ? "1 link that didn't come from a source was removed." : `${removed} links that didn't come from a source were removed.`}
+              {removed === 1
+                ? "1 link that didn't come from a source was removed."
+                : `${removed} links that didn't come from a source were removed.`}
             </p>
           )}
         </footer>

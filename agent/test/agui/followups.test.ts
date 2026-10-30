@@ -45,18 +45,33 @@ describe("follow-up line", () => {
 describe("translator follow-ups", () => {
   const assistantStart = { type: "message_start", message: { role: "assistant" } } as unknown as PiEvent;
   const assistantEnd = { type: "message_end", message: { role: "assistant" } } as unknown as PiEvent;
-  const delta = (d: string) => ({ type: "message_update", message: { role: "assistant" }, assistantMessageEvent: { type: "text_delta", delta: d } }) as unknown as PiEvent;
+  const delta = (d: string) =>
+    ({
+      type: "message_update",
+      message: { role: "assistant" },
+      assistantMessageEvent: { type: "text_delta", delta: d },
+    }) as unknown as PiEvent;
   const translate = (events: PiEvent[]) => {
     let n = 0;
     const t = createTranslator({ newId: () => `id${++n}`, render: () => null });
     const out = [...events.flatMap((e) => t.translate(e)), ...t.finish()];
-    const text = out.filter((e) => e.type === EventType.TEXT_MESSAGE_CONTENT).map((e) => (e as unknown as { delta: string }).delta).join("");
-    const widgets = out.filter((e) => e.type === EventType.TOOL_CALL_ARGS).map((e) => JSON.parse((e as unknown as { delta: string }).delta).widget);
+    const text = out
+      .filter((e) => e.type === EventType.TEXT_MESSAGE_CONTENT)
+      .map((e) => (e as unknown as { delta: string }).delta)
+      .join("");
+    const widgets = out
+      .filter((e) => e.type === EventType.TOOL_CALL_ARGS)
+      .map((e) => JSON.parse((e as unknown as { delta: string }).delta).widget);
     return { text, widgets, answered: t.answered(), types: out.map((e) => e.type) };
   };
 
   it("shows the answer as text and the tag as follow-up buttons after it", () => {
-    const r = translate([assistantStart, delta("Top 3: Valletta, Valencia, Palermo.\n<follow"), delta("ups>Flights | Hotels</followups>"), assistantEnd]);
+    const r = translate([
+      assistantStart,
+      delta("Top 3: Valletta, Valencia, Palermo.\n<follow"),
+      delta("ups>Flights | Hotels</followups>"),
+      assistantEnd,
+    ]);
     expect(r.text).toBe("Top 3: Valletta, Valencia, Palermo.\n");
     expect(r.widgets).toEqual([{ kind: "followups", replies: ["Flights", "Hotels"] }]);
     expect(r.types.indexOf(EventType.TEXT_MESSAGE_END)).toBeLessThan(r.types.indexOf(EventType.TOOL_CALL_START));

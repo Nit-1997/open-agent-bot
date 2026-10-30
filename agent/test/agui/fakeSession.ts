@@ -26,9 +26,12 @@ export function fakeSession(script: Script) {
     async prompt(text: string) {
       fake.prompts.push(text);
       aborted = false;
-      await script((e) => {
-        for (const l of listeners) l(e);
-      }, { aborted: () => aborted });
+      await script(
+        (e) => {
+          for (const l of listeners) l(e);
+        },
+        { aborted: () => aborted },
+      );
     },
     async abort() {
       fake.abortCalls++;
@@ -49,5 +52,9 @@ export const ev = {
   assistantEnd: (stopReason = "stop", errorMessage?: string) =>
     ({ type: "message_end", message: { role: "assistant", stopReason, errorMessage } }) as unknown as PiEvent,
   delta: (d: string) =>
-    ({ type: "message_update", message: { role: "assistant" }, assistantMessageEvent: { type: "text_delta", delta: d } }) as unknown as PiEvent,
+    ({
+      type: "message_update",
+      message: { role: "assistant" },
+      assistantMessageEvent: { type: "text_delta", delta: d },
+    }) as unknown as PiEvent,
 };

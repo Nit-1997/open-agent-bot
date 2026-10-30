@@ -6,7 +6,10 @@ const frame = (e: object) => `data: ${JSON.stringify(e)}\n\n`;
 describe("createSseParser", () => {
   it("parses complete frames", () => {
     const p = createSseParser();
-    expect(p.feed(frame({ type: "RUN_STARTED" }) + frame({ type: "RUN_FINISHED" }))).toEqual([{ type: "RUN_STARTED" }, { type: "RUN_FINISHED" }]);
+    expect(p.feed(frame({ type: "RUN_STARTED" }) + frame({ type: "RUN_FINISHED" }))).toEqual([
+      { type: "RUN_STARTED" },
+      { type: "RUN_FINISHED" },
+    ]);
   });
 
   it("buffers a frame split across chunks, including in the middle of the JSON", () => {

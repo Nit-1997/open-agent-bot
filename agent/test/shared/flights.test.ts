@@ -76,7 +76,11 @@ describe("rankAirports", () => {
   });
 
   it("ranks by fare alone when rides are unknown", () => {
-    const r = rankAirports(airports.map(({ rideOneWay: _r, driveMinutes: _d, ...a }) => a), flights, {});
+    const r = rankAirports(
+      airports.map(({ rideOneWay: _r, driveMinutes: _d, ...a }) => a),
+      flights,
+      {},
+    );
     expect(r[0]).toMatchObject({ code: "SFO", total: 543, bestValue: true });
   });
 });

@@ -9,8 +9,19 @@ import { planTool } from "../../src/tools/plan.js";
 import { workspaceCart, workspaceNote } from "../../src/workspace/cart.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
 
-const target: Store = { id: "target", label: "Target", home: "https://www.target.com/", searchUrl: (q) => `https://www.target.com/s?searchTerm=${q}` };
-const tile = (title: string, price: number): Tile => ({ title, price, priceText: `$${price}`, url: `https://www.target.com/p/${title}`, sponsored: false });
+const target: Store = {
+  id: "target",
+  label: "Target",
+  home: "https://www.target.com/",
+  searchUrl: (q) => `https://www.target.com/s?searchTerm=${q}`,
+};
+const tile = (title: string, price: number): Tile => ({
+  title,
+  price,
+  priceText: `$${price}`,
+  url: `https://www.target.com/p/${title}`,
+  sponsored: false,
+});
 
 const stores: WorkspaceStore[] = [];
 afterEach(() => {
@@ -26,7 +37,14 @@ function setup() {
     return jobs.map((j) => ({ store: j.store, item: j.item, tiles: [tile(j.item.query, 5)] }));
   };
   const cart = workspaceCart(store, "t");
-  const shop = shopTool({ pool: {} as never, threadId: "t", userContext: null, storeFor: (n) => (n === "target" ? target : undefined), cart, search });
+  const shop = shopTool({
+    pool: {} as never,
+    threadId: "t",
+    userContext: null,
+    storeFor: (n) => (n === "target" ? target : undefined),
+    cart,
+    search,
+  });
   const plan = planTool({ store, threadId: "t" });
   const callShop = (p: object) => shop.execute("c", p as never, undefined, undefined, {} as never);
   const callPlan = (p: object) => plan.execute("c", p as never, undefined, undefined, {} as never);
@@ -37,20 +55,36 @@ describe("party follow-up: make it 16 kids", () => {
   it("patches guests and changes only quantities, with no new catalog search", async () => {
     const { store, searches, callShop, callPlan } = setup();
     await callPlan({ action: "set", kind: "event", value: { title: "8th birthday", date: "Nov 14", guests: 12, budget: 300 } });
-    await callShop({ stores: ["target"], items: [{ query: "pizza", qty: 3 }, { query: "plates", qty: 12 }, { query: "cake", qty: 1 }] });
+    await callShop({
+      stores: ["target"],
+      items: [
+        { query: "pizza", qty: 3 },
+        { query: "plates", qty: 12 },
+        { query: "cake", qty: 1 },
+      ],
+    });
     expect(searches).toEqual([["pizza", "plates", "cake"]]);
     const picksBefore = store.get("t", "cart", "main")?.value;
 
     const patched = await callPlan({ action: "patch", kind: "event", ops: [{ op: "replace", path: "/guests", value: 16 }] });
     expect(patched.isError).toBeUndefined();
-    const r = await callShop({ items: [{ query: "pizza", qty: 4 }, { query: "plates", qty: 16 }] });
+    const r = await callShop({
+      items: [
+        { query: "pizza", qty: 4 },
+        { query: "plates", qty: 16 },
+      ],
+    });
 
     expect(r.isError).toBeUndefined();
     expect(searches).toHaveLength(1);
     const event = store.get("t", "event", "main");
     expect(event).toMatchObject({ version: 2, value: { guests: 16, title: "8th birthday", budget: 300 } });
     const cart = store.get("t", "cart", "main")?.value as { items: { query: string; qty: number }[]; picks: unknown };
-    expect(cart.items).toEqual([{ query: "pizza", qty: 4 }, { query: "plates", qty: 16 }, { query: "cake", qty: 1 }]);
+    expect(cart.items).toEqual([
+      { query: "pizza", qty: 4 },
+      { query: "plates", qty: 16 },
+      { query: "cake", qty: 1 },
+    ]);
     expect(cart.picks).toEqual((picksBefore as { picks: unknown }).picks);
     expect(r.details.data).toMatchObject({ kind: "shop" });
   });
@@ -78,7 +112,13 @@ describe("party follow-up: make it 16 kids", () => {
 
   it("persists UI edits to the cart", async () => {
     const { store, callShop } = setup();
-    await callShop({ stores: ["target"], items: [{ query: "pizza", qty: 3 }, { query: "cake", qty: 1 }] });
+    await callShop({
+      stores: ["target"],
+      items: [
+        { query: "pizza", qty: 3 },
+        { query: "cake", qty: 1 },
+      ],
+    });
     workspaceCart(store, "t").applyEdits({ removed: ["cake"], qty: { pizza: 5 } });
     expect((store.get("t", "cart", "main")!.value as { items: unknown }).items).toEqual([{ query: "pizza", qty: 5 }]);
   });

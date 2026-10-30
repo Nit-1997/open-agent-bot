@@ -3,7 +3,14 @@ import { regionFor } from "./region.js";
 
 export type UserProfile = { name?: string; home?: string; interests?: string[]; notes?: string };
 export type Viewport = { width: number; height: number };
-export type UserContext = { timeZone: string; locale: string; localTime: string; model?: string; profile?: UserProfile; viewport?: Viewport };
+export type UserContext = {
+  timeZone: string;
+  locale: string;
+  localTime: string;
+  model?: string;
+  profile?: UserProfile;
+  viewport?: Viewport;
+};
 
 function profileSection(p: UserProfile | undefined): string {
   if (!p) return "";
@@ -45,7 +52,8 @@ Skills: before a task that matches one of these, call load_skill with its name a
 ${skills.map((s) => `- ${s.name}: ${s.description}`).join("\n")}`;
 }
 
-const CONTEXT_TAIL = "Use this country's currency, sites, and units. Resolve relative dates against the local time. The time zone gives the country, not the city: if the answer depends on the city and the user hasn't said where, ask one short question before searching.";
+const CONTEXT_TAIL =
+  "Use this country's currency, sites, and units. Resolve relative dates against the local time. The time zone gives the country, not the city: if the answer depends on the city and the user hasn't said where, ask one short question before searching.";
 
 export function buildSystemPrompt(ctx: UserContext | null, skills: Pick<SkillEntry, "name" | "description">[] = []): string {
   const rules = CORE_PROMPT + skillIndex(skills);

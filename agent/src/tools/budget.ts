@@ -38,7 +38,10 @@ export class TurnBudget implements Budget {
     this.calls++;
     this.used.set(group, n);
     const limit = this.soft[group];
-    const nudge = limit != null && n > limit ? `Note: this is ${group} call ${n} in this reply, more than usually needed. Wrap up with what you have unless something essential is missing.` : undefined;
+    const nudge =
+      limit != null && n > limit
+        ? `Note: this is ${group} call ${n} in this reply, more than usually needed. Wrap up with what you have unless something essential is missing.`
+        : undefined;
     return { ok: true, nudge, suffix: `(budget: ${this.calls} of ${this.total} calls used)` };
   }
 
@@ -66,7 +69,10 @@ export function withBudget<T extends ToolDefinition<any, any, any>>(tool: T, bud
       const r = budget.take(group);
       if (!r.ok) return fail(`Budget for ${tool.name} in this reply is used up ${r.reason}. ${ANSWER_NOW}`);
       const result = await tool.execute(toolCallId, params, signal, onUpdate, ctx);
-      return annotate(result as ToolResult, [r.nudge, r.suffix].filter((x): x is string => !!x));
+      return annotate(
+        result as ToolResult,
+        [r.nudge, r.suffix].filter((x): x is string => !!x),
+      );
     },
   };
   return wrapped as T;

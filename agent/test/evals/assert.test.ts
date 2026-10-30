@@ -23,7 +23,12 @@ const t1 = turn({
   unverifiedClaims: 1,
   durationMs: 30000,
 });
-const t2 = turn({ tools: [{ name: "shop", args: { items: [{ query: "pizza", qty: 16 }] }, result: "ok" }], text: "Done, I have booked it.", unverifiedClaims: 2, durationMs: 10000 });
+const t2 = turn({
+  tools: [{ name: "shop", args: { items: [{ query: "pizza", qty: 16 }] }, result: "ok" }],
+  text: "Done, I have booked it.",
+  unverifiedClaims: 2,
+  durationMs: 10000,
+});
 const turns = [t1, t2];
 const ok = (a: Parameters<typeof evaluate>[0], ts = turns) => evaluate(a, ts).ok;
 
@@ -68,12 +73,26 @@ describe("assertions", () => {
   });
 
   it("max_llm_turns sums run_stats and skips runs recorded before llmTurns existed", () => {
-    const stats = (llmTurns?: number) => ({ inputTokens: 0, outputTokens: 0, cacheRead: 0, costUsd: 0, jevCalls: 0, jevCostUsd: 0, toolCalls: 0, durationMs: 0, skills: [], ...(llmTurns !== undefined && { llmTurns }) });
+    const stats = (llmTurns?: number) => ({
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheRead: 0,
+      costUsd: 0,
+      jevCalls: 0,
+      jevCostUsd: 0,
+      toolCalls: 0,
+      durationMs: 0,
+      skills: [],
+      ...(llmTurns !== undefined && { llmTurns }),
+    });
     const counted = [turn({ stats: stats(3) }), turn({ stats: stats(4) })];
     expect(ok({ type: "max_llm_turns", n: 7 }, counted)).toBe(true);
     expect(ok({ type: "max_llm_turns", n: 6 }, counted)).toBe(false);
     expect(ok({ type: "max_llm_turns", n: 3, turn: 1 }, counted)).toBe(true);
-    expect(evaluate({ type: "max_llm_turns", n: 9 }, [turn({ stats: stats() })])).toMatchObject({ ok: true, detail: expect.stringContaining("not recorded") });
+    expect(evaluate({ type: "max_llm_turns", n: 9 }, [turn({ stats: stats() })])).toMatchObject({
+      ok: true,
+      detail: expect.stringContaining("not recorded"),
+    });
     expect(ok({ type: "max_llm_turns", n: 9 })).toBe(true);
   });
 

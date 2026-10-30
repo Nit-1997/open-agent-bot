@@ -4,7 +4,8 @@ import { fakeFetch, html } from "../fixtures/fakeFetch.js";
 
 const text = (r: { content: Array<{ text?: string }> }) => r.content[0].text ?? "";
 const publicDns = async () => ["93.184.216.34"];
-const call = (f: typeof fetch, url: string, lookup = publicDns) => fetchPageTool({ fetch: f, lookup }).execute("c", { url }, undefined, undefined, {} as never);
+const call = (f: typeof fetch, url: string, lookup = publicDns) =>
+  fetchPageTool({ fetch: f, lookup }).execute("c", { url }, undefined, undefined, {} as never);
 
 describe("fetch_page", () => {
   it("fetch_page truncates and rejects binary", async () => {
@@ -34,7 +35,15 @@ describe("fetch_page", () => {
   });
 
   it("lists the page's product images after the text", async () => {
-    const f = fakeFetch([[/shop/, () => html('<article><h1>Boots</h1><p>Turf boots for every budget.</p><p>Tiempo Academy TF $95</p><img src="/b.jpg" alt="Tiempo Academy TF"></article>')]]);
+    const f = fakeFetch([
+      [
+        /shop/,
+        () =>
+          html(
+            '<article><h1>Boots</h1><p>Turf boots for every budget.</p><p>Tiempo Academy TF $95</p><img src="/b.jpg" alt="Tiempo Academy TF"></article>',
+          ),
+      ],
+    ]);
     const t = text(await call(f, "https://example.com/shop"));
     expect(t).toContain("images:\n- Tiempo Academy TF — https://example.com/b.jpg");
   });
@@ -86,9 +95,25 @@ describe("fetch_page network guard", () => {
 });
 
 describe("fetch_page structured data", () => {
-  const ld = JSON.stringify({ "@context": "https://schema.org", "@graph": [{ "@type": "Product", name: "Kettle", offers: { "@type": "Offer", price: "39.90", priceCurrency: "EUR", availability: "https://schema.org/InStock" } }] });
+  const ld = JSON.stringify({
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Product",
+        name: "Kettle",
+        offers: { "@type": "Offer", price: "39.90", priceCurrency: "EUR", availability: "https://schema.org/InStock" },
+      },
+    ],
+  });
   const f = fakeFetch([[/kettle/, () => html(`<script type="application/ld+json">${ld}</script><p>A kettle.</p>`)]]);
-  const run = () => fetchPageTool({ fetch: f, lookup: publicDns }).execute("c", { url: "https://shop.example.com/kettle" }, undefined, undefined, {} as never);
+  const run = () =>
+    fetchPageTool({ fetch: f, lookup: publicDns }).execute(
+      "c",
+      { url: "https://shop.example.com/kettle" },
+      undefined,
+      undefined,
+      {} as never,
+    );
 
   it("appends compact structured lines", async () => {
     expect(text(await run())).toMatch(/\n\nstructured:\n- product: Kettle — EUR 39.9, InStock$/);

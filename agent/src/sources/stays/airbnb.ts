@@ -18,7 +18,10 @@ const TYPE_IN_PLACE = /^([A-Z][\w-]*(?: [a-z][\w-]*)*) in (.+)$/;
 
 export function parseAirbnbCard(c: AirbnbCard, q: StayQuery): Stay | null {
   const url = cleanUrl(c.href, ["check_in", "check_out", "adults"]);
-  const typeLine = c.text.split("\n").map((l) => l.trim()).find((l) => TYPE_IN_PLACE.test(l));
+  const typeLine = c.text
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => TYPE_IN_PLACE.test(l));
   const titleIsType = TYPE_IN_PLACE.test(c.title);
   const title = clip(titleIsType ? (c.name ?? c.title) : c.title, 120);
   if (!title || !url) return null;

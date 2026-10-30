@@ -17,15 +17,30 @@ export function ArtifactViewer({ artifactId, title, onClose }: { artifactId: str
           {title}
         </span>
         <div id={`${id}-actions`} className="flex gap-2">
-          <a id={`${id}-pdf`} href={`/api/artifacts/${artifactId}?format=pdf`} className="rounded-full border border-border px-3.5 py-1.5 text-[13px] font-medium">
+          <a
+            id={`${id}-pdf`}
+            href={`/api/artifacts/${artifactId}?format=pdf`}
+            className="rounded-full border border-border px-3.5 py-1.5 text-[13px] font-medium"
+          >
             Download PDF
           </a>
-          <button id={`${id}-close`} type="button" onClick={onClose} className="rounded-full bg-charcoal px-3.5 py-1.5 text-[13px] font-medium text-on-charcoal">
+          <button
+            id={`${id}-close`}
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-charcoal px-3.5 py-1.5 text-[13px] font-medium text-on-charcoal"
+          >
             Close
           </button>
         </div>
       </div>
-      <iframe id={`${id}-frame`} title={title} sandbox={ARTIFACT_SANDBOX} src={`/api/artifacts/${artifactId}`} className="min-h-0 w-full flex-1 bg-white" />
+      <iframe
+        id={`${id}-frame`}
+        title={title}
+        sandbox={ARTIFACT_SANDBOX}
+        src={`/api/artifacts/${artifactId}`}
+        className="min-h-0 w-full flex-1 bg-white"
+      />
     </div>
   );
 }

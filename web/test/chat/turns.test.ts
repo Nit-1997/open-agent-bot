@@ -12,10 +12,26 @@ const SEARCH_RESULT = `1. Party City Sunnyvale — https://www.partycity.com/sun
 
 const messages: ChatMessage[] = [
   { id: "u1", role: "user", content: "plan a halloween party" },
-  { id: "a1", role: "assistant", content: "Let me look.", toolCalls: [call("t1", "web_search", { query: "halloween supplies sunnyvale" }), call("t2", "fetch_page", { url: "https://www.target.com/c/halloween" })] },
+  {
+    id: "a1",
+    role: "assistant",
+    content: "Let me look.",
+    toolCalls: [
+      call("t1", "web_search", { query: "halloween supplies sunnyvale" }),
+      call("t2", "fetch_page", { url: "https://www.target.com/c/halloween" }),
+    ],
+  },
   { id: "r1", role: "tool", toolCallId: "t1", content: SEARCH_RESULT },
   { id: "r2", role: "tool", toolCallId: "t2", content: "page text" },
-  { id: "a2", role: "assistant", content: "Here's the plan. See [Spirit](https://www.spirithalloween.com/stores).", toolCalls: [call("t3", "show_ui", { title: "x" }), call("t3-widget", "show_widget", { widget: { kind: "ui", title: "Plan", blocks: [] } })] },
+  {
+    id: "a2",
+    role: "assistant",
+    content: "Here's the plan. See [Spirit](https://www.spirithalloween.com/stores).",
+    toolCalls: [
+      call("t3", "show_ui", { title: "x" }),
+      call("t3-widget", "show_widget", { widget: { kind: "ui", title: "Plan", blocks: [] } }),
+    ],
+  },
   { id: "r3", role: "tool", toolCallId: "t3", content: "shown" },
   { id: "u2", role: "user", content: "make a pdf" },
   { id: "a3", role: "assistant", content: "", toolCalls: [call("t4", "create_artifact", { title: "Party plan", html: "<p/>" })] },
@@ -85,7 +101,9 @@ describe("steps", () => {
     expect(stepLabel("music", { queries: ["Hey Jude"], kind: "song" }, false)).toBe("Looking up 1 song");
     expect(stepLabel("wikipedia", { queries: ["Kinkaku-ji"] })).toBe("Read Wikipedia on Kinkaku-ji");
     expect(stepLabel("shop", { stores: ["shipt"], items: [{ query: "rice" }, { query: "beans" }] })).toBe("Shopped 2 items at Shipt");
-    expect(stepLabel("shop", { stores: ["amazon", "bestbuy"], items: [{ query: "headphones" }] }, false)).toBe("Shopping 1 item at Amazon, Bestbuy");
+    expect(stepLabel("shop", { stores: ["amazon", "bestbuy"], items: [{ query: "headphones" }] }, false)).toBe(
+      "Shopping 1 item at Amazon, Bestbuy",
+    );
     expect(stepLabel("wikipedia", { queries: ["Kinkaku-ji", "Ryoan-ji"] }, false)).toBe("Reading Wikipedia on 2 topics");
     expect(stepLabel("fetch_page", { url: "https://www.target.com/x" })).toBe("Read target.com");
     expect(stepLabel("weather", { location: "Pune" })).toBe("Checked weather in Pune");
@@ -103,24 +121,51 @@ describe("research workflow", () => {
     { id: "u1", role: "user", content: "heat pump report" },
     { id: "a1", role: "assistant", content: "", toolCalls: [call("r1", "research", { question: "heat pump or furnace?" })] },
   ];
-  const ev = (phase: "research" | "plan" | "implement" | "verify", status: "start" | "done", detail?: object) => ({ workflow: "research" as const, phase, status, detail });
+  const ev = (phase: "research" | "plan" | "implement" | "verify", status: "start" | "done", detail?: object) => ({
+    workflow: "research" as const,
+    phase,
+    status,
+    detail,
+  });
 
   it("shows the research tool as an artifact once its result arrives", () => {
-    const done = buildTurns([...msgs, { id: "t1", role: "tool", toolCallId: "r1", content: "artifact abcdefghijkl created: Heat pump vs furnace\nRead 4 sources." }]);
+    const done = buildTurns([
+      ...msgs,
+      { id: "t1", role: "tool", toolCallId: "r1", content: "artifact abcdefghijkl created: Heat pump vs furnace\nRead 4 sources." },
+    ]);
     expect(done[0].items).toEqual([expect.objectContaining({ kind: "artifact", title: "Heat pump vs furnace" })]);
     expect(buildTurns(msgs)[0].items).toEqual([expect.objectContaining({ kind: "artifact", result: undefined })]);
   });
 
   it("replaces the research call with its phases, labeled in order", () => {
-    const turns = withWorkflow(buildTurns(msgs), { u1: [ev("research", "start"), ev("research", "done", { sources: 4 }), ev("plan", "start"), ev("plan", "done"), ev("implement", "start"), ev("implement", "done"), ev("verify", "start"), ev("verify", "done", { supported: 9, total: 11 })] });
-    expect(turns[0].steps.map((s) => stepLabel(s.name, s.args, s.done))).toEqual(["Researching sources", "Planning the report", "Writing the report", "Checking claims (9 of 11 supported)"]);
+    const turns = withWorkflow(buildTurns(msgs), {
+      u1: [
+        ev("research", "start"),
+        ev("research", "done", { sources: 4 }),
+        ev("plan", "start"),
+        ev("plan", "done"),
+        ev("implement", "start"),
+        ev("implement", "done"),
+        ev("verify", "start"),
+        ev("verify", "done", { supported: 9, total: 11 }),
+      ],
+    });
+    expect(turns[0].steps.map((s) => stepLabel(s.name, s.args, s.done))).toEqual([
+      "Researching sources",
+      "Planning the report",
+      "Writing the report",
+      "Checking claims (9 of 11 supported)",
+    ]);
     expect(turns[0].steps.every((s) => s.done)).toBe(true);
     expect(new Set(turns[0].steps.map((s) => s.id)).size).toBe(4);
   });
 
   it("marks only started phases and leaves the active one running", () => {
     const turns = withWorkflow(buildTurns(msgs), { u1: [ev("research", "start"), ev("research", "done"), ev("plan", "start")] });
-    expect(turns[0].steps.map((s) => [s.args.phase, s.done])).toEqual([["research", true], ["plan", false]]);
+    expect(turns[0].steps.map((s) => [s.args.phase, s.done])).toEqual([
+      ["research", true],
+      ["plan", false],
+    ]);
     expect(stepLabel("workflow_step", { phase: "verify" }, false)).toBe("Checking claims");
   });
 

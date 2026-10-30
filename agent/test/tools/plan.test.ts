@@ -58,7 +58,10 @@ describe("plan tool", () => {
       ],
     });
     expect(r.isError).toBeUndefined();
-    expect(store.get("t", "event", "main")).toMatchObject({ version: 2, value: { title: "8th birthday", guests: 16, menu: ["pizza", "cake"], theme: "space" } });
+    expect(store.get("t", "event", "main")).toMatchObject({
+      version: 2,
+      value: { title: "8th birthday", guests: 16, menu: ["pizza", "cake"], theme: "space" },
+    });
     expect(store.get("t", "event", "main")?.value).not.toHaveProperty("budget");
     expect(r.details.widget).toMatchObject({ version: 2 });
   });
@@ -100,10 +103,19 @@ describe("plan tool", () => {
 
   it("validates trips and shortlists, with the card for shortlists too", async () => {
     const { run } = setup();
-    const trip = { destination: "Tahoe", start: "2026-12-01", end: "2026-12-04", travelers: 2, stays: [], days: [{ date: "2026-12-01", items: ["ski"] }] };
+    const trip = {
+      destination: "Tahoe",
+      start: "2026-12-01",
+      end: "2026-12-04",
+      travelers: 2,
+      stays: [],
+      days: [{ date: "2026-12-01", items: ["ski"] }],
+    };
     expect((await run({ action: "set", kind: "trip", value: trip })).details.widget).toMatchObject({ entity: "trip" });
     expect((await run({ action: "set", kind: "trip", value: { ...trip, travelers: 0 } })).isError).toBe(true);
-    expect((await run({ action: "set", kind: "shortlist", value: { title: "Gifts", items: [{ name: "Lego", price: 20 }] } })).details.widget).toMatchObject({ entity: "shortlist" });
+    expect(
+      (await run({ action: "set", kind: "shortlist", value: { title: "Gifts", items: [{ name: "Lego", price: 20 }] } })).details.widget,
+    ).toMatchObject({ entity: "shortlist" });
   });
 
   it("describes when to patch instead of rebuilding", () => {

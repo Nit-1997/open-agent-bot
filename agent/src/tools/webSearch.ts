@@ -87,7 +87,8 @@ export const webSearchTool = (deps: Deps) =>
   defineTool({
     name: "web_search",
     label: "Web search",
-    description: "Search the web. Returns titles, URLs, snippets, and an image when the result has one. Use fetch_page or browse to read a result.",
+    description:
+      "Search the web. Returns titles, URLs, snippets, and an image when the result has one. Use fetch_page or browse to read a result.",
     parameters: Type.Object({
       query: Type.String({ minLength: 1 }),
       count: Type.Optional(Type.Number({ description: "results to return, default 8, max 15" })),
@@ -103,14 +104,21 @@ export function imageSearchTool(deps: Deps) {
     name: "image_search",
     label: "Image search",
     description:
-      "Find pictures: album and playlist covers, places, hotels, landmarks, dishes, people, or a product when its store page had none. Pass every name you need in queries (up to 10) in one call, e.g. [\"Rumours Fleetwood Mac album cover\", \"Hotel California Eagles album cover\"]; or one query for several results. Returns each image URL with the page it came from. Use those image URLs in show_ui cards.",
+      'Find pictures: album and playlist covers, places, hotels, landmarks, dishes, people, or a product when its store page had none. Pass every name you need in queries (up to 10) in one call, e.g. ["Rumours Fleetwood Mac album cover", "Hotel California Eagles album cover"]; or one query for several results. Returns each image URL with the page it came from. Use those image URLs in show_ui cards.',
     parameters: Type.Object({
       query: Type.Optional(Type.String({ description: "one search, for several pictures of one thing" })),
-      queries: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "one search per name, up to 10; returns the top pictures for each" })),
+      queries: Type.Optional(
+        Type.Union([Type.Array(Type.String()), Type.String()], {
+          description: "one search per name, up to 10; returns the top pictures for each",
+        }),
+      ),
       count: Type.Optional(Type.Number({ description: "results for a single query, default 6, max 15" })),
     }),
     async execute(_id, params, signal): Promise<ToolResult> {
-      const names = queryList(params.queries).map((q) => q.trim()).filter(Boolean).slice(0, MAX_BATCH);
+      const names = queryList(params.queries)
+        .map((q) => q.trim())
+        .filter(Boolean)
+        .slice(0, MAX_BATCH);
       if (!names.length) {
         if (!params.query) return fail("pass query or queries");
         return runSearch(deps, "images", params.query, clampCount(params.count, 6), signal);

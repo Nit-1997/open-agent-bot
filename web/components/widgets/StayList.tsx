@@ -30,7 +30,21 @@ function ratingText(s: Stay): string | undefined {
   return s.ratingScale === 10 ? `${s.rating}/10` : `${s.rating}`;
 }
 
-function StayCard({ id, stay, currency, locale, showSource, folded }: { id: string; stay: Stay; currency: string; locale: string; showSource: boolean; folded: boolean }) {
+function StayCard({
+  id,
+  stay,
+  currency,
+  locale,
+  showSource,
+  folded,
+}: {
+  id: string;
+  stay: Stay;
+  currency: string;
+  locale: string;
+  showSource: boolean;
+  folded: boolean;
+}) {
   const own = stay.currency ?? currency;
   const nightly = money(stay.nightly, own, locale);
   const total = money(stay.total, own, locale);
@@ -48,7 +62,10 @@ function StayCard({ id, stay, currency, locale, showSource, folded }: { id: stri
         <span id={`${id}-media`} className="relative block aspect-[16/10] w-full overflow-hidden bg-surface">
           <Picture id={`${id}-img`} src={stay.image} alt={stay.title} fallback={stay.title} className="h-full w-full object-cover" />
           {stay.badge && (
-            <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-on-charcoal">
+            <span
+              id={`${id}-badge`}
+              className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-on-charcoal"
+            >
               {stay.badge}
             </span>
           )}
@@ -103,7 +120,9 @@ function StayCard({ id, stay, currency, locale, showSource, folded }: { id: stri
               <span id={`${id}-rating`} className="inline-flex items-center gap-0.5 font-medium text-text-secondary">
                 <Star id={`${id}-star`} aria-hidden="true" size={11} className="fill-current" />
                 {rating}
-                {stay.reviews ? <span id={`${id}-reviews`} className="font-normal text-text-muted">{` (${stay.reviews.toLocaleString(locale)})`}</span> : null}
+                {stay.reviews ? (
+                  <span id={`${id}-reviews`} className="font-normal text-text-muted">{` (${stay.reviews.toLocaleString(locale)})`}</span>
+                ) : null}
               </span>
             )}
             {showSource && <span id={`${id}-source`}>{stay.source}</span>}
@@ -166,17 +185,32 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
       {shown.length > 0 ? (
         <ul id={`${id}-list`} className="mt-3 grid grid-cols-2 gap-3 pb-2 sm:-mx-1 sm:flex sm:snap-x sm:overflow-x-auto sm:px-1">
           {shown.map((s, i) => (
-            <StayCard key={`${tab}-${i}`} id={`${id}-${tab}-${i}`} stay={s} currency={widget.currency} locale={locale} showSource={tab === ALL} folded={!unfolded && i >= NARROW_SHOWN} />
+            <StayCard
+              key={`${tab}-${i}`}
+              id={`${id}-${tab}-${i}`}
+              stay={s}
+              currency={widget.currency}
+              locale={locale}
+              showSource={tab === ALL}
+              folded={!unfolded && i >= NARROW_SHOWN}
+            />
           ))}
         </ul>
       ) : (
         <p id={`${id}-empty`} className="mt-3 text-sm text-text-muted">
-          {widget.maxNightly != null ? "Nothing came back under that budget. Try the sites below." : "No listings could be read. Try the sites below."}
+          {widget.maxNightly != null
+            ? "Nothing came back under that budget. Try the sites below."
+            : "No listings could be read. Try the sites below."}
         </p>
       )}
 
       {!unfolded && shown.length > NARROW_SHOWN && (
-        <button id={`${id}-more`} type="button" onClick={() => setUnfolded(true)} className="w-full rounded-xl border border-border bg-paper py-2 text-[14px] text-text-secondary hover:border-border-strong sm:hidden">
+        <button
+          id={`${id}-more`}
+          type="button"
+          onClick={() => setUnfolded(true)}
+          className="w-full rounded-xl border border-border bg-paper py-2 text-[14px] text-text-secondary hover:border-border-strong sm:hidden"
+        >
           {`Show ${shown.length - NARROW_SHOWN} more`}
         </button>
       )}

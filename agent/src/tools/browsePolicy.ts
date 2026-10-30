@@ -14,7 +14,8 @@ type PolicyOptions = { allowPrivateHosts?: boolean };
 
 type PolicyResult = { allowed: true } | { allowed: false; reason: string };
 
-export const BOT_WALL = /(robot or human|are you a robot|captcha|access denied|unusual traffic|verify you are human|press and hold|sorry! something went wrong)/i;
+export const BOT_WALL =
+  /(robot or human|are you a robot|captcha|access denied|unusual traffic|verify you are human|press and hold|sorry! something went wrong)/i;
 
 const BLOCKED_URL_WORDS =
   /(?:^|[^a-z0-9])(?:checkout|cart|basket|payment|payments|pay|billing|login|signin|sign-in|signup|sign-up|register|account|accounts|auth|oauth|wallet|book|booking|bookings|reserve|reservation|reservations|order|orders|purchase|passenger|passengers|traveler|travelers|traveller|travellers|guest-details)(?:[^a-z0-9]|$)/i;

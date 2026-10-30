@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { currencyTag } from "../../src/stays/parse.js";
 import type { StayQuery } from "../../src/stays/types.js";
 
-const q = (currency: string): StayQuery => ({ location: "Paris", checkin: "2026-12-10", checkout: "2026-12-13", nights: 3, adults: 2, rooms: 1, currency });
+const q = (currency: string): StayQuery => ({
+  location: "Paris",
+  checkin: "2026-12-10",
+  checkout: "2026-12-13",
+  nights: 3,
+  adults: 2,
+  rooms: 1,
+  currency,
+});
 
 describe("currencyTag", () => {
   it("tags a price only when it differs from the currency that was asked for", () => {

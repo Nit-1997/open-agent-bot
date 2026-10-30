@@ -23,13 +23,20 @@ export type WorkflowStepEvent = {
   detail?: { sources?: number; supported?: number; total?: number; unchecked?: number };
 };
 
-const PHASE_LABELS = { research: "Researching sources", plan: "Planning the report", implement: "Writing the report", verify: "Checking claims" };
+const PHASE_LABELS = {
+  research: "Researching sources",
+  plan: "Planning the report",
+  implement: "Writing the report",
+  verify: "Checking claims",
+};
 
 function workflowLabel(args: StepArgs): string {
   const phase = String(args.phase) as WorkflowStepEvent["phase"];
   const label = PHASE_LABELS[phase] ?? "Working";
   const { supported, total } = args as { supported?: number; total?: number };
-  return phase === "verify" && typeof supported === "number" && typeof total === "number" ? `${label} (${supported} of ${total} supported)` : label;
+  return phase === "verify" && typeof supported === "number" && typeof total === "number"
+    ? `${label} (${supported} of ${total} supported)`
+    : label;
 }
 
 export function stepLabel(name: string, args: StepArgs, done = true): string {
@@ -48,7 +55,9 @@ export function stepLabel(name: string, args: StepArgs, done = true): string {
     }
     case "shop": {
       const n = list(args.items).length;
-      const stores = list(args.stores).map((st) => st.charAt(0).toUpperCase() + st.slice(1)).join(", ");
+      const stores = list(args.stores)
+        .map((st) => st.charAt(0).toUpperCase() + st.slice(1))
+        .join(", ");
       return `${done ? "Shopped" : "Shopping"} ${n} ${n === 1 ? "item" : "items"} at ${stores}`;
     }
     case "wikipedia": {

@@ -108,7 +108,14 @@ describe("widgets", () => {
         {
           type: "cards" as const,
           items: [
-            { title: "Mercurial Vapor 17 Academy TF", price: "$100", image: "https://static.nike.com/vapor.png", url: "https://www.nike.com/t/vapor", source: "Nike", badge: "Best pick" },
+            {
+              title: "Mercurial Vapor 17 Academy TF",
+              price: "$100",
+              image: "https://static.nike.com/vapor.png",
+              url: "https://www.nike.com/t/vapor",
+              source: "Nike",
+              badge: "Best pick",
+            },
             { title: "Tiempo Maestro Academy TF", price: "$95", source: "Nike", note: "Touch and control" },
           ],
         },
@@ -130,7 +137,11 @@ describe("widgets", () => {
   });
 
   it("UiCard falls back to a placeholder when a product image fails to load", () => {
-    const widget = { kind: "ui" as const, title: "Boots", blocks: [{ type: "cards" as const, items: [{ title: "Phantom 6 Low", image: "https://x.com/broken.png" }] }] };
+    const widget = {
+      kind: "ui" as const,
+      title: "Boots",
+      blocks: [{ type: "cards" as const, items: [{ title: "Phantom 6 Low", image: "https://x.com/broken.png" }] }],
+    };
     render(<UiCard toolCallId="p2" widget={widget} />);
     fireEvent.error(screen.getByRole("img", { name: "Phantom 6 Low" }));
     expect(screen.queryByRole("img", { name: "Phantom 6 Low" })).toBeNull();
@@ -145,19 +156,38 @@ describe("widgets", () => {
         {
           type: "cards" as const,
           shape: "wide" as const,
-          items: [{ title: "Memmo Alfama", subtitle: "Boutique · Alfama", rating: "4.7", price: "$310/night", place: "Memmo Alfama, Lisbon", image: "https://img.com/m.jpg", url: "https://memmo.com/alfama" }],
+          items: [
+            {
+              title: "Memmo Alfama",
+              subtitle: "Boutique · Alfama",
+              rating: "4.7",
+              price: "$310/night",
+              place: "Memmo Alfama, Lisbon",
+              image: "https://img.com/m.jpg",
+              url: "https://memmo.com/alfama",
+            },
+          ],
         },
       ],
     };
     render(<UiCard toolCallId="p3" widget={widget} />);
     expect(screen.getByRole("img", { name: "Memmo Alfama" }).parentElement?.className).toMatch(/aspect-\[16\/10\]/);
     expect(screen.getByText("★ 4.7")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Map" })).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=Memmo%20Alfama%2C%20Lisbon");
+    expect(screen.getByRole("link", { name: "Map" })).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=Memmo%20Alfama%2C%20Lisbon",
+    );
     expect(screen.getByRole("link", { name: /Memmo Alfama/ })).toHaveAttribute("href", "https://memmo.com/alfama");
   });
 
   it("UiCard shows an image block with its caption", () => {
-    const widget = { kind: "ui" as const, title: "Belém", blocks: [{ type: "image" as const, url: "https://upload.wikimedia.org/belem.jpg", caption: "Belém Tower at sunset", source: "Wikipedia" }] };
+    const widget = {
+      kind: "ui" as const,
+      title: "Belém",
+      blocks: [
+        { type: "image" as const, url: "https://upload.wikimedia.org/belem.jpg", caption: "Belém Tower at sunset", source: "Wikipedia" },
+      ],
+    };
     render(<UiCard toolCallId="p4" widget={widget} />);
     expect(screen.getByRole("img", { name: "Belém Tower at sunset" })).toHaveAttribute("src", "https://upload.wikimedia.org/belem.jpg");
     expect(screen.getByText("Wikipedia")).toBeInTheDocument();

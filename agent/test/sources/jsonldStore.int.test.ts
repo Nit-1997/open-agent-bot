@@ -9,9 +9,20 @@ import { shopTool } from "../../src/tools/shop.js";
 
 const product = (name: string, price: string, extra: object = {}) => ({
   "@context": "https://schema.org",
-  "@graph": [{ "@type": "WebPage", name }, { "@type": "Product", name, image: "/img/p.jpg", brand: { name: "Sony" }, offers: { "@type": "AggregateOffer", priceCurrency: "USD", lowPrice: price, offerCount: 2 }, ...extra }],
+  "@graph": [
+    { "@type": "WebPage", name },
+    {
+      "@type": "Product",
+      name,
+      image: "/img/p.jpg",
+      brand: { name: "Sony" },
+      offers: { "@type": "AggregateOffer", priceCurrency: "USD", lowPrice: price, offerCount: 2 },
+      ...extra,
+    },
+  ],
 });
-const html = (ld: unknown) => `<!doctype html><html><head><title>P</title><script type="application/ld+json">${JSON.stringify(ld)}</script></head><body>page</body></html>`;
+const html = (ld: unknown) =>
+  `<!doctype html><html><head><title>P</title><script type="application/ld+json">${JSON.stringify(ld)}</script></head><body>page</body></html>`;
 
 let open: Server;
 let walled: Server;
@@ -97,7 +108,15 @@ describe("JSON-LD store for unknown domains", () => {
       storeFor: (s) => stores[s],
       cart: new ActiveCart(),
     });
-    const r = (await tool.execute(...(["c", { stores: Object.keys(stores), items: [{ query: "Sony WH-1000XM5 Wireless Headphones" }] }, undefined, undefined, {}] as never[]))) as { content: Array<{ text: string }> };
+    const r = (await tool.execute(
+      ...([
+        "c",
+        { stores: Object.keys(stores), items: [{ query: "Sony WH-1000XM5 Wireless Headphones" }] },
+        undefined,
+        undefined,
+        {},
+      ] as never[]),
+    )) as { content: Array<{ text: string }> };
     const text = r.content[0].text;
     expect(text).toContain("Sony WH-1000XM5 Wireless Headphones — $298.00");
     expect(text).toContain(`${wallBase}/p/xm5`);

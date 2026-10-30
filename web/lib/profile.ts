@@ -4,7 +4,17 @@ export type Profile = { name: string; home: string; interests: string[]; notes: 
 
 export const EMPTY_PROFILE: Profile = { name: "", home: "", interests: [], notes: "", onboarded: false };
 
-export const INTERESTS = ["Vegetarian", "Vegan", "Budget-conscious", "Has kids", "Has pets", "Prefers local shops", "Eco-friendly", "Loves to cook", "Travels often"];
+export const INTERESTS = [
+  "Vegetarian",
+  "Vegan",
+  "Budget-conscious",
+  "Has kids",
+  "Has pets",
+  "Prefers local shops",
+  "Eco-friendly",
+  "Loves to cook",
+  "Travels often",
+];
 
 const KEY = "open-agent.profile";
 const EVENT = "open-agent:profile";

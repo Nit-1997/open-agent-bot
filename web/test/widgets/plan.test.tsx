@@ -11,7 +11,15 @@ const event: Plan = {
   entity: "event",
   id: "main",
   version: 1,
-  value: { title: "8th birthday", date: "2026-11-14", guests: 12, budget: 300, currency: "USD", menu: ["pizza", "cake"], timeline: [{ when: "Day of", what: "Set up" }] },
+  value: {
+    title: "8th birthday",
+    date: "2026-11-14",
+    guests: 12,
+    budget: 300,
+    currency: "USD",
+    menu: ["pizza", "cake"],
+    timeline: [{ when: "Day of", what: "Set up" }],
+  },
 };
 
 const trip: Plan = {
@@ -19,7 +27,14 @@ const trip: Plan = {
   entity: "trip",
   id: "main",
   version: 2,
-  value: { destination: "Tahoe", start: "2026-12-01", end: "2026-12-04", travelers: 2, stays: [{ name: "Lodge", url: "https://lodge.example/" }], days: [{ date: "2026-12-01", items: ["Ski"] }] },
+  value: {
+    destination: "Tahoe",
+    start: "2026-12-01",
+    end: "2026-12-04",
+    travelers: 2,
+    stays: [{ name: "Lodge", url: "https://lodge.example/" }],
+    days: [{ date: "2026-12-01", items: ["Ski"] }],
+  },
 };
 
 const ids = (c: HTMLElement) => [...c.querySelectorAll("[id]")].map((e) => e.id);
@@ -82,7 +97,13 @@ describe("PlanCard trip and shortlist", () => {
   });
 
   it("lists a shortlist without edit controls", () => {
-    const list: Plan = { kind: "plan", entity: "shortlist", id: "gifts", version: 1, value: { title: "Gifts", items: [{ name: "Lego", price: 20, note: "ages 8+" }] } };
+    const list: Plan = {
+      kind: "plan",
+      entity: "shortlist",
+      id: "gifts",
+      version: 1,
+      value: { title: "Gifts", items: [{ name: "Lego", price: 20, note: "ages 8+" }] },
+    };
     render(<PlanCard toolCallId="s1" widget={list} onEdit={vi.fn()} />);
     expect(screen.getByRole("heading", { name: "Gifts" })).toBeInTheDocument();
     expect(screen.getByText("Lego")).toBeInTheDocument();
@@ -101,7 +122,13 @@ describe("WidgetRenderer plan", () => {
   });
 
   it("renders nothing for an invalid plan", () => {
-    const { container } = render(<WidgetRenderer toolCallId="w2" args={{ widget: { kind: "plan", entity: "event", id: "x", version: 1, value: { title: "x", guests: 0 } } }} locale="en-US" />);
+    const { container } = render(
+      <WidgetRenderer
+        toolCallId="w2"
+        args={{ widget: { kind: "plan", entity: "event", id: "x", version: 1, value: { title: "x", guests: 0 } } }}
+        locale="en-US"
+      />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 });

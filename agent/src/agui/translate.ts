@@ -43,7 +43,13 @@ export function createTranslator(ids: Deps) {
     } as BaseEvent,
     { type: EventType.TOOL_CALL_ARGS, toolCallId: id, delta: JSON.stringify({ widget }) } as BaseEvent,
     { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent,
-    { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: id, content: `rendered ${widget.kind}`, role: "tool" } as BaseEvent,
+    {
+      type: EventType.TOOL_CALL_RESULT,
+      messageId: ids.newId(),
+      toolCallId: id,
+      content: `rendered ${widget.kind}`,
+      role: "tool",
+    } as BaseEvent,
   ];
 
   const emitText = (chunk: string): BaseEvent[] => {

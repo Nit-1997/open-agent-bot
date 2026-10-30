@@ -13,10 +13,16 @@ export function completeWith(runtime: Pick<ModelRuntime, "completeSimple">, mode
     const reply = await runtime.completeSimple(
       m,
       { systemPrompt: system, messages: [{ role: "user", content: user, timestamp: Date.now() }] },
-      { maxTokens: Math.min(maxTokens ?? MAX_OUTPUT, m.maxTokens || MAX_OUTPUT), signal: signal ? AbortSignal.any([signal, timeout]) : timeout },
+      {
+        maxTokens: Math.min(maxTokens ?? MAX_OUTPUT, m.maxTokens || MAX_OUTPUT),
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      },
     );
     const error = (reply as { errorMessage?: string }).errorMessage;
-    const text = (reply.content ?? []).map((c) => (c.type === "text" ? c.text : "")).join("").trim();
+    const text = (reply.content ?? [])
+      .map((c) => (c.type === "text" ? c.text : ""))
+      .join("")
+      .trim();
     if (reply.stopReason === "error" || (error && !text)) throw new Error(error ?? "the model returned an error");
     if (!text) throw new Error("the model returned nothing");
     return text;

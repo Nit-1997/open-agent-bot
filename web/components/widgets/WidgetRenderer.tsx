@@ -9,7 +9,17 @@ import { StayList } from "./StayList";
 import { UiCard } from "./UiCard";
 import { WeatherCard } from "./WeatherCard";
 
-export function WidgetRenderer(props: { toolCallId: string; args: unknown; locale: string; answered?: boolean; onAnswer?: (text: string) => void; staleCart?: boolean; onCartEdit?: (e: CartEdits) => void; stalePlan?: boolean; onPlanEdit?: (e: PlanEdits) => void }) {
+export function WidgetRenderer(props: {
+  toolCallId: string;
+  args: unknown;
+  locale: string;
+  answered?: boolean;
+  onAnswer?: (text: string) => void;
+  staleCart?: boolean;
+  onCartEdit?: (e: CartEdits) => void;
+  stalePlan?: boolean;
+  onPlanEdit?: (e: PlanEdits) => void;
+}) {
   const { toolCallId, args, locale } = props;
   const r = validateWidget((args as { widget?: unknown } | undefined)?.widget);
   if (!r.ok) return null;
@@ -30,8 +40,18 @@ export function WidgetRenderer(props: { toolCallId: string; args: unknown; local
     case "stay_list":
       return <StayList toolCallId={toolCallId} widget={w} locale={locale} />;
     case "plan":
-      return <PlanCard toolCallId={toolCallId} widget={w} stale={props.stalePlan} onEdit={props.stalePlan ? undefined : props.onPlanEdit} />;
+      return (
+        <PlanCard toolCallId={toolCallId} widget={w} stale={props.stalePlan} onEdit={props.stalePlan ? undefined : props.onPlanEdit} />
+      );
     case "cart":
-      return <CartCard toolCallId={toolCallId} widget={w} locale={locale} stale={props.staleCart} onEdit={props.staleCart ? undefined : props.onCartEdit} />;
+      return (
+        <CartCard
+          toolCallId={toolCallId}
+          widget={w}
+          locale={locale}
+          stale={props.staleCart}
+          onEdit={props.staleCart ? undefined : props.onCartEdit}
+        />
+      );
   }
 }

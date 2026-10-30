@@ -49,7 +49,11 @@ type Lane = { label: string; home: string; item: Item; tiles: Tile[]; grouped: b
 
 function items(v: unknown): Item[] {
   return looseList<unknown>(v)
-    .map((x) => (typeof x === "string" ? { query: x, qty: 1 } : { query: String((x as Item).query ?? ""), qty: Math.max(1, Math.round(Number((x as Item).qty) || 1)) }))
+    .map((x) =>
+      typeof x === "string"
+        ? { query: x, qty: 1 }
+        : { query: String((x as Item).query ?? ""), qty: Math.max(1, Math.round(Number((x as Item).qty) || 1)) },
+    )
     .filter((i) => i.query.trim())
     .slice(0, MAX_ITEMS);
 }
@@ -57,7 +61,10 @@ function items(v: unknown): Item[] {
 async function runJob(page: Page, job: Job, deps: Deps): Promise<JobResult> {
   const { store, item } = job;
   const search = store.search ?? ((q, ctx) => browserSearch(store, q, ctx));
-  const r = await search({ query: item.query }, { page, allowPrivateHosts: deps.allowPrivateHosts, fetch: deps.fetch, webSearch: deps.webSearch });
+  const r = await search(
+    { query: item.query },
+    { page, allowPrivateHosts: deps.allowPrivateHosts, fetch: deps.fetch, webSearch: deps.webSearch },
+  );
   return { store, item, tiles: r.tiles, ...(r.blocked && { blocked: r.blocked }), ...(r.error && { error: r.error }) };
 }
 
@@ -87,7 +94,13 @@ function lanesOf(results: JobResult[]): Lane[] {
     if (!r.store.marketplace) return [{ label: r.store.label, home: r.store.home, item: r.item, tiles: r.tiles, grouped: false }];
     const groups = new Map<string, Tile[]>();
     for (const t of r.tiles) if (t.group) groups.set(t.group, [...(groups.get(t.group) ?? []), t]);
-    return [...groups].map(([group, tiles]) => ({ label: `${group} (${r.store.label})`, home: r.store.home, item: r.item, tiles, grouped: true }));
+    return [...groups].map(([group, tiles]) => ({
+      label: `${group} (${r.store.label})`,
+      home: r.store.home,
+      item: r.item,
+      tiles,
+      grouped: true,
+    }));
   });
 }
 
@@ -111,19 +124,29 @@ async function rankLanes(judge: Judge | undefined, lanes: Lane[]): Promise<Pick[
       return keyword(l);
     }),
   );
-  if (failed.length) console.log(`[shop] rerank fallback reason=${signal.aborted ? "budget" : "judge"} lanes=${failed.length}/${lanes.length}`);
+  if (failed.length)
+    console.log(`[shop] rerank fallback reason=${signal.aborted ? "budget" : "judge"} lanes=${failed.length}/${lanes.length}`);
   console.log(`[shop] rerank ms=${Date.now() - started} tiles=${tiles}`);
   return ranked;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-const carries = (group: string | undefined, store: Store) => !!group && (norm(group).includes(norm(store.label)) || norm(store.label).includes(norm(group)));
+const carries = (group: string | undefined, store: Store) =>
+  !!group && (norm(group).includes(norm(store.label)) || norm(store.label).includes(norm(group)));
 
 type Search = (jobs: Job[]) => Promise<JobResult[]>;
 
-async function viaMarketplace(market: Store | undefined, stores: Store[], results: JobResult[], wanted: Item[], run: Search): Promise<{ results: JobResult[]; routed: Store[] } | null> {
+async function viaMarketplace(
+  market: Store | undefined,
+  stores: Store[],
+  results: JobResult[],
+  wanted: Item[],
+  run: Search,
+): Promise<{ results: JobResult[]; routed: Store[] } | null> {
   if (!market || !wanted.length || stores.some((s) => s.id === market.id)) return null;
-  const stuck = stores.filter((s) => !s.marketplace && results.filter((r) => r.store.id === s.id).every((r) => r.blocked || r.error || !r.tiles.length));
+  const stuck = stores.filter(
+    (s) => !s.marketplace && results.filter((r) => r.store.id === s.id).every((r) => r.blocked || r.error || !r.tiles.length),
+  );
   if (!stuck.length) return null;
   const found = await run(wanted.map((item) => ({ store: market, item })));
   const kept = found.map((r) => ({ ...r, tiles: r.tiles.filter((t) => stuck.some((s) => carries(t.group, s))) }));
@@ -135,7 +158,11 @@ function storeResults(lanes: Lane[], ranked: Pick[][], wanted: Item[]): StoreRes
   lanes.forEach((l, n) => {
     const picks = ranked[n].slice(0, PICKS);
     if (l.grouped && !picks.length) return;
-    const s = byStore.get(l.label) ?? { store: l.label, home: l.home, items: wanted.map((w) => ({ query: w.query, qty: w.qty, picks: [] as Pick[] })) };
+    const s = byStore.get(l.label) ?? {
+      store: l.label,
+      home: l.home,
+      items: wanted.map((w) => ({ query: w.query, qty: w.qty, picks: [] as Pick[] })),
+    };
     byStore.set(l.label, s);
     const slot = s.items.find((i) => i.query === l.item.query)!;
     if (!slot.picks.length) slot.picks = picks;
@@ -146,7 +173,15 @@ function storeResults(lanes: Lane[], ranked: Pick[][], wanted: Item[]): StoreRes
 type Summary = ReturnType<typeof bestValue>;
 
 function describeTile(t: Pick, n: number): string {
-  const meta = [t.priceText ?? "price not shown", t.size, t.rating && `${t.rating}★`, t.sponsored && "sponsored", t.match === "substitute" && "substitute"].filter(Boolean).join(" · ");
+  const meta = [
+    t.priceText ?? "price not shown",
+    t.size,
+    t.rating && `${t.rating}★`,
+    t.sponsored && "sponsored",
+    t.match === "substitute" && "substitute",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return `  ${n}. ${t.title} — ${meta}\n     link: ${t.url}${t.image ? `\n     image: ${t.image}` : ""}`;
 }
 
@@ -157,7 +192,14 @@ function summaryLines(summary: Summary, stores: StoreResult[], wanted: number): 
   const [best, ...rest] = summary;
   return [
     ...(best ? [`Best value: ${best.store} — ${of(best)}`] : []),
-    ...(rest.length ? [`Others: ${rest.slice(0, 5).map((s) => `${s.store} ${of(s)}`).join("; ")}`] : []),
+    ...(rest.length
+      ? [
+          `Others: ${rest
+            .slice(0, 5)
+            .map((s) => `${s.store} ${of(s)}`)
+            .join("; ")}`,
+        ]
+      : []),
   ];
 }
 
@@ -176,7 +218,9 @@ function problemLines(results: JobResult[], firstQuery: string): string[] {
     if (mine.some((x) => !x.error && x.tiles.length)) continue;
     reported.add(r.store.id);
     const err = mine.find((x) => x.error)?.error;
-    lines.push(`${r.store.label}: no products read${err ? ` (${err})` : " (the store showed no results to the agent's browser)"}. Link for the user: ${r.store.searchUrl?.(firstQuery) ?? r.store.home}`);
+    lines.push(
+      `${r.store.label}: no products read${err ? ` (${err})` : " (the store showed no results to the agent's browser)"}. Link for the user: ${r.store.searchUrl?.(firstQuery) ?? r.store.home}`,
+    );
   }
   return lines;
 }
@@ -198,7 +242,11 @@ function storeLines(stores: StoreResult[], summary: Summary): string[] {
 
 function render(stores: StoreResult[], results: JobResult[], wanted: Item[]): { text: string; summary: Summary } {
   const summary = bestValue(stores).filter((s) => s.found > 0);
-  const lines = [...summaryLines(summary, stores, wanted.length), ...problemLines(results, wanted[0].query), ...storeLines(stores, summary)];
+  const lines = [
+    ...summaryLines(summary, stores, wanted.length),
+    ...problemLines(results, wanted[0].query),
+    ...storeLines(stores, summary),
+  ];
   return { text: lines.join("\n").trim(), summary };
 }
 
@@ -214,13 +262,16 @@ export function shopTool(deps: Deps) {
   return defineTool({
     name: "shop",
     label: "Shop",
-    description:
-      `Build and update the user's shopping cart from stores' real catalogs, browsing as a guest. The chat has one active cart: the first call searches every item at the stores you pass and keeps the best-value stores; later calls add items to that same cart and search only the new items at those same stores (pass just the new items, no stores). Pass stores again only when the user wants different stores (the whole list is re-checked there), remove to drop items, and new_cart:true only when the user starts an unrelated list. Returns the full cart per store: best matching catalog products (title, price, size, rating, product link, catalog image), items not found, and the best-value store. ${storesHelp(registry, deps.region)}`,
+    description: `Build and update the user's shopping cart from stores' real catalogs, browsing as a guest. The chat has one active cart: the first call searches every item at the stores you pass and keeps the best-value stores; later calls add items to that same cart and search only the new items at those same stores (pass just the new items, no stores). Pass stores again only when the user wants different stores (the whole list is re-checked there), remove to drop items, and new_cart:true only when the user starts an unrelated list. Returns the full cart per store: best matching catalog products (title, price, size, rating, product link, catalog image), items not found, and the best-value store. ${storesHelp(registry, deps.region)}`,
     parameters: Type.Object({
-      stores: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "1-3 stores for a new cart or to switch stores, e.g. [\"shipt\"] or [\"amazon\", \"bestbuy\"]" })),
+      stores: Type.Optional(
+        Type.Union([Type.Array(Type.String()), Type.String()], {
+          description: '1-3 stores for a new cart or to switch stores, e.g. ["shipt"] or ["amazon", "bestbuy"]',
+        }),
+      ),
       items: Type.Optional(
         Type.Union([Type.Array(Type.Object({ query: Type.String(), qty: Type.Optional(Type.Number()) })), Type.String()], {
-          description: "products to add, up to 12, each a short catalog search like \"black beans 15 oz\" with qty",
+          description: 'products to add, up to 12, each a short catalog search like "black beans 15 oz" with qty',
         }),
       ),
       remove: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "item queries to drop from the cart" })),
@@ -229,7 +280,10 @@ export function shopTool(deps: Deps) {
     async execute(_id, params): Promise<ToolResult> {
       const cart = deps.cart ?? fallbackCart;
       const asked = items(params.items);
-      const picked = looseList<string>(params.stores).map((x) => resolve(String(x))).filter((x): x is Store => !!x).slice(0, MAX_STORES);
+      const picked = looseList<string>(params.stores)
+        .map((x) => resolve(String(x)))
+        .filter((x): x is Store => !!x)
+        .slice(0, MAX_STORES);
       const ids = picked.map((x) => x.id);
       if (params.remove) cart.remove(looseList<string>(params.remove).map(String));
       const switching = ids.length > 0 && !(ids.length === cart.stores.length && ids.every((id) => cart.stores.includes(id)));
@@ -240,7 +294,9 @@ export function shopTool(deps: Deps) {
         if (!asked.length) return fail("pass items to add");
         if (!picked.length) {
           const region = deps.region ?? "US";
-          return fail(`pass stores for this new cart: the store the user named, else this region's defaults (groceries ${defaultStoresFor(region, "grocery").join(", ")}; other products ${defaultStoresFor(region, "general").join(", ")})`);
+          return fail(
+            `pass stores for this new cart: the store the user named, else this region's defaults (groceries ${defaultStoresFor(region, "grocery").join(", ")}; other products ${defaultStoresFor(region, "general").join(", ")})`,
+          );
         }
         cart.start(ids, asked);
         added = cart.items;
@@ -248,7 +304,10 @@ export function shopTool(deps: Deps) {
         fresh = true;
       } else if (switching) {
         added = cart.add(asked);
-        cart.start(ids, cart.items.map((i) => ({ ...i })));
+        cart.start(
+          ids,
+          cart.items.map((i) => ({ ...i })),
+        );
         search = cart.items;
         fresh = true;
       } else {
@@ -262,16 +321,26 @@ export function shopTool(deps: Deps) {
       const stores = cart.stores.map((id) => resolve(id)).filter((x): x is Store => !!x);
       const run: Search = deps.search ?? ((jobs) => runAll(deps, jobs));
       const results = search.length ? await run(stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
-      const market = defaultStoresFor(deps.region ?? "US", "grocery").map((id) => resolve(id)).find((x): x is Store => !!x?.marketplace);
+      const market = defaultStoresFor(deps.region ?? "US", "grocery")
+        .map((id) => resolve(id))
+        .find((x): x is Store => !!x?.marketplace);
       const via = await viaMarketplace(market, stores, results, search, run);
-      if (via?.routed.length && market) cart.stores = [...new Set([...cart.stores.filter((id) => !via.routed.some((s) => s.id === id)), market.id])];
+      if (via?.routed.length && market)
+        cart.stores = [...new Set([...cart.stores.filter((id) => !via.routed.some((s) => s.id === id)), market.id])];
       const lanes = lanesOf([...results, ...(via?.results ?? [])]);
       cart.addResults(storeResults(lanes, await rankLanes(deps.judge, lanes), search));
-      if (fresh) cart.scopeTo(bestValue(cart.view()).filter((x) => x.found > 0).slice(0, SCOPE).map((x) => x.store));
+      if (fresh)
+        cart.scopeTo(
+          bestValue(cart.view())
+            .filter((x) => x.found > 0)
+            .slice(0, SCOPE)
+            .map((x) => x.store),
+        );
       cart.save();
       const view = cart.view();
       const { text: body, summary } = render(view, results, cart.items);
-      const routedNote = via?.routed.map((x) => `${x.label} blocked direct browsing, so its prices were read through ${market?.label}.`).join(" ") ?? "";
+      const routedNote =
+        via?.routed.map((x) => `${x.label} blocked direct browsing, so its prices were read through ${market?.label}.`).join(" ") ?? "";
       const text = [routedNote, body].filter(Boolean).join("\n");
       const n = cart.items.length;
       const head = `Cart: ${n} ${n === 1 ? "item" : "items"} at ${cart.scope.join(", ") || stores.map((x) => x.label).join(", ")}.${added.length && !fresh ? ` Added: ${added.map((i) => i.query).join(", ")}.` : ""} Later additions stay at these stores.`;

@@ -4,7 +4,10 @@ import { type Judge, noJudge } from "../../src/judge/index.js";
 
 const hits = ["a", "b", "c", "d", "e"].map((x) => ({ title: `Title ${x}`, snippet: `about ${x}`, url: `https://${x}.test/` }));
 
-function fake(verdicts: Array<[boolean, number]> | null, seen: { state?: Record<string, unknown>; criteria?: unknown; shared?: unknown } = {}): Judge {
+function fake(
+  verdicts: Array<[boolean, number]> | null,
+  seen: { state?: Record<string, unknown>; criteria?: unknown; shared?: unknown } = {},
+): Judge {
   return {
     available: true,
     score: async () => null,
@@ -22,7 +25,21 @@ function fake(verdicts: Array<[boolean, number]> | null, seen: { state?: Record<
 describe("selectHits", () => {
   it("keeps the hits judged useful, most confident first, up to max", async () => {
     const seen: { state?: Record<string, unknown>; criteria?: unknown; shared?: unknown } = {};
-    const out = await selectHits(fake([[true, 0.7], [false, 0.1], [true, 0.95], [true, 0.8], [false, 0.3]], seen), "heat pump cost?", hits, { max: 2 });
+    const out = await selectHits(
+      fake(
+        [
+          [true, 0.7],
+          [false, 0.1],
+          [true, 0.95],
+          [true, 0.8],
+          [false, 0.3],
+        ],
+        seen,
+      ),
+      "heat pump cost?",
+      hits,
+      { max: 2 },
+    );
     expect(out.map((h) => h.url)).toEqual(["https://c.test/", "https://d.test/"]);
     expect(seen.state).toEqual({ title: "Title a", snippet: "about a", url: "https://a.test/" });
     expect(seen.shared).toEqual({ question: "heat pump cost?" });
@@ -38,7 +55,9 @@ describe("selectHits", () => {
     const original = hits.slice(0, 3).map((h) => h.url);
     expect((await selectHits(noJudge, "q", hits, { max: 3 })).map((h) => h.url)).toEqual(original);
     expect((await selectHits(fake(null), "q", hits, { max: 3 })).map((h) => h.url)).toEqual(original);
-    expect((await selectHits(fake(hits.map(() => [false, 0.1] as [boolean, number])), "q", hits, { max: 3 })).map((h) => h.url)).toEqual(original);
+    expect((await selectHits(fake(hits.map(() => [false, 0.1] as [boolean, number])), "q", hits, { max: 3 })).map((h) => h.url)).toEqual(
+      original,
+    );
   });
 
   it("handles an empty list and hits without a snippet", async () => {

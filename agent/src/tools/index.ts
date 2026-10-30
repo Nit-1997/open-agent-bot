@@ -51,7 +51,16 @@ type ToolDeps = {
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2, research: 2 };
 
-const CODEMODE_TOOLS: ReadonlySet<string> = new Set(["web_search", "fetch_page", "wikipedia", "music", "weather", "shop", "stays", "flights"]);
+const CODEMODE_TOOLS: ReadonlySet<string> = new Set([
+  "web_search",
+  "fetch_page",
+  "wikipedia",
+  "music",
+  "weather",
+  "shop",
+  "stays",
+  "flights",
+]);
 
 export function scopeToCodemode(tools: ToolDefinition<any, any, any>[]): ToolDefinition<any, any, any>[] {
   return tools.map((t) => (CODEMODE_TOOLS.has(t.name) ? t : { ...t, exposure: "model-only" as const }));
@@ -77,10 +86,12 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         return drives.get(code)!;
       }
     : undefined;
-  const nearby = home ? async () => {
+  const nearby = home
+    ? async () => {
         const h = await home();
         return h ? nearbyAirports(h) : [];
-      } : undefined;
+      }
+    : undefined;
   const judge = deps.judge ?? noJudge;
   const country = regionFor(deps.userContext).country;
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
@@ -103,23 +114,75 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browseTool(browseDeps), deps.budget, "read"),
-    withBudget(withRules(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart, judge, region: country, webSearch: (query) => runSearch(search, query, "web", 8) }), shopRules(country)), deps.budget, "shop"),
+    withBudget(
+      withRules(
+        shopTool({
+          pool: deps.pool,
+          threadId: deps.threadId,
+          userContext: deps.userContext,
+          frames: deps.frames,
+          cart: deps.cart,
+          judge,
+          region: country,
+          webSearch: (query) => runSearch(search, query, "web", 8),
+        }),
+        shopRules(country),
+      ),
+      deps.budget,
+      "shop",
+    ),
     withRules(weatherTool({ defaultUnits: country === "US" ? "imperial" : "metric" }), RULES.weather),
-    withBudget(withRules(flightsTool({
-      locale: deps.userContext?.locale ?? "en-US",
-      currency: regionFor(deps.userContext).currency,
-      browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
-      drive,
-      nearby,
-    }), RULES.flights), deps.budget, "flights"),
-    withBudget(withRules(staysTool({ openTab, region: country, currency: regionFor(deps.userContext).currency, judge }), RULES.stays), deps.budget, "stays"),
-    withRules(showUiTool({
-      findMusicArt: musicCover({ country, judge }),
-      isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
-      findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, BLOCKS_HELP),
+    withBudget(
+      withRules(
+        flightsTool({
+          locale: deps.userContext?.locale ?? "en-US",
+          currency: regionFor(deps.userContext).currency,
+          browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
+          drive,
+          nearby,
+        }),
+        RULES.flights,
+      ),
+      deps.budget,
+      "flights",
+    ),
+    withBudget(
+      withRules(staysTool({ openTab, region: country, currency: regionFor(deps.userContext).currency, judge }), RULES.stays),
+      deps.budget,
+      "stays",
+    ),
+    withRules(
+      showUiTool({
+        findMusicArt: musicCover({ country, judge }),
+        isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
+        findImage: async (name, source) =>
+          matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)),
+      }),
+      RULES.showUi,
+      BLOCKS_HELP,
+    ),
     withRules(askUserTool(), RULES.askUser, FIELDS_HELP),
-    withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, REPORT_GUIDE),
-    ...(deps.complete ? [withBudget(researchTool({ search, artifacts: deps.artifacts, images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }, complete: deps.complete, judge, evidence: deps.evidence }), deps.budget, "research")] : []),
+    withRules(
+      createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }),
+      RULES.createArtifact,
+      REPORT_GUIDE,
+    ),
+    ...(deps.complete
+      ? [
+          withBudget(
+            researchTool({
+              search,
+              artifacts: deps.artifacts,
+              images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() },
+              complete: deps.complete,
+              judge,
+              evidence: deps.evidence,
+            }),
+            deps.budget,
+            "research",
+          ),
+        ]
+      : []),
     loadSkillTool(() => deps.skills ?? []),
     ...(deps.workspace ? [planTool({ store: deps.workspace, threadId: deps.threadId })] : []),
   ];

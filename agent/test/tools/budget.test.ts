@@ -79,7 +79,9 @@ describe("TurnBudget", () => {
     await call(a);
     const r = await call(b);
     expect(r.isError).toBe(true);
-    expect(text(r)).toBe("Budget for fetch_page in this reply is used up (3 calls). Answer now with what you already have, and offer to look up more if needed.");
+    expect(text(r)).toBe(
+      "Budget for fetch_page in this reply is used up (3 calls). Answer now with what you already have, and offer to look up more if needed.",
+    );
   });
 
   it("stops after the wall time, using the injected clock", async () => {
@@ -119,7 +121,9 @@ describe("TurnBudget", () => {
   it("adds the note as a new text part when the result has no text last", async () => {
     const budget = new TurnBudget({}, { total: 2 });
     const odd = { ...echo("x"), execute: async () => ({ content: [], details: {} }) } as never;
-    const r = (await withBudget(odd, budget, "g").execute("c", {}, undefined, undefined, {} as never)) as { content: Array<{ text: string }> };
+    const r = (await withBudget(odd, budget, "g").execute("c", {}, undefined, undefined, {} as never)) as {
+      content: Array<{ text: string }>;
+    };
     expect(r.content[0].text).toBe("(budget: 1 of 2 calls used)");
   });
 });

@@ -19,7 +19,8 @@ beforeAll(async () => {
       if (!raw) return res.writeHead(404).end();
       bodies.push(JSON.parse(raw));
       res.writeHead(200, { "content-type": "text/event-stream" });
-      const chunk = (delta: object, finish: string | null = null) => `data: ${JSON.stringify({ id: "x", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+      const chunk = (delta: object, finish: string | null = null) =>
+        `data: ${JSON.stringify({ id: "x", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
       res.write(chunk({ role: "assistant", content: "done" }));
       res.write(chunk({}, "stop"));
       res.end("data: [DONE]\n\n");
@@ -28,7 +29,11 @@ beforeAll(async () => {
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   hub = await ProviderHub.create({
     dataDir: mkdtempSync(join(tmpdir(), "wsctx-")),
-    litellm: { baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, apiKey: "none", models: [{ id: "m", label: "m" }] },
+    litellm: {
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
+      apiKey: "none",
+      models: [{ id: "m", label: "m" }],
+    },
   });
 });
 

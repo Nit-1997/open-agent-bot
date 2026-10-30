@@ -80,7 +80,13 @@ export function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollM
             {state.prompt.message}
           </label>
           <div id={`${id}-answer-row`} className="flex gap-2">
-            <input id={`${id}-answer`} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={state.prompt.placeholder} className={input} />
+            <input
+              id={`${id}-answer`}
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder={state.prompt.placeholder}
+              className={input}
+            />
             <button id={`${id}-answer-submit`} type="submit" disabled={!answer.trim()} className={solid}>
               Finish sign-in
             </button>

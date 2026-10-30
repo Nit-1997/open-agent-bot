@@ -19,7 +19,19 @@ const widget: StayListWidget = {
       site: "google.com",
       url: "https://www.google.com/travel/search?q=hotels",
       status: "ok",
-      stays: [{ title: "Bellagio", url: "https://www.google.com/travel/search?q=Bellagio", nightly: 131, total: 393, rating: 4.7, ratingScale: 5, reviews: 144300, kind: "5-star hotel", badge: "24% off usual" }],
+      stays: [
+        {
+          title: "Bellagio",
+          url: "https://www.google.com/travel/search?q=Bellagio",
+          nightly: 131,
+          total: 393,
+          rating: 4.7,
+          ratingScale: 5,
+          reviews: 144300,
+          kind: "5-star hotel",
+          badge: "24% off usual",
+        },
+      ],
     },
     {
       id: "booking",
@@ -27,7 +39,9 @@ const widget: StayListWidget = {
       site: "booking.com",
       url: "https://www.booking.com/searchresults.html",
       status: "ok",
-      stays: [{ title: "Flamingo", url: "https://www.booking.com/hotel/us/flamingo.html", nightly: 98, total: 294, rating: 7.8, ratingScale: 10 }],
+      stays: [
+        { title: "Flamingo", url: "https://www.booking.com/hotel/us/flamingo.html", nightly: 98, total: 294, rating: 7.8, ratingScale: 10 },
+      ],
     },
     { id: "airbnb", label: "Airbnb", site: "airbnb.com", url: "https://www.airbnb.com/s/Las%20Vegas/homes", status: "blocked", stays: [] },
     { id: "expedia", label: "Expedia", site: "expedia.com", url: "https://www.expedia.com/Hotel-Search", status: "link", stays: [] },
@@ -52,14 +66,26 @@ describe("StayList", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Google Hotels" }));
     expect(screen.queryByText("Flamingo")).toBeNull();
     expect(screen.getByText("24% off usual")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Blocked us · open Airbnb/ })).toHaveAttribute("href", "https://www.airbnb.com/s/Las%20Vegas/homes");
+    expect(screen.getByRole("link", { name: /Blocked us · open Airbnb/ })).toHaveAttribute(
+      "href",
+      "https://www.airbnb.com/s/Las%20Vegas/homes",
+    );
     expect(screen.getByRole("link", { name: /Search on Expedia/ })).toHaveAttribute("href", "https://www.expedia.com/Hotel-Search");
   });
 
   it("folds a long list on narrow screens until asked for more", () => {
     const many: StayListWidget = {
       ...widget,
-      sources: [{ ...widget.sources[0], stays: Array.from({ length: 6 }, (_, i) => ({ title: `Hotel ${i}`, url: `https://www.google.com/travel/search?q=h${i}`, nightly: 100 + i })) }],
+      sources: [
+        {
+          ...widget.sources[0],
+          stays: Array.from({ length: 6 }, (_, i) => ({
+            title: `Hotel ${i}`,
+            url: `https://www.google.com/travel/search?q=h${i}`,
+            nightly: 100 + i,
+          })),
+        },
+      ],
     };
     const { container } = render(<StayList toolCallId="s3" widget={many} />);
     const folded = () => [...container.querySelectorAll("li")].filter((li) => li.className.includes("hidden sm:block")).length;
@@ -82,7 +108,17 @@ describe("StayList", () => {
             { title: "Hyatt Regency", url: "https://www.google.com/travel/search?q=h", nightly: 380, met: ["Marriott/Hyatt"] },
           ],
         },
-        { ...widget.sources[1], stays: [{ title: "Hotel du Louvre", url: "https://www.booking.com/hotel/fr/louvre.html", nightly: 390, met: ["Marriott/Hyatt", "near the Louvre"] }] },
+        {
+          ...widget.sources[1],
+          stays: [
+            {
+              title: "Hotel du Louvre",
+              url: "https://www.booking.com/hotel/fr/louvre.html",
+              nightly: 390,
+              met: ["Marriott/Hyatt", "near the Louvre"],
+            },
+          ],
+        },
       ],
     };
     const { container } = render(<StayList toolCallId="s4" widget={wished} />);
@@ -101,7 +137,12 @@ describe("StayList", () => {
     const mixed: StayListWidget = {
       ...widget,
       currency: "EUR",
-      sources: [{ ...widget.sources[0], stays: [{ title: "Dollar hotel", url: "https://www.google.com/travel/search?q=d", nightly: 420, currency: "USD" }] }],
+      sources: [
+        {
+          ...widget.sources[0],
+          stays: [{ title: "Dollar hotel", url: "https://www.google.com/travel/search?q=d", nightly: 420, currency: "USD" }],
+        },
+      ],
     };
     const { container } = render(<StayList toolCallId="s5" widget={mixed} />);
     expect(container.querySelector("#stays-s5-google_hotels-0-nightly")?.textContent).toContain("$420.00");

@@ -41,7 +41,8 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   const onPlanEdit = useCallback((plan: PlanEdits) => setEdits((e) => withPlanEdits(e, plan)), []);
   const latestCart = useMemo(() => {
     for (const t of [...turns].reverse())
-      for (const it of [...t.items].reverse()) if (it.kind === "widget" && (it.widget as { kind?: string } | null)?.kind === "cart") return it.id;
+      for (const it of [...t.items].reverse())
+        if (it.kind === "widget" && (it.widget as { kind?: string } | null)?.kind === "cart") return it.id;
     return undefined;
   }, [turns]);
   const latestPlans = useMemo(() => {
@@ -60,7 +61,8 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
       onCustomEvent: ({ event }) => {
         const id = lastRef.current;
         if (event.name === "browser_frame" && id) setFrames((f) => ({ ...f, [id]: event.value as BrowserFrame }));
-        if (event.name === "workflow_step" && id) setWorkflow((w) => ({ ...w, [id]: [...(w[id] ?? []), event.value as WorkflowStepEvent] }));
+        if (event.name === "workflow_step" && id)
+          setWorkflow((w) => ({ ...w, [id]: [...(w[id] ?? []), event.value as WorkflowStepEvent] }));
       },
       onRunErrorEvent: ({ event }) => {
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
@@ -124,12 +126,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
 
   return (
     <div id="chat-session" className="flex min-h-0 flex-1 flex-col">
-      <div
-        id="chat-scroller"
-        ref={scroller}
-        onScroll={measure}
-        className="relative flex min-h-0 flex-1 flex-col overflow-y-auto"
-      >
+      <div id="chat-scroller" ref={scroller} onScroll={measure} className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
         {turns.length === 0 ? (
           <EmptyState name={props.name?.trim().split(/\s+/)[0]} onPick={send} />
         ) : (
@@ -161,7 +158,9 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
           <button
             id="chat-jump-bottom"
             type="button"
-            onClick={() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: prefersReducedMotion() ? "auto" : "smooth" })}
+            onClick={() =>
+              scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: prefersReducedMotion() ? "auto" : "smooth" })
+            }
             className="absolute -top-11 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-paper px-3 text-[12px] font-medium text-text-secondary shadow-float transition hover:text-text-primary focus-visible:outline-2 focus-visible:outline-mist-500"
           >
             <ArrowDown id="chat-jump-bottom-icon" aria-hidden="true" size={14} />

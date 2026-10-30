@@ -45,7 +45,14 @@ export const CLOUD: CatalogEntry[] = [
     keyUrl: "https://api.together.ai/settings/api-keys",
     recommended: ["deepseek-ai/DeepSeek-V4.1-Flash", "Qwen/Qwen3.6-Plus"],
   },
-  { id: "groq", label: "Groq", kind: "cloud", site: "groq.com", keyUrl: "https://console.groq.com/keys", recommended: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"] },
+  {
+    id: "groq",
+    label: "Groq",
+    kind: "cloud",
+    site: "groq.com",
+    keyUrl: "https://console.groq.com/keys",
+    recommended: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"],
+  },
   {
     id: "google",
     label: "Google Gemini",

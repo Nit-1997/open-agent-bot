@@ -9,7 +9,13 @@ import { LoginFlows } from "../src/providers/logins.js";
 import { SessionStore } from "../src/session/sessionStore.js";
 import { fakeFetch, json } from "./fixtures/fakeFetch.js";
 
-const store = () => new SessionStore({ idleMs: 1000, create: async () => { throw new Error("unused"); } });
+const store = () =>
+  new SessionStore({
+    idleMs: 1000,
+    create: async () => {
+      throw new Error("unused");
+    },
+  });
 
 describe("createApp", () => {
   it("serves health", async () => {
@@ -32,7 +38,12 @@ describe("createApp", () => {
 
   describe("models and providers", () => {
     const setup = async () => {
-      const cfg = loadConfig({ LLM_API_KEY: "k", AGENT_MODEL: "chat-default", AGENT_MODELS: "chat-sonnet-5.5=Sonnet 5.5", AGENT_SHARED_SECRET: "s3" });
+      const cfg = loadConfig({
+        LLM_API_KEY: "k",
+        AGENT_MODEL: "chat-default",
+        AGENT_MODELS: "chat-sonnet-5.5=Sonnet 5.5",
+        AGENT_SHARED_SECRET: "s3",
+      });
       const f = fakeFetch([[/host\.docker\.internal:11434\/v1\/models$/, () => json({ data: [{ id: "qwen3.5:35b" }] })]]);
       const hub = await ProviderHub.create({
         dataDir: mkdtempSync(join(tmpdir(), "app-")),
@@ -51,7 +62,12 @@ describe("createApp", () => {
 
     it("keeps every model and provider route behind the shared secret", async () => {
       const { app } = await setup();
-      for (const [method, path] of [["GET", "/models"], ["GET", "/providers"], ["POST", "/providers/groq/key"], ["DELETE", "/providers/groq"]]) {
+      for (const [method, path] of [
+        ["GET", "/models"],
+        ["GET", "/providers"],
+        ["POST", "/providers/groq/key"],
+        ["DELETE", "/providers/groq"],
+      ]) {
         expect((await app.request(path, { method })).status).toBe(401);
       }
     });
@@ -84,7 +100,10 @@ describe("createApp", () => {
 
     it("adds a local server and removes providers", async () => {
       const { call } = await setup();
-      const added = await call("/providers/local", { method: "POST", body: JSON.stringify({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" }) });
+      const added = await call("/providers/local", {
+        method: "POST",
+        body: JSON.stringify({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" }),
+      });
       expect(await added.json()).toMatchObject({ provider: { id: "ollama", configured: true } });
       expect((await call("/providers/ollama", { method: "DELETE" })).status).toBe(200);
     });
@@ -98,7 +117,10 @@ describe("createApp", () => {
         authUrl: "https://auth.openai.com/authorize?x=1",
         prompt: { message: "Paste the final redirect URL" },
       });
-      const answered = await call(`/providers/logins/${started.flow}/answer`, { method: "POST", body: JSON.stringify({ value: "http://127.0.0.1:1455/auth/callback?code=c" }) });
+      const answered = await call(`/providers/logins/${started.flow}/answer`, {
+        method: "POST",
+        body: JSON.stringify({ value: "http://127.0.0.1:1455/auth/callback?code=c" }),
+      });
       expect(answered.status).toBe(200);
       await new Promise((r) => setTimeout(r, 0));
       expect(await (await call(`/providers/logins/${started.flow}`)).json()).toMatchObject({ status: "done" });

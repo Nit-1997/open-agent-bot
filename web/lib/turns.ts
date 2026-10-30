@@ -67,7 +67,13 @@ export function buildTurns(messages: readonly ChatMessage[]): Turn[] {
       const result = results.get(c.id);
       if (name === "show_widget") t.items.push({ kind: "widget", id: c.id, widget: args.widget });
       if (name === "create_artifact") t.items.push({ kind: "artifact", id: c.id, title: String(args.title ?? "Page"), result });
-      if (name === "research") t.items.push({ kind: "artifact", id: c.id, title: /artifact [\w-]{12} created: ([^\n]+)/.exec(result ?? "")?.[1] ?? "Report", result });
+      if (name === "research")
+        t.items.push({
+          kind: "artifact",
+          id: c.id,
+          title: /artifact [\w-]{12} created: ([^\n]+)/.exec(result ?? "")?.[1] ?? "Report",
+          result,
+        });
       if (RENDER_TOOLS.has(name)) continue;
       const found = name === "web_search" && result ? searchResults(result) : [];
       p.searched.push(...found);

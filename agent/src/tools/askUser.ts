@@ -37,8 +37,11 @@ export const askUserTool = () =>
         ...(params.submit_label && { submitLabel: params.submit_label }),
       });
       if (!r.ok) return fail(`invalid form:\n${r.errors.join("\n")}`);
-      return ok("The form is shown to the user. End your reply now with at most one short sentence; their answers arrive as their next message.", {
-        widget: r.value,
-      });
+      return ok(
+        "The form is shown to the user. End your reply now with at most one short sentence; their answers arrive as their next message.",
+        {
+          widget: r.value,
+        },
+      );
     },
   });

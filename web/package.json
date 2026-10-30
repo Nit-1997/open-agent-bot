@@ -11,6 +11,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "biome format --write",
+    "format:check": "biome format",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -28,6 +30,7 @@
     "typebox": "^1.4.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.3",
     "@tailwindcss/turbopack": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

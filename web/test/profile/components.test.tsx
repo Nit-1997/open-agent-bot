@@ -65,7 +65,12 @@ describe("ProfileDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Vegetarian" }));
     fireEvent.click(screen.getByRole("radio", { name: /Sonnet 5.5/ }));
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
-    expect(onSave).toHaveBeenCalledWith({ ...profile, name: "Nitin B", interests: ["Vegetarian"], defaultModel: "litellm/chat-sonnet-5.5" });
+    expect(onSave).toHaveBeenCalledWith({
+      ...profile,
+      name: "Nitin B",
+      interests: ["Vegetarian"],
+      defaultModel: "litellm/chat-sonnet-5.5",
+    });
   });
 
   it("asks before clearing the profile", () => {

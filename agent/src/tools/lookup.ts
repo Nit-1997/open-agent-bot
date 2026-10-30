@@ -15,7 +15,10 @@ const timeout = (signal?: AbortSignal) => timeoutSignal(10000, signal);
 const Queries = Type.Union([Type.Array(Type.String()), Type.String()], { description: "names to look up, up to 10, in one call" });
 
 function names(v: unknown): string[] {
-  return queryList(v).map((q) => q.trim()).filter(Boolean).slice(0, MAX_BATCH);
+  return queryList(v)
+    .map((q) => q.trim())
+    .filter(Boolean)
+    .slice(0, MAX_BATCH);
 }
 
 export type ITunes = {
@@ -38,7 +41,15 @@ function describeMusic(r: ITunes, kind: "album" | "song"): string {
   return `${title} — ${parts.filter(Boolean).join(" · ")}${link ? `\n   link: ${link}` : ""}${image ? `\n   image: ${image}` : ""}`;
 }
 
-const words = (s: string) => new Set(s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 1));
+const words = (s: string) =>
+  new Set(
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 1),
+  );
 
 export function bestMatch(results: ITunes[], query: string, kind: "album" | "song"): ITunes | undefined {
   const want = words(query);
@@ -58,7 +69,13 @@ const optionText = (r: ITunes, kind: "album" | "song") => {
     : `${r.collectionName} by ${r.artistName}${year ? ` (${year})` : ""}`;
 };
 
-export async function pickMusic(results: ITunes[], query: string, kind: "album" | "song", judge?: Judge, signal?: AbortSignal): Promise<ITunes | undefined> {
+export async function pickMusic(
+  results: ITunes[],
+  query: string,
+  kind: "album" | "song",
+  judge?: Judge,
+  signal?: AbortSignal,
+): Promise<ITunes | undefined> {
   if (judge?.available && results.length) {
     const options = Object.fromEntries(results.map((r, i) => [`c${i}`, optionText(r, kind)]));
     const verdict = await judge.choose({ request: query, kind }, options, musicMatch, { signal });
@@ -73,7 +90,7 @@ export function musicTool(deps: { country: string; fetch?: typeof fetch; judge?:
     name: "music",
     label: "Music",
     description:
-      "Look up albums or songs: official cover art, artist, year, and an Apple Music link. Use it for playlists and album recommendations; pass every title in one call, e.g. [\"Rumours Fleetwood Mac\", \"Hotel California Eagles\"].",
+      'Look up albums or songs: official cover art, artist, year, and an Apple Music link. Use it for playlists and album recommendations; pass every title in one call, e.g. ["Rumours Fleetwood Mac", "Hotel California Eagles"].',
     parameters: Type.Object({
       queries: Queries,
       kind: Type.Optional(Type.Enum(["album", "song"], { description: "default album" })),
@@ -110,7 +127,7 @@ export function wikipediaTool(deps: { fetch?: typeof fetch } = {}) {
     name: "wikipedia",
     label: "Wikipedia",
     description:
-      "Look up places, landmarks, people, events, or topics on Wikipedia: a short summary, the lead picture, and the article link. Pass every name in one call, e.g. [\"Kinkaku-ji\", \"Fushimi Inari-taisha\"]. Good for research overviews and travel sights.",
+      'Look up places, landmarks, people, events, or topics on Wikipedia: a short summary, the lead picture, and the article link. Pass every name in one call, e.g. ["Kinkaku-ji", "Fushimi Inari-taisha"]. Good for research overviews and travel sights.',
     parameters: Type.Object({ queries: Queries }),
     async execute(_id, params, signal): Promise<ToolResult> {
       const list = names(params.queries);

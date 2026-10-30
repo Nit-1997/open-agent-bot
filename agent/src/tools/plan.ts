@@ -1,7 +1,15 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { validateWidget } from "../../../shared/widgets.js";
-import { applyPatch, ENTITY_KINDS, type EntityKind, isEntityKind, isPlanKind, type PatchOp, validateEntity } from "../../../shared/workspace.js";
+import {
+  applyPatch,
+  ENTITY_KINDS,
+  type EntityKind,
+  isEntityKind,
+  isPlanKind,
+  type PatchOp,
+  validateEntity,
+} from "../../../shared/workspace.js";
 import { VersionConflict } from "../workspace/conflict.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import { fail, ok, type ToolResult } from "./result.js";
@@ -61,10 +69,14 @@ export function planTool(deps: { store: WorkspaceStore; threadId: string }) {
       if (params.action === "get") {
         if (params.id) {
           const found = store.get(threadId, kind, id);
-          return found ? ok(`${kind} "${id}" (version ${found.version}): ${JSON.stringify(found.value)}`) : fail(`No ${kind} "${id}" is saved in this chat.`);
+          return found
+            ? ok(`${kind} "${id}" (version ${found.version}): ${JSON.stringify(found.value)}`)
+            : fail(`No ${kind} "${id}" is saved in this chat.`);
         }
         const all = store.list(threadId, kind);
-        return all.length ? ok(all.map((e) => `${kind} "${e.id}" (version ${e.version}): ${JSON.stringify(e.value)}`).join("\n")) : fail(`No ${kind} is saved in this chat.`);
+        return all.length
+          ? ok(all.map((e) => `${kind} "${e.id}" (version ${e.version}): ${JSON.stringify(e.value)}`).join("\n"))
+          : fail(`No ${kind} is saved in this chat.`);
       }
       if (kind === "cart") return fail("The cart is changed with the shop tool, not plan.");
       if (params.action === "set") {

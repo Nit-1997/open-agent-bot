@@ -24,7 +24,12 @@ export function SourcesRow({ id, sources }: { id: string; sources: Source[] }) {
           ))}
         </span>
         <span id={`${id}-count`} className="font-medium">{`${sources.length} source${sources.length === 1 ? "" : "s"}`}</span>
-        <ChevronDown id={`${id}-chevron`} aria-hidden="true" size={14} className={`text-text-faint transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          id={`${id}-chevron`}
+          aria-hidden="true"
+          size={14}
+          className={`text-text-faint transition ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open && (
         <ol id={`${id}-list`} className="mt-2 grid animate-rise gap-2 sm:grid-cols-2">

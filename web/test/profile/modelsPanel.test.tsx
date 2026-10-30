@@ -21,9 +21,24 @@ let loginState: Record<string, unknown>;
 
 beforeEach(() => {
   providers = [
-    base({ id: "openai", label: "OpenAI", site: "openai.com", keyUrl: "https://platform.openai.com/api-keys", methods: ["api_key", "oauth"], oauthLabel: "Sign in with ChatGPT" }),
+    base({
+      id: "openai",
+      label: "OpenAI",
+      site: "openai.com",
+      keyUrl: "https://platform.openai.com/api-keys",
+      methods: ["api_key", "oauth"],
+      oauthLabel: "Sign in with ChatGPT",
+    }),
     base({ id: "groq", label: "Groq", site: "groq.com", configured: true, source: "key", enabled: ["llama-3.3-70b-versatile"] }),
-    base({ id: "ollama", label: "Ollama", kind: "local", site: "ollama.com", methods: [], defaultBaseUrl: "http://host.docker.internal:11434/v1", modelCount: 0 }),
+    base({
+      id: "ollama",
+      label: "Ollama",
+      kind: "local",
+      site: "ollama.com",
+      methods: [],
+      defaultBaseUrl: "http://host.docker.internal:11434/v1",
+      modelCount: 0,
+    }),
   ];
   calls = [];
   loginState = {
@@ -48,7 +63,13 @@ beforeEach(() => {
       if (url === "/api/providers/groq/models" && method === "GET")
         return ok({
           models: [
-            { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", contextWindow: 131072, note: "$0.59 in · $0.79 out per 1M tokens", enabled: true },
+            {
+              id: "llama-3.3-70b-versatile",
+              label: "Llama 3.3 70B",
+              contextWindow: 131072,
+              note: "$0.59 in · $0.79 out per 1M tokens",
+              enabled: true,
+            },
             { id: "openai/gpt-oss-120b", label: "GPT OSS 120B", contextWindow: 131072, enabled: false },
           ],
         });
@@ -66,7 +87,14 @@ beforeEach(() => {
       }
       if (url === "/api/providers/logins/11111111-2222-3333-4444-555555555555") return ok(loginState);
       if (url === "/api/providers/local") {
-        providers[2] = { ...providers[2], configured: true, source: "server", baseUrl: body.baseUrl, enabled: ["qwen3.5:35b"], modelCount: 1 };
+        providers[2] = {
+          ...providers[2],
+          configured: true,
+          source: "server",
+          baseUrl: body.baseUrl,
+          enabled: ["qwen3.5:35b"],
+          modelCount: 1,
+        };
         return ok({ provider: providers[2] });
       }
       return new Response("{}", { status: 404 });
@@ -117,7 +145,9 @@ describe("ModelsPanel", () => {
     expect(screen.getByRole("checkbox", { name: /Llama 3.3 70B/ })).toBeChecked();
     expect(screen.getByText("$0.59 in · $0.79 out per 1M tokens")).toBeInTheDocument();
     fireEvent.click(gptOss);
-    await waitFor(() => expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ enabled: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"] }));
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ enabled: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"] }),
+    );
     expect(onChanged).toHaveBeenCalled();
   });
 
@@ -142,7 +172,10 @@ describe("ModelsPanel", () => {
     expect(screen.getByLabelText("Ollama server URL")).toHaveValue("http://host.docker.internal:11434/v1");
     fireEvent.click(within(row("Ollama")).getByRole("button", { name: "Connect server" }));
     await waitFor(() => expect(row("Ollama")).toHaveTextContent("http://host.docker.internal:11434/v1"));
-    expect(calls.find((c) => c.url === "/api/providers/local")?.body).toEqual({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" });
+    expect(calls.find((c) => c.url === "/api/providers/local")?.body).toEqual({
+      kind: "ollama",
+      baseUrl: "http://host.docker.internal:11434/v1",
+    });
   });
 
   it("signs in with ChatGPT: opens OpenAI's page, accepts a pasted redirect, then shows signed in", async () => {

@@ -9,9 +9,10 @@ export function withRules<T extends ToolDefinition<any, any, any>>(tool: T, rule
 const list = (ids: string[]) => ids.join(", ");
 
 export const RULES = {
-  weather: "Never repeat its numbers in another card, table, or list. Typical weather for far-off dates is not a forecast: call it typical.",
+  weather:
+    "Never repeat its numbers in another card, table, or list. Typical weather for far-off dates is not a forecast: call it typical.",
   flights: () =>
-    'Search flights and show one flight card with links for the user to book themselves. Dates are YYYY-MM-DD. from is an airport code or city, up to 4 codes separated by commas, or "nearby" for every airport near the user\'s home: use nearby when they fly from home, unless they chose the closest only. The card ranks airports by fare plus an estimated rideshare. Pass layover and departure-time preferences when known. Then explain the best value in a sentence and point to the search link; don\'t ask which airport or offer driving.',
+    "Search flights and show one flight card with links for the user to book themselves. Dates are YYYY-MM-DD. from is an airport code or city, up to 4 codes separated by commas, or \"nearby\" for every airport near the user's home: use nearby when they fly from home, unless they chose the closest only. The card ranks airports by fare plus an estimated rideshare. Pass layover and departure-time preferences when known. Then explain the best value in a sentence and point to the search link; don't ask which airport or offer driving.",
   stays:
     'Call it once; type "rental" for homes and apartments, "hotel" for hotels. Don\'t browse booking sites or repeat its listings in show_ui. Then name the best one or two picks in a sentence.',
   askUser:
@@ -29,7 +30,9 @@ export function shopRules(country: string): (base: string) => string {
     const at = base.indexOf("Stores");
     const stores = at < 0 ? "" : ` ${base.slice(at)}`;
     const market = defaultStoresFor(country, "grocery").find((id) => storeFor(id).marketplace);
-    const viaMarket = market ? ` Groceries from a store ${market} carries: pass ${market}, which reads that store's real prices; the store's own site usually blocks guests.` : "";
+    const viaMarket = market
+      ? ` Groceries from a store ${market} carries: pass ${market}, which reads that store's real prices; the store's own site usually blocks guests.`
+      : "";
     return `Build the chat's one shopping cart from stores' real catalogs, browsing as a guest. First call: items with qty and 1-3 stores; it keeps the best-value stores. For follow-ups ("add tortillas", "make it for 6") pass only the new items, no stores. remove drops items; pass stores again only to switch stores, new_cart only for an unrelated list. Use the store the user named, else the defaults for their region: groceries ${list(defaultStoresFor(country, "grocery"))}; other products ${list(defaultStoresFor(country, "general"))}.${viaMarket}${stores}
 
 It shows its own cart card (products, prices, links, best value), so don't repeat products in show_ui and never use image_search pictures for products. For recipes skip pantry basics. Reply in a sentence or two: best-value store, how much cheaper than the next, missing items.`;

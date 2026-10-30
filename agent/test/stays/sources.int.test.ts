@@ -5,7 +5,15 @@ import { booking } from "../../src/sources/stays/booking.js";
 import { googleHotels } from "../../src/sources/stays/googleHotels.js";
 import type { StayQuery } from "../../src/stays/types.js";
 
-const q: StayQuery = { location: "Las Vegas", checkin: "2026-11-12", checkout: "2026-11-15", nights: 3, adults: 2, rooms: 1, currency: "USD" };
+const q: StayQuery = {
+  location: "Las Vegas",
+  checkin: "2026-11-12",
+  checkout: "2026-11-15",
+  nights: 3,
+  adults: 2,
+  rooms: 1,
+  currency: "USD",
+};
 
 let browser: Browser;
 let page: Page;
@@ -45,7 +53,14 @@ describe("stay source readers in a real page", () => {
         <div data-testid="listing-card-title">Condo in Paradise</div><div data-testid="listing-card-name">Strip view 2BR</div>
         <div>4.9 out of 5 average rating, 210 reviews</div><div>$720 for 3 nights</div></div>`);
     const [s] = await airbnb.read!(page, q);
-    expect(s).toMatchObject({ title: "Strip view 2BR", total: 720, nightly: 240, rating: 4.9, kind: "Condo", url: "https://www.airbnb.com/rooms/1?check_in=2026-11-12&check_out=2026-11-15&adults=2" });
+    expect(s).toMatchObject({
+      title: "Strip view 2BR",
+      total: 720,
+      nightly: 240,
+      rating: 4.9,
+      kind: "Condo",
+      url: "https://www.airbnb.com/rooms/1?check_in=2026-11-12&check_out=2026-11-15&adults=2",
+    });
   });
 
   it("Booking.com: reads property cards and skips ads outside them", async () => {

@@ -36,8 +36,14 @@ export function providerRoutes(deps: Deps) {
     return deps.logins;
   };
 
-  app.get("/models", safe((c) => c.json({ default: defaultModelRef(deps.cfg, hub()), models: hub().enabledModels() })));
-  app.get("/providers", safe((c) => c.json({ providers: hub().list() })));
+  app.get(
+    "/models",
+    safe((c) => c.json({ default: defaultModelRef(deps.cfg, hub()), models: hub().enabledModels() })),
+  );
+  app.get(
+    "/providers",
+    safe((c) => c.json({ providers: hub().list() })),
+  );
   app.post(
     "/providers/local",
     safe(async (c) => {
@@ -81,7 +87,9 @@ export function providerRoutes(deps: Deps) {
     "/providers/:id/login",
     safe((c) => {
       const id = param(c, "id");
-      const provider = hub().list().find((p) => p.id === id);
+      const provider = hub()
+        .list()
+        .find((p) => p.id === id);
       if (!provider) throw new Error(`provider ${id} is not supported`);
       if (!provider.methods.includes("oauth")) throw new Error(`${provider.label} has no sign-in option here`);
       return c.json({ flow: logins().start(id) });
@@ -102,7 +110,10 @@ export function providerRoutes(deps: Deps) {
       return c.json({ ok: true });
     }),
   );
-  app.get("/providers/:id/models", safe((c) => c.json({ models: hub().models(param(c, "id")) })));
+  app.get(
+    "/providers/:id/models",
+    safe((c) => c.json({ models: hub().models(param(c, "id")) })),
+  );
   app.put(
     "/providers/:id/models",
     safe(async (c) => {

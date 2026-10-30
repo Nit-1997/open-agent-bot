@@ -3,7 +3,9 @@ import { Evidence, extractClaims } from "../../src/grounding/evidence.js";
 
 describe("extractClaims", () => {
   it("finds prices, ratings, stock phrases and links", () => {
-    const claims = extractClaims("Diyas are $6.99 (4.5 stars), ✅ In Stock at https://www.target.com/p/diya/-/A-1?x=1. Rs. 1,299 on Amazon.");
+    const claims = extractClaims(
+      "Diyas are $6.99 (4.5 stars), ✅ In Stock at https://www.target.com/p/diya/-/A-1?x=1. Rs. 1,299 on Amazon.",
+    );
     expect(claims.map((c) => [c.kind, c.text])).toEqual([
       ["price", "$6.99"],
       ["rating", "4.5 stars"],
@@ -21,7 +23,9 @@ describe("extractClaims", () => {
 
 describe("Evidence", () => {
   const ev = new Evidence();
-  ev.add('Target: Diwali Diya 12ct $6.99 · 4.5 out of 5 stars · In stock. https://www.target.com/p/diya/-/A-84311898 {"price":289,"rating":4.2}');
+  ev.add(
+    'Target: Diwali Diya 12ct $6.99 · 4.5 out of 5 stars · In stock. https://www.target.com/p/diya/-/A-84311898 {"price":289,"rating":4.2}',
+  );
   ev.add("My budget is about $200.");
 
   const unverified = (text: string) => ev.unverified(text);

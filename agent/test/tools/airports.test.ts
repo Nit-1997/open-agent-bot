@@ -10,7 +10,8 @@ const SUNNYVALE = { lat: 37.3688, lon: -122.0363 };
 
 const option = (depart: string, arrive: string, airline: string, price: number) =>
   `${depart} – ${arrive}\n${airline}\n\n3 hrs 5 min\n\n1 stop\n\n$${price}\n`;
-const pageWith = (...opts: string[]) => `Round trip\n${opts.join("\n")}\nPrices include required taxes + fees for 2 adults. Optional charges may apply.\n`;
+const pageWith = (...opts: string[]) =>
+  `Round trip\n${opts.join("\n")}\nPrices include required taxes + fees for 2 adults. Optional charges may apply.\n`;
 
 describe("geo", () => {
   it("knows the Bay Area airports and their distance from Sunnyvale", () => {
@@ -36,7 +37,12 @@ describe("geo", () => {
   });
 
   it("gets real driving distance and time from OSRM", async () => {
-    const f = fakeFetch([[/router\.project-osrm\.org\/route\/v1\/driving\/-122\.0363,37\.3688;-121\.9289,37\.3639/, () => json({ routes: [{ distance: 12070, duration: 840 }] })]]);
+    const f = fakeFetch([
+      [
+        /router\.project-osrm\.org\/route\/v1\/driving\/-122\.0363,37\.3688;-121\.9289,37\.3639/,
+        () => json({ routes: [{ distance: 12070, duration: 840 }] }),
+      ],
+    ]);
     expect(await driveRoute(SUNNYVALE, AIRPORTS.SJC, f)).toEqual({ miles: 7.5, minutes: 14, source: "road" });
   });
 
@@ -77,7 +83,10 @@ describe("flights across nearby airports", () => {
   };
 
   it("searches each airport once, in parallel (retrying a failure once), and returns one card with rides and preferences", async () => {
-    const drives: Record<string, { miles: number; minutes: number }> = { SJC: { miles: 7.5, minutes: 14 }, SFO: { miles: 33, minutes: 38 } };
+    const drives: Record<string, { miles: number; minutes: number }> = {
+      SJC: { miles: 7.5, minutes: 14 },
+      SFO: { miles: 33, minutes: 38 },
+    };
     const tool = flightsTool({
       locale: "en-US",
       currency: "USD",
@@ -86,7 +95,15 @@ describe("flights across nearby airports", () => {
     });
     const r = await tool.execute(
       "c",
-      { from: "SJC, SFO, OAK", to: "LAS", date: "2026-11-25", returnDate: "2026-11-29", adults: 2, max_layover: "5h", depart_times: "midday, evening" },
+      {
+        from: "SJC, SFO, OAK",
+        to: "LAS",
+        date: "2026-11-25",
+        returnDate: "2026-11-29",
+        adults: 2,
+        max_layover: "5h",
+        depart_times: "midday, evening",
+      },
       undefined,
       undefined,
       {} as never,
@@ -106,14 +123,21 @@ describe("flights across nearby airports", () => {
     ]);
     expect(data.priceNote).toBe("Round-trip total for 2 adults, incl. taxes and fees");
     const text = (r.content[0] as { text: string }).text;
-    expect(text).toContain("SFO San Francisco: 38 min drive, ride about 85 USD each way (estimate), best matching fare 543 USD, about 713 USD all-in (best value)");
+    expect(text).toContain(
+      "SFO San Francisco: 38 min drive, ride about 85 USD each way (estimate), best matching fare 543 USD, about 713 USD all-in (best value)",
+    );
     expect(text).toContain("SJC San Jose: 14 min drive");
     expect(text).toContain("no flights match the preferences");
     expect(text).toContain("OAK: couldn't load");
-    expect(text).toContain("Matching the preferences (layovers up to 5h; departs midday 9 am–4 pm or evening 4–10 pm):\n- SFO: Frontier 3:10 pm");
+    expect(text).toContain(
+      "Matching the preferences (layovers up to 5h; departs midday 9 am–4 pm or evening 4–10 pm):\n- SFO: Frontier 3:10 pm",
+    );
     expect(text).toContain("Other options (outside the preferences):\n- SJC: Southwest 8:00 am");
     const widget = renderData(data);
     expect(validateWidget(widget)).toMatchObject({ ok: true });
-    expect(widget).toMatchObject({ prefs: { maxLayover: "5h" }, airports: [{ code: "SJC", rideOneWay: 26 }, { code: "SFO" }, { code: "OAK", status: "failed" }] });
+    expect(widget).toMatchObject({
+      prefs: { maxLayover: "5h" },
+      airports: [{ code: "SJC", rideOneWay: 26 }, { code: "SFO" }, { code: "OAK", status: "failed" }],
+    });
   });
 });

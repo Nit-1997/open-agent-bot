@@ -4,7 +4,9 @@ import { productMatch } from "../../src/judge/criteria/productMatch.js";
 
 type Call = { state: Record<string, unknown>; questions: Record<string, any> };
 
-function fakeRuntime(opts: { models?: { provider: string; id: string }[]; classify?: (ctx: Call, signal?: AbortSignal) => Promise<any> } = {}) {
+function fakeRuntime(
+  opts: { models?: { provider: string; id: string }[]; classify?: (ctx: Call, signal?: AbortSignal) => Promise<any> } = {},
+) {
   const calls: Call[] = [];
   const runtime = {
     getAvailableOfType: async () => opts.models ?? [{ provider: "openrouter", id: "typesafe/jev-1.14" }],
@@ -42,7 +44,9 @@ describe("createJudge", () => {
   });
 
   it("is unavailable when the model is missing or the ref is malformed", async () => {
-    expect((await createJudge({ runtime: fakeRuntime({ models: [] }).runtime, model: "openrouter/typesafe/jev-1.14" })).available).toBe(false);
+    expect((await createJudge({ runtime: fakeRuntime({ models: [] }).runtime, model: "openrouter/typesafe/jev-1.14" })).available).toBe(
+      false,
+    );
     expect((await createJudge({ runtime: fakeRuntime().runtime, model: "nonsense" })).available).toBe(false);
   });
 
@@ -123,13 +127,18 @@ describe("createJudge", () => {
   it("yesno thresholds the bool probability", async () => {
     const { runtime } = fakeRuntime({ classify: async () => ({ stopReason: "stop", answers: { q: { type: "bool", probability: 0.7 } } }) });
     const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
-    expect(await judge.yesno(items(1), { id: "x", version: "1", question: "q", yes: "y", no: "n" })).toEqual([{ id: "t0", yes: true, p: 0.7 }]);
+    expect(await judge.yesno(items(1), { id: "x", version: "1", question: "q", yes: "y", no: "n" })).toEqual([
+      { id: "t0", yes: true, p: 0.7 },
+    ]);
   });
 
   it("choose maps the none option to null", async () => {
     const { runtime } = fakeRuntime({ classify: async () => choice("none", 0.8) });
     const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
-    expect(await judge.choose({}, { a: "A" }, { id: "x", version: "1", question: "q", none: "nothing fits" })).toEqual({ choice: null, p: 0.8 });
+    expect(await judge.choose({}, { a: "A" }, { id: "x", version: "1", question: "q", none: "nothing fits" })).toEqual({
+      choice: null,
+      p: 0.8,
+    });
   });
 });
 
@@ -137,7 +146,9 @@ describe("batched score", () => {
   const multi = (n: number, label = "exact") => ({
     stopReason: "stop",
     usage: { cost: { total: 0.0003 } },
-    answers: Object.fromEntries(Array.from({ length: n }, (_, i) => [`t${i}`, { type: "choice", choice: label, probabilities: { [label]: 0.8 }, confidence: 0.8 }])),
+    answers: Object.fromEntries(
+      Array.from({ length: n }, (_, i) => [`t${i}`, { type: "choice", choice: label, probabilities: { [label]: 0.8 }, confidence: 0.8 }]),
+    ),
   });
 
   it("asks one question per tile in a single call and keeps item order", async () => {
@@ -161,7 +172,9 @@ describe("batched score", () => {
   });
 
   it("falls back to one call per item when the batched call fails", async () => {
-    const { runtime, calls } = fakeRuntime({ classify: async (ctx) => (ctx.questions.t0 ? { stopReason: "error", answers: {} } : choice("substitute", 0.7)) });
+    const { runtime, calls } = fakeRuntime({
+      classify: async (ctx) => (ctx.questions.t0 ? { stopReason: "error", answers: {} } : choice("substitute", 0.7)),
+    });
     const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
     const out = await judge.score(items(3), productMatch, { batch: { shared: {} } });
     expect(out?.map((s) => s.level)).toEqual(["substitute", "substitute", "substitute"]);
@@ -181,7 +194,10 @@ describe("classify", () => {
     intent: { type: "choice" as const, question: "Which?", options: { plan: "look up", buy: "pay" } },
   };
   const reply = (answers: Record<string, unknown>) => ({ stopReason: "stop", usage: { cost: { total: 0.00002 } }, answers });
-  const good = reply({ lodging: { type: "bool", probability: 0.8 }, intent: { type: "choice", choice: "plan", probabilities: { plan: 0.9 }, confidence: 0.9 } });
+  const good = reply({
+    lodging: { type: "bool", probability: 0.8 },
+    intent: { type: "choice", choice: "plan", probabilities: { plan: 0.9 }, confidence: 0.9 },
+  });
 
   it("asks every question in one call and returns typed answers", async () => {
     const { runtime, calls } = fakeRuntime({ classify: async () => good });
@@ -202,15 +218,28 @@ describe("classify", () => {
       { lodging: { type: "choice", choice: "plan", probabilities: { plan: 1 } }, intent: good.answers.intent },
       { lodging: good.answers.lodging, intent: { type: "choice", choice: "sell", probabilities: { sell: 1 } } },
     ]) {
-      const judge = await createJudge({ runtime: fakeRuntime({ classify: async () => reply(answers) }).runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+      const judge = await createJudge({
+        runtime: fakeRuntime({ classify: async () => reply(answers) }).runtime,
+        model: "openrouter/typesafe/jev-1.14",
+        log: () => {},
+      });
       expect(await judge.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
     }
   });
 
   it("returns null on timeout and on a provider error", async () => {
-    const hang = await createJudge({ runtime: fakeRuntime({ classify: () => new Promise(() => {}) }).runtime, model: "openrouter/typesafe/jev-1.14", timeoutMs: 20, log: () => {} });
+    const hang = await createJudge({
+      runtime: fakeRuntime({ classify: () => new Promise(() => {}) }).runtime,
+      model: "openrouter/typesafe/jev-1.14",
+      timeoutMs: 20,
+      log: () => {},
+    });
     expect(await hang.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
-    const bad = await createJudge({ runtime: fakeRuntime({ classify: async () => ({ stopReason: "error", errorMessage: "402", answers: {} }) }).runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
+    const bad = await createJudge({
+      runtime: fakeRuntime({ classify: async () => ({ stopReason: "error", errorMessage: "402", answers: {} }) }).runtime,
+      model: "openrouter/typesafe/jev-1.14",
+      log: () => {},
+    });
     expect(await bad.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
     expect(await noJudge.classify({}, { id: "route", version: "1" }, questions)).toBeNull();
   });
@@ -225,7 +254,9 @@ describe("batched yesno", () => {
   });
 
   it("asks one bool question per item in a single call and keeps item order", async () => {
-    const { runtime, calls } = fakeRuntime({ classify: async (ctx) => bools(Object.keys(ctx.questions).map((_, i) => (i % 2 ? 0.2 : 0.8))) });
+    const { runtime, calls } = fakeRuntime({
+      classify: async (ctx) => bools(Object.keys(ctx.questions).map((_, i) => (i % 2 ? 0.2 : 0.8))),
+    });
     const judge = await createJudge({ runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
     const out = await judge.yesno(items(4), crit, { batch: { shared: { brands: ["Hyatt"] } } });
     expect(out).toEqual([
@@ -248,7 +279,12 @@ describe("batched yesno", () => {
     expect(await a.yesno(items(5), crit, { batch: { shared: {}, max: 2 } })).toHaveLength(5);
     expect(split.calls).toHaveLength(3);
 
-    const broken = fakeRuntime({ classify: async (ctx) => (ctx.questions.t0 ? { stopReason: "error", answers: {} } : { stopReason: "stop", answers: { q: { type: "bool", probability: 0.6 } } }) });
+    const broken = fakeRuntime({
+      classify: async (ctx) =>
+        ctx.questions.t0
+          ? { stopReason: "error", answers: {} }
+          : { stopReason: "stop", answers: { q: { type: "bool", probability: 0.6 } } },
+    });
     const b = await createJudge({ runtime: broken.runtime, model: "openrouter/typesafe/jev-1.14", log: () => {} });
     const out = await b.yesno(items(3), crit, { batch: { shared: {} } });
     expect(out?.map((r) => r.yes)).toEqual([true, true, true]);

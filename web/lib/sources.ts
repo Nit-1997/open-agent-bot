@@ -32,7 +32,10 @@ export function linksIn(markdown: string): Source[] {
 export function dedupeSources(lists: Source[][]): Source[] {
   const byKey = new Map<string, Source>();
   for (const s of lists.flat()) {
-    const key = s.url.replace(/[?#].*$/, "").replace(/\/+$/, "").replace(/^https?:\/\/(www\.)?/, "");
+    const key = s.url
+      .replace(/[?#].*$/, "")
+      .replace(/\/+$/, "")
+      .replace(/^https?:\/\/(www\.)?/, "");
     const prev = byKey.get(key);
     if (!prev) byKey.set(key, { ...s });
     else if (prev.title === prev.host && s.title !== s.host) prev.title = s.title;

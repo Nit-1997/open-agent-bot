@@ -50,7 +50,14 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
             {running ? elapsed : summary}
           </span>
         )}
-        {steps.length > 0 && <ChevronDown id={`${id}-chevron`} aria-hidden="true" size={14} className={`shrink-0 text-text-faint transition ${open ? "rotate-180" : ""}`} />}
+        {steps.length > 0 && (
+          <ChevronDown
+            id={`${id}-chevron`}
+            aria-hidden="true"
+            size={14}
+            className={`shrink-0 text-text-faint transition ${open ? "rotate-180" : ""}`}
+          />
+        )}
       </button>
       {open && (
         <ol id={`${id}-list`} className="ml-2 mt-1 animate-rise border-l border-border pl-4">
@@ -59,11 +66,17 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
             const sid = `${id}-step-${i}`;
             return (
               <li id={sid} key={s.id} className="relative py-1.5">
-                <span id={`${sid}-dot`} className="absolute -left-[25px] top-2 flex h-4 w-4 items-center justify-center rounded-full border border-border bg-bg">
+                <span
+                  id={`${sid}-dot`}
+                  className="absolute -left-[25px] top-2 flex h-4 w-4 items-center justify-center rounded-full border border-border bg-bg"
+                >
                   {s.done ? (
                     <Check id={`${sid}-check`} aria-hidden="true" size={10} className="text-text-muted" />
                   ) : (
-                    <span id={`${sid}-spin`} className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-mist-500 border-t-transparent" />
+                    <span
+                      id={`${sid}-spin`}
+                      className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-mist-500 border-t-transparent"
+                    />
                   )}
                 </span>
                 <span id={`${sid}-row`} className="flex items-center gap-2 text-[13px] text-text-secondary">
@@ -79,7 +92,10 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
                         <Favicon key={h} id={`${sid}-site-${j}`} host={h} size={16} />
                       ))}
                     </span>
-                    <span id={`${sid}-sites-count`} className="text-[12px] sm:text-[11px] text-text-faint">{`${s.sites.length} results`}</span>
+                    <span
+                      id={`${sid}-sites-count`}
+                      className="text-[12px] sm:text-[11px] text-text-faint"
+                    >{`${s.sites.length} results`}</span>
                   </span>
                 )}
               </li>

@@ -6,7 +6,19 @@ import { hostOf } from "@/lib/sources";
 
 export type BrowserFrame = { url: string; data: string };
 
-function Expanded({ id, src, host, opener, onClose }: { id: string; src: string; host: string; opener: RefObject<HTMLElement | null>; onClose: () => void }) {
+function Expanded({
+  id,
+  src,
+  host,
+  opener,
+  onClose,
+}: {
+  id: string;
+  src: string;
+  host: string;
+  opener: RefObject<HTMLElement | null>;
+  onClose: () => void;
+}) {
   const close = useRef<HTMLButtonElement>(null);
   const closeFn = useRef(onClose);
   useEffect(() => {
@@ -29,15 +41,35 @@ function Expanded({ id, src, host, opener, onClose }: { id: string; src: string;
     };
   }, [opener]);
   return (
-    <div id={`${id}-expanded`} role="dialog" aria-modal="true" aria-label={`Browser view of ${host}`} className="fixed inset-0 z-50 flex flex-col bg-black/85 p-3 sm:p-6" onClick={onClose}>
+    <div
+      id={`${id}-expanded`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Browser view of ${host}`}
+      className="fixed inset-0 z-50 flex flex-col bg-black/85 p-3 sm:p-6"
+      onClick={onClose}
+    >
       <div id={`${id}-expanded-bar`} className="mb-2 flex items-center justify-between text-sm text-white/80">
         <span id={`${id}-expanded-host`}>{host}</span>
-        <button id={`${id}-expanded-close`} ref={close} type="button" aria-label="Close browser view" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 focus-visible:outline-2 focus-visible:outline-white">
+        <button
+          id={`${id}-expanded-close`}
+          ref={close}
+          type="button"
+          aria-label="Close browser view"
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 focus-visible:outline-2 focus-visible:outline-white"
+        >
           <X id={`${id}-expanded-close-icon`} aria-hidden="true" size={18} />
         </button>
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img id={`${id}-expanded-img`} src={src} alt={`Browser view of ${host}`} className="min-h-0 flex-1 rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+      <img
+        id={`${id}-expanded-img`}
+        src={src}
+        alt={`Browser view of ${host}`}
+        className="min-h-0 flex-1 rounded-lg object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
     </div>
   );
 }
@@ -61,13 +93,30 @@ export function LiveBrowser({ id, frame, live }: { id: string; frame: BrowserFra
           <span id={`${id}-label`} className="flex-1">
             Browsing {host}
           </span>
-          <button id={`${id}-expand`} type="button" aria-label="Expand browser view" onClick={expand} className="flex h-7 w-7 items-center justify-center rounded-full text-text-muted hover:bg-surface-accent hover:text-text-primary focus-visible:outline-2 focus-visible:outline-mist-500">
+          <button
+            id={`${id}-expand`}
+            type="button"
+            aria-label="Expand browser view"
+            onClick={expand}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-text-muted hover:bg-surface-accent hover:text-text-primary focus-visible:outline-2 focus-visible:outline-mist-500"
+          >
             <Maximize2 id={`${id}-expand-icon`} aria-hidden="true" size={14} />
           </button>
         </figcaption>
-        <button id={`${id}-view`} type="button" aria-label={`Expand live view of ${host}`} onClick={expand} className="block w-full bg-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-mist-500">
+        <button
+          id={`${id}-view`}
+          type="button"
+          aria-label={`Expand live view of ${host}`}
+          onClick={expand}
+          className="block w-full bg-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-mist-500"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img id={`${id}-img`} src={src} alt={`Live view of ${host}`} className="h-[min(34vh,260px)] w-full object-cover object-top sm:h-auto sm:max-h-80" />
+          <img
+            id={`${id}-img`}
+            src={src}
+            alt={`Live view of ${host}`}
+            className="h-[min(34vh,260px)] w-full object-cover object-top sm:h-auto sm:max-h-80"
+          />
         </button>
         {overlay}
       </figure>
@@ -88,7 +137,13 @@ export function LiveBrowser({ id, frame, live }: { id: string; frame: BrowserFra
         <span id={`${id}-thumb-label`}>Browser · {host}</span>
       </button>
       {open && (
-        <button id={`${id}-full-button`} type="button" aria-label={`Expand last view of ${host}`} onClick={expand} className="mt-2 block w-full">
+        <button
+          id={`${id}-full-button`}
+          type="button"
+          aria-label={`Expand last view of ${host}`}
+          onClick={expand}
+          className="mt-2 block w-full"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img id={`${id}-full`} src={src} alt={`Last view of ${host}`} className="w-full rounded-xl border border-border" />
         </button>

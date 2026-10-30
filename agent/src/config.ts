@@ -24,7 +24,13 @@ function parseCaps(raw: string | undefined): Record<string, string[]> {
       .split("|")
       .map((entry) => entry.split("=").map((p) => p.trim()))
       .filter(([id, caps]) => id && caps)
-      .map(([id, caps]) => [id, caps.split(",").map((c) => c.trim()).filter(Boolean)]),
+      .map(([id, caps]) => [
+        id,
+        caps
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean),
+      ]),
   );
 }
 

@@ -16,5 +16,7 @@ export function workspaceCart(store: WorkspaceStore, threadId: string): ActiveCa
 
 export const workspaceNote = (store: WorkspaceStore, threadId: string): string | undefined => {
   const summary = store.summary(threadId);
-  return summary ? `<workspace>\nSaved plan state for this chat (the user can edit it in the cards; trust it over earlier messages):\n${summary}\n</workspace>` : undefined;
+  return summary
+    ? `<workspace>\nSaved plan state for this chat (the user can edit it in the cards; trust it over earlier messages):\n${summary}\n</workspace>`
+    : undefined;
 };

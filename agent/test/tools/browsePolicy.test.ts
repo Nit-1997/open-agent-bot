@@ -4,10 +4,13 @@ import { checkAction, isBlockedUrl } from "../../src/tools/browsePolicy.js";
 describe("checkAction", () => {
   it("allows search input typing on amazon.in", () => {
     expect(
-      checkAction({ op: "type", selector: "#twotabsearchtextbox", value: "sony xm5" }, {
-        url: "https://www.amazon.in/",
-        target: { type: "text", name: "field-keywords" },
-      }),
+      checkAction(
+        { op: "type", selector: "#twotabsearchtextbox", value: "sony xm5" },
+        {
+          url: "https://www.amazon.in/",
+          target: { type: "text", name: "field-keywords" },
+        },
+      ),
     ).toEqual({ allowed: true });
   });
 
@@ -17,7 +20,10 @@ describe("checkAction", () => {
   });
 
   it('blocks click on "Proceed to checkout"', () => {
-    const r = checkAction({ op: "click", text: "Proceed to checkout" }, { url: "https://www.amazon.in/dp/B09XS7JWHH", target: { text: "Proceed to checkout" } });
+    const r = checkAction(
+      { op: "click", text: "Proceed to checkout" },
+      { url: "https://www.amazon.in/dp/B09XS7JWHH", target: { text: "Proceed to checkout" } },
+    );
     expect(r.allowed).toBe(false);
   });
 
@@ -38,10 +44,13 @@ describe("checkAction", () => {
   });
 
   it("allows pincode input", () => {
-    const r = checkAction({ op: "type", selector: "#pincode", value: "411001" }, {
-      url: "https://www.flipkart.com/sony-wh-1000xm5/p/itm123",
-      target: { type: "text", name: "pincode", text: "Enter Delivery Pincode" },
-    });
+    const r = checkAction(
+      { op: "type", selector: "#pincode", value: "411001" },
+      {
+        url: "https://www.flipkart.com/sony-wh-1000xm5/p/itm123",
+        target: { type: "text", name: "pincode", text: "Enter Delivery Pincode" },
+      },
+    );
     expect(r).toEqual({ allowed: true });
   });
 
@@ -110,7 +119,9 @@ describe("network and personal-data guards", () => {
   });
 
   it("allows private hosts only when explicitly enabled", () => {
-    expect(checkAction({ op: "goto", url: "http://127.0.0.1:5000/" }, { url: "about:blank" }, { allowPrivateHosts: true })).toEqual({ allowed: true });
+    expect(checkAction({ op: "goto", url: "http://127.0.0.1:5000/" }, { url: "about:blank" }, { allowPrivateHosts: true })).toEqual({
+      allowed: true,
+    });
   });
 
   it("blocks booking, reservation and order flow urls", () => {
@@ -134,7 +145,10 @@ describe("network and personal-data guards", () => {
 
   it("still allows postal code entry", () => {
     expect(
-      checkAction({ op: "type", selector: "#pin", value: "411001" }, { url: "https://www.amazon.in/dp/x", target: { type: "text", autocomplete: "postal-code" } }),
+      checkAction(
+        { op: "type", selector: "#pin", value: "411001" },
+        { url: "https://www.amazon.in/dp/x", target: { type: "text", autocomplete: "postal-code" } },
+      ),
     ).toEqual({ allowed: true });
   });
 });

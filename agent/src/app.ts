@@ -11,7 +11,14 @@ import type { SessionStore } from "./session/sessionStore.js";
 
 export { defaultModelRef } from "./http/defaultModel.js";
 
-export function createApp(deps: { cfg: AgentConfig; store: SessionStore; artifacts?: ArtifactStore; hub?: ProviderHub; logins?: LoginFlows; run?: RunOptions }) {
+export function createApp(deps: {
+  cfg: AgentConfig;
+  store: SessionStore;
+  artifacts?: ArtifactStore;
+  hub?: ProviderHub;
+  logins?: LoginFlows;
+  run?: RunOptions;
+}) {
   const authorized = (secret: string | undefined) => !deps.cfg.sharedSecret || secret === deps.cfg.sharedSecret;
   const app = new Hono();
 

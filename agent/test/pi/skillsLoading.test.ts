@@ -42,7 +42,10 @@ describe("pi skill loading", () => {
   it("registers the skills directory with pi's resource loader", async () => {
     const handle = await open(skillsDir());
     try {
-      const names = handle.session.resourceLoader.getSkills().skills.map((s) => s.name).sort();
+      const names = handle.session.resourceLoader
+        .getSkills()
+        .skills.map((s) => s.name)
+        .sort();
       expect(names).toEqual(loadSkillCatalog(skillsDir(), { codemode: true }).map((s) => s.name));
     } finally {
       await handle.dispose();

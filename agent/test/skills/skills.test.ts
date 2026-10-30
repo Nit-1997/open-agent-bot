@@ -14,7 +14,10 @@ const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
 function dummy(dir: string, name: string) {
   mkdirSync(join(dir, name), { recursive: true });
-  writeFileSync(join(dir, name, "SKILL.md"), `---\nname: ${name}\ndescription: Load for pet grooming questions.\n---\n\n# Grooming\n\nBrush daily.\n`);
+  writeFileSync(
+    join(dir, name, "SKILL.md"),
+    `---\nname: ${name}\ndescription: Load for pet grooming questions.\n---\n\n# Grooming\n\nBrush daily.\n`,
+  );
 }
 
 describe("skills directory", () => {
@@ -80,7 +83,8 @@ describe("skill content", () => {
   });
 
   it("trip planning keeps the flight preference fields and their mapping", () => {
-    for (const s of ["Compare nearby airports?", "Layovers", "Departure time", "max_layover", "depart_times", "early_morning"]) expect(by["trip-planning"]).toContain(s);
+    for (const s of ["Compare nearby airports?", "Layovers", "Departure time", "max_layover", "depart_times", "early_morning"])
+      expect(by["trip-planning"]).toContain(s);
   });
 
   it("grocery and party skills keep pantry basics, cart edits, and the budget math", () => {
@@ -111,7 +115,12 @@ describe("system prompt", () => {
   });
 
   it("keeps the user context", () => {
-    const ctx = { timeZone: "America/Los_Angeles", locale: "en-US", localTime: "2026-10-27T18:00", profile: { name: "Nitin", home: "Sunnyvale, CA 94087" } };
+    const ctx = {
+      timeZone: "America/Los_Angeles",
+      locale: "en-US",
+      localTime: "2026-10-27T18:00",
+      profile: { name: "Nitin", home: "Sunnyvale, CA 94087" },
+    };
     const p = buildSystemPrompt(ctx, skills);
     expect(p).toContain("Country: US");
     expect(p).toContain("Home: Sunnyvale, CA 94087");
@@ -144,7 +153,17 @@ describe("load_skill", () => {
   });
 
   it("rejects path-like names", async () => {
-    for (const n of ["../package", "../../etc/passwd", "research/SKILL.md", "/etc/passwd", "research\\..", "Research", "research\0", "..", ""]) {
+    for (const n of [
+      "../package",
+      "../../etc/passwd",
+      "research/SKILL.md",
+      "/etc/passwd",
+      "research\\..",
+      "Research",
+      "research\0",
+      "..",
+      "",
+    ]) {
       const r = await run(skills, n);
       expect(r.isError).toBe(true);
       expect(text(r)).toContain("Unknown skill");

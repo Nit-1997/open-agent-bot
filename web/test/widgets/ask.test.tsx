@@ -52,9 +52,9 @@ describe("AskCard", () => {
   });
 
   it("formats a single-day range without nights", () => {
-    expect(formatAnswers([{ type: "date_range", label: "Date", start: "2026-11-26", end: "2026-11-26" }], ["2026-11-26|2026-11-26"], "en-US")).toBe(
-      "Date: Thu, Nov 26, 2026",
-    );
+    expect(
+      formatAnswers([{ type: "date_range", label: "Date", start: "2026-11-26", end: "2026-11-26" }], ["2026-11-26|2026-11-26"], "en-US"),
+    ).toBe("Date: Thu, Nov 26, 2026");
   });
 });
 

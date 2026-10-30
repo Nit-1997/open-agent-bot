@@ -27,12 +27,23 @@ function inPage(opts: { groupSelector?: string; groupFromHref?: string; max: num
     for (const g of groups) {
       if (!(g.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
       const slug = hrefRe ? (g.getAttribute("href") ?? "").match(hrefRe)?.[1] : undefined;
-      found = slug ? slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : (g.textContent ?? "").trim();
+      found = slug
+        ? slug
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ")
+        : (g.textContent ?? "").trim();
     }
     return found;
   };
   const sourceOf = (img: HTMLImageElement) => {
-    const candidates = [img.currentSrc, img.getAttribute("src"), img.getAttribute("data-src"), img.getAttribute("data-original"), img.getAttribute("srcset")?.split(/\s+/)[0]];
+    const candidates = [
+      img.currentSrc,
+      img.getAttribute("src"),
+      img.getAttribute("data-src"),
+      img.getAttribute("data-original"),
+      img.getAttribute("srcset")?.split(/\s+/)[0],
+    ];
     const raw = candidates.find((c) => c && !c.startsWith("data:"));
     if (!raw) return undefined;
     try {
@@ -69,10 +80,20 @@ function inPage(opts: { groupSelector?: string; groupFromHref?: string; max: num
       if (!price || !link) continue;
       if (!seen.has(el)) {
         seen.add(el);
-        const lines = text.split("\n").map((s) => s.trim()).filter(Boolean);
+        const lines = text
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean);
         const alt = (img.alt || "").trim();
         const title = alt.length > 8 ? alt : (lines.find((l) => l.length > 12 && !PRICE.test(l) && !/^sponsored/i.test(l)) ?? alt);
-        out.push({ title, priceText: price[0].replace(/\s/g, ""), image: sourceOf(img), url: link.href, text: text.slice(0, 600), group: groupOf(el) });
+        out.push({
+          title,
+          priceText: price[0].replace(/\s/g, ""),
+          image: sourceOf(img),
+          url: link.href,
+          text: text.slice(0, 600),
+          group: groupOf(el),
+        });
       }
       break;
     }
@@ -82,7 +103,10 @@ function inPage(opts: { groupSelector?: string; groupFromHref?: string; max: num
 
 function normalize(raw: Raw): Tile | null {
   const sponsored = /\bsponsored\b/i.test(raw.text) || /^sponsored/i.test(raw.title);
-  const title = raw.title.replace(/^sponsored( ad)?\s*[-–:]\s*/i, "").replace(/\s+/g, " ").trim();
+  const title = raw.title
+    .replace(/^sponsored( ad)?\s*[-–:]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!title || !/^https?:/.test(raw.url)) return null;
   const price = raw.priceText ? Number(raw.priceText.replace(/[^\d.]/g, "")) : undefined;
   const rating = raw.text.match(RATING);
@@ -99,7 +123,10 @@ function normalize(raw: Raw): Tile | null {
   };
 }
 
-export async function extractTiles(page: Page, opts: { groupSelector?: string; groupFromHref?: string; max?: number } = {}): Promise<Tile[]> {
+export async function extractTiles(
+  page: Page,
+  opts: { groupSelector?: string; groupFromHref?: string; max?: number } = {},
+): Promise<Tile[]> {
   const raws = await page.evaluate(inPage, { groupSelector: opts.groupSelector, groupFromHref: opts.groupFromHref, max: opts.max ?? 150 });
   return raws.map(normalize).filter((t): t is Tile => t !== null);
 }

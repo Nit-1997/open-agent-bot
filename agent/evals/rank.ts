@@ -27,7 +27,12 @@ export const exactAt1 = (ranked: Label[]): number => (ranked[0] === "E" ? 1 : 0)
 const dcg = (gains: number[]) => gains.reduce((sum, g, i) => sum + g / Math.log2(i + 2), 0);
 
 export function ndcgAt3(ranked: Label[], all: Label[]): number {
-  const ideal = dcg(all.map((l) => GAIN[l]).sort((a, b) => b - a).slice(0, 3));
+  const ideal = dcg(
+    all
+      .map((l) => GAIN[l])
+      .sort((a, b) => b - a)
+      .slice(0, 3),
+  );
   return ideal === 0 ? 0 : dcg(ranked.slice(0, 3).map((l) => GAIN[l])) / ideal;
 }
 
@@ -58,14 +63,22 @@ export async function evaluate(rows: Row[], ranker: Ranker, fallback: Ranker = k
     }
     const labels = ranked.map((t) => label.get(t.title) as Label);
     exact += exactAt1(labels);
-    ndcg += ndcgAt3(labels, row.tiles.map((t) => t.label));
+    ndcg += ndcgAt3(
+      labels,
+      row.tiles.map((t) => t.label),
+    );
   }
   return { n: rows.length, exact1: exact / rows.length, ndcg3: ndcg / rows.length, fallbacks, ms: Date.now() - started };
 }
 
 async function openJudge(): Promise<Judge> {
   if (!process.env.OPENROUTER_API_KEY) throw new Error("--judge needs OPENROUTER_API_KEY in the environment");
-  const runtime = await ModelRuntime.create({ authPath: join(mkdtempSync(join(tmpdir(), "rank-")), "auth.json"), modelsPath: null, refreshOnCreate: false, allowModelNetwork: false });
+  const runtime = await ModelRuntime.create({
+    authPath: join(mkdtempSync(join(tmpdir(), "rank-")), "auth.json"),
+    modelsPath: null,
+    refreshOnCreate: false,
+    allowModelNetwork: false,
+  });
   const judge = await createJudge({ runtime, model: process.env.JEV_MODEL ?? "openrouter/typesafe/jev-1.14", log: () => {} });
   if (!judge.available) throw new Error("the Jev model is not available with this key");
   return judge;
@@ -77,7 +90,10 @@ export function table(lines: { name: string; split: string; r: Report; extra?: s
   return [
     "| ranker | split | queries | Exact@1 | NDCG@3 | fallbacks | note |",
     "| --- | --- | --- | --- | --- | --- | --- |",
-    ...lines.map(({ name, split, r, extra }) => `| ${name} | ${split} | ${r.n} | ${pct(r.exact1)} | ${r.ndcg3.toFixed(3)} | ${r.fallbacks} | ${extra ?? ""} |`),
+    ...lines.map(
+      ({ name, split, r, extra }) =>
+        `| ${name} | ${split} | ${r.n} | ${pct(r.exact1)} | ${r.ndcg3.toFixed(3)} | ${r.fallbacks} | ${extra ?? ""} |`,
+    ),
   ].join("\n");
 }
 
@@ -91,7 +107,12 @@ async function main() {
     const limit = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : undefined;
     const r = await evaluate(rows, jevRanker(judge, limit, args.includes("--batch")));
     const u = judge.usage();
-    lines.push({ name: "jev re-rank", split, r, extra: `${u.calls} calls, $${u.costUsd.toFixed(4)}, ${Math.round(r.ms / rows.length)} ms/query` });
+    lines.push({
+      name: "jev re-rank",
+      split,
+      r,
+      extra: `${u.calls} calls, $${u.costUsd.toFixed(4)}, ${Math.round(r.ms / rows.length)} ms/query`,
+    });
   }
   console.log(table(lines));
 }

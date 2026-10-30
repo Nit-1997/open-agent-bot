@@ -23,7 +23,10 @@ function readProfile(v: unknown): UserProfile | undefined {
   if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
   const p = v as Record<string, unknown>;
   const interests = Array.isArray(p.interests)
-    ? p.interests.map((i) => clip(i, 40)).filter((i): i is string => !!i).slice(0, 12)
+    ? p.interests
+        .map((i) => clip(i, 40))
+        .filter((i): i is string => !!i)
+        .slice(0, 12)
     : [];
   const profile: UserProfile = {
     ...(clip(p.name, 80) && { name: clip(p.name, 80) }),
@@ -50,7 +53,14 @@ export function readUserContext(input: RunAgentInput): UserContext | null {
       const model = clip(v.model, 100);
       const profile = readProfile(v.profile);
       const viewport = readViewport(v.viewport);
-      return { timeZone: v.timeZone, locale: v.locale, localTime: v.localTime, ...(model && { model }), ...(profile && { profile }), ...(viewport && { viewport }) };
+      return {
+        timeZone: v.timeZone,
+        locale: v.locale,
+        localTime: v.localTime,
+        ...(model && { model }),
+        ...(profile && { profile }),
+        ...(viewport && { viewport }),
+      };
     }
   } catch {}
   return null;
@@ -130,7 +140,13 @@ function createStatsCollector(now: () => number = Date.now) {
       if (name === "load_skill" && typeof skill === "string" && !skills.includes(skill)) skills.push(skill);
     },
     snapshot(turn?: { jevCalls: number; jevCostUsd: number }): RunStats {
-      return { ...totals, jevCalls: (turn?.jevCalls ?? 0) + script.calls, jevCostUsd: (turn?.jevCostUsd ?? 0) + script.costUsd, durationMs: now() - startedAt, skills: [...skills] };
+      return {
+        ...totals,
+        jevCalls: (turn?.jevCalls ?? 0) + script.calls,
+        jevCostUsd: (turn?.jevCostUsd ?? 0) + script.costUsd,
+        durationMs: now() - startedAt,
+        skills: [...skills],
+      };
     },
   };
 }
@@ -141,7 +157,12 @@ function runError(code: string, message: string): BaseEvent {
 
 export type RunOptions = { workspace?: WorkspaceStore };
 
-export async function* handleRun(input: RunAgentInput, store: SessionStore, signal: AbortSignal, opts: RunOptions = {}): AsyncIterable<BaseEvent> {
+export async function* handleRun(
+  input: RunAgentInput,
+  store: SessionStore,
+  signal: AbortSignal,
+  opts: RunOptions = {},
+): AsyncIterable<BaseEvent> {
   const { threadId, runId } = input;
   yield { type: EventType.RUN_STARTED, threadId, runId } as BaseEvent;
 
@@ -235,16 +256,27 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
   const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {
     if (e.type === "tool_execution_start") stats.toolStart(e.toolName, e.args);
-    if (e.type === "tool_execution_start") console.log(`[run] thread=${threadId} tool=${e.toolName} args=${JSON.stringify(e.args).slice(0, 300)}`);
+    if (e.type === "tool_execution_start")
+      console.log(`[run] thread=${threadId} tool=${e.toolName} args=${JSON.stringify(e.args).slice(0, 300)}`);
     if (e.type === "tool_execution_end" && e.toolName === "codemode") stats.scriptCalls(e.result);
-    if (e.type === "tool_execution_end") console.log(`[run] thread=${threadId} tool=${e.toolName} error=${e.isError} result=${JSON.stringify(e.result?.content?.[0]?.text ?? "").slice(0, 200)}`);
+    if (e.type === "tool_execution_end")
+      console.log(
+        `[run] thread=${threadId} tool=${e.toolName} error=${e.isError} result=${JSON.stringify(e.result?.content?.[0]?.text ?? "").slice(0, 200)}`,
+      );
     if (e.type === "message_end") {
-      const m = e.message as { role?: string; stopReason?: string; errorMessage?: string; usage?: Usage & { input: number; output: number; cacheRead: number } };
+      const m = e.message as {
+        role?: string;
+        stopReason?: string;
+        errorMessage?: string;
+        usage?: Usage & { input: number; output: number; cacheRead: number };
+      };
       if (m.role === "assistant" && m.usage) stats.usage(m.usage);
       if (m.role === "assistant" && m.usage) {
         const parts = (e.message as { content?: { type: string; text?: string; thinking?: string }[] }).content ?? [];
         const chars = (type: string) => parts.filter((c) => c.type === type).reduce((n, c) => n + (c.text ?? c.thinking ?? "").length, 0);
-        console.log(`[run] thread=${threadId} usage in=${m.usage.input} out=${m.usage.output} cacheRead=${m.usage.cacheRead} text=${chars("text")} thinking=${chars("thinking")}`);
+        console.log(
+          `[run] thread=${threadId} usage in=${m.usage.input} out=${m.usage.output} cacheRead=${m.usage.cacheRead} text=${chars("text")} thinking=${chars("thinking")}`,
+        );
       }
       if (m.role === "toolResult" && m.usage) stats.scriptCost(m.usage);
       if (m.role === "assistant" && m.stopReason === "error") modelError = m.errorMessage ?? "The model returned an error.";

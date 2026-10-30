@@ -26,7 +26,9 @@ export function createFx(opts: Opts = {}): Fx {
         const res = await f(`${BASE_URL}?from=${encodeURIComponent(base)}`, { signal: timeoutSignal(opts.timeoutMs ?? TIMEOUT_MS) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const body = (await res.json()) as { rates?: Record<string, unknown> };
-        const rates = Object.fromEntries(Object.entries(body.rates ?? {}).filter((e): e is [string, number] => typeof e[1] === "number" && e[1] > 0));
+        const rates = Object.fromEntries(
+          Object.entries(body.rates ?? {}).filter((e): e is [string, number] => typeof e[1] === "number" && e[1] > 0),
+        );
         if (!Object.keys(rates).length) throw new Error("no rates");
         const loaded = { at: now(), rates };
         cache.set(base, loaded);

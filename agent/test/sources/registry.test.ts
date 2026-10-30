@@ -14,7 +14,12 @@ describe("SourceRegistry", () => {
     expect(ids(r.select({ vertical: "retail", region: "IN" }))).toEqual(["amazon", "amazon.in", "flipkart"]);
     expect(ids(r.select({ vertical: "retail", region: "gb" }))).toEqual(["amazon", "amazon.co.uk"]);
     expect(ids(r.select({ vertical: "retail", region: "US", capability: "grocery" }))).toEqual(["shipt", "kroger", "safeway"]);
-    expect(ids(r.select({ vertical: "stays", region: "FR", capability: "rental" }))).toEqual(["google_hotels", "airbnb", "booking", "expedia"]);
+    expect(ids(r.select({ vertical: "stays", region: "FR", capability: "rental" }))).toEqual([
+      "google_hotels",
+      "airbnb",
+      "booking",
+      "expedia",
+    ]);
     expect(ids(r.select({ vertical: "flights" }))).toEqual(["google_flights"]);
   });
 

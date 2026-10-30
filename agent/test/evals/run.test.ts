@@ -6,7 +6,17 @@ import type { RunRecord, Scenario } from "../../evals/types.js";
 
 const ev = (e: object) => `data: ${JSON.stringify(e)}\n\n`;
 
-const stats = { inputTokens: 100, outputTokens: 10, cacheRead: 0, costUsd: 0.5, jevCalls: 0, jevCostUsd: 0, toolCalls: 1, durationMs: 10, skills: [] };
+const stats = {
+  inputTokens: 100,
+  outputTokens: 10,
+  cacheRead: 0,
+  costUsd: 0.5,
+  jevCalls: 0,
+  jevCostUsd: 0,
+  toolCalls: 1,
+  durationMs: 10,
+  skills: [],
+};
 
 const answer = (text: string, extra: object[] = []) =>
   [
@@ -40,7 +50,13 @@ const scenario = (over: Partial<Scenario> = {}): Scenario => ({
   ...over,
 });
 
-const deps = (fetchImpl: typeof fetch, timeoutMs = 5000) => ({ url: "http://x/agui", secret: "sek", model: "m1", timeoutMs, fetch: fetchImpl });
+const deps = (fetchImpl: typeof fetch, timeoutMs = 5000) => ({
+  url: "http://x/agui",
+  secret: "sek",
+  model: "m1",
+  timeoutMs,
+  fetch: fetchImpl,
+});
 
 describe("createTurnCollector", () => {
   it("records tools with parsed args and clipped results, widgets, claims, text and stats", () => {
@@ -149,10 +165,27 @@ describe("runScenario", () => {
 describe("helpers", () => {
   it("loads every committed scenario and each assertion evaluates without a config error", () => {
     const ids = loadScenarios(new URL("../../evals/scenarios", import.meta.url).pathname).map((s) => s.id);
-    expect(ids.sort()).toEqual(["car", "cities-fanout", "dining", "events", "gifts", "grocery-offlist", "hotel-brand", "india-shop", "party", "party-followup", "playlist", "recipe-cart", "research", "store-domain", "trip"]);
+    expect(ids.sort()).toEqual([
+      "car",
+      "cities-fanout",
+      "dining",
+      "events",
+      "gifts",
+      "grocery-offlist",
+      "hotel-brand",
+      "india-shop",
+      "party",
+      "party-followup",
+      "playlist",
+      "recipe-cart",
+      "research",
+      "store-domain",
+      "trip",
+    ]);
     for (const s of loadScenarios(new URL("../../evals/scenarios", import.meta.url).pathname)) {
       const empty = [{ prompt: "", tools: [], widgets: [], unverifiedClaims: 0, text: "", askedUser: false, durationMs: 0 }];
-      for (const r of evaluateAll([...s.assert, ...s.future_assert], [...empty, ...empty])) expect(r.detail, `${s.id} ${r.label}`).not.toMatch(/needs|unknown assertion|Invalid regular/);
+      for (const r of evaluateAll([...s.assert, ...s.future_assert], [...empty, ...empty]))
+        expect(r.detail, `${s.id} ${r.label}`).not.toMatch(/needs|unknown assertion|Invalid regular/);
       expect(s.turns.length).toBeGreaterThan(0);
     }
   });
@@ -196,7 +229,18 @@ describe("report", () => {
     model: "m1",
     run,
     threadId: "t",
-    turns: [{ prompt: "p", tools: [{ name: "shop", args: {}, result: "" }], widgets: [], unverifiedClaims: 0, text: "", askedUser: false, durationMs: 12000, stats }],
+    turns: [
+      {
+        prompt: "p",
+        tools: [{ name: "shop", args: {}, result: "" }],
+        widgets: [],
+        unverifiedClaims: 0,
+        text: "",
+        askedUser: false,
+        durationMs: 12000,
+        stats,
+      },
+    ],
     passed,
     failed: passed ? [] : [{ label: failedLabel, ok: false, detail: "shop called 0x" }],
     future: [{ label: "must_call(tool=load_skill)", ok: false, detail: "load_skill called 0x" }],
@@ -206,7 +250,11 @@ describe("report", () => {
     const runs = [rec("party", 0, true), rec("party", 1, false), rec("car", 0, true)];
     const summary = summarize(runs, { model: "m1", label: "x", date: "2026-10-29" });
     expect(summary.scenarios.party).toMatchObject({ runs: 2, passes: 1, toolCalls: 1, seconds: 12, costUsd: 0.5, inputTokens: 100 });
-    const baseline = { ...summary, label: "base", scenarios: { party: { ...summary.scenarios.party, passes: 2 }, car: { ...summary.scenarios.car, costUsd: 0.25 } } };
+    const baseline = {
+      ...summary,
+      label: "base",
+      scenarios: { party: { ...summary.scenarios.party, passes: 2 }, car: { ...summary.scenarios.car, costUsd: 0.25 } },
+    };
     const md = renderReport(runs, summary, baseline);
     expect(md).toContain("| party | pass FAIL |");
     expect(md).toContain("must_call(tool=shop) x1");
@@ -232,7 +280,18 @@ describe("rescore", () => {
       model: "m",
       run: 0,
       threadId: "t",
-      turns: [{ prompt: "p", tools: [{ name: "shop", args: {}, result: "ok" }], widgets: [], unverifiedClaims: 0, text: "hi", askedUser: false, durationMs: 1, stats: { ...stats, costUsd: 0, inputTokens: 1_000_000, outputTokens: 100_000, cacheRead: 0 } }],
+      turns: [
+        {
+          prompt: "p",
+          tools: [{ name: "shop", args: {}, result: "ok" }],
+          widgets: [],
+          unverifiedClaims: 0,
+          text: "hi",
+          askedUser: false,
+          durationMs: 1,
+          stats: { ...stats, costUsd: 0, inputTokens: 1_000_000, outputTokens: 100_000, cacheRead: 0 },
+        },
+      ],
       passed: false,
       failed: [{ label: "old", ok: false, detail: "" }],
       future: [],

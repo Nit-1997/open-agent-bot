@@ -34,7 +34,9 @@ export function codemodeFailure(isError: boolean, result: unknown): string | und
   if (isError) return "the script failed";
   const calls = (result as { details?: { calls?: CodemodeCall[] } } | undefined)?.details?.calls ?? [];
   const failed = calls.filter((c) => c.status === "error" && !BUDGET_REFUSAL.test(c.error ?? ""));
-  return failed.length ? `${failed.length} tool call(s) in the script failed (${[...new Set(failed.map((c) => c.name))].join(", ")})` : undefined;
+  return failed.length
+    ? `${failed.length} tool call(s) in the script failed (${[...new Set(failed.map((c) => c.name))].join(", ")})`
+    : undefined;
 }
 
 type AgentMessage = ContextEvent["messages"][number];
@@ -52,7 +54,14 @@ function seed(sessionManager: SessionManager, model: Model<any>, history: SeedMe
         api: model.api,
         provider: model.provider,
         model: model.id,
-        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
         stopReason: "stop",
         timestamp,
       });
@@ -136,7 +145,8 @@ export async function createPiSession(opts: {
   syncCodemode(opts.model);
   if (opts.codemode) {
     session.subscribe((e) => {
-      if (codemodeOff || e.type !== "tool_execution_end" || e.toolName !== CODEMODE || !session.getActiveToolNames().includes(CODEMODE)) return;
+      if (codemodeOff || e.type !== "tool_execution_end" || e.toolName !== CODEMODE || !session.getActiveToolNames().includes(CODEMODE))
+        return;
       const reason = codemodeFailure(e.isError, e.result);
       if (!reason) return;
       codemodeOff = true;

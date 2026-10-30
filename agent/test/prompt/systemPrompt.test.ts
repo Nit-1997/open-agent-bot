@@ -4,7 +4,17 @@ import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 describe("buildSystemPrompt", () => {
   it("includes user context and the core rules", () => {
     const p = buildSystemPrompt({ timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T14:00" });
-    for (const s of ["Asia/Kolkata", "en-IN", "2026-10-27T14:00", "Country: IN", "Currency: INR", "checkout", "unverified", "ask_user", "<followups>"]) {
+    for (const s of [
+      "Asia/Kolkata",
+      "en-IN",
+      "2026-10-27T14:00",
+      "Country: IN",
+      "Currency: INR",
+      "checkout",
+      "unverified",
+      "ask_user",
+      "<followups>",
+    ]) {
       expect(p).toContain(s);
     }
   });

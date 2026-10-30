@@ -4,7 +4,12 @@ import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type ModelList, type ModelOption, modelLabel, normalizeRef } from "@/lib/models";
 
-export function ModelMenu(props: { models: ModelList | null; value: string | undefined; onChange: (id: string) => void; onManage: () => void }) {
+export function ModelMenu(props: {
+  models: ModelList | null;
+  value: string | undefined;
+  onChange: (id: string) => void;
+  onManage: () => void;
+}) {
   const { models, value, onChange } = props;
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -45,10 +50,20 @@ export function ModelMenu(props: { models: ModelList | null; value: string | und
         <span id="model-menu-label" className="max-w-[140px] truncate">
           {modelLabel(models, current)}
         </span>
-        <ChevronDown id="model-menu-chevron" aria-hidden="true" size={13} className={`text-text-faint transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          id="model-menu-chevron"
+          aria-hidden="true"
+          size={13}
+          className={`text-text-faint transition ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open && (
-        <div id="model-menu-list" role="menu" aria-label="Model for this chat" className="absolute right-0 top-full z-30 mt-2 w-72 animate-rise rounded-2xl border border-border bg-paper p-1.5 shadow-lift">
+        <div
+          id="model-menu-list"
+          role="menu"
+          aria-label="Model for this chat"
+          className="absolute right-0 top-full z-30 mt-2 w-72 animate-rise rounded-2xl border border-border bg-paper p-1.5 shadow-lift"
+        >
           <p id="model-menu-hint" className="eyebrow px-2.5 pb-1.5 pt-1">
             This chat · from your next message
           </p>

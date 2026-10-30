@@ -81,7 +81,12 @@ function verdict(now: ScenarioSummary, before?: ScenarioSummary): string {
 
 export function renderReport(runs: RunRecord[], summary: Summary, baseline?: Summary): string {
   const ids = [...new Set(runs.map((r) => r.scenario))];
-  const lines = [`# Eval report: ${summary.model}`, "", `label: ${summary.label} | date: ${summary.date} | baseline: ${baseline ? `${baseline.label} (${baseline.date})` : "none"}`, ""];
+  const lines = [
+    `# Eval report: ${summary.model}`,
+    "",
+    `label: ${summary.label} | date: ${summary.date} | baseline: ${baseline ? `${baseline.label} (${baseline.date})` : "none"}`,
+    "",
+  ];
   lines.push("| Scenario | Runs | Failed assertions | Tool calls | LLM turns | Seconds | Cost $ | Input tokens | vs baseline |");
   lines.push("|---|---|---|---|---|---|---|---|---|");
   for (const id of ids) {

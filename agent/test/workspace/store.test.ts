@@ -34,7 +34,12 @@ describe("WorkspaceStore", () => {
     s.put("t2", "event", "main", party);
     expect(s.get("t1", "event", "main")).toMatchObject({ version: 2, value: { guests: 16 } });
     expect(s.get("t1", "event", "other")).toBeUndefined();
-    expect(s.list("t1").map((e) => `${e.kind}:${e.id}`).sort()).toEqual(["event:main", "shortlist:gifts"]);
+    expect(
+      s
+        .list("t1")
+        .map((e) => `${e.kind}:${e.id}`)
+        .sort(),
+    ).toEqual(["event:main", "shortlist:gifts"]);
     expect(s.list("t1", "event")).toHaveLength(1);
     expect(s.list("nobody")).toEqual([]);
   });
@@ -69,13 +74,34 @@ describe("WorkspaceStore", () => {
   it("summarizes every entity compactly, including the cart's best store", () => {
     const { s } = open();
     const cart = new ActiveCart();
-    cart.start(["target"], [{ query: "pizza", qty: 2 }, { query: "cake", qty: 1 }]);
+    cart.start(
+      ["target"],
+      [
+        { query: "pizza", qty: 2 },
+        { query: "cake", qty: 1 },
+      ],
+    );
     const t = (title: string, price: number) => ({ title, price, priceText: `$${price}`, url: `https://t.com/${title}`, sponsored: false });
-    cart.addResults([{ store: "Target", items: [{ query: "pizza", qty: 2, picks: [t("pizza", 10)] }, { query: "cake", qty: 1, picks: [t("cake", 20)] }] }]);
+    cart.addResults([
+      {
+        store: "Target",
+        items: [
+          { query: "pizza", qty: 2, picks: [t("pizza", 10)] },
+          { query: "cake", qty: 1, picks: [t("cake", 20)] },
+        ],
+      },
+    ]);
     cart.scopeTo(["Target"]);
     s.put("t", "cart", "main", cart.snapshot());
     s.put("t", "event", "party", party);
-    s.put("t", "trip", "main", { destination: "Tahoe", start: "2026-12-01", end: "2026-12-04", travelers: 1, stays: [{ name: "Lodge" }], days: [] });
+    s.put("t", "trip", "main", {
+      destination: "Tahoe",
+      start: "2026-12-01",
+      end: "2026-12-04",
+      travelers: 1,
+      stays: [{ name: "Lodge" }],
+      days: [],
+    });
     const text = s.summary("t");
     expect(text).toContain("event party: 8th birthday, 12 guests, Nov 14, budget $300");
     expect(text).toContain("cart: 2 items at Target (best $40 at Target)");

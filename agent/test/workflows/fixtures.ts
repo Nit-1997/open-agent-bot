@@ -1,7 +1,13 @@
 import type { Judge } from "../../src/judge/index.js";
 
-export const SOURCE_A = { url: "https://energy.example.org/heat-pumps", text: "Air-source heat pumps reach a COP of 3.2 in mild weather. A typical install costs $14,500 before incentives. The federal credit covers 30% of the cost." };
-export const SOURCE_B = { url: "https://hvac.example.com/furnaces", text: "A gas furnace is 96% efficient (AFUE). A new furnace install costs $6,200 on average." };
+export const SOURCE_A = {
+  url: "https://energy.example.org/heat-pumps",
+  text: "Air-source heat pumps reach a COP of 3.2 in mild weather. A typical install costs $14,500 before incentives. The federal credit covers 30% of the cost.",
+};
+export const SOURCE_B = {
+  url: "https://hvac.example.com/furnaces",
+  text: "A gas furnace is 96% efficient (AFUE). A new furnace install costs $6,200 on average.",
+};
 
 export const REPORT = `<!doctype html><html><body>
 <header class="hero"><h1>Heat pump or furnace</h1><p class="dek">A heat pump is the better choice for most mild-climate homes.</p></header>

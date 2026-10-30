@@ -31,13 +31,18 @@ async function readPage(url: string, ctx: RetailCtx): Promise<Read> {
     const { res, url: at } = await fetchPublic(
       ctx.fetch ?? fetch,
       url,
-      { signal: timeoutSignal(15000, ctx.signal), headers: { "user-agent": "Mozilla/5.0 (compatible; OpenAgent/0.1)", accept: "text/html" } },
+      {
+        signal: timeoutSignal(15000, ctx.signal),
+        headers: { "user-agent": "Mozilla/5.0 (compatible; OpenAgent/0.1)", accept: "text/html" },
+      },
       { allowPrivateHosts: ctx.allowPrivateHosts, lookup: ctx.lookup },
     );
     if (BLOCKING_STATUSES.has(res.status)) return { url, tiles: [], blocked: true };
     if (!res.ok) return { url, tiles: [], error: `HTTP ${res.status}` };
     const html = await readCapped(res, MAX_BYTES);
-    const tiles = parseJsonLd(html, at).map((r) => tileOf(r, at)).filter((t): t is Tile => !!t);
+    const tiles = parseJsonLd(html, at)
+      .map((r) => tileOf(r, at))
+      .filter((t): t is Tile => !!t);
     if (!tiles.length && BOT_WALL.test(html.slice(0, 3000))) return { url, tiles: [], blocked: true };
     return { url, tiles };
   } catch (err) {

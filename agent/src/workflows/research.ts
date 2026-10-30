@@ -26,7 +26,18 @@ export type ResearchDeps = {
 };
 
 type ResearchOutcome =
-  | { ok: true; id: string; title: string; takeaway: string; sources: number; supported: number; flagged: number; removed: number; unchecked: number; total: number }
+  | {
+      ok: true;
+      id: string;
+      title: string;
+      takeaway: string;
+      sources: number;
+      supported: number;
+      flagged: number;
+      removed: number;
+      unchecked: number;
+      total: number;
+    }
   | { ok: false; error: string };
 
 const MAX_QUERIES = 4;
@@ -80,7 +91,8 @@ export function parsePlan(raw: string, question: string): Plan {
     };
   } catch {
     const title = field(raw, "title");
-    if (title) return { title: title.slice(0, 120), decision: field(raw, "decision") || question, takeaway: field(raw, "takeaway"), outline: [] };
+    if (title)
+      return { title: title.slice(0, 120), decision: field(raw, "decision") || question, takeaway: field(raw, "takeaway"), outline: [] };
     return { title: question.slice(0, 120), decision: question, takeaway: "", outline: [raw.slice(0, 2000)] };
   }
 }
@@ -92,16 +104,25 @@ function unfenced(raw: string): string {
 
 async function gather(deps: ResearchDeps, input: ResearchInput): Promise<SourceDoc[]> {
   const queries = [...new Set((input.queries ?? []).map((q) => q.trim()).filter(Boolean))].slice(0, MAX_QUERIES);
-  const lists = await Promise.all((queries.length ? queries : [input.question]).map((q) => deps.search(q, deps.signal).catch(() => [] as Hit[])));
+  const lists = await Promise.all(
+    (queries.length ? queries : [input.question]).map((q) => deps.search(q, deps.signal).catch(() => [] as Hit[])),
+  );
   const seen = new Set<string>();
-  const hits = lists.flat().filter((h) => !seen.has(h.url) && !!seen.add(h.url)).slice(0, MAX_CANDIDATES);
+  const hits = lists
+    .flat()
+    .filter((h) => !seen.has(h.url) && !!seen.add(h.url))
+    .slice(0, MAX_CANDIDATES);
   const chosen = await selectHits(deps.judge, input.question, hits, { max: MAX_READS });
-  const pages = await mapLimit(chosen, READ_PARALLEL, async (h) => ({ url: h.url, text: await deps.read(h.url, deps.signal).catch(() => null) }));
+  const pages = await mapLimit(chosen, READ_PARALLEL, async (h) => ({
+    url: h.url,
+    text: await deps.read(h.url, deps.signal).catch(() => null),
+  }));
   return pages.filter((p): p is SourceDoc => !!p.text && p.text.length >= MIN_PAGE_CHARS);
 }
 
 export async function runResearch(input: ResearchInput, deps: ResearchDeps): Promise<ResearchOutcome> {
-  const step = (phase: Phase, status: WorkflowStep["status"], detail?: WorkflowStep["detail"]) => deps.emit({ workflow: "research", phase, status, ...(detail && { detail }) });
+  const step = (phase: Phase, status: WorkflowStep["status"], detail?: WorkflowStep["detail"]) =>
+    deps.emit({ workflow: "research", phase, status, ...(detail && { detail }) });
   try {
     step("research", "start");
     const docs = await gather(deps, input);
@@ -109,8 +130,22 @@ export async function runResearch(input: ResearchInput, deps: ResearchDeps): Pro
     step("research", "done", { sources: docs.length });
 
     step("plan", "start");
-    const brief = [`Question: ${input.question}`, input.decision && `Decision to support: ${input.decision}`, input.audience && `Audience: ${input.audience}`].filter(Boolean).join("\n");
-    const plan = parsePlan(await deps.complete({ system: PLAN_SYSTEM, user: `${brief}\n\nSources:\n\n${sourcesText(docs)}`, maxTokens: 4000, signal: deps.signal }), input.question);
+    const brief = [
+      `Question: ${input.question}`,
+      input.decision && `Decision to support: ${input.decision}`,
+      input.audience && `Audience: ${input.audience}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const plan = parsePlan(
+      await deps.complete({
+        system: PLAN_SYSTEM,
+        user: `${brief}\n\nSources:\n\n${sourcesText(docs)}`,
+        maxTokens: 4000,
+        signal: deps.signal,
+      }),
+      input.question,
+    );
     step("plan", "done");
 
     step("implement", "start");
@@ -124,12 +159,28 @@ export async function runResearch(input: ResearchInput, deps: ResearchDeps): Pro
     step("implement", "done");
 
     step("verify", "start");
-    const checked = await verifyReport(written, docs.map((d) => ({ url: d.url, text: clip(d.text) })), deps.judge, { signal: deps.signal });
+    const checked = await verifyReport(
+      written,
+      docs.map((d) => ({ url: d.url, text: clip(d.text) })),
+      deps.judge,
+      { signal: deps.signal },
+    );
     step("verify", "done", { supported: checked.supported, total: checked.total, unchecked: checked.unchecked });
 
     const saved = await deps.publish(plan.title, checked.html);
     if ("error" in saved) return { ok: false, error: saved.error };
-    return { ok: true, id: saved.id, title: plan.title, takeaway: plan.takeaway, sources: docs.length, supported: checked.supported, flagged: checked.flagged, removed: checked.removed, unchecked: checked.unchecked, total: checked.total };
+    return {
+      ok: true,
+      id: saved.id,
+      title: plan.title,
+      takeaway: plan.takeaway,
+      sources: docs.length,
+      supported: checked.supported,
+      flagged: checked.flagged,
+      removed: checked.removed,
+      unchecked: checked.unchecked,
+      total: checked.total,
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

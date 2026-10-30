@@ -26,7 +26,16 @@ describe("ProviderHub", () => {
 
   it("takes context and output limits for gateway models from LiteLLM, keeping safe defaults for unknown ones", async () => {
     const f = fakeFetch([
-      [/model\/info/, () => json({ data: [{ model_name: "chat-sonnet-5.5", model_info: { max_input_tokens: 1_000_000, max_output_tokens: 128_000 } }, { model_name: "chat-default", model_info: null }] })],
+      [
+        /model\/info/,
+        () =>
+          json({
+            data: [
+              { model_name: "chat-sonnet-5.5", model_info: { max_input_tokens: 1_000_000, max_output_tokens: 128_000 } },
+              { model_name: "chat-default", model_info: null },
+            ],
+          }),
+      ],
     ]);
     const { hub } = await make(undefined, { fetch: f });
     expect(hub.resolve("litellm/chat-sonnet-5.5")).toMatchObject({ contextWindow: 1_000_000, maxTokens: 32_000 });
@@ -35,7 +44,18 @@ describe("ProviderHub", () => {
 
   it("takes per-token prices for gateway models from LiteLLM so runs report their cost", async () => {
     const f = fakeFetch([
-      [/model\/info/, () => json({ data: [{ model_name: "chat-sonnet-5.5", model_info: { input_cost_per_token: 2e-6, output_cost_per_token: 1e-5, cache_read_input_token_cost: 1e-7 } }] })],
+      [
+        /model\/info/,
+        () =>
+          json({
+            data: [
+              {
+                model_name: "chat-sonnet-5.5",
+                model_info: { input_cost_per_token: 2e-6, output_cost_per_token: 1e-5, cache_read_input_token_cost: 1e-7 },
+              },
+            ],
+          }),
+      ],
     ]);
     const { hub } = await make(undefined, { fetch: f });
     expect(hub.resolve("litellm/chat-sonnet-5.5")?.cost).toEqual({ input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 });
@@ -45,10 +65,20 @@ describe("ProviderHub", () => {
   it("lists the curated providers, with the LiteLLM gateway seeded and ready", async () => {
     const { hub } = await make();
     const list = hub.list();
-    expect(list.map((p) => p.id)).toEqual(expect.arrayContaining(["openai", "anthropic", "openrouter", "together", "groq", "google", "litellm"]));
-    expect(list.find((p) => p.id === "openai")).toMatchObject({ configured: false, methods: ["api_key", "oauth"], oauthLabel: "Sign in with ChatGPT" });
+    expect(list.map((p) => p.id)).toEqual(
+      expect.arrayContaining(["openai", "anthropic", "openrouter", "together", "groq", "google", "litellm"]),
+    );
+    expect(list.find((p) => p.id === "openai")).toMatchObject({
+      configured: false,
+      methods: ["api_key", "oauth"],
+      oauthLabel: "Sign in with ChatGPT",
+    });
     expect(list.find((p) => p.id === "anthropic")).toMatchObject({ methods: ["api_key"] });
-    expect(list.find((p) => p.id === "litellm")).toMatchObject({ configured: true, kind: "local", enabled: ["chat-default", "chat-sonnet-5.5"] });
+    expect(list.find((p) => p.id === "litellm")).toMatchObject({
+      configured: true,
+      kind: "local",
+      enabled: ["chat-default", "chat-sonnet-5.5"],
+    });
   });
 
   it("saves a key that survives a restart, never returns it, and keeps the file private", async () => {
@@ -67,7 +97,11 @@ describe("ProviderHub", () => {
     await hub.setEnabled("openai", ["gpt-4.1"]);
     expect(hub.enabledModels().some((m) => m.id === "openai/gpt-4.1")).toBe(false);
     await hub.setKey("openai", "sk-x");
-    expect(hub.enabledModels().find((m) => m.id === "openai/gpt-4.1")).toMatchObject({ provider: "OpenAI", label: expect.any(String), note: "$2 in · $8 out per 1M tokens" });
+    expect(hub.enabledModels().find((m) => m.id === "openai/gpt-4.1")).toMatchObject({
+      provider: "OpenAI",
+      label: expect.any(String),
+      note: "$2 in · $8 out per 1M tokens",
+    });
   });
 
   it("resolves references, including old LiteLLM aliases without a provider", async () => {
@@ -80,7 +114,9 @@ describe("ProviderHub", () => {
   });
 
   it("adds a local server by discovering its models, and remembers it", async () => {
-    const f = fakeFetch([[/host\.docker\.internal:11434\/v1\/models$/, () => json({ data: [{ id: "qwen3.5:35b" }, { id: "gemma4:latest" }] })]]);
+    const f = fakeFetch([
+      [/host\.docker\.internal:11434\/v1\/models$/, () => json({ data: [{ id: "qwen3.5:35b" }, { id: "gemma4:latest" }] })],
+    ]);
     const { hub, dir } = await make(undefined, { fetch: f });
     const added = await hub.addLocal({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" });
     expect(added).toMatchObject({ id: "ollama", configured: true, enabled: ["qwen3.5:35b", "gemma4:latest"] });
@@ -91,7 +127,9 @@ describe("ProviderHub", () => {
 
   it("explains when a local server can't be reached", async () => {
     const { hub } = await make(undefined, { fetch: fakeFetch([]) });
-    await expect(hub.addLocal({ kind: "llamacpp", baseUrl: "http://host.docker.internal:8080/v1" })).rejects.toThrow(/couldn't list models/i);
+    await expect(hub.addLocal({ kind: "llamacpp", baseUrl: "http://host.docker.internal:8080/v1" })).rejects.toThrow(
+      /couldn't list models/i,
+    );
   });
 
   it("removes a cloud key or a local server", async () => {
@@ -116,13 +154,18 @@ describe("ProviderHub", () => {
   it("tests a model with one small tool call and reports cost", async () => {
     const { hub } = await make(undefined, {
       complete: async () =>
-        ({ content: [{ type: "toolCall", id: "t", name: "get_time", arguments: { city: "Paris" } }], usage: { cost: { total: 0.00012 } } }) as never,
+        ({
+          content: [{ type: "toolCall", id: "t", name: "get_time", arguments: { city: "Paris" } }],
+          usage: { cost: { total: 0.00012 } },
+        }) as never,
     });
     expect(await hub.test("litellm/chat-default")).toMatchObject({ ok: true, toolCall: true, cost: 0.00012 });
   });
 
   it("reports a model that answers in prose instead of calling the tool", async () => {
-    const { hub } = await make(undefined, { complete: async () => ({ content: [{ type: "text", text: "It is noon." }], usage: { cost: { total: 0 } } }) as never });
+    const { hub } = await make(undefined, {
+      complete: async () => ({ content: [{ type: "text", text: "It is noon." }], usage: { cost: { total: 0 } } }) as never,
+    });
     expect(await hub.test("litellm/chat-default")).toMatchObject({ ok: false, toolCall: false });
   });
 

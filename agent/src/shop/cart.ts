@@ -25,7 +25,9 @@ export class ActiveCart {
     this.scope = [...state.scope];
     this.items = state.items.map((i) => ({ ...i }));
     this.homes = new Map(Object.entries(state.homes));
-    this.picks = new Map(Object.entries(state.picks).map(([store, m]) => [store, new Map(Object.entries(m).map(([k, v]) => [k, v as unknown as Tile[]]))]));
+    this.picks = new Map(
+      Object.entries(state.picks).map(([store, m]) => [store, new Map(Object.entries(m).map(([k, v]) => [k, v as unknown as Tile[]]))]),
+    );
   }
 
   snapshot(): CartEntity {

@@ -29,7 +29,10 @@ export function ModelPicker({ p, onSaved }: { p: ProviderView; onSaved: () => vo
     const next = models.map((m) => (m.id === modelId ? { ...m, enabled: !m.enabled } : m));
     setModels(next);
     try {
-      await providersApi.setEnabled(p.id, next.filter((m) => m.enabled).map((m) => m.id));
+      await providersApi.setEnabled(
+        p.id,
+        next.filter((m) => m.enabled).map((m) => m.id),
+      );
       onSaved();
     } catch (e) {
       setModels(models);
@@ -54,13 +57,29 @@ export function ModelPicker({ p, onSaved }: { p: ProviderView; onSaved: () => vo
   return (
     <div id={id} className="mt-3 space-y-2">
       {models.length > SEARCH_AFTER && (
-        <input id={`${id}-search`} aria-label={`Search ${p.label} models`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${models.length} models`} className={input} />
+        <input
+          id={`${id}-search`}
+          aria-label={`Search ${p.label} models`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`Search ${models.length} models`}
+          className={input}
+        />
       )}
       <ul id={`${id}-list`} className="max-h-72 space-y-1 overflow-y-auto pr-1">
         {shown.map((m, i) => (
           <li id={`${id}-${i}`} key={m.id}>
-            <label id={`${id}-${i}-label`} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 transition hover:bg-surface">
-              <input id={`${id}-${i}-check`} type="checkbox" checked={m.enabled} onChange={() => void toggle(m.id)} className="mt-1 accent-charcoal" />
+            <label
+              id={`${id}-${i}-label`}
+              className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 transition hover:bg-surface"
+            >
+              <input
+                id={`${id}-${i}-check`}
+                type="checkbox"
+                checked={m.enabled}
+                onChange={() => void toggle(m.id)}
+                className="mt-1 accent-charcoal"
+              />
               <span id={`${id}-${i}-text`} className="min-w-0">
                 <span id={`${id}-${i}-name`} className="block text-sm text-text-primary">
                   {m.label}

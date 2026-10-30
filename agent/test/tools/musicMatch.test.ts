@@ -25,7 +25,10 @@ async function score(pick: (c: Case) => Promise<ITunes | undefined>) {
   return { right, total: cases.length, wrong };
 }
 
-const fakeJudge = (choice: string | null | "fail", seen: { state?: Record<string, unknown>; options?: Record<string, string> } = {}): Judge => ({
+const fakeJudge = (
+  choice: string | null | "fail",
+  seen: { state?: Record<string, unknown>; options?: Record<string, string> } = {},
+): Judge => ({
   available: true,
   score: async () => null,
   yesno: async () => null,
@@ -41,7 +44,8 @@ describe("music match set", () => {
   it("has 20 titles with tributes, karaoke, covers, live versions and compilations among real iTunes candidates", () => {
     expect(cases).toHaveLength(20);
     const names = cases.flatMap((c) => c.results.map((r) => `${r.trackName ?? ""} ${r.collectionName} ${r.artistName}`)).join("\n");
-    for (const word of [/karaoke/i, /tribute|lullaby|string quartet|symphonic/i, /\(Live/i, /greatest hits|essential|best of/i]) expect(names).toMatch(word);
+    for (const word of [/karaoke/i, /tribute|lullaby|string quartet|symphonic/i, /\(Live/i, /greatest hits|essential|best of/i])
+      expect(names).toMatch(word);
     expect(cases.some((c) => c.accept.length === 0)).toBe(true);
   });
 
@@ -86,25 +90,49 @@ describe("music tool with a judge", () => {
 
   it("asks for ten candidates and shows the chosen one", async () => {
     const f = fakeFetch([[/itunes/, () => json({ results: rows })]]);
-    const r = (await musicTool({ country: "US", fetch: f, judge: fakeJudge("c4") }).execute("c", { queries: ["Bohemian Rhapsody Queen"], kind: "song" } as never, undefined, undefined, {} as never)) as { content: Array<{ text: string }> };
+    const r = (await musicTool({ country: "US", fetch: f, judge: fakeJudge("c4") }).execute(
+      "c",
+      { queries: ["Bohemian Rhapsody Queen"], kind: "song" } as never,
+      undefined,
+      undefined,
+      {} as never,
+    )) as { content: Array<{ text: string }> };
     expect(new URL(f.calls[0]).searchParams.get("limit")).toBe("10");
     expect(r.content[0].text).toContain("Bohemian Rhapsody — Queen · A Night At The Opera · 1975");
   });
 
   it("keeps today's limit and matching with no judge, or an unavailable one", async () => {
     const f = fakeFetch([[/itunes/, () => json({ results: rows })]]);
-    await musicTool({ country: "US", fetch: f, judge: { ...fakeJudge("c4"), available: false } }).execute("c", { queries: ["x"], kind: "song" } as never, undefined, undefined, {} as never);
+    await musicTool({ country: "US", fetch: f, judge: { ...fakeJudge("c4"), available: false } }).execute(
+      "c",
+      { queries: ["x"], kind: "song" } as never,
+      undefined,
+      undefined,
+      {} as never,
+    );
     expect(new URL(f.calls[0]).searchParams.get("limit")).toBe("5");
   });
 });
 
 describe.skipIf(!process.env.OPENROUTER_API_KEY)("music match with live Jev", () => {
   it("picks the right work on at least 19 of 20", { timeout: 120000 }, async () => {
-    const runtime = await ModelRuntime.create({ authPath: join(mkdtempSync(join(tmpdir(), "music-")), "auth.json"), modelsPath: null, refreshOnCreate: false, allowModelNetwork: false });
-    const judge = await createJudge({ runtime, model: process.env.JEV_MODEL ?? "openrouter/typesafe/jev-1.14", log: () => {}, timeoutMs: 15000 });
+    const runtime = await ModelRuntime.create({
+      authPath: join(mkdtempSync(join(tmpdir(), "music-")), "auth.json"),
+      modelsPath: null,
+      refreshOnCreate: false,
+      allowModelNetwork: false,
+    });
+    const judge = await createJudge({
+      runtime,
+      model: process.env.JEV_MODEL ?? "openrouter/typesafe/jev-1.14",
+      log: () => {},
+      timeoutMs: 15000,
+    });
     expect(judge.available).toBe(true);
     const s = await score((c) => pickMusic(c.results, c.query, c.kind, judge));
-    console.log(`[music] ${musicMatch.id}@${musicMatch.version} jev ${s.right}/${s.total} wrong: ${s.wrong.join("; ")} cost $${judge.usage().costUsd.toFixed(5)} calls ${judge.usage().calls}`);
+    console.log(
+      `[music] ${musicMatch.id}@${musicMatch.version} jev ${s.right}/${s.total} wrong: ${s.wrong.join("; ")} cost $${judge.usage().costUsd.toFixed(5)} calls ${judge.usage().calls}`,
+    );
     expect(s.right).toBeGreaterThanOrEqual(19);
   });
 });

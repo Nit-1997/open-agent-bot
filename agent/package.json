@@ -10,6 +10,8 @@
   },
   "scripts": {
     "lint": "biome lint",
+    "format": "biome format --write",
+    "format:check": "biome format",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.evals.json",
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",

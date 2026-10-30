@@ -18,12 +18,12 @@ To run the whole stack, follow **Run** in the [README](README.md). To work on on
 
 ## Checks
 
-CI runs these on every pull request. Run them before you push:
+CI runs these on every pull request. Run them before you push (`npm run format` fixes formatting):
 
 | Package | Commands |
 | --- | --- |
-| `agent` | `npm run lint && npm run typecheck && npm test && npm run build` |
-| `web` | `npm run lint && npm run typecheck && npm test && npm run build` |
+| `agent` | `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` |
+| `web` | `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set.
 

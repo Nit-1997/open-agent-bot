@@ -2,7 +2,26 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildSystemPrompt, CORE_PROMPT } from "../../src/prompt/systemPrompt.js";
 
-const NAMES = ["amazon", "walmart", "target", "costco", "best buy", "bestbuy", "kroger", "safeway", "shipt", "flipkart", "b&h", "newegg", "google hotels", "airbnb", "booking.com", "expedia", "google flights", "instacart"];
+const NAMES = [
+  "amazon",
+  "walmart",
+  "target",
+  "costco",
+  "best buy",
+  "bestbuy",
+  "kroger",
+  "safeway",
+  "shipt",
+  "flipkart",
+  "b&h",
+  "newegg",
+  "google hotels",
+  "airbnb",
+  "booking.com",
+  "expedia",
+  "google flights",
+  "instacart",
+];
 const pattern = new RegExp(`(?<![a-z])(${NAMES.map((n) => n.replace(/[.&]/g, "\\$&")).join("|")})(?![a-z])`, "i");
 
 const skillsDir = new URL("../../skills/", import.meta.url);

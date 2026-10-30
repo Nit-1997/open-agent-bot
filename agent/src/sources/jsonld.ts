@@ -27,8 +27,29 @@ type Node = Record<string, unknown>;
 
 const SCRIPT = /<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi;
 const PRODUCT = new Set(["Product", "ProductGroup", "IndividualProduct", "SomeProducts", "Vehicle", "Car", "Book", "Movie"]);
-const LODGING = new Set(["Hotel", "LodgingBusiness", "Resort", "Hostel", "Motel", "BedAndBreakfast", "Campground", "VacationRental", "Apartment", "House"]);
-const RESTAURANT = new Set(["Restaurant", "FoodEstablishment", "CafeOrCoffeeShop", "BarOrPub", "Bakery", "FastFoodRestaurant", "IceCreamShop", "Winery", "Brewery"]);
+const LODGING = new Set([
+  "Hotel",
+  "LodgingBusiness",
+  "Resort",
+  "Hostel",
+  "Motel",
+  "BedAndBreakfast",
+  "Campground",
+  "VacationRental",
+  "Apartment",
+  "House",
+]);
+const RESTAURANT = new Set([
+  "Restaurant",
+  "FoodEstablishment",
+  "CafeOrCoffeeShop",
+  "BarOrPub",
+  "Bakery",
+  "FastFoodRestaurant",
+  "IceCreamShop",
+  "Winery",
+  "Brewery",
+]);
 const MAX_RECORDS = 40;
 
 const isNode = (v: unknown): v is Node => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -70,12 +91,22 @@ function image(v: unknown): string | undefined {
 function address(v: unknown): string | undefined {
   if (typeof v === "string") return v.trim() || undefined;
   if (!isNode(v)) return undefined;
-  const parts = [v.streetAddress, v.addressLocality, v.addressRegion, v.postalCode, isNode(v.addressCountry) ? v.addressCountry.name : v.addressCountry].map(text).filter(Boolean);
+  const parts = [
+    v.streetAddress,
+    v.addressLocality,
+    v.addressRegion,
+    v.postalCode,
+    isNode(v.addressCountry) ? v.addressCountry.name : v.addressCountry,
+  ]
+    .map(text)
+    .filter(Boolean);
   return parts.length ? parts.join(", ") : undefined;
 }
 
 function types(node: Node): string[] {
-  return list(node["@type"]).filter((t): t is string => typeof t === "string").map((t) => t.replace(/^.*[/#]/, ""));
+  return list(node["@type"])
+    .filter((t): t is string => typeof t === "string")
+    .map((t) => t.replace(/^.*[/#]/, ""));
 }
 
 function kindOf(node: Node): LdKind | undefined {
@@ -113,13 +144,16 @@ function priceOf(offers: Offer[]): Partial<LdRecord> {
   const live = priced.filter((o) => !o.availability || !OUT.test(o.availability));
   const pool = live.length ? live : priced;
   const best = pool.reduce<Offer | undefined>((a, o) => (a == null || (o.price as number) < (a.price as number) ? o : a), undefined);
-  const availability = best?.availability ?? live.find((o) => o.availability)?.availability ?? offers.find((o) => o.availability)?.availability;
+  const availability =
+    best?.availability ?? live.find((o) => o.availability)?.availability ?? offers.find((o) => o.availability)?.availability;
   const high = Math.max(...priced.map((o) => o.high ?? (o.price as number)), Number.NEGATIVE_INFINITY);
   const count = offers.map((o) => o.count).find((c) => c != null);
   return {
     ...(best?.price != null && { price: best.price }),
     ...(Number.isFinite(high) && best?.price != null && high > best.price && { highPrice: high }),
-    ...((best?.currency ?? offers.find((o) => o.currency)?.currency) && { currency: best?.currency ?? offers.find((o) => o.currency)?.currency }),
+    ...((best?.currency ?? offers.find((o) => o.currency)?.currency) && {
+      currency: best?.currency ?? offers.find((o) => o.currency)?.currency,
+    }),
     ...(availability && { availability }),
     ...(count != null && { offerCount: count }),
   };
@@ -194,7 +228,11 @@ function walk(raw: unknown, out: LdRecord[], depth = 0, parent?: Node): void {
 }
 
 function parseBlock(src: string): unknown {
-  const body = src.replace(/^\s*<!--/, "").replace(/-->\s*$/, "").replace(/^\s*\/\*[\s\S]*?\*\/|^\s*\/\/<!\[CDATA\[|\/\/\]\]>\s*$/g, "").trim();
+  const body = src
+    .replace(/^\s*<!--/, "")
+    .replace(/-->\s*$/, "")
+    .replace(/^\s*\/\*[\s\S]*?\*\/|^\s*\/\/<!\[CDATA\[|\/\/\]\]>\s*$/g, "")
+    .trim();
   try {
     return JSON.parse(body);
   } catch {

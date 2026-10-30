@@ -19,11 +19,32 @@ function Field({ id, label, children }: { id: string; label: string; children: R
   );
 }
 
-function Stepper({ id, label, value, min = 1, disabled, onChange }: { id: string; label: string; value: number; min?: number; disabled: boolean; onChange: (n: number) => void }) {
+function Stepper({
+  id,
+  label,
+  value,
+  min = 1,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min?: number;
+  disabled: boolean;
+  onChange: (n: number) => void;
+}) {
   return (
     <Field id={id} label={label}>
       <div id={`${id}-control`} className="flex w-fit items-center rounded-full border border-border">
-        <button id={`${id}-dec`} type="button" aria-label={`Decrease ${label.toLowerCase()}`} disabled={disabled || value <= min} onClick={() => onChange(value - 1)} className="p-1.5 text-text-secondary disabled:opacity-30">
+        <button
+          id={`${id}-dec`}
+          type="button"
+          aria-label={`Decrease ${label.toLowerCase()}`}
+          disabled={disabled || value <= min}
+          onClick={() => onChange(value - 1)}
+          className="p-1.5 text-text-secondary disabled:opacity-30"
+        >
           <Minus id={`${id}-dec-icon`} aria-hidden="true" size={12} />
         </button>
         <input
@@ -39,7 +60,14 @@ function Stepper({ id, label, value, min = 1, disabled, onChange }: { id: string
           }}
           className="w-12 bg-transparent text-center text-sm [appearance:textfield] disabled:opacity-60"
         />
-        <button id={`${id}-inc`} type="button" aria-label={`Increase ${label.toLowerCase()}`} disabled={disabled} onClick={() => onChange(value + 1)} className="p-1.5 text-text-secondary disabled:opacity-30">
+        <button
+          id={`${id}-inc`}
+          type="button"
+          aria-label={`Increase ${label.toLowerCase()}`}
+          disabled={disabled}
+          onClick={() => onChange(value + 1)}
+          className="p-1.5 text-text-secondary disabled:opacity-30"
+        >
           <Plus id={`${id}-inc-icon`} aria-hidden="true" size={12} />
         </button>
       </div>
@@ -47,7 +75,19 @@ function Stepper({ id, label, value, min = 1, disabled, onChange }: { id: string
   );
 }
 
-function DateField({ id, label, value, disabled, onChange }: { id: string; label: string; value: string | undefined; disabled: boolean; onChange: (v: string) => void }) {
+function DateField({
+  id,
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string | undefined;
+  disabled: boolean;
+  onChange: (v: string) => void;
+}) {
   if (value && !ISO_DAY.test(value.slice(0, 10))) {
     return (
       <Field id={id} label={label}>
@@ -59,12 +99,31 @@ function DateField({ id, label, value, disabled, onChange }: { id: string; label
   }
   return (
     <Field id={id} label={label}>
-      <input id={`${id}-input`} type="date" value={value?.slice(0, 10) ?? ""} disabled={disabled} onChange={(e) => e.target.value && onChange(e.target.value)} className={INPUT} />
+      <input
+        id={`${id}-input`}
+        type="date"
+        value={value?.slice(0, 10) ?? ""}
+        disabled={disabled}
+        onChange={(e) => e.target.value && onChange(e.target.value)}
+        className={INPUT}
+      />
     </Field>
   );
 }
 
-function BudgetField({ id, value, currency, disabled, onChange }: { id: string; value: number | undefined; currency?: string; disabled: boolean; onChange: (n: number) => void }) {
+function BudgetField({
+  id,
+  value,
+  currency,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: number | undefined;
+  currency?: string;
+  disabled: boolean;
+  onChange: (n: number) => void;
+}) {
   return (
     <Field id={id} label={`Budget${currency ? ` (${currency})` : ""}`}>
       <input
@@ -87,10 +146,25 @@ function BudgetField({ id, value, currency, disabled, onChange }: { id: string; 
 type EventDraft = { guests: number; date?: string; budget?: number };
 type TripDraft = { start: string; end: string; travelers: number; budget?: number };
 
-export function PlanCard({ toolCallId, widget, onEdit, stale = false }: { toolCallId: string; widget: Plan; onEdit?: (e: PlanEdits) => void; stale?: boolean }) {
+export function PlanCard({
+  toolCallId,
+  widget,
+  onEdit,
+  stale = false,
+}: {
+  toolCallId: string;
+  widget: Plan;
+  onEdit?: (e: PlanEdits) => void;
+  stale?: boolean;
+}) {
   const id = `plan-${toolCallId}`;
   const locked = stale || !onEdit;
-  const initial = widget.entity === "event" ? { guests: widget.value.guests, date: widget.value.date, budget: widget.value.budget } : widget.entity === "trip" ? { start: widget.value.start, end: widget.value.end, travelers: widget.value.travelers, budget: widget.value.budget } : {};
+  const initial =
+    widget.entity === "event"
+      ? { guests: widget.value.guests, date: widget.value.date, budget: widget.value.budget }
+      : widget.entity === "trip"
+        ? { start: widget.value.start, end: widget.value.end, travelers: widget.value.travelers, budget: widget.value.budget }
+        : {};
   const [draft, setDraft] = useState<Record<string, number | string | undefined>>(initial);
   const set = (patch: Record<string, number | string>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -128,7 +202,15 @@ export function PlanCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
         <div id={`${id}-fields`} className="mt-3 flex flex-wrap items-end gap-4">
           <Stepper id={`${id}-guests`} label="Guests" value={ev.guests} disabled={locked} onChange={(n) => set({ guests: n })} />
           <DateField id={`${id}-date`} label="Date" value={ev.date} disabled={locked} onChange={(v) => set({ date: v })} />
-          {(ev.budget !== undefined || !locked) && <BudgetField id={`${id}-budget`} value={ev.budget} currency={widget.value.currency} disabled={locked} onChange={(n) => set({ budget: n })} />}
+          {(ev.budget !== undefined || !locked) && (
+            <BudgetField
+              id={`${id}-budget`}
+              value={ev.budget}
+              currency={widget.value.currency}
+              disabled={locked}
+              onChange={(n) => set({ budget: n })}
+            />
+          )}
         </div>
       )}
       {widget.entity === "event" && (widget.value.location || widget.value.theme) && (
@@ -162,8 +244,16 @@ export function PlanCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
         <div id={`${id}-fields`} className="mt-3 flex flex-wrap items-end gap-4">
           <DateField id={`${id}-start`} label="Start" value={tr.start} disabled={locked} onChange={(v) => set({ start: v })} />
           <DateField id={`${id}-end`} label="End" value={tr.end} disabled={locked} onChange={(v) => set({ end: v })} />
-          <Stepper id={`${id}-travelers`} label="Travelers" value={tr.travelers} disabled={locked} onChange={(n) => set({ travelers: n })} />
-          {(tr.budget !== undefined || !locked) && <BudgetField id={`${id}-budget`} value={tr.budget} disabled={locked} onChange={(n) => set({ budget: n })} />}
+          <Stepper
+            id={`${id}-travelers`}
+            label="Travelers"
+            value={tr.travelers}
+            disabled={locked}
+            onChange={(n) => set({ travelers: n })}
+          />
+          {(tr.budget !== undefined || !locked) && (
+            <BudgetField id={`${id}-budget`} value={tr.budget} disabled={locked} onChange={(n) => set({ budget: n })} />
+          )}
         </div>
       )}
       {widget.entity === "trip" && !!widget.value.stays.length && (
@@ -171,7 +261,13 @@ export function PlanCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
           {widget.value.stays.map((s, i) => (
             <li id={`${id}-stays-${i}`} key={i}>
               {s.url ? (
-                <a id={`${id}-stays-${i}-link`} href={s.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
+                <a
+                  id={`${id}-stays-${i}-link`}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium hover:underline"
+                >
                   {s.name}
                 </a>
               ) : (
@@ -207,7 +303,13 @@ export function PlanCard({ toolCallId, widget, onEdit, stale = false }: { toolCa
           {widget.value.items.map((s, i) => (
             <li id={`${id}-items-${i}`} key={i}>
               {s.url ? (
-                <a id={`${id}-items-${i}-link`} href={s.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
+                <a
+                  id={`${id}-items-${i}-link`}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium hover:underline"
+                >
                   {s.name}
                 </a>
               ) : (

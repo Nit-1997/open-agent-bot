@@ -17,7 +17,9 @@ describe("googleFlightsUrl", () => {
   });
 
   it("includes return date and adults", () => {
-    const u = new URL(googleFlightsUrl({ from: "SFO", to: "BLR", date: "2026-12-15", returnDate: "2027-01-05", adults: 2 }, "en-US", "USD"));
+    const u = new URL(
+      googleFlightsUrl({ from: "SFO", to: "BLR", date: "2026-12-15", returnDate: "2027-01-05", adults: 2 }, "en-US", "USD"),
+    );
     expect(u.searchParams.get("q")).toBe("Flights from SFO to BLR on 2026-12-15 returning 2027-01-05 for 2 adults");
   });
 });
@@ -36,7 +38,14 @@ describe("parseGoogleFlights", () => {
       layoverAt: "SLC",
       price: 177,
     });
-    expect(flights[1]).toMatchObject({ airline: "American", departTime: "8:55 AM", stops: 1, layoverMinutes: 55, layoverAt: "DFW", price: 177 });
+    expect(flights[1]).toMatchObject({
+      airline: "American",
+      departTime: "8:55 AM",
+      stops: 1,
+      layoverMinutes: 55,
+      layoverAt: "DFW",
+      price: 177,
+    });
   });
 
   it("parses nonstop, next-day arrivals, lowercase am/pm and other currency symbols", () => {
@@ -48,7 +57,14 @@ describe("parseGoogleFlights", () => {
 
   it("parses the en-IN page variant (hrs, lowercase am/pm)", () => {
     const pageIn = readFileSync(new URL("../fixtures/google-flights-sfo-bna-en-in.txt", import.meta.url), "utf8");
-    expect(parseGoogleFlights(pageIn)[0]).toMatchObject({ airline: "Delta", departTime: "6:00 am", arriveTime: "2:17 pm", duration: "6 hrs 17 min", stops: 1, price: 177 });
+    expect(parseGoogleFlights(pageIn)[0]).toMatchObject({
+      airline: "Delta",
+      departTime: "6:00 am",
+      arriveTime: "2:17 pm",
+      duration: "6 hrs 17 min",
+      stops: 1,
+      price: 177,
+    });
   });
 
   it("drops the operated-by suffix from airline names", () => {
@@ -75,7 +91,9 @@ describe("flights tool", () => {
     const r = await run(page);
     const t = (r.content[0] as { text: string }).text;
     expect(t.startsWith("searchUrl: https://www.google.com/travel/flights?")).toBe(true);
-    expect(t).toContain("(Note for you, do not repeat to the user: a flight card with these options and the booking link is already displayed.)");
+    expect(t).toContain(
+      "(Note for you, do not repeat to the user: a flight card with these options and the booking link is already displayed.)",
+    );
     expect(t).toContain("Delta 6:00 AM – 2:17 PM, 6 hr 17 min, 1 stop (1h 1m in SLC), 177 USD");
     const data = (r.details as { data: Record<string, unknown> }).data;
     expect(data).toMatchObject({ kind: "flights", from: "SFO", to: "BNA", date: "2026-12-12", currency: "USD", source: "Google Flights" });
@@ -104,7 +122,13 @@ describe("flights tool", () => {
       inFlight--;
       return ok(page);
     };
-    await flightsTool({ locale: "en-US", currency: "USD", browse }).execute("c", { from: "SJC, SFO, OAK", to: "BNA", date: "2026-12-12" }, undefined, undefined, {} as never);
+    await flightsTool({ locale: "en-US", currency: "USD", browse }).execute(
+      "c",
+      { from: "SJC, SFO, OAK", to: "BNA", date: "2026-12-12" },
+      undefined,
+      undefined,
+      {} as never,
+    );
     expect(peak).toBe(3);
     expect(calls.every((c) => c.fresh)).toBe(true);
     expect(calls.filter((c) => c.live)).toHaveLength(1);

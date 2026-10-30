@@ -42,6 +42,10 @@ const AIRLINES: Record<string, string> = {
 };
 
 export function airlineHost(name: string): string | undefined {
-  const first = name.split(/[,·]|\band\b/)[0].trim().toLowerCase().replace(/\s+(airlines?|airways)$/, "");
+  const first = name
+    .split(/[,·]|\band\b/)[0]
+    .trim()
+    .toLowerCase()
+    .replace(/\s+(airlines?|airways)$/, "");
   return AIRLINES[first] ?? AIRLINES[name.trim().toLowerCase()];
 }

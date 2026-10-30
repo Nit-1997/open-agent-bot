@@ -33,12 +33,17 @@ export function researchTool(deps: Deps) {
       "Research a question end to end and publish a report whose claims are checked against its sources. Searches the web, reads the best pages, plans and writes the report, then verifies each claim against the page it cites. Call it once for any report, comparison, or 'should I buy X' decision, instead of searching, reading, and calling create_artifact yourself. The report is shown inline; reply in two or three sentences with the takeaway.",
     parameters: Type.Object({
       question: Type.String({ minLength: 1, description: "what the report should answer, with the user's constraints" }),
-      queries: Type.Optional(Type.Union([Type.Array(Type.String()), Type.String()], { description: "up to 4 web searches covering different angles; defaults to the question" })),
+      queries: Type.Optional(
+        Type.Union([Type.Array(Type.String()), Type.String()], {
+          description: "up to 4 web searches covering different angles; defaults to the question",
+        }),
+      ),
       decision: Type.Optional(Type.String({ description: "the decision the report supports, e.g. which one to buy" })),
       audience: Type.Optional(Type.String()),
     }),
     async execute(_id, params, signal, onUpdate): Promise<ToolResult> {
-      const emit = (step: WorkflowStep) => onUpdate?.({ content: [{ type: "text", text: step.phase }], details: { [WORKFLOW_STEP]: step } });
+      const emit = (step: WorkflowStep) =>
+        onUpdate?.({ content: [{ type: "text", text: step.phase }], details: { [WORKFLOW_STEP]: step } });
       const outcome = await runResearch(
         { question: params.question, queries: queryList(params.queries), decision: params.decision, audience: params.audience },
         {
@@ -62,9 +67,17 @@ export function researchTool(deps: Deps) {
         },
       );
       if (!outcome.ok) return fail(`research failed: ${outcome.error}. Continue yourself with web_search, fetch_page and create_artifact.`);
-      const parts = [`${outcome.supported} supported`, outcome.removed && `${outcome.removed} unsupported removed`, outcome.flagged && `${outcome.flagged} flagged as unverified in the report`, outcome.unchecked && `${outcome.unchecked} not checked`].filter(Boolean);
+      const parts = [
+        `${outcome.supported} supported`,
+        outcome.removed && `${outcome.removed} unsupported removed`,
+        outcome.flagged && `${outcome.flagged} flagged as unverified in the report`,
+        outcome.unchecked && `${outcome.unchecked} not checked`,
+      ].filter(Boolean);
       const checks = `${outcome.total} claims checked against their sources: ${parts.join(", ")}.`;
-      return ok(`artifact ${outcome.id} created: ${outcome.title}\nRead ${outcome.sources} sources. ${checks}\nTakeaway: ${outcome.takeaway}\nThe report is shown to the user. If the question is about something to buy, first call shop once with the top 2-3 picks at the user's regional stores for live prices and links. Then reply in two or three sentences with the takeaway${outcome.flagged || outcome.unchecked ? " and say how many claims could not be confirmed" : ""}.`, { artifactId: outcome.id, title: outcome.title });
+      return ok(
+        `artifact ${outcome.id} created: ${outcome.title}\nRead ${outcome.sources} sources. ${checks}\nTakeaway: ${outcome.takeaway}\nThe report is shown to the user. If the question is about something to buy, first call shop once with the top 2-3 picks at the user's regional stores for live prices and links. Then reply in two or three sentences with the takeaway${outcome.flagged || outcome.unchecked ? " and say how many claims could not be confirmed" : ""}.`,
+        { artifactId: outcome.id, title: outcome.title },
+      );
     },
   });
 }

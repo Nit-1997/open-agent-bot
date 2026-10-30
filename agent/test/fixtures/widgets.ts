@@ -23,7 +23,13 @@ export const validWidgets = {
     subtitle: "Pune · Nov 8",
     blocks: [
       { type: "heading", text: "Budget" },
-      { type: "stats", items: [{ label: "Guests", value: "25" }, { label: "Budget", value: "₹15,000" }] },
+      {
+        type: "stats",
+        items: [
+          { label: "Guests", value: "25" },
+          { label: "Budget", value: "₹15,000" },
+        ],
+      },
       { type: "table", columns: ["Item", "Qty"], rows: [["Kaju katli", "1.5 kg"]] },
       { type: "list", items: [{ title: "Diya set", value: "₹499", badge: "In stock", url: "https://amazon.in/x" }] },
       { type: "checklist", title: "Day before", items: [{ text: "Clean the house", note: "start early" }] },

@@ -29,21 +29,38 @@ function fakeTab(pages: Record<string, string>): { openTab: OpenTab; opened: str
   return { openTab, opened, live };
 }
 
-const source = (id: string, lists: StaySource["lists"], titles: string[], read = true): StaySource => staySource({
-  id,
-  label: id.toUpperCase(),
-  site: `${id}.test`,
-  lists,
-  searchUrl: (q) => `https://${id}.test/search?where=${encodeURIComponent(q.location)}`,
-  ...(read && { read: async () => titles.map((t, i) => ({ title: t, url: `https://${id}.test/${i}`, nightly: 100 * (i + 1), total: 300 * (i + 1) })) }),
-});
+const source = (id: string, lists: StaySource["lists"], titles: string[], read = true): StaySource =>
+  staySource({
+    id,
+    label: id.toUpperCase(),
+    site: `${id}.test`,
+    lists,
+    searchUrl: (q) => `https://${id}.test/search?where=${encodeURIComponent(q.location)}`,
+    ...(read && {
+      read: async () => titles.map((t, i) => ({ title: t, url: `https://${id}.test/${i}`, nightly: 100 * (i + 1), total: 300 * (i + 1) })),
+    }),
+  });
 
-const sources = [source("hotels", ["hotel"], ["Grand", "Plaza"]), source("homes", ["rental"], ["Loft"]), source("walled", ["hotel", "rental"], ["x"]), source("linkonly", ["hotel"], [], false)];
+const sources = [
+  source("hotels", ["hotel"], ["Grand", "Plaza"]),
+  source("homes", ["rental"], ["Loft"]),
+  source("walled", ["hotel", "rental"], ["x"]),
+  source("linkonly", ["hotel"], [], false),
+];
 
 const run = (params: Record<string, unknown>, pages: Record<string, string> = { "walled.test": "Are you a robot?" }) => {
   const tab = fakeTab(pages);
   const tool = staysTool({ openTab: tab.openTab, currency: "USD", sources });
-  return { tab, result: tool.execute("c", { location: "Las Vegas", checkin: "2026-11-12", checkout: "2026-11-15", ...params } as never, undefined, undefined, {} as never) };
+  return {
+    tab,
+    result: tool.execute(
+      "c",
+      { location: "Las Vegas", checkin: "2026-11-12", checkout: "2026-11-15", ...params } as never,
+      undefined,
+      undefined,
+      {} as never,
+    ),
+  };
 };
 
 describe("stays tool", () => {

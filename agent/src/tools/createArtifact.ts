@@ -35,7 +35,12 @@ function firstPicture(html: string): { src: string; alt: string } | undefined {
   return { src: m[1], alt };
 }
 
-export async function storeArtifact(artifacts: ArtifactStore, images: ImageCheck | undefined, title: string, html: string): Promise<ToolResult> {
+export async function storeArtifact(
+  artifacts: ArtifactStore,
+  images: ImageCheck | undefined,
+  title: string,
+  html: string,
+): Promise<ToolResult> {
   if (Buffer.byteLength(html) > MAX_HTML_BYTES) {
     return fail("html too large (max 2MB)");
   }

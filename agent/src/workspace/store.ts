@@ -9,7 +9,13 @@ type Versioned = StoredEntity & { version: number; updatedAt: number };
 
 type Row = { kind: string; id: string; json: string; version: number; updated_at: number };
 
-const toEntity = (r: Row): Versioned => ({ kind: r.kind as EntityKind, id: r.id, value: JSON.parse(r.json), version: r.version, updatedAt: r.updated_at });
+const toEntity = (r: Row): Versioned => ({
+  kind: r.kind as EntityKind,
+  id: r.id,
+  value: JSON.parse(r.json),
+  version: r.version,
+  updatedAt: r.updated_at,
+});
 
 export class WorkspaceStore {
   private readonly db: DatabaseSync;
@@ -36,20 +42,29 @@ export class WorkspaceStore {
   }
 
   get(thread: string, kind: EntityKind, id: string): Versioned | undefined {
-    const row = this.db.prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? AND kind = ? AND id = ?").get(thread, kind, id) as Row | undefined;
+    const row = this.db
+      .prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? AND kind = ? AND id = ?")
+      .get(thread, kind, id) as Row | undefined;
     return row && toEntity(row);
   }
 
   list(thread: string, kind?: EntityKind): Versioned[] {
-    const rows = (kind
-      ? this.db.prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? AND kind = ? ORDER BY updated_at, id").all(thread, kind)
-      : this.db.prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? ORDER BY updated_at, kind, id").all(thread)) as Row[];
+    const rows = (
+      kind
+        ? this.db
+            .prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? AND kind = ? ORDER BY updated_at, id")
+            .all(thread, kind)
+        : this.db
+            .prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? ORDER BY updated_at, kind, id")
+            .all(thread)
+    ) as Row[];
     return rows.map(toEntity);
   }
 
   put(thread: string, kind: EntityKind, id: string, value: unknown, expectedVersion?: number): number {
     const current = this.get(thread, kind, id);
-    if (expectedVersion !== undefined && (current?.version ?? 0) !== expectedVersion) throw new VersionConflict(kind, id, expectedVersion, current?.version ?? 0);
+    if (expectedVersion !== undefined && (current?.version ?? 0) !== expectedVersion)
+      throw new VersionConflict(kind, id, expectedVersion, current?.version ?? 0);
     const version = (current?.version ?? 0) + 1;
     this.db
       .prepare("INSERT OR REPLACE INTO workspace (thread_id, kind, id, json, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)")

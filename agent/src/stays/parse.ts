@@ -15,7 +15,8 @@ export function count(text: string | undefined): number | undefined {
   return Number.isFinite(n) ? Math.round(n * scale) : undefined;
 }
 
-export const nightlyFromTotal = (total: number | undefined, q: StayQuery) => (total != null && q.nights > 0 ? Math.round(total / q.nights) : undefined);
+export const nightlyFromTotal = (total: number | undefined, q: StayQuery) =>
+  total != null && q.nights > 0 ? Math.round(total / q.nights) : undefined;
 export const totalFromNightly = (nightly: number | undefined, q: StayQuery) => (nightly != null ? nightly * q.nights : undefined);
 
 export function cleanUrl(raw: string | undefined, keep: string[]): string | undefined {
@@ -49,7 +50,7 @@ export function currencyTag(text: string | undefined, q: StayQuery): { currency?
   return found && found !== q.currency ? { currency: found } : {};
 }
 
-export const httpImage =(src: string | undefined) => (src && /^https?:\/\//.test(src) ? src : undefined);
+export const httpImage = (src: string | undefined) => (src && /^https?:\/\//.test(src) ? src : undefined);
 
 export const clip = (s: string | undefined, max: number) => {
   const t = (s ?? "").replace(/\s+/g, " ").trim();

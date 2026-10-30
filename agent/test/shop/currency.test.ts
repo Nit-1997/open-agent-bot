@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { currencyOf, formatMoney } from "../../src/shop/currency.js";
 import { renderData } from "../../src/render/registry.js";
 
-const item = (priceText?: string) => ({ query: "rice", qty: 1, picks: priceText ? [{ title: "Rice", url: "https://x.in/r", sponsored: false, price: 1, priceText }] : [] });
+const item = (priceText?: string) => ({
+  query: "rice",
+  qty: 1,
+  picks: priceText ? [{ title: "Rice", url: "https://x.in/r", sponsored: false, price: 1, priceText }] : [],
+});
 
 describe("cart currency", () => {
   it("reads the currency from the store's own price labels", () => {

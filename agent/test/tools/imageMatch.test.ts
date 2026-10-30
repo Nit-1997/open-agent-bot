@@ -14,6 +14,8 @@ describe("matchingImage", () => {
   });
 
   it("ignores sizes and filler words when matching", () => {
-    expect(matchingImage("Boneless skinless chicken breast, ~2 lbs", [hit("Foster Farms Boneless Skinless Chicken Breasts")])).toBeDefined();
+    expect(
+      matchingImage("Boneless skinless chicken breast, ~2 lbs", [hit("Foster Farms Boneless Skinless Chicken Breasts")]),
+    ).toBeDefined();
   });
 });

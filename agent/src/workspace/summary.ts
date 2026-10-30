@@ -14,12 +14,20 @@ function cartLine(c: CartEntity): string {
   const best = bestValue(view).find((s) => s.found > 0);
   const at = c.scope.length ? c.scope.join(", ") : c.stores.join(", ");
   const n = c.items.length;
-  const price = best ? ` (best ${money(best.total, currencyOf(view.find((v) => v.store === best.store)?.items ?? []))} at ${best.store})` : "";
+  const price = best
+    ? ` (best ${money(best.total, currencyOf(view.find((v) => v.store === best.store)?.items ?? []))} at ${best.store})`
+    : "";
   return `cart: ${n} ${n === 1 ? "item" : "items"} at ${at || "no store yet"}${price}`;
 }
 
 function eventLine(id: string, e: EventEntity): string {
-  const parts = [e.title, `${e.guests} guests`, e.date, e.budget !== undefined && `budget ${money(e.budget, e.currency)}`, e.location].filter(Boolean);
+  const parts = [
+    e.title,
+    `${e.guests} guests`,
+    e.date,
+    e.budget !== undefined && `budget ${money(e.budget, e.currency)}`,
+    e.location,
+  ].filter(Boolean);
   return `event ${id}: ${parts.join(", ")}`;
 }
 

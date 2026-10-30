@@ -10,7 +10,6 @@ function layover(line: string | undefined): Pick<FlightOption, "layoverMinutes" 
   return { ...(minutes != null && { layoverMinutes: minutes }), layoverAt: m[3] };
 }
 
-
 const TIME = String.raw`(\d{1,2}:\d{2}(?:\s?[ap]\.?m\.?)?(?:\+\d)?)`;
 const OPTION = new RegExp(
   String.raw`${TIME}\s+[–-]\s+${TIME}\n([^\n]+)\n\s*\n(\d+ hrs?(?: \d+ mins?)?|\d+ mins?)\n\s*\n(Nonstop|\d+ stops?)\n[\s\S]{0,200}?\n[^\d\s]{1,4}\s?([\d,]+)\n`,
@@ -61,7 +60,6 @@ export function priceBasis(text: string, roundTrip: boolean): string | undefined
   return `${roundTrip ? "Round-trip" : "One-way"} total for ${m[1]} ${m[2].toLowerCase()}, incl. taxes and fees`;
 }
 
-
 export type Browse = (actions: BrowseAction[], opts?: { fresh?: boolean; live?: boolean }) => Promise<ToolResult>;
 
 export type FlightCtx = { locale: string; currency: string; browse: Browse; fresh: boolean; live: boolean };
@@ -79,7 +77,10 @@ export const googleFlights: FlightSource = {
   async search(q, ctx) {
     const url = googleFlightsUrl(q, ctx.locale, ctx.currency);
     const attempt = async (): Promise<FlightAttempt> => {
-      const result = await ctx.browse([{ op: "goto", url }, { op: "wait", ms: 3000 }, { op: "read" }], { fresh: ctx.fresh, live: ctx.live });
+      const result = await ctx.browse([{ op: "goto", url }, { op: "wait", ms: 3000 }, { op: "read" }], {
+        fresh: ctx.fresh,
+        live: ctx.live,
+      });
       const text = result.content.map((c) => c.text).join("");
       const hardFail = !!(result.isError || result.details?.blocked || result.details?.stopped);
       return { url, result, text, options: hardFail ? [] : parseGoogleFlights(text), hardFail };

@@ -2,7 +2,33 @@ import type { ComponentProps, ElementType } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-const TAGS = ["p", "a", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "em", "del", "code", "pre", "blockquote", "hr", "table", "thead", "tbody", "tr", "th", "td", "input"] as const;
+const TAGS = [
+  "p",
+  "a",
+  "ul",
+  "ol",
+  "li",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "strong",
+  "em",
+  "del",
+  "code",
+  "pre",
+  "blockquote",
+  "hr",
+  "table",
+  "thead",
+  "tbody",
+  "tr",
+  "th",
+  "td",
+  "input",
+] as const;
 
 type Props = ComponentProps<"p"> & { node?: { position?: { start: { offset?: number } } } };
 

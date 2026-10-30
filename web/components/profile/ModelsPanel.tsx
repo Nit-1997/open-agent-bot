@@ -40,8 +40,20 @@ export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: ()
 
   return (
     <div id="models-panel" className="fixed inset-0 z-50 flex justify-end">
-      <button id="models-panel-backdrop" type="button" aria-label="Close models" onClick={onClose} className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
-      <aside id="models-panel-sheet" role="dialog" aria-modal="true" aria-label="Models" className="relative flex h-full w-full max-w-[480px] animate-rise flex-col border-l border-border bg-bg shadow-lift">
+      <button
+        id="models-panel-backdrop"
+        type="button"
+        aria-label="Close models"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+      />
+      <aside
+        id="models-panel-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Models"
+        className="relative flex h-full w-full max-w-[480px] animate-rise flex-col border-l border-border bg-bg shadow-lift"
+      >
         <header id="models-panel-header" className="flex items-start justify-between gap-3 px-6 pt-6">
           <div id="models-panel-titles">
             <h2 id="models-panel-title" className="font-display text-[28px] leading-none text-text-primary">
@@ -51,7 +63,13 @@ export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: ()
               Connect providers and pick which models appear in your menu. Keys stay on this machine and are never shown again.
             </p>
           </div>
-          <button id="models-panel-close" type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-muted transition hover:bg-surface hover:text-text-primary">
+          <button
+            id="models-panel-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-muted transition hover:bg-surface hover:text-text-primary"
+          >
             <X id="models-panel-close-icon" aria-hidden="true" size={16} />
           </button>
         </header>

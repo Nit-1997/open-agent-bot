@@ -18,7 +18,31 @@ function matches(query: string, title: string): boolean {
   return want.filter((w) => have.has(w)).length >= Math.max(1, Math.ceil(want.length * 0.6));
 }
 
-const DERIVED = ["chip", "crisp", "flavor", "flavored", "flavour", "seasoning", "mix", "sauce", "dip", "snack", "candy", "cracker", "dressing", "pickle", "kit", "bar", "cereal", "soup", "drink", "juice", "spray", "powder", "wild"];
+const DERIVED = [
+  "chip",
+  "crisp",
+  "flavor",
+  "flavored",
+  "flavour",
+  "seasoning",
+  "mix",
+  "sauce",
+  "dip",
+  "snack",
+  "candy",
+  "cracker",
+  "dressing",
+  "pickle",
+  "kit",
+  "bar",
+  "cereal",
+  "soup",
+  "drink",
+  "juice",
+  "spray",
+  "powder",
+  "wild",
+];
 
 function fullMatch(query: string, title: string): boolean {
   const have = new Set(keyWords(title));
@@ -59,7 +83,12 @@ export function shortlist(query: string, tiles: Tile[], limit = SHORTLIST): Tile
 
 const LEVEL_ORDER: Record<Match, number> = { exact: 0, substitute: 1 };
 
-export async function judgeRank(judge: Judge, query: string, tiles: Tile[], opts: { signal?: AbortSignal; limit?: number; batch?: boolean } = {}): Promise<Pick[] | null> {
+export async function judgeRank(
+  judge: Judge,
+  query: string,
+  tiles: Tile[],
+  opts: { signal?: AbortSignal; limit?: number; batch?: boolean } = {},
+): Promise<Pick[] | null> {
   const short = shortlist(query, tiles, opts.limit);
   if (!short.length) return [];
   const scored = await judge.score(
@@ -70,8 +99,16 @@ export async function judgeRank(judge: Judge, query: string, tiles: Tile[], opts
   if (!scored) return null;
   const price = (t: Tile) => t.price ?? Number.POSITIVE_INFINITY;
   return scored
-    .flatMap((s) => (s.level === "exact" || s.level === "substitute" ? [{ t: short[Number(s.id)], i: Number(s.id), match: s.level as Match, p: s.p }] : []))
-    .sort((a, b) => LEVEL_ORDER[a.match] - LEVEL_ORDER[b.match] || Number(a.t.sponsored) - Number(b.t.sponsored) || price(a.t) - price(b.t) || a.i - b.i)
+    .flatMap((s) =>
+      s.level === "exact" || s.level === "substitute" ? [{ t: short[Number(s.id)], i: Number(s.id), match: s.level as Match, p: s.p }] : [],
+    )
+    .sort(
+      (a, b) =>
+        LEVEL_ORDER[a.match] - LEVEL_ORDER[b.match] ||
+        Number(a.t.sponsored) - Number(b.t.sponsored) ||
+        price(a.t) - price(b.t) ||
+        a.i - b.i,
+    )
     .map(({ t, match, p }) => ({ ...t, match, why: `${match}, ${Math.round(p * 100)}%` }));
 }
 

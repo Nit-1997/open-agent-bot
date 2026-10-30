@@ -14,15 +14,34 @@ function ids() {
 const assistantStart = { type: "message_start", message: { role: "assistant" } } as unknown as PiEvent;
 const assistantEnd = { type: "message_end", message: { role: "assistant" } } as unknown as PiEvent;
 const delta = (d: string) =>
-  ({ type: "message_update", message: { role: "assistant" }, assistantMessageEvent: { type: "text_delta", delta: d } }) as unknown as PiEvent;
-const thinking = { type: "message_update", message: { role: "assistant" }, assistantMessageEvent: { type: "thinking_delta", delta: "hmm" } } as unknown as PiEvent;
-const toolStart = { type: "tool_execution_start", toolCallId: "call_1", toolName: "weather", args: { location: "Pune" } } as unknown as PiEvent;
+  ({
+    type: "message_update",
+    message: { role: "assistant" },
+    assistantMessageEvent: { type: "text_delta", delta: d },
+  }) as unknown as PiEvent;
+const thinking = {
+  type: "message_update",
+  message: { role: "assistant" },
+  assistantMessageEvent: { type: "thinking_delta", delta: "hmm" },
+} as unknown as PiEvent;
+const toolStart = {
+  type: "tool_execution_start",
+  toolCallId: "call_1",
+  toolName: "weather",
+  args: { location: "Pune" },
+} as unknown as PiEvent;
 const toolEnd = {
   type: "tool_execution_end",
   toolCallId: "call_1",
   toolName: "weather",
   isError: false,
-  result: { content: [{ type: "text", text: "Sunny" }, { type: "text", text: " 28C" }], details: {} },
+  result: {
+    content: [
+      { type: "text", text: "Sunny" },
+      { type: "text", text: " 28C" },
+    ],
+    details: {},
+  },
 } as unknown as PiEvent;
 
 const run = (events: PiEvent[], evidence?: Evidence) => {
@@ -65,7 +84,10 @@ describe("createTranslator", () => {
 
   it("a data tool result is rendered by the registry into a synthetic show_widget call", () => {
     const widget = { kind: "weather_card", location: "Pune" };
-    const end = { ...toolEnd, result: { content: [{ type: "text", text: "Sunny" }], details: { data: { kind: "weather" } } } } as unknown as PiEvent;
+    const end = {
+      ...toolEnd,
+      result: { content: [{ type: "text", text: "Sunny" }], details: { data: { kind: "weather" } } },
+    } as unknown as PiEvent;
     const out = run([assistantStart, assistantEnd, toolStart, end]);
     const tail = out.slice(3);
     expect(tail.map((e) => e.type)).toEqual([
@@ -82,7 +104,11 @@ describe("createTranslator", () => {
 
   it("render tools that return details.widget are shown as-is", () => {
     const widget = { kind: "weather_card", location: "Pune" };
-    const end = { ...toolEnd, toolName: "show_x", result: { content: [{ type: "text", text: "ok" }], details: { widget } } } as unknown as PiEvent;
+    const end = {
+      ...toolEnd,
+      toolName: "show_x",
+      result: { content: [{ type: "text", text: "ok" }], details: { widget } },
+    } as unknown as PiEvent;
     const out = run([end]);
     expect(out.map((e) => e.type)).toContain(EventType.TOOL_CALL_START);
     expect(JSON.parse((out[2] as unknown as { delta: string }).delta)).toEqual({ widget });
@@ -90,18 +116,29 @@ describe("createTranslator", () => {
 
   it("renders at most one card per data kind in a run", () => {
     const end = (id: string) =>
-      ({ ...toolEnd, toolCallId: id, result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } } }) as unknown as PiEvent;
+      ({
+        ...toolEnd,
+        toolCallId: id,
+        result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } },
+      }) as unknown as PiEvent;
     const starts = run([end("a"), end("b")]).filter((e) => e.type === EventType.TOOL_CALL_START);
     expect(starts).toHaveLength(1);
   });
 
   it("data the registry can't render emits nothing extra", () => {
-    const end = { ...toolEnd, result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "search_results" } } } } as unknown as PiEvent;
+    const end = {
+      ...toolEnd,
+      result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "search_results" } } },
+    } as unknown as PiEvent;
     expect(run([end]).map((e) => e.type)).toEqual([EventType.TOOL_CALL_RESULT]);
   });
 
   it("errored tool results never emit a widget", () => {
-    const end = { ...toolEnd, isError: true, result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } } } as unknown as PiEvent;
+    const end = {
+      ...toolEnd,
+      isError: true,
+      result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } },
+    } as unknown as PiEvent;
     expect(run([end]).map((e) => e.type)).toEqual([EventType.TOOL_CALL_RESULT]);
   });
 
@@ -150,9 +187,33 @@ const uiEnd = (blocks: unknown[]) =>
 
 describe("grounding", () => {
   it("marks card values no tool returned and keeps sourced ones clean", () => {
-    const out = run([searchEnd, uiEnd([{ type: "list", items: [{ title: "Diya", value: "$6.99", badge: "In stock" }, { title: "Lantern", value: "$5.99" }] }])]);
+    const out = run([
+      searchEnd,
+      uiEnd([
+        {
+          type: "list",
+          items: [
+            { title: "Diya", value: "$6.99", badge: "In stock" },
+            { title: "Lantern", value: "$5.99" },
+          ],
+        },
+      ]),
+    ]);
     expect(widgetArgs(out)).toEqual([
-      { kind: "ui", title: "Shopping", blocks: [{ type: "list", items: [{ title: "Diya", value: "$6.99", badge: "In stock" }, { title: "Lantern", value: "$5.99" }] }], unverified: ["$5.99"] },
+      {
+        kind: "ui",
+        title: "Shopping",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              { title: "Diya", value: "$6.99", badge: "In stock" },
+              { title: "Lantern", value: "$5.99" },
+            ],
+          },
+        ],
+        unverified: ["$5.99"],
+      },
     ]);
   });
 
@@ -164,7 +225,11 @@ describe("grounding", () => {
       result: {
         content: [{ type: "text", text: "shown" }],
         details: {
-          widget: { kind: "ui", title: "Cart", blocks: [{ type: "cards", items: [{ title: "Barilla", image: "https://tse1.mm.bing.net/barilla.jpg" }] }] },
+          widget: {
+            kind: "ui",
+            title: "Cart",
+            blocks: [{ type: "cards", items: [{ title: "Barilla", image: "https://tse1.mm.bing.net/barilla.jpg" }] }],
+          },
           sourced: "image: https://tse1.mm.bing.net/barilla.jpg",
         },
       },
@@ -178,7 +243,12 @@ describe("grounding", () => {
   });
 
   it("a form the agent shows is not evidence for its own claims", () => {
-    const ask = { ...toolEnd, toolCallId: "q1", toolName: "ask_user", result: { content: [{ type: "text", text: "budget $250" }], details: {} } } as unknown as PiEvent;
+    const ask = {
+      ...toolEnd,
+      toolCallId: "q1",
+      toolName: "ask_user",
+      result: { content: [{ type: "text", text: "budget $250" }], details: {} },
+    } as unknown as PiEvent;
     const out = run([ask, assistantStart, delta("Flights from $250."), assistantEnd]);
     expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$250"] }]);
   });
@@ -211,16 +281,35 @@ describe("grounding", () => {
 
   it("turns research tool updates into workflow_step events", () => {
     const step = { workflow: "research", phase: "plan", status: "start" };
-    const update = { type: "tool_execution_update", toolCallId: "c", toolName: "research", args: {}, partialResult: { details: { workflowStep: step } } } as unknown as PiEvent;
-    const plain = { type: "tool_execution_update", toolCallId: "c", toolName: "browse", args: {}, partialResult: { details: {} } } as unknown as PiEvent;
+    const update = {
+      type: "tool_execution_update",
+      toolCallId: "c",
+      toolName: "research",
+      args: {},
+      partialResult: { details: { workflowStep: step } },
+    } as unknown as PiEvent;
+    const plain = {
+      type: "tool_execution_update",
+      toolCallId: "c",
+      toolName: "browse",
+      args: {},
+      partialResult: { details: {} },
+    } as unknown as PiEvent;
     expect(run([update, plain])).toEqual([{ type: EventType.CUSTOM, name: "workflow_step", value: step }]);
   });
 });
 
 describe("answered", () => {
-  const start = (id: string, name: string) => ({ type: "tool_execution_start", toolCallId: id, toolName: name, args: {} }) as unknown as PiEvent;
+  const start = (id: string, name: string) =>
+    ({ type: "tool_execution_start", toolCallId: id, toolName: name, args: {} }) as unknown as PiEvent;
   const end = (id: string, name: string, details: Record<string, unknown> = {}) =>
-    ({ type: "tool_execution_end", toolCallId: id, toolName: name, isError: false, result: { content: [{ type: "text", text: "ok" }], details } }) as unknown as PiEvent;
+    ({
+      type: "tool_execution_end",
+      toolCallId: id,
+      toolName: name,
+      isError: false,
+      result: { content: [{ type: "text", text: "ok" }], details },
+    }) as unknown as PiEvent;
   const weatherData = { data: { kind: "weather" } };
   const answeredAfter = (events: PiEvent[]) => {
     const t = createTranslator(ids());
@@ -233,11 +322,17 @@ describe("answered", () => {
   });
 
   it("does not count a card from a tool called inside a codemode script", () => {
-    expect(answeredAfter([start("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData), end("c1", "codemode")])).toBe(false);
+    expect(answeredAfter([start("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData), end("c1", "codemode")])).toBe(
+      false,
+    );
   });
 
   it("counts cards and text again once the script has finished", () => {
-    expect(answeredAfter([start("c1", "codemode"), end("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData)])).toBe(true);
-    expect(answeredAfter([start("c1", "codemode"), end("c1", "codemode"), assistantStart, delta("Valletta is warmest."), assistantEnd])).toBe(true);
+    expect(answeredAfter([start("c1", "codemode"), end("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData)])).toBe(
+      true,
+    );
+    expect(
+      answeredAfter([start("c1", "codemode"), end("c1", "codemode"), assistantStart, delta("Valletta is warmest."), assistantEnd]),
+    ).toBe(true);
   });
 });

@@ -60,4 +60,3 @@ export type StaysData = {
   maxNightly?: number;
   sources: Array<{ id: string; label: string; site: string; url: string; status: "ok" | "blocked" | "failed" | "link"; stays: Stay[] }>;
 };
-

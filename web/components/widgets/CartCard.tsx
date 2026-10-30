@@ -12,7 +12,19 @@ type Shared = Record<string, { qty: number; removed: boolean }>;
 
 const portalOf = (name: string) => name.match(/\(([^)]+)\)\s*$/)?.[1] ?? name;
 
-export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale = false }: { toolCallId: string; widget: Cart; locale?: string; onEdit?: (e: CartEdits) => void; stale?: boolean }) {
+export function CartCard({
+  toolCallId,
+  widget,
+  locale = "en-US",
+  onEdit,
+  stale = false,
+}: {
+  toolCallId: string;
+  widget: Cart;
+  locale?: string;
+  onEdit?: (e: CartEdits) => void;
+  stale?: boolean;
+}) {
   const id = `cart-${toolCallId}`;
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState<Shared>({});
@@ -42,12 +54,25 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
     }
     const first = widget.stores[0].items;
     const edits: CartEdits = {
-      removed: Object.entries(shared).filter(([, v]) => v.removed).map(([q]) => q),
-      qty: Object.fromEntries(Object.entries(shared).filter(([q, v]) => !v.removed && v.qty !== first.find((i) => i.query === q)?.qty).map(([q, v]) => [q, v.qty])),
+      removed: Object.entries(shared)
+        .filter(([, v]) => v.removed)
+        .map(([q]) => q),
+      qty: Object.fromEntries(
+        Object.entries(shared)
+          .filter(([q, v]) => !v.removed && v.qty !== first.find((i) => i.query === q)?.qty)
+          .map(([q, v]) => [q, v.qty]),
+      ),
       picks: Object.fromEntries(
         Object.entries(choices).map(([name, m]) => {
           const s = widget.stores.find((x) => x.name === name)!;
-          return [name, Object.fromEntries(Object.entries(m).filter(([, n]) => n > 0).map(([q, n]) => [q, s.items.find((i) => i.query === q)!.picks[n].title]))];
+          return [
+            name,
+            Object.fromEntries(
+              Object.entries(m)
+                .filter(([, n]) => n > 0)
+                .map(([q, n]) => [q, s.items.find((i) => i.query === q)!.picks[n].title]),
+            ),
+          ];
         }),
       ),
     };
@@ -93,7 +118,10 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
               {money(s.total, s.currency)}
             </span>
             {n === 0 && widget.stores.length > 1 && (
-              <span id={`${id}-tab-${n}-best`} className={`rounded-full px-1.5 py-0.5 text-[11px] sm:text-[10px] font-semibold ${n === active ? "bg-paper/20" : "bg-success-bg text-success-fg"}`}>
+              <span
+                id={`${id}-tab-${n}-best`}
+                className={`rounded-full px-1.5 py-0.5 text-[11px] sm:text-[10px] font-semibold ${n === active ? "bg-paper/20" : "bg-success-bg text-success-fg"}`}
+              >
                 Best value
               </span>
             )}
@@ -112,10 +140,22 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                   <li id={rid} key={`${active}-${i}`} aria-label={item.query} className="py-3">
                     <div id={`${rid}-row`} className="flex gap-3">
                       <div id={`${rid}-media`} className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-white">
-                        <Picture id={`${rid}-img`} src={pick.image} alt={pick.title} fallback={pick.title} className="h-full w-full object-contain p-1" />
+                        <Picture
+                          id={`${rid}-img`}
+                          src={pick.image}
+                          alt={pick.title}
+                          fallback={pick.title}
+                          className="h-full w-full object-contain p-1"
+                        />
                       </div>
                       <div id={`${rid}-info`} className="min-w-0 flex-1">
-                        <a id={`${rid}-link`} href={pick.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium text-text-primary hover:underline">
+                        <a
+                          id={`${rid}-link`}
+                          href={pick.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="line-clamp-2 text-sm font-medium text-text-primary hover:underline"
+                        >
                           {pick.title}
                         </a>
                         <p id={`${rid}-meta`} className="mt-0.5 text-xs text-text-muted">
@@ -125,15 +165,23 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                           {pick.size && <span id={`${rid}-size`}> · {pick.size}</span>}
                           {pick.sponsored && <span id={`${rid}-ad`}> · Sponsored</span>}
                           {pick.match === "substitute" && (
-                            <span id={`${rid}-substitute`} title={pick.why} className="ml-1.5 rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn-fg sm:text-[10px]">
+                            <span
+                              id={`${rid}-substitute`}
+                              title={pick.why}
+                              className="ml-1.5 rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn-fg sm:text-[10px]"
+                            >
                               Substitute
                             </span>
                           )}
-                          {pick.match === "substitute" && (
-                            <span id={`${rid}-not-in-total`}> · not in total</span>
-                          )}
+                          {pick.match === "substitute" && <span id={`${rid}-not-in-total`}> · not in total</span>}
                           {pick.match === "exact" && pick.why && (
-                            <span id={`${rid}-why`} role="img" title={pick.why} aria-label={`Match: ${pick.why}`} className="ml-1.5 inline-block align-middle text-text-muted">
+                            <span
+                              id={`${rid}-why`}
+                              role="img"
+                              title={pick.why}
+                              aria-label={`Match: ${pick.why}`}
+                              className="ml-1.5 inline-block align-middle text-text-muted"
+                            >
                               <Info id={`${rid}-why-icon`} aria-hidden="true" size={12} />
                             </span>
                           )}
@@ -151,17 +199,38 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                       </div>
                       <div id={`${rid}-controls`} className="flex shrink-0 flex-col items-end gap-2">
                         <div id={`${rid}-qty`} className="flex items-center rounded-full border border-border">
-                          <button id={`${rid}-dec`} type="button" aria-label="Decrease quantity" disabled={stale || line.qty <= 1} onClick={() => update(i, { qty: line.qty - 1 })} className="p-1.5 text-text-secondary disabled:opacity-30">
+                          <button
+                            id={`${rid}-dec`}
+                            type="button"
+                            aria-label="Decrease quantity"
+                            disabled={stale || line.qty <= 1}
+                            onClick={() => update(i, { qty: line.qty - 1 })}
+                            className="p-1.5 text-text-secondary disabled:opacity-30"
+                          >
                             <Minus id={`${rid}-dec-icon`} aria-hidden="true" size={12} />
                           </button>
                           <span id={`${rid}-qty-n`} className="w-5 text-center text-sm">
                             {line.qty}
                           </span>
-                          <button id={`${rid}-inc`} type="button" aria-label="Increase quantity" disabled={stale} onClick={() => update(i, { qty: line.qty + 1 })} className="p-1.5 text-text-secondary disabled:opacity-30">
+                          <button
+                            id={`${rid}-inc`}
+                            type="button"
+                            aria-label="Increase quantity"
+                            disabled={stale}
+                            onClick={() => update(i, { qty: line.qty + 1 })}
+                            className="p-1.5 text-text-secondary disabled:opacity-30"
+                          >
                             <Plus id={`${rid}-inc-icon`} aria-hidden="true" size={12} />
                           </button>
                         </div>
-                        <button id={`${rid}-remove`} type="button" aria-label="Remove" disabled={stale} onClick={() => update(i, { removed: true })} className="rounded-full bg-surface p-1.5 text-text-secondary hover:text-text-primary">
+                        <button
+                          id={`${rid}-remove`}
+                          type="button"
+                          aria-label="Remove"
+                          disabled={stale}
+                          onClick={() => update(i, { removed: true })}
+                          className="rounded-full bg-surface p-1.5 text-text-secondary hover:text-text-primary"
+                        >
                           <Trash2 id={`${rid}-remove-icon`} aria-hidden="true" size={13} />
                         </button>
                       </div>
@@ -181,13 +250,23 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                               className="flex w-full items-center gap-2 rounded-lg border border-border px-2 py-1 text-left text-xs hover:border-border-strong"
                             >
                               <span id={`${rid}-alt-${n}-media`} className="h-8 w-8 shrink-0 overflow-hidden rounded bg-white">
-                                <Picture id={`${rid}-alt-${n}-img`} src={alt.image} alt="" fallback={alt.title} className="h-full w-full object-contain" />
+                                <Picture
+                                  id={`${rid}-alt-${n}-img`}
+                                  src={alt.image}
+                                  alt=""
+                                  fallback={alt.title}
+                                  className="h-full w-full object-contain"
+                                />
                               </span>
                               <span id={`${rid}-alt-${n}-title`} className="line-clamp-1 flex-1">
                                 {alt.title}
                               </span>
                               {alt.match === "substitute" && (
-                                <span id={`${rid}-alt-${n}-substitute`} title={alt.why} className="shrink-0 rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn-fg sm:text-[10px]">
+                                <span
+                                  id={`${rid}-alt-${n}-substitute`}
+                                  title={alt.why}
+                                  className="shrink-0 rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-semibold text-warn-fg sm:text-[10px]"
+                                >
                                   Substitute
                                 </span>
                               )}
@@ -203,7 +282,12 @@ export function CartCard({ toolCallId, widget, locale = "en-US", onEdit, stale =
                 );
               })}
             {missing.map((item) => (
-              <li id={`${id}-s${active}-missing-${store.items.indexOf(item)}`} key={`m-${item.query}`} aria-label={item.query} className="py-2 text-xs text-warn-fg">
+              <li
+                id={`${id}-s${active}-missing-${store.items.indexOf(item)}`}
+                key={`m-${item.query}`}
+                aria-label={item.query}
+                className="py-2 text-xs text-warn-fg"
+              >
                 Not found: {item.query}
               </li>
             ))}

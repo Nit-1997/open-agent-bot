@@ -45,10 +45,25 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
           </p>
         </div>
         <div id={`${id}-actions`} className="flex shrink-0 items-center gap-0.5">
-          <button id={`${id}-fullscreen`} type="button" aria-label="Open full screen" title="Full screen" onClick={() => setFullScreen(true)} className={action}>
+          <button
+            id={`${id}-fullscreen`}
+            type="button"
+            aria-label="Open full screen"
+            title="Full screen"
+            onClick={() => setFullScreen(true)}
+            className={action}
+          >
             <Maximize2 id={`${id}-fullscreen-icon`} aria-hidden="true" size={15} />
           </button>
-          <a id={`${id}-new-tab`} aria-label="Open in new tab" title="Open in new tab" href={src} target="_blank" rel="noopener noreferrer" className={action}>
+          <a
+            id={`${id}-new-tab`}
+            aria-label="Open in new tab"
+            title="Open in new tab"
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={action}
+          >
             <ExternalLink id={`${id}-new-tab-icon`} aria-hidden="true" size={15} />
           </a>
           <a id={`${id}-pdf`} aria-label="Download PDF" title="Download PDF" href={`${src}?format=pdf`} className={action}>
@@ -56,7 +71,14 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
           </a>
         </div>
       </header>
-      <iframe id={`${id}-frame`} title={title} sandbox={ARTIFACT_SANDBOX} src={src} loading="lazy" className="block h-[min(58vh,520px)] min-h-[280px] sm:h-[min(70vh,640px)] sm:min-h-[360px] w-full bg-white" />
+      <iframe
+        id={`${id}-frame`}
+        title={title}
+        sandbox={ARTIFACT_SANDBOX}
+        src={src}
+        loading="lazy"
+        className="block h-[min(58vh,520px)] min-h-[280px] sm:h-[min(70vh,640px)] sm:min-h-[360px] w-full bg-white"
+      />
       {fullScreen && <ArtifactViewer artifactId={artifactId} title={title} onClose={() => setFullScreen(false)} />}
     </section>
   );

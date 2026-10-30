@@ -15,7 +15,14 @@ const say: Script = async (emit) => {
   emit(ev.assistantEnd());
 };
 
-function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string) => Promise<void>, frames?: FrameBus, cart?: ActiveCart, extra: Partial<SessionEntry> = {}) {
+function setup(
+  script: Script = say,
+  evidence?: Evidence,
+  setModel?: (id: string) => Promise<void>,
+  frames?: FrameBus,
+  cart?: ActiveCart,
+  extra: Partial<SessionEntry> = {},
+) {
   const session = fakeSession(script);
   const runStarts = { count: 0 };
   const contexts: Array<UserContext | null> = [];
@@ -23,7 +30,18 @@ function setup(script: Script = say, evidence?: Evidence, setModel?: (id: string
     idleMs: 60000,
     create: async (_t, ctx): Promise<SessionEntry> => {
       contexts.push(ctx);
-      return { session, busy: false, lastUsed: 0, dispose: async () => {}, onRunStart: () => runStarts.count++, evidence, setModel, frames, cart, ...extra };
+      return {
+        session,
+        busy: false,
+        lastUsed: 0,
+        dispose: async () => {},
+        onRunStart: () => runStarts.count++,
+        evidence,
+        setModel,
+        frames,
+        cart,
+        ...extra,
+      };
     },
   });
   return { session, store, contexts, runStarts };
@@ -48,11 +66,19 @@ async function collect(it: AsyncIterable<BaseEvent>) {
   return out;
 }
 
-const customEvents = (out: BaseEvent[]) => out.filter((e) => e.type === EventType.CUSTOM) as unknown as Array<{ name: string; value: Record<string, unknown> }>;
+const customEvents = (out: BaseEvent[]) =>
+  out.filter((e) => e.type === EventType.CUSTOM) as unknown as Array<{ name: string; value: Record<string, unknown> }>;
 
-const usage = (input: number, output: number, cacheRead: number, total?: number) => ({ input, output, cacheRead, ...(total !== undefined && { cost: { total } }) });
-const assistantEndWith = (u: object) => ({ type: "message_end", message: { role: "assistant", stopReason: "stop", usage: u } }) as unknown as PiEvent;
-const toolStart = (toolName: string, args: unknown) => ({ type: "tool_execution_start", toolCallId: `c-${toolName}`, toolName, args }) as unknown as PiEvent;
+const usage = (input: number, output: number, cacheRead: number, total?: number) => ({
+  input,
+  output,
+  cacheRead,
+  ...(total !== undefined && { cost: { total } }),
+});
+const assistantEndWith = (u: object) =>
+  ({ type: "message_end", message: { role: "assistant", stopReason: "stop", usage: u } }) as unknown as PiEvent;
+const toolStart = (toolName: string, args: unknown) =>
+  ({ type: "tool_execution_start", toolCallId: `c-${toolName}`, toolName, args }) as unknown as PiEvent;
 
 describe("run_stats", () => {
   it("sums usage across the run including the nudge, counts tools and collects loaded skills, just before RUN_FINISHED", async () => {
@@ -70,7 +96,16 @@ describe("run_stats", () => {
     const { store } = setup(script, undefined, undefined, undefined, undefined, { turnStats: () => ({ jevCalls: 3, jevCostUsd: 0.01 }) });
     const out = await collect(handleRun(input(), store, new AbortController().signal));
     const stats = customEvents(out).find((e) => e.name === "run_stats");
-    expect(stats?.value).toMatchObject({ inputTokens: 300, outputTokens: 20, cacheRead: 10, costUsd: 0.5, jevCalls: 3, jevCostUsd: 0.01, toolCalls: 3, skills: ["trip-planning"] });
+    expect(stats?.value).toMatchObject({
+      inputTokens: 300,
+      outputTokens: 20,
+      cacheRead: 10,
+      costUsd: 0.5,
+      jevCalls: 3,
+      jevCostUsd: 0.01,
+      toolCalls: 3,
+      skills: ["trip-planning"],
+    });
     expect(typeof stats?.value.durationMs).toBe("number");
     expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
     expect(out.at(-2)).toMatchObject({ type: EventType.CUSTOM, name: "run_stats" });
@@ -81,8 +116,17 @@ describe("run_stats", () => {
     const script: Script = async (emit) => {
       emit(ev.assistantStart);
       if (turn === 0) {
-        emit({ type: "tool_execution_end", toolCallId: "c1", toolName: "codemode", isError: false, result: { content: [], details: { calls: [{ name: "weather" }, { name: "models.classify" }, { name: "models.classify" }] } } } as unknown as PiEvent);
-        emit({ type: "message_end", message: { role: "toolResult", usage: { input: 5, output: 1, cost: { total: 0.004 } } } } as unknown as PiEvent);
+        emit({
+          type: "tool_execution_end",
+          toolCallId: "c1",
+          toolName: "codemode",
+          isError: false,
+          result: { content: [], details: { calls: [{ name: "weather" }, { name: "models.classify" }, { name: "models.classify" }] } },
+        } as unknown as PiEvent);
+        emit({
+          type: "message_end",
+          message: { role: "toolResult", usage: { input: 5, output: 1, cost: { total: 0.004 } } },
+        } as unknown as PiEvent);
       } else emit(ev.delta("Answer."));
       emit(assistantEndWith(usage(10, 2, 0, 0.1)));
       turn++;
@@ -101,7 +145,15 @@ describe("run_stats", () => {
     };
     const { store } = setup(script);
     const out = await collect(handleRun(input(), store, new AbortController().signal));
-    expect(customEvents(out).find((e) => e.name === "run_stats")?.value).toMatchObject({ costUsd: 0, jevCalls: 0, jevCostUsd: 0, inputTokens: 7, outputTokens: 3, toolCalls: 0, skills: [] });
+    expect(customEvents(out).find((e) => e.name === "run_stats")?.value).toMatchObject({
+      costUsd: 0,
+      jevCalls: 0,
+      jevCostUsd: 0,
+      inputTokens: 7,
+      outputTokens: 3,
+      toolCalls: 0,
+      skills: [],
+    });
   });
 
   it("emits run_stats before RUN_ERROR on a model error", async () => {
@@ -119,10 +171,22 @@ describe("run_stats", () => {
 describe("handleRun", () => {
   it("applies the user's cart edits sent with the message before the agent runs", async () => {
     const cart = new ActiveCart();
-    cart.start(["shipt"], [{ query: "rice", qty: 1 }, { query: "black beans", qty: 2 }]);
+    cart.start(
+      ["shipt"],
+      [
+        { query: "rice", qty: 1 },
+        { query: "black beans", qty: 2 },
+      ],
+    );
     const { store } = setup(say, undefined, undefined, undefined, cart);
     const edits = { cart: { removed: ["black beans"], qty: { rice: 4 } } };
-    await collect(handleRun(input({ context: [{ description: "workspace_edits", value: JSON.stringify(edits) }] }), store, new AbortController().signal));
+    await collect(
+      handleRun(
+        input({ context: [{ description: "workspace_edits", value: JSON.stringify(edits) }] }),
+        store,
+        new AbortController().signal,
+      ),
+    );
     expect(cart.items).toEqual([{ query: "rice", qty: 4 }]);
   });
 
@@ -131,13 +195,23 @@ describe("handleRun", () => {
     cart.start(["shipt"], [{ query: "rice", qty: 1 }]);
     cart.addResults([{ store: "Shipt", home: "https://shipt.com", items: [{ query: "rice", qty: 1, picks: [] }] }]);
     const { store } = setup(say, undefined, undefined, undefined, cart);
-    const out = await collect(handleRun(input({ context: [{ description: "workspace_edits", value: JSON.stringify({ cart: { picks: { Shipt: null } } }) }] }), store, new AbortController().signal));
+    const out = await collect(
+      handleRun(
+        input({ context: [{ description: "workspace_edits", value: JSON.stringify({ cart: { picks: { Shipt: null } } }) }] }),
+        store,
+        new AbortController().signal,
+      ),
+    );
     expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
     expect(store.get("t1")?.busy).toBe(false);
   });
 
   it("reports an internal error and frees the thread when the turn throws before the model runs", async () => {
-    const { store } = setup(say, undefined, undefined, undefined, undefined, { onRunStart: () => { throw new Error("boom"); } });
+    const { store } = setup(say, undefined, undefined, undefined, undefined, {
+      onRunStart: () => {
+        throw new Error("boom");
+      },
+    });
     const first = await collect(handleRun(input(), store, new AbortController().signal));
     expect(first.at(-1)).toMatchObject({ type: EventType.RUN_ERROR, code: "INTERNAL_ERROR" });
     expect(store.get("t1")?.busy).toBe(false);
@@ -224,7 +298,13 @@ describe("handleRun", () => {
       emit(ev.assistantEnd());
     };
     const { store } = setup(echo, new Evidence());
-    const out = await collect(handleRun(input({ messages: [{ id: "m1", role: "user", content: "my budget is $200" }] as RunAgentInput["messages"] }), store, new AbortController().signal));
+    const out = await collect(
+      handleRun(
+        input({ messages: [{ id: "m1", role: "user", content: "my budget is $200" }] as RunAgentInput["messages"] }),
+        store,
+        new AbortController().signal,
+      ),
+    );
     const note = out.find((e) => e.type === EventType.TOOL_CALL_ARGS) as unknown as { delta: string };
     expect(JSON.parse(note.delta).widget).toEqual({ kind: "grounding_note", claims: ["$7.49"] });
   });
@@ -232,7 +312,19 @@ describe("handleRun", () => {
   it("calls onRunStart once per run so per-reply budgets reset", async () => {
     const { store, runStarts } = setup();
     await collect(handleRun(input(), store, new AbortController().signal));
-    await collect(handleRun(input({ runId: "r2", messages: [{ id: "m1", role: "user", content: "a" }, { id: "m2", role: "user", content: "b" }] as RunAgentInput["messages"] }), store, new AbortController().signal));
+    await collect(
+      handleRun(
+        input({
+          runId: "r2",
+          messages: [
+            { id: "m1", role: "user", content: "a" },
+            { id: "m2", role: "user", content: "b" },
+          ] as RunAgentInput["messages"],
+        }),
+        store,
+        new AbortController().signal,
+      ),
+    );
     expect(runStarts.count).toBe(2);
   });
 
@@ -324,7 +416,10 @@ describe("readUserContext", () => {
   const ctx = (v: unknown) => readUserContext(input({ context: [{ description: "user_context", value: JSON.stringify(v) }] }));
 
   it("keeps a sane viewport and drops a bad one", () => {
-    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: 558.4, height: 698 } })?.viewport).toEqual({ width: 558, height: 698 });
+    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: 558.4, height: 698 } })?.viewport).toEqual({
+      width: 558,
+      height: 698,
+    });
     expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: "wide", height: 698 } })?.viewport).toBeUndefined();
     expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: 50, height: 698 } })?.viewport).toBeUndefined();
   });
@@ -335,14 +430,24 @@ describe("readUserContext", () => {
       locale: "en-US",
       localTime: "t",
       model: "chat-sonnet-5.5",
-      profile: { name: "  Nitin ", home: "Sunnyvale", interests: ["Vegetarian", 7, "x".repeat(80)], notes: "n".repeat(2000), extra: "dropped" },
+      profile: {
+        name: "  Nitin ",
+        home: "Sunnyvale",
+        interests: ["Vegetarian", 7, "x".repeat(80)],
+        notes: "n".repeat(2000),
+        extra: "dropped",
+      },
     });
     expect(r?.model).toBe("chat-sonnet-5.5");
     expect(r?.profile).toEqual({ name: "Nitin", home: "Sunnyvale", interests: ["Vegetarian", "x".repeat(40)], notes: "n".repeat(1000) });
   });
 
   it("ignores a profile that isn't an object and empty fields", () => {
-    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", profile: "hi", model: 3 })).toEqual({ timeZone: "UTC", locale: "en-US", localTime: "t" });
+    expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", profile: "hi", model: 3 })).toEqual({
+      timeZone: "UTC",
+      locale: "en-US",
+      localTime: "t",
+    });
     expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", profile: { name: " " } })?.profile).toBeUndefined();
   });
 });

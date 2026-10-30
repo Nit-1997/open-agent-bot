@@ -19,7 +19,8 @@ let script = "";
 let toolNamesSeen: string[][] = [];
 
 const reply = (res: ServerResponse, delta: object, finish: string) => {
-  const chunk = (d: object, f: string | null) => `data: ${JSON.stringify({ id: "x", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta: d, finish_reason: f }] })}\n\n`;
+  const chunk = (d: object, f: string | null) =>
+    `data: ${JSON.stringify({ id: "x", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta: d, finish_reason: f }] })}\n\n`;
   res.writeHead(200, { "content-type": "text/event-stream" });
   res.write(chunk(delta, null));
   res.write(chunk({}, finish));
@@ -35,13 +36,29 @@ beforeAll(async () => {
       const body = JSON.parse(raw) as { messages: { role: string }[]; tools?: { function: { name: string } }[] };
       toolNamesSeen.push((body.tools ?? []).map((t) => t.function.name));
       if (body.messages.at(-1)?.role === "tool") return reply(res, { role: "assistant", content: "done" }, "stop");
-      reply(res, { role: "assistant", tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "codemode", arguments: JSON.stringify({ code: script }) } }] }, "tool_calls");
+      reply(
+        res,
+        {
+          role: "assistant",
+          tool_calls: [
+            { index: 0, id: "c1", type: "function", function: { name: "codemode", arguments: JSON.stringify({ code: script }) } },
+          ],
+        },
+        "tool_calls",
+      );
     });
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   hub = await ProviderHub.create({
     dataDir: mkdtempSync(join(tmpdir(), "codemode-")),
-    litellm: { baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, apiKey: "none", models: [{ id: "m", label: "m" }, { id: "q", label: "q" }] },
+    litellm: {
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
+      apiKey: "none",
+      models: [
+        { id: "m", label: "m" },
+        { id: "q", label: "q" },
+      ],
+    },
   });
 });
 
@@ -63,7 +80,13 @@ function fakeTool(name: string, hits: string[]): ToolDefinition<any, any, any> {
 }
 
 type Call = { name: string; status: string; error?: string; cost?: number };
-type CodemodeRun = { text: string; failed: boolean; details: { calls: Call[]; fullOutputPath?: string }; usage?: { cost: { total: number } }; nested?: { name?: string }[] };
+type CodemodeRun = {
+  text: string;
+  failed: boolean;
+  details: { calls: Call[]; fullOutputPath?: string };
+  usage?: { cost: { total: number } };
+  nested?: { name?: string }[];
+};
 
 async function run(code: string, tools: ToolDefinition<any, any, any>[], runtime: ModelRuntime = hub.runtime): Promise<CodemodeRun> {
   script = code;
@@ -114,7 +137,10 @@ describe("codemode sandbox guards", () => {
 
   it("rejects a tool that is not on the allow-list and never runs it", async () => {
     const hits: string[] = [];
-    const r = await run(`try { await tools.show_ui({ q: "x" }); return "called"; } catch (e) { return "rejected: " + e.message; }`, [fakeTool("show_ui", hits), fakeTool("weather", hits)]);
+    const r = await run(`try { await tools.show_ui({ q: "x" }); return "called"; } catch (e) { return "rejected: " + e.message; }`, [
+      fakeTool("show_ui", hits),
+      fakeTool("weather", hits),
+    ]);
     expect(hits).toEqual([]);
     expect(r.text).toContain("rejected: tools.show_ui does not exist");
   }, 60000);
@@ -136,7 +162,10 @@ describe("codemode sandbox guards", () => {
     const hits: string[] = [];
     const budget = new TurnBudget({}, { total: 2 });
     const search = withBudget(fakeTool("web_search", hits), budget, "search");
-    const r = await run(`const rs = await Promise.allSettled([1,2,3,4].map((i) => tools.web_search({ q: "q" + i }))); return rs.map((x) => x.status === "fulfilled" ? "ok" : "budget:" + /used up/.test(String(x.reason))).join(",");`, [search]);
+    const r = await run(
+      `const rs = await Promise.allSettled([1,2,3,4].map((i) => tools.web_search({ q: "q" + i }))); return rs.map((x) => x.status === "fulfilled" ? "ok" : "budget:" + /used up/.test(String(x.reason))).join(",");`,
+      [search],
+    );
     expect(hits).toHaveLength(2);
     expect(r.text).toContain("ok,ok,budget:true,budget:true");
   }, 60000);
@@ -145,13 +174,19 @@ describe("codemode sandbox guards", () => {
     const hits: string[] = [];
     const budget = new TurnBudget({}, { total: 3 });
     const search = withBudget(fakeTool("web_search", hits), budget, "search");
-    const r = await run(`let n = 0; for (let i = 0; i < 5; i++) { try { await tools.web_search({ q: String(i) }); n++; } catch (e) {} } return n;`, [search]);
+    const r = await run(
+      `let n = 0; for (let i = 0; i < 5; i++) { try { await tools.web_search({ q: String(i) }); n++; } catch (e) {} } return n;`,
+      [search],
+    );
     expect(hits).toHaveLength(3);
     expect(r.text).toContain("3");
   }, 60000);
 
   it("keeps the net guard on fetch_page calls made from a script", async () => {
-    const r = await run(`try { await tools.fetch_page({ url: "http://127.0.0.1:9/secret" }); return "fetched"; } catch (e) { return "blocked: " + e.message; }`, [fetchPageTool()]);
+    const r = await run(
+      `try { await tools.fetch_page({ url: "http://127.0.0.1:9/secret" }); return "fetched"; } catch (e) { return "blocked: " + e.message; }`,
+      [fetchPageTool()],
+    );
     expect(r.text).toContain("blocked");
     expect(r.text).not.toContain("fetched");
   }, 60000);
@@ -159,9 +194,24 @@ describe("codemode sandbox guards", () => {
   it("counts classifier usage from a script in the tool result", async () => {
     const fake = new Proxy(hub.runtime, {
       get(target, prop, receiver) {
-        if (prop === "getModelOfType") return (type: string, provider: string, id: string) => (type === "classifier" ? { type, provider, id, name: id, api: "x", input: ["text"] } : undefined);
+        if (prop === "getModelOfType")
+          return (type: string, provider: string, id: string) =>
+            type === "classifier" ? { type, provider, id, name: id, api: "x", input: ["text"] } : undefined;
         if (prop === "classify")
-          return async () => ({ provider: "openrouter", model: "jev", answers: { q: { type: "bool", probability: 0.9 } }, usage: { input: 10, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 11, cost: { input: 0.001, output: 0.001, cacheRead: 0, cacheWrite: 0, total: 0.002 } }, stopReason: "stop" });
+          return async () => ({
+            provider: "openrouter",
+            model: "jev",
+            answers: { q: { type: "bool", probability: 0.9 } },
+            usage: {
+              input: 10,
+              output: 1,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 11,
+              cost: { input: 0.001, output: 0.001, cacheRead: 0, cacheWrite: 0, total: 0.002 },
+            },
+            stopReason: "stop",
+          });
         return Reflect.get(target, prop, receiver);
       },
     });
@@ -199,7 +249,13 @@ describe("codemode availability follows the model", () => {
     const q = hub.resolve("litellm/q");
     if (!m || !q) throw new Error("no model");
     const capable = (x: { id: string }) => x.id === "m";
-    const handle = await createPiSession({ runtime: hub.runtime, model: q, systemPrompt: "sys", tools: scopeToCodemode([fakeTool("weather", [])]), codemode: capable });
+    const handle = await createPiSession({
+      runtime: hub.runtime,
+      model: q,
+      systemPrompt: "sys",
+      tools: scopeToCodemode([fakeTool("weather", [])]),
+      codemode: capable,
+    });
     try {
       expect(handle.session.getActiveToolNames()).not.toContain("codemode");
       expect(handle.session.getActiveToolNames()).toContain("weather");
@@ -234,14 +290,27 @@ describe("codemode availability follows the model", () => {
 
 describe("codemode switches itself off for the chat when a script goes wrong", () => {
   function failingTool(name: string, text: string): ToolDefinition<any, any, any> {
-    return defineTool({ name, label: name, description: `fake ${name}`, parameters: Type.Object({ q: Type.Optional(Type.String()) }), execute: async () => fail(text) });
+    return defineTool({
+      name,
+      label: name,
+      description: `fake ${name}`,
+      parameters: Type.Object({ q: Type.Optional(Type.String()) }),
+      execute: async () => fail(text),
+    });
   }
 
   async function prompted(code: string, tools: ToolDefinition<any, any, any>[]) {
     const model = hub.resolve("litellm/m");
     if (!model) throw new Error("no model");
     const reasons: string[] = [];
-    const handle = await createPiSession({ runtime: hub.runtime, model, systemPrompt: "sys", tools: scopeToCodemode(tools), codemode: () => true, onCodemodeOff: (r) => reasons.push(r) });
+    const handle = await createPiSession({
+      runtime: hub.runtime,
+      model,
+      systemPrompt: "sys",
+      tools: scopeToCodemode(tools),
+      codemode: () => true,
+      onCodemodeOff: (r) => reasons.push(r),
+    });
     script = code;
     toolNamesSeen = [];
     try {
@@ -253,7 +322,10 @@ describe("codemode switches itself off for the chat when a script goes wrong", (
   }
 
   it("drops codemode before the next model call when a tool inside the script fails", async () => {
-    const r = await prompted(`const rs = await Promise.allSettled(["a", "b"].map((q) => tools.weather({ q }))); return rs.map((x) => x.status).join(",");`, [failingTool("weather", "weather service error: HTTP 429")]);
+    const r = await prompted(
+      `const rs = await Promise.allSettled(["a", "b"].map((q) => tools.weather({ q }))); return rs.map((x) => x.status).join(",");`,
+      [failingTool("weather", "weather service error: HTTP 429")],
+    );
     expect(r.reasons).toEqual(["2 tool call(s) in the script failed (weather)"]);
     expect(r.seen[0]).toContain("codemode");
     expect(r.seen.at(-1)).not.toContain("codemode");
@@ -272,7 +344,9 @@ describe("codemode switches itself off for the chat when a script goes wrong", (
     expect(clean.reasons).toEqual([]);
     expect(clean.active).toBe(true);
     const budget = new TurnBudget({}, { total: 0 });
-    const limited = await prompted(`try { await tools.web_search({ q: "x" }); } catch {} return "ok";`, [withBudget(fakeTool("web_search", []), budget, "search")]);
+    const limited = await prompted(`try { await tools.web_search({ q: "x" }); } catch {} return "ok";`, [
+      withBudget(fakeTool("web_search", []), budget, "search"),
+    ]);
     expect(limited.reasons).toEqual([]);
     expect(limited.active).toBe(true);
   }, 60000);
@@ -283,8 +357,18 @@ describe("codemodeFailure", () => {
     const details = (calls: { name: string; status: string; error?: string }[]) => ({ details: { calls } });
     expect(codemodeFailure(false, details([{ name: "weather", status: "ok" }]))).toBeUndefined();
     expect(codemodeFailure(false, details([{ name: "weather", status: "cancelled" }]))).toBeUndefined();
-    expect(codemodeFailure(false, details([{ name: "web_search", status: "error", error: "Budget for web_search in this reply is used up" }]))).toBeUndefined();
-    expect(codemodeFailure(false, details([{ name: "weather", status: "error" }, { name: "music", status: "error" }]))).toBe("2 tool call(s) in the script failed (weather, music)");
+    expect(
+      codemodeFailure(false, details([{ name: "web_search", status: "error", error: "Budget for web_search in this reply is used up" }])),
+    ).toBeUndefined();
+    expect(
+      codemodeFailure(
+        false,
+        details([
+          { name: "weather", status: "error" },
+          { name: "music", status: "error" },
+        ]),
+      ),
+    ).toBe("2 tool call(s) in the script failed (weather, music)");
     expect(codemodeFailure(true, undefined)).toBe("the script failed");
   });
 });

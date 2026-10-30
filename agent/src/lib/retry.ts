@@ -76,7 +76,9 @@ export function withRetry(f: typeof fetch, overrides: Partial<RetryOptions> = {}
       } catch (err) {
         if (last || isAbort(err) || signal?.aborted) throw err;
         wait = backoffMs(attempt, o);
-        o.log(`[retry] ${hostOf(input)} ${err instanceof Error ? err.message : String(err)}, attempt ${attempt + 2}/${o.attempts} in ${wait}ms`);
+        o.log(
+          `[retry] ${hostOf(input)} ${err instanceof Error ? err.message : String(err)}, attempt ${attempt + 2}/${o.attempts} in ${wait}ms`,
+        );
       }
       await o.sleep(wait, signal);
     }

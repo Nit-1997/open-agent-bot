@@ -30,13 +30,20 @@ describe("ask_user", () => {
   });
 
   it("rejects a date range that ends before it starts, with the field path", async () => {
-    const res = await exec({ question: "Dates?", fields: [{ type: "date_range", label: "Dates", start: "2026-11-29", end: "2026-11-25" }] });
+    const res = await exec({
+      question: "Dates?",
+      fields: [{ type: "date_range", label: "Dates", start: "2026-11-29", end: "2026-11-25" }],
+    });
     expect(res.isError).toBe(true);
     expect(res.content[0].text).toContain("/fields/0/end");
   });
 
   it("rejects badly formatted dates and unknown field types", () => {
-    const r = validateWidget({ kind: "ask", question: "q", fields: [{ type: "date_range", label: "d", start: "Nov 25", end: "2026-11-29" }, { type: "slider" }] });
+    const r = validateWidget({
+      kind: "ask",
+      question: "q",
+      fields: [{ type: "date_range", label: "d", start: "Nov 25", end: "2026-11-29" }, { type: "slider" }],
+    });
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.errors.join("\n")).toContain("/fields/0/start");

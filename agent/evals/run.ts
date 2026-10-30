@@ -199,7 +199,11 @@ export async function runScenario(scenario: Scenario, runIndex: number, deps: Ru
       }
     } catch (err) {
       const aborted = ac.signal.aborted || Date.now() >= deadline;
-      turnError = aborted ? `turn ${i + 1} timed out after ${Math.round(deps.timeoutMs / 1000)}s` : err instanceof Error ? err.message : String(err);
+      turnError = aborted
+        ? `turn ${i + 1} timed out after ${Math.round(deps.timeoutMs / 1000)}s`
+        : err instanceof Error
+          ? err.message
+          : String(err);
     } finally {
       clearTimeout(timer);
     }
@@ -229,7 +233,14 @@ export function rescore(record: RunRecord, scenario: Scenario, price?: { input: 
   const turns = price
     ? record.turns.map((t) =>
         t.stats && !t.stats.costUsd
-          ? { ...t, stats: { ...t.stats, costUsd: (t.stats.inputTokens * price.input + t.stats.outputTokens * price.output + t.stats.cacheRead * price.cacheRead) / 1e6 } }
+          ? {
+              ...t,
+              stats: {
+                ...t.stats,
+                costUsd:
+                  (t.stats.inputTokens * price.input + t.stats.outputTokens * price.output + t.stats.cacheRead * price.cacheRead) / 1e6,
+              },
+            }
           : t,
       )
     : record.turns;
@@ -239,9 +250,18 @@ export function rescore(record: RunRecord, scenario: Scenario, price?: { input: 
 
 export function parseScenario(raw: unknown, file: string): Scenario {
   const v = raw as Partial<Scenario> | null;
-  if (!v || typeof v.id !== "string" || !v.context || !Array.isArray(v.turns) || !v.turns.length) throw new Error(`${file}: scenario needs id, context and turns`);
+  if (!v || typeof v.id !== "string" || !v.context || !Array.isArray(v.turns) || !v.turns.length)
+    throw new Error(`${file}: scenario needs id, context and turns`);
   const list = (x: unknown): Assertion[] => (Array.isArray(x) ? (x as Assertion[]) : []);
-  return { id: v.id, proves: v.proves ?? [], ...(typeof v.set === "string" && { set: v.set }), context: v.context, turns: v.turns, assert: list(v.assert), future_assert: list((v as Record<string, unknown>).future_assert) };
+  return {
+    id: v.id,
+    proves: v.proves ?? [],
+    ...(typeof v.set === "string" && { set: v.set }),
+    context: v.context,
+    turns: v.turns,
+    assert: list(v.assert),
+    future_assert: list((v as Record<string, unknown>).future_assert),
+  };
 }
 
 export function loadScenarios(dir: string, only?: string[], set?: string): Scenario[] {
@@ -263,7 +283,12 @@ export function readSecret(envFile: string, env: NodeJS.ProcessEnv = process.env
   const line = readFileSync(envFile, "utf8")
     .split("\n")
     .find((l) => l.startsWith("AGENT_SHARED_SECRET="));
-  return line?.slice("AGENT_SHARED_SECRET=".length).trim().replace(/^["']|["']$/g, "") || undefined;
+  return (
+    line
+      ?.slice("AGENT_SHARED_SECRET=".length)
+      .trim()
+      .replace(/^["']|["']$/g, "") || undefined
+  );
 }
 
 export async function pool<T>(items: T[], concurrency: number, work: (item: T) => Promise<void>): Promise<void> {
@@ -296,7 +321,14 @@ async function main() {
   const model = values.model as string;
   const label = values.label as string;
   const runs = Number(values.runs);
-  const scenarios = loadScenarios(join(evalsDir, "scenarios"), values.only?.split(",").map((s) => s.trim()).filter(Boolean), values.set);
+  const scenarios = loadScenarios(
+    join(evalsDir, "scenarios"),
+    values.only
+      ?.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    values.set,
+  );
   const secret = readSecret(values["env-file"] as string);
   const date = new Date().toISOString().slice(0, 10);
   const outDir = join(evalsDir, "results", `${date}-${label}-${model}`);
@@ -313,7 +345,9 @@ async function main() {
     await appendFile(jsonl, `${JSON.stringify(record)}\n`);
     console.log(`${record.passed ? "pass" : "FAIL"} ${s.id} run ${i + 1}${record.error ? ` (${record.error})` : ""}`);
   });
-  records.sort((a, b) => scenarios.findIndex((s) => s.id === a.scenario) - scenarios.findIndex((s) => s.id === b.scenario) || a.run - b.run);
+  records.sort(
+    (a, b) => scenarios.findIndex((s) => s.id === a.scenario) - scenarios.findIndex((s) => s.id === b.scenario) || a.run - b.run,
+  );
 
   const summary = summarize(records, { model, label, date });
   const baselinePath = join(evalsDir, "baseline", `${model}.json`);

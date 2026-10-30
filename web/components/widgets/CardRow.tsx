@@ -9,7 +9,19 @@ type Mark = (id: string, text: string | undefined) => React.ReactNode;
 
 const mapUrl = (place: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
 
-export function Picture({ id, src, alt, fallback, className }: { id: string; src?: string; alt: string; fallback: string; className: string }) {
+export function Picture({
+  id,
+  src,
+  alt,
+  fallback,
+  className,
+}: {
+  id: string;
+  src?: string;
+  alt: string;
+  fallback: string;
+  className: string;
+}) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
@@ -27,7 +39,10 @@ export function Picture({ id, src, alt, fallback, className }: { id: string; src
 function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide: boolean; folded: boolean; m: Mark }) {
   const head = (
     <>
-      <div id={`${id}-media`} className={`relative w-full overflow-hidden ${wide ? "aspect-[16/10] bg-surface" : "aspect-square bg-white"}`}>
+      <div
+        id={`${id}-media`}
+        className={`relative w-full overflow-hidden ${wide ? "aspect-[16/10] bg-surface" : "aspect-square bg-white"}`}
+      >
         <Picture
           id={`${id}-img`}
           src={item.image}
@@ -36,7 +51,10 @@ function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide:
           className={wide ? "h-full w-full object-cover" : "h-full w-full object-contain p-2 mix-blend-multiply"}
         />
         {item.badge && (
-          <span id={`${id}-badge`} className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-on-charcoal">
+          <span
+            id={`${id}-badge`}
+            className="absolute left-2 top-2 rounded-full bg-charcoal px-2 py-0.5 text-[11px] sm:text-[10px] font-semibold text-on-charcoal"
+          >
             {m(`${id}-badge`, item.badge)}
           </span>
         )}
@@ -60,7 +78,10 @@ function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide:
   );
   return (
     <li id={id} className={`${wide ? "sm:w-64" : "sm:w-44"} min-w-0 snap-start sm:shrink-0 ${folded ? "hidden sm:block" : ""}`}>
-      <div id={`${id}-card`} className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-paper transition hover:border-border-strong hover:shadow-sm">
+      <div
+        id={`${id}-card`}
+        className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-paper transition hover:border-border-strong hover:shadow-sm"
+      >
         {item.url ? (
           <a id={`${id}-link`} href={item.url} target="_blank" rel="noopener noreferrer" className="flex flex-col">
             {head}
@@ -86,7 +107,13 @@ function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide:
             </span>
           )}
           {item.place && (
-            <a id={`${id}-map`} href={mapUrl(item.place)} target="_blank" rel="noopener noreferrer" className="shrink-0 font-medium text-mist-600 hover:underline">
+            <a
+              id={`${id}-map`}
+              href={mapUrl(item.place)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 font-medium text-mist-600 hover:underline"
+            >
               Map
             </a>
           )}
@@ -131,7 +158,12 @@ export function CardRow({ id, label, block, m }: { id: string; label: string; bl
         ))}
       </ul>
       {hidden > 0 && (
-        <button id={`${id}-more`} type="button" onClick={() => setAll(true)} className="mx-4 mt-1 w-[calc(100%-2rem)] rounded-xl border border-border bg-paper py-2 text-[14px] text-text-secondary hover:border-border-strong sm:hidden">
+        <button
+          id={`${id}-more`}
+          type="button"
+          onClick={() => setAll(true)}
+          className="mx-4 mt-1 w-[calc(100%-2rem)] rounded-xl border border-border bg-paper py-2 text-[14px] text-text-secondary hover:border-border-strong sm:hidden"
+        >
           {`Show ${hidden} more`}
         </button>
       )}

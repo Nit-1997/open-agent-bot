@@ -35,7 +35,14 @@ function summary(o: FlightOption, currency: string): string {
 
 type Attempt = Awaited<ReturnType<FlightSource["search"]>>;
 type Search = { code: string; url: string; last: Attempt };
-type Deps = { source: FlightSource; locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null>; nearby?: () => Promise<string[]> };
+type Deps = {
+  source: FlightSource;
+  locale: string;
+  currency: string;
+  browse: Browse;
+  drive?: (airportCode: string) => Promise<Drive | null>;
+  nearby?: () => Promise<string[]>;
+};
 type Params = { from: string; to: string; date: string; returnDate?: string; adults?: number; max_layover?: string; depart_times?: string };
 
 function readPrefs(params: Params): FlightPrefs {
@@ -50,7 +57,10 @@ function readPrefs(params: Params): FlightPrefs {
 }
 
 async function searchOrigin(deps: Deps, params: Params, code: string, opts: { fresh: boolean; live: boolean }): Promise<Search> {
-  const last = await deps.source.search({ ...params, from: code }, { locale: deps.locale, currency: deps.currency, browse: deps.browse, ...opts });
+  const last = await deps.source.search(
+    { ...params, from: code },
+    { locale: deps.locale, currency: deps.currency, browse: deps.browse, ...opts },
+  );
   return { code, url: last.url, last };
 }
 
@@ -62,7 +72,11 @@ async function airportResults(deps: Deps, searches: Search[], withRides: boolean
       return {
         code,
         ...(known && { name: known.name }),
-        ...(drive && { miles: drive.miles, ...(drive.minutes != null && { driveMinutes: drive.minutes }), rideOneWay: rideOneWay(drive.miles) }),
+        ...(drive && {
+          miles: drive.miles,
+          ...(drive.minutes != null && { driveMinutes: drive.minutes }),
+          rideOneWay: rideOneWay(drive.miles),
+        }),
         status: last.options.length ? "ok" : "failed",
         searchUrl: url,
       };
@@ -73,8 +87,13 @@ async function airportResults(deps: Deps, searches: Search[], withRides: boolean
 function airportLine(a: RankedAirport<AirportResult>, money: (n: number) => string): string {
   if (a.status === "failed") return `- ${a.code}: couldn't load (the card links to Google Flights for it)`;
   const ride =
-    a.rideOneWay != null ? `${a.driveMinutes != null ? `${a.driveMinutes} min drive` : `${a.miles} mi`}, ride about ${money(a.rideOneWay)} each way (estimate), ` : "";
-  const fare = a.bestFare != null ? `best matching fare ${money(a.bestFare)}${a.rideOneWay != null ? `, about ${money(a.total!)} all-in` : ""}` : "no flights match the preferences";
+    a.rideOneWay != null
+      ? `${a.driveMinutes != null ? `${a.driveMinutes} min drive` : `${a.miles} mi`}, ride about ${money(a.rideOneWay)} each way (estimate), `
+      : "";
+  const fare =
+    a.bestFare != null
+      ? `best matching fare ${money(a.bestFare)}${a.rideOneWay != null ? `, about ${money(a.total!)} all-in` : ""}`
+      : "no flights match the preferences";
   const flags = [a.bestValue && "best value", a.closest && "closest"].filter(Boolean).join(", ");
   return `- ${a.code}${a.name ? ` ${a.name}` : ""}: ${ride}${fare}${flags ? ` (${flags})` : ""}`;
 }
@@ -112,8 +131,12 @@ function modelText(data: FlightsData, ranked: RankedAirport<AirportResult>[], se
     "",
     `(Note for you, do not repeat to the user: ${multi ? "one flight card comparing these airports, with filters the user can change," : "a flight card with these options and the booking link"} is already displayed.)`,
     ...(data.priceNote ? [`Prices: ${data.priceNote}.`] : []),
-    ...(multi ? ["Airports, ranked by the best fare matching the preferences plus a round-trip ride:", ...ranked.map((a) => airportLine(a, money))] : []),
-    ...(data.options.length ? optionLines(data.options, data.prefs, line) : ["No options could be read from the page.", "Page text:", searches[0].last.text]),
+    ...(multi
+      ? ["Airports, ranked by the best fare matching the preferences plus a round-trip ride:", ...ranked.map((a) => airportLine(a, money))]
+      : []),
+    ...(data.options.length
+      ? optionLines(data.options, data.prefs, line)
+      : ["No options could be read from the page.", "Page text:", searches[0].last.text]),
   ].join("\n");
 }
 
@@ -137,7 +160,10 @@ export function flightsTool(args: Omit<Deps, "source"> & { source?: FlightSource
       if (!DATE.test(params.date) || (params.returnDate && !DATE.test(params.returnDate))) {
         return fail("dates must be YYYY-MM-DD");
       }
-      const asked = params.from.split(",").map((o) => o.trim()).filter(Boolean);
+      const asked = params.from
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean);
       const wantsNearby = asked.some((o) => NEARBY.test(o));
       const nearby = wantsNearby ? await (deps.nearby?.() ?? Promise.resolve([])) : [];
       if (wantsNearby && !nearby.length && asked.every((o) => NEARBY.test(o))) {

@@ -10,6 +10,8 @@ export const mockStore: RetailSource = {
   defaultFor: ["NZ"],
   domains: ["mockmart.test"],
   async search(q) {
-    return { tiles: [{ title: `${q.query} at Mock Mart`, price: 9.5, priceText: "$9.50", url: "https://mockmart.test/p/1", sponsored: false }] };
+    return {
+      tiles: [{ title: `${q.query} at Mock Mart`, price: 9.5, priceText: "$9.50", url: "https://mockmart.test/p/1", sponsored: false }],
+    };
   },
 };

@@ -17,7 +17,10 @@ export function looseList<T>(v: unknown): T[] {
       const parsed = JSON.parse(v);
       return Array.isArray(parsed) ? parsed : [parsed];
     } catch {
-      return v.split(",").map((s) => s.trim()).filter(Boolean) as T[];
+      return v
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean) as T[];
     }
   }
   return [];

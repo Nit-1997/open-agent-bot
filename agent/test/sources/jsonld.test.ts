@@ -54,7 +54,14 @@ describe("parseJsonLd", () => {
 
   it("reads a plain Offer array with a priceSpecification and a locale-formatted price", () => {
     const [p] = parseJsonLd(
-      page([{ "@type": ["Product", "Thing"], name: "Phone", image: { "@type": "ImageObject", url: "/i.jpg" }, offers: [{ "@type": "Offer", priceSpecification: { price: "29.999,00", priceCurrency: "INR" }, availability: "InStock" }] }]),
+      page([
+        {
+          "@type": ["Product", "Thing"],
+          name: "Phone",
+          image: { "@type": "ImageObject", url: "/i.jpg" },
+          offers: [{ "@type": "Offer", priceSpecification: { price: "29.999,00", priceCurrency: "INR" }, availability: "InStock" }],
+        },
+      ]),
       "https://shop.in/p/1",
     );
     expect(p).toMatchObject({ price: 29999, currency: "INR", image: "https://shop.in/i.jpg" });
@@ -62,17 +69,39 @@ describe("parseJsonLd", () => {
 
   it("reads product variants from a ProductGroup", () => {
     const rs = parseJsonLd(
-      page({ "@type": "ProductGroup", name: "Tee", hasVariant: [{ "@type": "Product", name: "Tee S", offers: { price: 10, priceCurrency: "USD" } }, { "@type": "Product", name: "Tee M", offers: { price: 12, priceCurrency: "USD" } }] }),
+      page({
+        "@type": "ProductGroup",
+        name: "Tee",
+        hasVariant: [
+          { "@type": "Product", name: "Tee S", offers: { price: 10, priceCurrency: "USD" } },
+          { "@type": "Product", name: "Tee M", offers: { price: 12, priceCurrency: "USD" } },
+        ],
+      }),
     );
-    expect(rs.map((r) => [r.name, r.price])).toEqual([["Tee S", 10], ["Tee M", 12]]);
+    expect(rs.map((r) => [r.name, r.price])).toEqual([
+      ["Tee S", 10],
+      ["Tee M", 12],
+    ]);
   });
 
   it("reads hotels, restaurants and events", () => {
     const rs = parseJsonLd(
       page(
-        { "@type": "Hotel", name: "Grand", address: { "@type": "PostalAddress", streetAddress: "1 Main St", addressLocality: "Reno", addressRegion: "NV" }, priceRange: "$$", aggregateRating: { ratingValue: 4.2, ratingCount: 88 } },
+        {
+          "@type": "Hotel",
+          name: "Grand",
+          address: { "@type": "PostalAddress", streetAddress: "1 Main St", addressLocality: "Reno", addressRegion: "NV" },
+          priceRange: "$$",
+          aggregateRating: { ratingValue: 4.2, ratingCount: 88 },
+        },
         { "@type": "Restaurant", name: "Bistro", servesCuisine: ["French", "Vegetarian"], telephone: "+1 555 0100" },
-        { "@type": "MusicEvent", name: "Gig", startDate: "2026-12-01T20:00", location: { "@type": "Place", name: "The Hall", address: "9 Elm" }, offers: { price: 45, priceCurrency: "USD" } },
+        {
+          "@type": "MusicEvent",
+          name: "Gig",
+          startDate: "2026-12-01T20:00",
+          location: { "@type": "Place", name: "The Hall", address: "9 Elm" },
+          offers: { price: 45, priceCurrency: "USD" },
+        },
       ),
     );
     expect(rs[0]).toMatchObject({ kind: "lodging", address: "1 Main St, Reno, NV", priceRange: "$$", rating: 4.2, reviews: 88 });
@@ -82,7 +111,17 @@ describe("parseJsonLd", () => {
 
   it("reads products from an ItemList and skips broken blocks", () => {
     const rs = parseJsonLd(
-      page("{ not json", { "@type": "ItemList", itemListElement: [{ "@type": "ListItem", position: 1, item: { "@type": "Product", name: "A", url: "https://s.test/a", offers: { price: 1, priceCurrency: "USD" } } }, { "@type": "ListItem", position: 2, item: { "@type": "Product", name: "B", offers: { price: 2 } } }] }),
+      page("{ not json", {
+        "@type": "ItemList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            item: { "@type": "Product", name: "A", url: "https://s.test/a", offers: { price: 1, priceCurrency: "USD" } },
+          },
+          { "@type": "ListItem", position: 2, item: { "@type": "Product", name: "B", offers: { price: 2 } } },
+        ],
+      }),
     );
     expect(rs.map((r) => r.name)).toEqual(["A", "B"]);
   });
@@ -100,7 +139,13 @@ describe("parseJsonLd", () => {
 describe("tileOf", () => {
   it("turns a priced product into a tile and flags out-of-stock without a price", () => {
     const [p] = parseJsonLd(page(productGraph), "https://shop.test/p/xm5");
-    expect(tileOf(p, "https://shop.test/p/xm5")).toMatchObject({ title: "Sony WH-1000XM5 Wireless Headphones", price: 298, priceText: "$298.00", url: "https://shop.test/p/xm5", rating: 4.6 });
+    expect(tileOf(p, "https://shop.test/p/xm5")).toMatchObject({
+      title: "Sony WH-1000XM5 Wireless Headphones",
+      price: 298,
+      priceText: "$298.00",
+      url: "https://shop.test/p/xm5",
+      rating: 4.6,
+    });
     const out = tileOf({ kind: "product", name: "Gone", price: 5, currency: "USD", availability: "OutOfStock" }, "https://s.test/g");
     expect(out?.price).toBeUndefined();
     expect(out?.priceText).toBe("$5.00 (out of stock)");

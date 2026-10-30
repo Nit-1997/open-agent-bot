@@ -5,7 +5,15 @@ import { googleHotels, parseGoogleCard } from "../../src/sources/stays/googleHot
 import { amount, cleanUrl, count } from "../../src/stays/parse.js";
 import type { StayQuery } from "../../src/stays/types.js";
 
-const q: StayQuery = { location: "Las Vegas", checkin: "2026-11-12", checkout: "2026-11-15", nights: 3, adults: 2, rooms: 1, currency: "USD" };
+const q: StayQuery = {
+  location: "Las Vegas",
+  checkin: "2026-11-12",
+  checkout: "2026-11-15",
+  nights: 3,
+  adults: 2,
+  rooms: 1,
+  currency: "USD",
+};
 
 describe("google hotels search", () => {
   it("names the wished-for chains in the search so their hotels come back", () => {
@@ -25,7 +33,9 @@ describe("stay parsing helpers", () => {
   });
 
   it("keeps only the listed query params", () => {
-    expect(cleanUrl("https://www.booking.com/hotel/us/x.html?aid=1&label=y&checkin=2026-11-12", ["checkin"])).toBe("https://www.booking.com/hotel/us/x.html?checkin=2026-11-12");
+    expect(cleanUrl("https://www.booking.com/hotel/us/x.html?aid=1&label=y&checkin=2026-11-12", ["checkin"])).toBe(
+      "https://www.booking.com/hotel/us/x.html?checkin=2026-11-12",
+    );
     expect(cleanUrl("javascript:alert(1)", [])).toBeUndefined();
   });
 });
@@ -41,12 +51,28 @@ describe("Google Hotels cards", () => {
       },
       q,
     );
-    expect(s).toMatchObject({ title: "Bellagio Hotel & Casino", nightly: 131, total: 393, rating: 4.7, ratingScale: 5, reviews: 144300, kind: "5-star hotel", badge: "24% off usual" });
+    expect(s).toMatchObject({
+      title: "Bellagio Hotel & Casino",
+      nightly: 131,
+      total: 393,
+      rating: 4.7,
+      ratingScale: 5,
+      reviews: 144300,
+      kind: "5-star hotel",
+      badge: "24% off usual",
+    });
     expect(s?.url).toContain("google.com/travel/search?q=Bellagio+Hotel+%26+Casino+Las+Vegas");
   });
 
   it("falls back to the price label for the name and spots rentals", () => {
-    const s = parseGoogleCard({ name: "", priceLabel: "Prices starting from $314, MGM Signature PH strip view condo", text: "$314 5.0 (8) · Apartment, Sleeps 4, 2 bedrooms" }, q);
+    const s = parseGoogleCard(
+      {
+        name: "",
+        priceLabel: "Prices starting from $314, MGM Signature PH strip view condo",
+        text: "$314 5.0 (8) · Apartment, Sleeps 4, 2 bedrooms",
+      },
+      q,
+    );
     expect(s).toMatchObject({ title: "MGM Signature PH strip view condo", nightly: 314, kind: "Rental", reviews: 8 });
   });
 });
@@ -62,13 +88,36 @@ describe("Airbnb cards", () => {
       },
       q,
     );
-    expect(s).toMatchObject({ title: "Luxor Hotel and Casino", total: 575, nightly: 192, rating: 4.27, reviews: 1861, kind: "Hotel", area: "Las Vegas Strip" });
+    expect(s).toMatchObject({
+      title: "Luxor Hotel and Casino",
+      total: 575,
+      nightly: 192,
+      rating: 4.27,
+      reviews: 1861,
+      kind: "Hotel",
+      area: "Las Vegas Strip",
+    });
     expect(s?.url).toBe("https://www.airbnb.com/rooms/1330478823292451559?check_in=2026-11-12&check_out=2026-11-15&adults=2");
   });
 
   it("uses the listing name when the title is just the home type", () => {
-    const s = parseAirbnbCard({ title: "Condo in Paradise", name: "Strip view 2BR with pool", href: "https://www.airbnb.com/rooms/1", text: "Condo in Paradise\nGuest favorite\n$900 total" }, q);
-    expect(s).toMatchObject({ title: "Strip view 2BR with pool", kind: "Condo", area: "Paradise", total: 900, nightly: 300, badge: "Guest favorite" });
+    const s = parseAirbnbCard(
+      {
+        title: "Condo in Paradise",
+        name: "Strip view 2BR with pool",
+        href: "https://www.airbnb.com/rooms/1",
+        text: "Condo in Paradise\nGuest favorite\n$900 total",
+      },
+      q,
+    );
+    expect(s).toMatchObject({
+      title: "Strip view 2BR with pool",
+      kind: "Condo",
+      area: "Paradise",
+      total: 900,
+      nightly: 300,
+      badge: "Guest favorite",
+    });
   });
 });
 
@@ -85,7 +134,15 @@ describe("Booking.com cards", () => {
       },
       q,
     );
-    expect(s).toMatchObject({ title: "Planet Hollywood Resort & Casino", total: 1262, nightly: 421, rating: 8.1, ratingScale: 10, reviews: 13204, area: "Las Vegas Strip, Las Vegas" });
+    expect(s).toMatchObject({
+      title: "Planet Hollywood Resort & Casino",
+      total: 1262,
+      nightly: 421,
+      rating: 8.1,
+      ratingScale: 10,
+      reviews: 13204,
+      area: "Las Vegas Strip, Las Vegas",
+    });
     expect(s?.url).toBe("https://www.booking.com/hotel/us/planet-hollywood.html?checkin=2026-11-12&checkout=2026-11-15&group_adults=2");
   });
 

@@ -34,7 +34,17 @@ export function KeyForm({ id, p, busy, onSubmit }: { id: string; p: ProviderView
   );
 }
 
-export function ConnectForm({ id, p, busy, onSubmit }: { id: string; p: ProviderView; busy: boolean; onSubmit: (input: LocalInput) => void }) {
+export function ConnectForm({
+  id,
+  p,
+  busy,
+  onSubmit,
+}: {
+  id: string;
+  p: ProviderView;
+  busy: boolean;
+  onSubmit: (input: LocalInput) => void;
+}) {
   const [url, setUrl] = useState(p.defaultBaseUrl ?? "");
   const [serverKey, setServerKey] = useState("");
   const [name, setName] = useState("");
@@ -52,11 +62,34 @@ export function ConnectForm({ id, p, busy, onSubmit }: { id: string; p: Provider
       }}
       className="mt-3 space-y-2"
     >
-      <input id={`${id}-url`} aria-label={`${p.label} server URL`} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://host.docker.internal:8080/v1" className={input} />
+      <input
+        id={`${id}-url`}
+        aria-label={`${p.label} server URL`}
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="http://host.docker.internal:8080/v1"
+        className={input}
+      />
       {p.id === "custom" && (
         <>
-          <input id={`${id}-name`} aria-label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. My vLLM box" className={input} />
-          <input id={`${id}-server-key`} type="password" autoComplete="off" aria-label="Server API key (optional)" value={serverKey} onChange={(e) => setServerKey(e.target.value)} placeholder="API key, if the server needs one" className={input} />
+          <input
+            id={`${id}-name`}
+            aria-label="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name, e.g. My vLLM box"
+            className={input}
+          />
+          <input
+            id={`${id}-server-key`}
+            type="password"
+            autoComplete="off"
+            aria-label="Server API key (optional)"
+            value={serverKey}
+            onChange={(e) => setServerKey(e.target.value)}
+            placeholder="API key, if the server needs one"
+            className={input}
+          />
         </>
       )}
       <div id={`${id}-connect-actions`} className="flex items-center justify-between gap-2">

@@ -3,7 +3,10 @@ import { dnsLookup, type Lookup, publicHttpUrlError, resolvesInternal } from "./
 
 const CACHE_MS = 60_000;
 
-export async function blockInternalRequests(context: BrowserContext, opts: { allowPrivateHosts?: boolean; lookup?: Lookup } = {}): Promise<void> {
+export async function blockInternalRequests(
+  context: BrowserContext,
+  opts: { allowPrivateHosts?: boolean; lookup?: Lookup } = {},
+): Promise<void> {
   if (opts.allowPrivateHosts) return;
   const resolve = opts.lookup ?? dnsLookup;
   const cache = new Map<string, { at: number; internal: Promise<boolean> }>();

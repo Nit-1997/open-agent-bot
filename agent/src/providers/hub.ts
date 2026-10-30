@@ -35,7 +35,13 @@ type EnabledModel = { id: string; label: string; provider: string; note?: string
 type ModelView = { id: string; label: string; contextWindow: number; note?: string; enabled: boolean };
 type TestResult = { ok: boolean; toolCall: boolean; latencyMs: number; cost?: number; error?: string };
 
-const LOCAL_MODEL = { reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens: 4096 };
+const LOCAL_MODEL = {
+  reasoning: false,
+  input: ["text" as const],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 32768,
+  maxTokens: 4096,
+};
 const MAX_OUTPUT_TOKENS = 32_000;
 
 type LiteLlmModelInfo = {
@@ -62,7 +68,10 @@ function gatewayCost(i: LiteLlmModelInfo): Cost | undefined {
 
 async function withGatewayLimits(f: typeof fetch, gateway: { baseUrl: string; apiKey: string; models: SeedModel[] }): Promise<SeedModel[]> {
   try {
-    const res = await f(`${gateway.baseUrl.replace(/\/+$/, "")}/model/info`, { headers: { authorization: `Bearer ${gateway.apiKey}` }, signal: AbortSignal.timeout(5000) });
+    const res = await f(`${gateway.baseUrl.replace(/\/+$/, "")}/model/info`, {
+      headers: { authorization: `Bearer ${gateway.apiKey}` },
+      signal: AbortSignal.timeout(5000),
+    });
     if (!res.ok) return gateway.models;
     const info = new Map(((await res.json()) as LiteLlmInfo).data?.map((d) => [d.model_name, d.model_info]) ?? []);
     return gateway.models.map((m) => {
@@ -111,14 +120,27 @@ export class ProviderHub {
       refreshOnCreate: false,
       allowModelNetwork: false,
     });
-    const settings: Settings = { custom: {}, enabled: {}, hidden: [], ...(await readJsonFile<Partial<Settings>>(join(opts.dataDir, "providers.json"))) };
+    const settings: Settings = {
+      custom: {},
+      enabled: {},
+      hidden: [],
+      ...(await readJsonFile<Partial<Settings>>(join(opts.dataDir, "providers.json"))),
+    };
     const keys = (await readJsonFile<Record<string, string>>(join(opts.dataDir, "local-keys.json"))) ?? {};
     const signedIn = new Map<string, "key" | "signin">();
     for (const e of CLOUD) {
       const check = await rt.checkAuth(e.id).catch(() => undefined);
       if (check) signedIn.set(e.id, (check as { type?: string }).type === "oauth" ? "signin" : "key");
     }
-    const hub = new ProviderHub(rt, opts.dataDir, settings, keys, opts.fetch ?? fetch, opts.complete ?? ((m, c, o) => rt.completeSimple(m, c, o)), signedIn);
+    const hub = new ProviderHub(
+      rt,
+      opts.dataDir,
+      settings,
+      keys,
+      opts.fetch ?? fetch,
+      opts.complete ?? ((m, c, o) => rt.completeSimple(m, c, o)),
+      signedIn,
+    );
     if (opts.litellm && !settings.hidden.includes("litellm")) {
       const models = await withGatewayLimits(opts.fetch ?? fetch, opts.litellm);
       settings.custom.litellm = { kind: "litellm", label: "LiteLLM gateway", baseUrl: opts.litellm.baseUrl, models };
@@ -268,7 +290,13 @@ export class ProviderHub {
     const enabled = new Set(this.enabledFor(id));
     return this.rt
       .getModels(id)
-      .map((m) => ({ id: m.id, label: m.name || m.id, contextWindow: m.contextWindow, ...(priceNote(m) && { note: priceNote(m) }), enabled: enabled.has(m.id) }));
+      .map((m) => ({
+        id: m.id,
+        label: m.name || m.id,
+        contextWindow: m.contextWindow,
+        ...(priceNote(m) && { note: priceNote(m) }),
+        enabled: enabled.has(m.id),
+      }));
   }
 
   async setEnabled(id: string, modelIds: string[]): Promise<void> {

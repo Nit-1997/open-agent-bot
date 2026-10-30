@@ -22,7 +22,17 @@ function testText(r: TestResult): string {
   return `Tool calls work · ${(r.latencyMs / 1000).toFixed(1)}s${r.cost ? ` · $${r.cost.toFixed(4)}` : ""}`;
 }
 
-export function ProviderRow({ p, refresh, onChanged, pollMs }: { p: ProviderView; refresh: () => Promise<void>; onChanged: () => void; pollMs: number }) {
+export function ProviderRow({
+  p,
+  refresh,
+  onChanged,
+  pollMs,
+}: {
+  p: ProviderView;
+  refresh: () => Promise<void>;
+  onChanged: () => void;
+  pollMs: number;
+}) {
   const id = `provider-${p.id}`;
   const [mode, setMode] = useState<Mode>(null);
   const [busy, setBusy] = useState(false);
@@ -94,7 +104,13 @@ export function ProviderRow({ p, refresh, onChanged, pollMs }: { p: ProviderView
           )}
           {p.configured && (
             <>
-              <button id={`${id}-models-toggle`} type="button" aria-expanded={mode === "models"} onClick={() => setMode(mode === "models" ? null : "models")} className={`${ghost} inline-flex items-center gap-1`}>
+              <button
+                id={`${id}-models-toggle`}
+                type="button"
+                aria-expanded={mode === "models"}
+                onClick={() => setMode(mode === "models" ? null : "models")}
+                className={`${ghost} inline-flex items-center gap-1`}
+              >
                 {`Models · ${p.enabled.length} on`}
                 <ChevronDown id={`${id}-models-chevron`} aria-hidden="true" size={12} className={mode === "models" ? "rotate-180" : ""} />
               </button>
@@ -110,7 +126,13 @@ export function ProviderRow({ p, refresh, onChanged, pollMs }: { p: ProviderView
       </div>
 
       {!p.configured && p.keyUrl && (
-        <a id={`${id}-key-link`} href={p.keyUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 ml-10 inline-block text-[11px] text-mist-600 underline underline-offset-2">
+        <a
+          id={`${id}-key-link`}
+          href={p.keyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1.5 ml-10 inline-block text-[11px] text-mist-600 underline underline-offset-2"
+        >
           Get a key ↗
         </a>
       )}
@@ -122,7 +144,13 @@ export function ProviderRow({ p, refresh, onChanged, pollMs }: { p: ProviderView
       {mode === "confirm" && (
         <div id={`${id}-confirm`} className="mt-3 flex items-center justify-end gap-2 text-sm">
           <span id={`${id}-confirm-text`} className="text-text-secondary">{`Remove ${p.label}?`}</span>
-          <button id={`${id}-confirm-yes`} type="button" disabled={busy} onClick={() => void run(() => providersApi.remove(p.id))} className="rounded-full bg-danger-bg px-3 py-1 text-xs font-medium text-danger-fg">
+          <button
+            id={`${id}-confirm-yes`}
+            type="button"
+            disabled={busy}
+            onClick={() => void run(() => providersApi.remove(p.id))}
+            className="rounded-full bg-danger-bg px-3 py-1 text-xs font-medium text-danger-fg"
+          >
             Yes, remove
           </button>
           <button id={`${id}-confirm-no`} type="button" onClick={() => setMode(null)} className="text-xs text-text-muted">
@@ -136,7 +164,10 @@ export function ProviderRow({ p, refresh, onChanged, pollMs }: { p: ProviderView
       {mode === "signin" && !p.configured && <SignIn p={p} pollMs={pollMs} onDone={signedIn} onCancel={() => setMode(null)} />}
 
       {test && (
-        <p id={`${id}-test-result`} className={`mt-2 inline-flex items-center gap-1.5 text-xs ${test.ok ? "text-success-fg" : "text-danger-fg"}`}>
+        <p
+          id={`${id}-test-result`}
+          className={`mt-2 inline-flex items-center gap-1.5 text-xs ${test.ok ? "text-success-fg" : "text-danger-fg"}`}
+        >
           {test.ok && <Check id={`${id}-test-icon`} aria-hidden="true" size={12} />}
           {testText(test)}
         </p>

@@ -52,16 +52,36 @@ describe("card length limits", () => {
   });
 
   it("accepts picture cards in square and wide shapes, capped at 10", () => {
-    const item = { title: "Mercurial Vapor 17 Academy TF", price: "$100", image: "https://static.nike.com/a/vapor.png", url: "https://www.nike.com/t/vapor", source: "Nike" };
-    const hotel = { title: "Memmo Alfama", subtitle: "Boutique hotel", rating: "4.7", price: "$310/night", place: "Memmo Alfama, Lisbon", image: "https://img.com/m.jpg" };
+    const item = {
+      title: "Mercurial Vapor 17 Academy TF",
+      price: "$100",
+      image: "https://static.nike.com/a/vapor.png",
+      url: "https://www.nike.com/t/vapor",
+      source: "Nike",
+    };
+    const hotel = {
+      title: "Memmo Alfama",
+      subtitle: "Boutique hotel",
+      rating: "4.7",
+      price: "$310/night",
+      place: "Memmo Alfama, Lisbon",
+      image: "https://img.com/m.jpg",
+    };
     expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", items: [item] }] }).ok).toBe(true);
     expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", shape: "wide", items: [hotel] }] }).ok).toBe(true);
     expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", shape: "round", items: [item] }] }).ok).toBe(false);
-    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", items: Array.from({ length: 11 }, () => item) }] }).ok).toBe(false);
+    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "cards", items: Array.from({ length: 11 }, () => item) }] }).ok).toBe(
+      false,
+    );
   });
 
   it("accepts a single image with a caption", () => {
-    expect(validateWidget({ ...validWidgets.ui, blocks: [{ type: "image", url: "https://upload.wikimedia.org/x.jpg", caption: "Belém Tower", source: "Wikipedia" }] }).ok).toBe(true);
+    expect(
+      validateWidget({
+        ...validWidgets.ui,
+        blocks: [{ type: "image", url: "https://upload.wikimedia.org/x.jpg", caption: "Belém Tower", source: "Wikipedia" }],
+      }).ok,
+    ).toBe(true);
   });
 
   it("keeps titles short", () => {
@@ -72,7 +92,9 @@ describe("card length limits", () => {
 describe("show_ui", () => {
   it("describes picture cards and images to the model", () => {
     const d = showUiTool().description;
-    expect(d).toContain('{type:"cards", shape?:"square"|"wide", items:[{title, subtitle?, image?, url?, price?, rating?, source?, place?, note?, badge?}]}');
+    expect(d).toContain(
+      '{type:"cards", shape?:"square"|"wide", items:[{title, subtitle?, image?, url?, price?, rating?, source?, place?, note?, badge?}]}',
+    );
     expect(d).toContain('{type:"image", url, caption?, source?}');
   });
 
@@ -146,11 +168,16 @@ describe("show_ui image fill", () => {
     };
     const res = await execWith(findImage, {
       title: "Mac and cheese cart",
-      blocks: [{ type: "cards", items: [
-        { title: "Barilla Elbow Macaroni 16 oz", source: "Shipt" },
-        { title: "Good & Gather Sharp Cheddar", image: "https://target.scene7.com/cheddar.jpg" },
-        { title: "First Street Butter" },
-      ] }],
+      blocks: [
+        {
+          type: "cards",
+          items: [
+            { title: "Barilla Elbow Macaroni 16 oz", source: "Shipt" },
+            { title: "Good & Gather Sharp Cheddar", image: "https://target.scene7.com/cheddar.jpg" },
+            { title: "First Street Butter" },
+          ],
+        },
+      ],
     });
     expect(asked).toEqual(["Barilla Elbow Macaroni 16 oz Shipt", "First Street Butter"]);
     const items = res.details.widget.blocks[0].items;
@@ -161,15 +188,34 @@ describe("show_ui image fill", () => {
 
 describe("show_ui replaces unsourced pictures", () => {
   it("looks up a picture when the card's image wasn't returned by any tool", async () => {
-    const tool = showUiTool({ findImage: async () => "https://tse1.mm.bing.net/real.jpg", isSourced: (u) => u.includes("target.scene7.com") });
-    const res = (await tool.execute(...(["c", {
-      title: "Cart",
-      blocks: [{ type: "cards", items: [
-        { title: "Made-up picture", image: "https://cdn.invented.example/x.jpg" },
-        { title: "Sourced picture", image: "https://target.scene7.com/ok.jpg" },
-      ] }],
-    }, undefined, undefined, {}] as never[]))) as { details: { widget: { blocks: Array<{ items: Array<{ image?: string }> }> } } };
-    expect(res.details.widget.blocks[0].items.map((i) => i.image)).toEqual(["https://tse1.mm.bing.net/real.jpg", "https://target.scene7.com/ok.jpg"]);
+    const tool = showUiTool({
+      findImage: async () => "https://tse1.mm.bing.net/real.jpg",
+      isSourced: (u) => u.includes("target.scene7.com"),
+    });
+    const res = (await tool.execute(
+      ...([
+        "c",
+        {
+          title: "Cart",
+          blocks: [
+            {
+              type: "cards",
+              items: [
+                { title: "Made-up picture", image: "https://cdn.invented.example/x.jpg" },
+                { title: "Sourced picture", image: "https://target.scene7.com/ok.jpg" },
+              ],
+            },
+          ],
+        },
+        undefined,
+        undefined,
+        {},
+      ] as never[]),
+    )) as { details: { widget: { blocks: Array<{ items: Array<{ image?: string }> }> } } };
+    expect(res.details.widget.blocks[0].items.map((i) => i.image)).toEqual([
+      "https://tse1.mm.bing.net/real.jpg",
+      "https://target.scene7.com/ok.jpg",
+    ]);
   });
 });
 

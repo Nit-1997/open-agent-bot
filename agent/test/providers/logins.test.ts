@@ -10,7 +10,11 @@ describe("LoginFlows", () => {
     let pasted = "";
     const flows = new LoginFlows(async (_id, ui: Interaction) => {
       ui.notify({ type: "auth_url", url: "https://auth.openai.com/authorize?x=1", instructions: "Finish in your browser" });
-      pasted = await ui.prompt({ type: "manual_code", message: "Paste the final redirect URL", placeholder: "http://127.0.0.1:1455/auth/callback" });
+      pasted = await ui.prompt({
+        type: "manual_code",
+        message: "Paste the final redirect URL",
+        placeholder: "http://127.0.0.1:1455/auth/callback",
+      });
       ui.notify({ type: "progress", message: "Exchanging code" });
     });
     const id = flows.start("openai");

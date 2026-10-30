@@ -30,9 +30,28 @@ export const validWidgets: {
     subtitle: "Pune · Nov 8",
     blocks: [
       { type: "heading", text: "Budget" },
-      { type: "stats", items: [{ label: "Guests", value: "25" }, { label: "Budget", value: "₹15,000", note: "your number" }] },
-      { type: "table", columns: ["Item", "Price"], rows: [["Diya set", "₹499"], ["Lantern", "₹350"]] },
-      { type: "list", items: [{ title: "Diya set", subtitle: "Amazon.in", value: "₹499", badge: "In stock", url: "https://amazon.in/x" }, { title: "Lantern", value: "₹350" }] },
+      {
+        type: "stats",
+        items: [
+          { label: "Guests", value: "25" },
+          { label: "Budget", value: "₹15,000", note: "your number" },
+        ],
+      },
+      {
+        type: "table",
+        columns: ["Item", "Price"],
+        rows: [
+          ["Diya set", "₹499"],
+          ["Lantern", "₹350"],
+        ],
+      },
+      {
+        type: "list",
+        items: [
+          { title: "Diya set", subtitle: "Amazon.in", value: "₹499", badge: "In stock", url: "https://amazon.in/x" },
+          { title: "Lantern", value: "₹350" },
+        ],
+      },
       { type: "checklist", title: "Day before", items: [{ text: "Clean the house", note: "start early" }] },
       { type: "links", items: [{ label: "Amazon", url: "https://amazon.in/x" }] },
       { type: "callout", tone: "warning", text: "Prices change often." },

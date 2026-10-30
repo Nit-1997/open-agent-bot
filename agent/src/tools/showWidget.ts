@@ -18,13 +18,18 @@ export const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at mos
 function textify(v: unknown): unknown {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   if (Array.isArray(v)) return v.map(textify);
-  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "type" || k === "tone" ? x : textify(x)]));
+  if (v && typeof v === "object")
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "type" || k === "tone" ? x : textify(x)]));
   return v;
 }
 
 type FindImage = (name: string, source?: string) => Promise<string | undefined>;
 
-const MUSIC_HOSTS: Record<string, string> = { "open.spotify.com": "Spotify", "music.apple.com": "Apple Music", "music.youtube.com": "YouTube Music" };
+const MUSIC_HOSTS: Record<string, string> = {
+  "open.spotify.com": "Spotify",
+  "music.apple.com": "Apple Music",
+  "music.youtube.com": "YouTube Music",
+};
 const MUSIC_WORDS = /\b(playlist|album|mixtape|soundtrack)\b/i;
 
 type ListItem = { title?: unknown; subtitle?: unknown; value?: unknown; badge?: unknown; url?: unknown };
@@ -67,7 +72,12 @@ function isMusicCard(it: { title?: unknown; subtitle?: unknown; url?: unknown; s
   return musicSource(it) !== undefined;
 }
 
-async function fillImages(widget: UiWidget, findImage: FindImage, isSourced: (url: string) => boolean, findMusicArt?: FindMusicArt): Promise<{ widget: UiWidget; sourced: string[] }> {
+async function fillImages(
+  widget: UiWidget,
+  findImage: FindImage,
+  isSourced: (url: string) => boolean,
+  findMusicArt?: FindMusicArt,
+): Promise<{ widget: UiWidget; sourced: string[] }> {
   const sourced: string[] = [];
   const blocks = await Promise.all(
     widget.blocks.map(async (b) => {
@@ -118,7 +128,9 @@ export const showUiTool = (deps: { findImage?: FindImage; isSourced?: (url: stri
       }
       const r = validateWidget(fitWidget({ kind: "ui", ...(textify({ ...params, blocks: musicListsToCards(blocks) }) as object) }));
       if (!r.ok) return fail(`invalid card:\n${r.errors.join("\n")}`);
-      const filled = deps.findImage ? await fillImages(r.value as UiWidget, deps.findImage, deps.isSourced ?? (() => true), deps.findMusicArt) : { widget: r.value as UiWidget, sourced: [] };
+      const filled = deps.findImage
+        ? await fillImages(r.value as UiWidget, deps.findImage, deps.isSourced ?? (() => true), deps.findMusicArt)
+        : { widget: r.value as UiWidget, sourced: [] };
       return ok(
         "Card shown. Now reply in at most two short sentences: the takeaway and the next step. Don't repeat the card, don't list what failed beyond a few words, and don't add bullets.",
         { widget: filled.widget, ...(filled.sourced.length && { sourced: filled.sourced.join("\n") }) },

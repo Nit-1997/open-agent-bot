@@ -114,7 +114,8 @@ export async function findPlace(name: string, f: typeof fetch = retryingFetch, s
   u.searchParams.set("count", "1");
   const res = await f(u, { signal: timeoutSignal(10000, signal) });
   if (!res.ok) throw new Error(`geocoding HTTP ${res.status}`);
-  const hit = ((await res.json()) as { results?: Array<{ name: string; country?: string; latitude: number; longitude: number }> }).results?.[0];
+  const hit = ((await res.json()) as { results?: Array<{ name: string; country?: string; latitude: number; longitude: number }> })
+    .results?.[0];
   return hit ? { name: hit.name, ...(hit.country && { country: hit.country }), lat: hit.latitude, lon: hit.longitude } : null;
 }
 

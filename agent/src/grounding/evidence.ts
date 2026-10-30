@@ -1,8 +1,10 @@
 type Claim = { kind: "price" | "rating" | "stock" | "link"; text: string; index: number };
 
-const PRICE = /(?:[$€£₹¥]\s?|\b(?:USD|INR|EUR|GBP|Rs\.?)\s?)\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|INR|EUR|GBP|dollars|rupees)\b/gi;
+const PRICE =
+  /(?:[$€£₹¥]\s?|\b(?:USD|INR|EUR|GBP|Rs\.?)\s?)\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|INR|EUR|GBP|dollars|rupees)\b/gi;
 const RATING = /\b\d(?:\.\d)?\s?(?:\/\s?5(?![\d/])|out of 5(?: stars)?|stars?\b|★)/gi;
-const STOCK = /\b(?:in[ -]stock|out of stock|sold out|back[- ]?ordered|available for pickup|pickup today|ships today|only \d+ left|limited stock)\b/gi;
+const STOCK =
+  /\b(?:in[ -]stock|out of stock|sold out|back[- ]?ordered|available for pickup|pickup today|ships today|only \d+ left|limited stock)\b/gi;
 const LINK = /https?:\/\/[^\s<>"'\])]+/gi;
 const JSON_NUMBER = (key: string) => new RegExp(`"${key}"\\s*:\\s*(\\d+(?:\\.\\d+)?)`, "gi");
 const RATING_LABEL = /\brating[:\s]+(\d(?:\.\d)?)/gi;
@@ -18,7 +20,9 @@ function matches(re: RegExp, text: string, kind: Claim["kind"]): Claim[] {
 export function extractClaims(text: string): Claim[] {
   const links = matches(LINK, text, "link");
   const inLink = (c: Claim) => links.some((l) => c.index >= l.index && c.index < l.index + l.text.length);
-  const others = [...matches(PRICE, text, "price"), ...matches(RATING, text, "rating"), ...matches(STOCK, text, "stock")].filter((c) => !inLink(c));
+  const others = [...matches(PRICE, text, "price"), ...matches(RATING, text, "rating"), ...matches(STOCK, text, "stock")].filter(
+    (c) => !inLink(c),
+  );
   return [...links, ...others].sort((a, b) => a.index - b.index);
 }
 
@@ -70,6 +74,12 @@ export class Evidence {
   }
 
   unverified(text: string): string[] {
-    return [...new Set(extractClaims(text).filter((c) => !this.supports(c)).map((c) => c.text))];
+    return [
+      ...new Set(
+        extractClaims(text)
+          .filter((c) => !this.supports(c))
+          .map((c) => c.text),
+      ),
+    ];
   }
 }

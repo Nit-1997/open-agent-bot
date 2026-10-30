@@ -4,7 +4,8 @@ import type { Evidence } from "./evidence.js";
 function strings(v: unknown, out: string[] = []): string[] {
   if (typeof v === "string") out.push(v);
   else if (Array.isArray(v)) for (const x of v) strings(x, out);
-  else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) if (k !== "url" && k !== "image" && k !== "type" && k !== "tone") strings(x, out);
+  else if (v && typeof v === "object")
+    for (const [k, x] of Object.entries(v)) if (k !== "url" && k !== "image" && k !== "type" && k !== "tone") strings(x, out);
   return out;
 }
 
@@ -39,7 +40,11 @@ export function groundUi(widget: UiWidget, evidence: Evidence): UiWidget {
     }
     return [b];
   });
-  const unverified = [...new Set(strings([widget.title, widget.subtitle, blocks]).flatMap((s) => evidence.unverified(s).filter((c) => !c.startsWith("http"))))];
+  const unverified = [
+    ...new Set(
+      strings([widget.title, widget.subtitle, blocks]).flatMap((s) => evidence.unverified(s).filter((c) => !c.startsWith("http"))),
+    ),
+  ];
   const out: UiWidget = { ...widget, blocks };
   if (unverified.length) out.unverified = unverified;
   if (removed) out.removedLinks = removed;

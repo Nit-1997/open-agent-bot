@@ -16,7 +16,9 @@ const matcher = (pattern: string) => new RegExp(pattern, "i");
 
 export function labelOf(a: Assertion): string {
   const { type, turn, negate, ...rest } = a;
-  const parts = Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "string" ? v : Array.isArray(v) ? `${v.length} patterns` : JSON.stringify(v)}`);
+  const parts = Object.entries(rest).map(
+    ([k, v]) => `${k}=${typeof v === "string" ? v : Array.isArray(v) ? `${v.length} patterns` : JSON.stringify(v)}`,
+  );
   return `${negate ? "not " : ""}${type}${parts.length ? `(${parts.join(", ")})` : ""}${turn ? ` @turn ${turn}` : ""}`;
 }
 

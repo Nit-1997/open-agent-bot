@@ -5,11 +5,14 @@ import { Markdown } from "@/components/chat/Markdown";
 import { SourcesRow } from "@/components/chat/SourcesRow";
 import type { Step } from "@/lib/turns";
 
-const htmlIds = (root: HTMLElement) => [...root.querySelectorAll("*")].filter((e) => e.namespaceURI === "http://www.w3.org/1999/xhtml").map((e) => e.id);
+const htmlIds = (root: HTMLElement) =>
+  [...root.querySelectorAll("*")].filter((e) => e.namespaceURI === "http://www.w3.org/1999/xhtml").map((e) => e.id);
 
 describe("Markdown", () => {
   it("gives every element a unique id and opens links in a new tab", () => {
-    const { container } = render(<Markdown id="m1" text={"# Plan\n\n- **one** [Target](https://target.com)\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |"} />);
+    const { container } = render(
+      <Markdown id="m1" text={"# Plan\n\n- **one** [Target](https://target.com)\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |"} />,
+    );
     const ids = htmlIds(container);
     expect(ids.filter((id) => !id)).toEqual([]);
     expect(new Set(ids).size).toBe(ids.length);
@@ -55,7 +58,9 @@ describe("ActivitySteps", () => {
   });
 
   it("collapses to a summary when done and expands to the steps", () => {
-    render(<ActivitySteps id="a2" steps={steps.map((s) => ({ ...s, done: true }))} running={false} startedAt={0} endedAt={12000} now={0} />);
+    render(
+      <ActivitySteps id="a2" steps={steps.map((s) => ({ ...s, done: true }))} running={false} startedAt={0} endedAt={12000} now={0} />,
+    );
     expect(screen.getByRole("status")).toHaveTextContent("Worked for 12s");
     expect(screen.getByText("1 search · 1 page read")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Worked for 12s/ }));

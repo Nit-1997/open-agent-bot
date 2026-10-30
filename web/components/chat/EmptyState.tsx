@@ -20,7 +20,10 @@ export function EmptyState({ name, onPick }: { name?: string; onPick: (text: str
       <p id="empty-eyebrow" className="eyebrow hidden sm:block">
         Open Agent
       </p>
-      <h2 id="empty-title" className="font-display text-[30px] leading-[1.1] text-text-primary text-balance sm:mt-3 sm:text-[56px] sm:leading-[1.05]">
+      <h2
+        id="empty-title"
+        className="font-display text-[30px] leading-[1.1] text-text-primary text-balance sm:mt-3 sm:text-[56px] sm:leading-[1.05]"
+      >
         {`${greeting(new Date().getHours())}${name ? `, ${name}` : ""}.`}
         <br />
         <span id="empty-title-sub" className="italic text-text-muted">
@@ -36,14 +39,20 @@ export function EmptyState({ name, onPick }: { name?: string; onPick: (text: str
               onClick={() => onPick(s.text)}
               className="group flex h-full w-full flex-col items-start gap-2 rounded-2xl border border-border bg-paper p-3 text-left transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mist-500 sm:flex-row sm:gap-3 sm:p-3.5"
             >
-              <span id={`empty-suggestion-${i}-icon`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface text-text-primary sm:h-8 sm:w-8 sm:rounded-xl">
+              <span
+                id={`empty-suggestion-${i}-icon`}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface text-text-primary sm:h-8 sm:w-8 sm:rounded-xl"
+              >
                 <s.icon id={`empty-suggestion-${i}-svg`} aria-hidden="true" size={16} />
               </span>
               <span id={`empty-suggestion-${i}-text`} className="min-w-0">
                 <span id={`empty-suggestion-${i}-label`} className="eyebrow block">
                   {s.label}
                 </span>
-                <span id={`empty-suggestion-${i}-prompt`} className="mt-1 line-clamp-3 text-[13px] leading-snug text-text-secondary group-hover:text-text-primary sm:line-clamp-none sm:text-sm">
+                <span
+                  id={`empty-suggestion-${i}-prompt`}
+                  className="mt-1 line-clamp-3 text-[13px] leading-snug text-text-secondary group-hover:text-text-primary sm:line-clamp-none sm:text-sm"
+                >
                   {s.text}
                 </span>
               </span>

@@ -6,7 +6,14 @@ import { buildTools, PER_REPLY_LIMITS } from "../../src/tools/index.js";
 const ctx = { timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T14:00" };
 
 function tools(userContext = ctx) {
-  return buildTools({ cfg: loadConfig({}), artifacts: {} as never, pool: {} as never, threadId: "t", userContext, budget: new TurnBudget(PER_REPLY_LIMITS) });
+  return buildTools({
+    cfg: loadConfig({}),
+    artifacts: {} as never,
+    pool: {} as never,
+    threadId: "t",
+    userContext,
+    budget: new TurnBudget(PER_REPLY_LIMITS),
+  });
 }
 const desc = (list: ReturnType<typeof tools>, name: string) => list.find((t) => t.name === name)!.description;
 

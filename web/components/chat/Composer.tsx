@@ -53,7 +53,13 @@ export function Composer(props: { running: boolean; onSend: (text: string) => vo
         className="max-h-[200px] flex-1 resize-none bg-transparent py-1.5 text-[14px] leading-6 text-text-primary outline-none placeholder:text-text-muted sm:py-2 sm:text-[15px]"
       />
       {props.running ? (
-        <button id="composer-stop" type="button" onClick={props.onStop} aria-label="Stop" className="flex h-9 w-9 items-center justify-center rounded-full bg-charcoal text-on-charcoal transition hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mist-500">
+        <button
+          id="composer-stop"
+          type="button"
+          onClick={props.onStop}
+          aria-label="Stop"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-charcoal text-on-charcoal transition hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mist-500"
+        >
           <Square id="composer-stop-icon" aria-hidden="true" size={12} fill="currentColor" />
         </button>
       ) : (

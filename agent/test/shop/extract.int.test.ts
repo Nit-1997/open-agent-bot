@@ -23,7 +23,9 @@ const grid = `
 beforeAll(async () => {
   browser = await chromium.launch();
   page = await browser.newPage();
-  await page.route("https://shop.test/**", (r) => r.fulfill({ contentType: "text/html", body: `<!doctype html><html><body>${grid}</body></html>` }));
+  await page.route("https://shop.test/**", (r) =>
+    r.fulfill({ contentType: "text/html", body: `<!doctype html><html><body>${grid}</body></html>` }),
+  );
   await page.goto("https://shop.test/search?q=black+beans");
 });
 
@@ -35,7 +37,9 @@ describe("extractTiles", () => {
   it("names groups from a section link's address when the store marks sections that way", async () => {
     const p2 = await browser.newPage();
     const body = `<a href="/shop/smart-final/search?q=x">View all</a><ul><li><a href="/p/1">${img("https://cdn.s.com/1.jpg", "Signature Black Beans 15 oz")}</a><span>$1.25</span></li></ul>`;
-    await p2.route("https://shop2.test/**", (r) => r.fulfill({ contentType: "text/html", body: `<!doctype html><html><body>${body}</body></html>` }));
+    await p2.route("https://shop2.test/**", (r) =>
+      r.fulfill({ contentType: "text/html", body: `<!doctype html><html><body>${body}</body></html>` }),
+    );
     await p2.goto("https://shop2.test/");
     const tiles = await extractTiles(p2, { groupSelector: 'a[href*="/shop/"]', groupFromHref: "/shop/([^/]+)/" });
     expect(tiles[0].group).toBe("Smart Final");
@@ -51,7 +55,16 @@ describe("extractTiles", () => {
       "Bush's Black Beans 15 oz",
     ]);
     const [beans, ad, goya, bush] = tiles;
-    expect(beans).toMatchObject({ url: "https://shop.test/p/beans", image: "https://cdn.shop.com/beans.jpg", price: 0.99, priceText: "$0.99", rating: 4.5, size: "15.5 oz", sponsored: false, group: "Target" });
+    expect(beans).toMatchObject({
+      url: "https://shop.test/p/beans",
+      image: "https://cdn.shop.com/beans.jpg",
+      price: 0.99,
+      priceText: "$0.99",
+      rating: 4.5,
+      size: "15.5 oz",
+      sponsored: false,
+      group: "Target",
+    });
     expect(ad.sponsored).toBe(true);
     expect(goya.image).toBe("https://cdn.shop.com/goya.jpg");
     expect(bush).toMatchObject({ image: "https://shop.test/img/bush.jpg", group: "Safeway" });

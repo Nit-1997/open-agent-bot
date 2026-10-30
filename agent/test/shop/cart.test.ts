@@ -6,10 +6,28 @@ const t = (title: string, price: number): Tile => ({ title, price, url: `https:/
 
 function cart() {
   const c = new ActiveCart();
-  c.start(["shipt"], [{ query: "rice", qty: 1 }, { query: "black beans", qty: 2 }]);
+  c.start(
+    ["shipt"],
+    [
+      { query: "rice", qty: 1 },
+      { query: "black beans", qty: 2 },
+    ],
+  );
   c.addResults([
-    { store: "Target (Shipt)", items: [{ query: "rice", qty: 1, picks: [t("G&G Rice", 2.39), t("Instant Rice", 1.89)] }, { query: "black beans", qty: 2, picks: [t("G&G Beans", 0.99)] }] },
-    { store: "Safeway (Shipt)", items: [{ query: "rice", qty: 1, picks: [t("Signature Rice", 3.5)] }, { query: "black beans", qty: 2, picks: [] }] },
+    {
+      store: "Target (Shipt)",
+      items: [
+        { query: "rice", qty: 1, picks: [t("G&G Rice", 2.39), t("Instant Rice", 1.89)] },
+        { query: "black beans", qty: 2, picks: [t("G&G Beans", 0.99)] },
+      ],
+    },
+    {
+      store: "Safeway (Shipt)",
+      items: [
+        { query: "rice", qty: 1, picks: [t("Signature Rice", 3.5)] },
+        { query: "black beans", qty: 2, picks: [] },
+      ],
+    },
   ]);
   c.scopeTo(["Target (Shipt)", "Safeway (Shipt)"]);
   return c;
@@ -19,7 +37,10 @@ describe("ActiveCart", () => {
   it("views every item at every store in scope, with missing picks empty", () => {
     const v = cart().view();
     expect(v.map((s) => s.store)).toEqual(["Target (Shipt)", "Safeway (Shipt)"]);
-    expect(v[1].items.map((i) => [i.query, i.picks.length])).toEqual([["rice", 1], ["black beans", 0]]);
+    expect(v[1].items.map((i) => [i.query, i.picks.length])).toEqual([
+      ["rice", 1],
+      ["black beans", 0],
+    ]);
   });
 
   it("ignores results from stores outside the scope once set", () => {

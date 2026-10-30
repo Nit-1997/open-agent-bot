@@ -7,7 +7,16 @@ const MAX_REDIRECTS = 5;
 
 function isPrivateIPv4(ip: string): boolean {
   const [a, b] = ip.split(".").map(Number);
-  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    a >= 224
+  );
 }
 
 function isInternalHost(hostname: string): boolean {
@@ -16,7 +25,8 @@ function isInternalHost(hostname: string): boolean {
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;
   const v = isIP(h);
   if (v === 4) return isPrivateIPv4(h);
-  if (v === 6) return h === "::1" || h === "::" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80") || h.startsWith("::ffff:");
+  if (v === 6)
+    return h === "::1" || h === "::" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80") || h.startsWith("::ffff:");
   return !h.includes(".");
 }
 
@@ -58,7 +68,8 @@ export async function fetchPublic(
     const err = publicHttpUrlError(current, opts);
     if (err) throw new Error(err);
     const host = new URL(current).hostname;
-    if (!opts.allowPrivateHosts && (await resolvesInternal(host, opts.lookup))) throw new Error(`refusing ${host}: it resolves to a private address`);
+    if (!opts.allowPrivateHosts && (await resolvesInternal(host, opts.lookup)))
+      throw new Error(`refusing ${host}: it resolves to a private address`);
     const res = await f(current, { ...init, redirect: "manual" });
     const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (!location) return { res, url: current };

@@ -12,7 +12,17 @@ const widget: FlightListData = {
   currency: "USD",
   priceNote: "Round-trip total for 2 adults, incl. taxes and fees",
   flights: [
-    { airline: "Frontier", departTime: "3:10 PM", arriveTime: "8:57 PM", duration: "5 hr 47 min", stops: 1, layoverMinutes: 400, layoverAt: "DEN", price: 543, origin: "SFO" },
+    {
+      airline: "Frontier",
+      departTime: "3:10 PM",
+      arriveTime: "8:57 PM",
+      duration: "5 hr 47 min",
+      stops: 1,
+      layoverMinutes: 400,
+      layoverAt: "DEN",
+      price: 543,
+      origin: "SFO",
+    },
     { airline: "Frontier", departTime: "10:30 PM", arriveTime: "11:59 PM", duration: "1 hr 29 min", stops: 0, price: 596, origin: "SFO" },
     { airline: "Southwest", departTime: "4:15 PM", arriveTime: "5:48 PM", duration: "1 hr 33 min", stops: 0, price: 623, origin: "SJC" },
   ],
