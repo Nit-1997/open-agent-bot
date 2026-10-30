@@ -49,6 +49,8 @@ export type ToolDeps = {
   complete?: Complete;
 };
 
+export const HARD_LIMITS = { followups: 1 };
+
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2, research: 2 };
 
 export const CODEMODE_TOOLS: ReadonlySet<string> = new Set(["web_search", "fetch_page", "wikipedia", "music", "weather", "shop", "stays", "flights"]);
@@ -119,7 +121,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       findMusicArt: musicCover({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
       findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, v2, BLOCKS_HELP),
-    suggestRepliesTool(),
+    withBudget(suggestRepliesTool(), deps.budget, "followups"),
     withRules(askUserTool(), RULES.askUser, v2, FIELDS_HELP),
     withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, v2, REPORT_GUIDE),
     ...(deps.cfg.flags.rpiv && deps.complete ? [withBudget(researchTool({ search, artifacts: deps.artifacts, images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }, complete: deps.complete, judge: deps.judge, evidence: deps.evidence }), deps.budget, "research")] : []),

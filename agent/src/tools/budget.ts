@@ -38,11 +38,13 @@ export class TurnBudget implements Budget {
   private readonly total: number;
   private readonly wallMs: number;
   private readonly now: () => number;
+  private readonly hard: Record<string, number>;
 
   constructor(
     private readonly soft: Record<string, number>,
-    opts: { total?: number; wallMs?: number; now?: () => number } = {},
+    opts: { total?: number; wallMs?: number; now?: () => number; hard?: Record<string, number> } = {},
   ) {
+    this.hard = opts.hard ?? {};
     this.total = opts.total ?? DEFAULT_TURN_CALLS;
     this.wallMs = opts.wallMs ?? DEFAULT_TURN_WALL_MS;
     this.now = opts.now ?? Date.now;
@@ -52,8 +54,9 @@ export class TurnBudget implements Budget {
   take(group: string): Taken {
     if (this.now() - this.started >= this.wallMs) return { ok: false, reason: `(${Math.round(this.wallMs / 1000)}s)` };
     if (this.calls >= this.total) return { ok: false, reason: `(${this.total} calls)` };
-    this.calls++;
     const n = (this.used.get(group) ?? 0) + 1;
+    if (this.hard[group] != null && n > this.hard[group]) return { ok: false, reason: `(${this.hard[group]})` };
+    this.calls++;
     this.used.set(group, n);
     const limit = this.soft[group];
     const nudge = limit != null && n > limit ? `Note: this is ${group} call ${n} in this reply, more than usually needed. Wrap up with what you have unless something essential is missing.` : undefined;

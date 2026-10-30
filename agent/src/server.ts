@@ -18,7 +18,7 @@ import { SessionStore } from "./session/sessionStore.js";
 import { BrowserPool } from "./tools/browserPool.js";
 import { ToolBudget, TurnBudget } from "./tools/budget.js";
 import { completeWith } from "./workflows/llm.js";
-import { buildTools, PER_REPLY_LIMITS } from "./tools/index.js";
+import { buildTools, HARD_LIMITS, PER_REPLY_LIMITS } from "./tools/index.js";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 
@@ -55,7 +55,7 @@ function modelFor(ref: string | undefined) {
 const store = new SessionStore({
   idleMs: SESSION_IDLE_MS,
   create: async (threadId, userContext, history) => {
-    const budget = cfg.flags.turnBudget ? new TurnBudget(PER_REPLY_LIMITS) : new ToolBudget(PER_REPLY_LIMITS);
+    const budget = cfg.flags.turnBudget ? new TurnBudget(PER_REPLY_LIMITS, { hard: HARD_LIMITS }) : new ToolBudget({ ...PER_REPLY_LIMITS, ...HARD_LIMITS });
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = workspace ? workspaceCart(workspace, threadId) : new ActiveCart();

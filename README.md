@@ -43,6 +43,21 @@ There's no app login yet: anyone who can reach port 3000 can change keys. Keep p
 - Pictures come from the pages the agent reads (`images:` section), `image_search` (SearXNG images), `music` (iTunes Search: album and song art, Apple Music links) and `wikipedia` (places, people, topics). No keys needed.
 - Cards show an image or link only if a tool returned it; otherwise the image is dropped and a placeholder is shown.
 
+## Skills, Jev and feature flags
+
+- **Skills** live in `agent/skills/<name>/SKILL.md` (frontmatter `name`, `description`, then a playbook). The core prompt lists them and the agent loads one with `load_skill`. A new use case is a new folder; no code change.
+- **Jev** (TypeSafe's calibrated classifier) judges product matches in `shop`, hotel brand/area/vibe wishes in `stays`, music cover art, which search hits to read, research claims, and the pre-turn router. It's reached through the OpenRouter key added in the app (`JEV_MODEL=openrouter/typesafe/jev-1.14`), or set `TYPESAFE_API_KEY` and `JEV_MODEL=typesafe/jev-latest`. If Jev is unreachable, every feature falls back to its non-Jev behavior.
+- **Flags** in `deploy-config/.env-agent` turn each feature on: `JEV_RERANK`, `PROMPT_V2`, `JEV_STAYS`, `JEV_MUSIC`, `TURN_BUDGET`, `SOURCES_V2`, `WORKSPACE`, `ROUTER`, `RPIV`, `CODEMODE`. Off means the previous behavior. `AGENT_MODEL_CAPS` marks models as `frontier`, `small` (gets router tool narrowing) or `codemode`.
+- **Workspace** (`WORKSPACE=1`): carts, trips, events and shortlists are saved in `/data/agent/workspace.sqlite`, so "make it 16 kids" patches the plan, and a chat continues after an agent restart.
+
+Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`, `docs/findings.md`.
+
+## Evals
+
+- `cd agent && npm run eval -- --model chat-sonnet-5.5` runs the scenarios in `agent/evals/scenarios/` against the running agent and writes `agent/evals/results/<date>-<label>-<model>/report.md`, diffed against `agent/evals/baseline/<model>.json`. Live runs cost money; `--only a,b` and `--runs N` keep them small.
+- `npm run eval:rank` scores shop ranking on the ESCI grocery slice (Exact@1, NDCG@3); add `-- --judge` with an OpenRouter key to score the Jev re-rank.
+- `npx tsx evals/run.ts --rescore <results dir>` re-grades saved runs after assertions change.
+
 ## Develop
 
 - Agent: `cd agent && npm run lint && npm run typecheck && npm test && npm run build` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test`)

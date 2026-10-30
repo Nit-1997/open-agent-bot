@@ -50,6 +50,14 @@ describe("withBudget", () => {
 const text = (r: Awaited<ReturnType<typeof call>>) => (r.content.at(-1) as { text: string }).text;
 
 describe("TurnBudget", () => {
+  it("enforces hard group limits, which are never just a nudge", () => {
+    const budget = new TurnBudget({ search: 2 }, { total: 10, hard: { followups: 1 } });
+    expect(budget.take("followups").ok).toBe(true);
+    expect(budget.take("followups")).toMatchObject({ ok: false });
+    budget.reset();
+    expect(budget.take("followups").ok).toBe(true);
+  });
+
   it("ends every result with the calls used and does not refuse under the total", async () => {
     const budget = new TurnBudget({ search: 2 }, { total: 5 });
     const t = withBudget(echo("web_search"), budget, "search");
