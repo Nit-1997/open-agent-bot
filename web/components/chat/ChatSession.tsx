@@ -16,7 +16,7 @@ import { QUIET_ANSWER, TurnView } from "./TurnView";
 
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string }) {
+export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string; draft?: string }) {
   const { agent } = useAgent({ agentId: `chat-${props.threadId}`, runtimeAgentId: props.agentId, threadId: props.threadId });
   const { copilotkit } = useCopilotKit();
   const [sending, setSending] = useState(false);
@@ -178,7 +178,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
             onDismiss={() => setError(null)}
           />
         )}
-        <Composer running={running} onSend={send} onStop={stop} autoFocus />
+        <Composer running={running} onSend={send} onStop={stop} autoFocus initialText={props.draft} />
         <p id="chat-disclaimer" className="mt-1.5 text-center text-[11px] text-text-muted">
           Read-only: I look things up and plan, but never buy, book, or sign in for you.
         </p>

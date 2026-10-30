@@ -3,8 +3,14 @@
 import { ArrowUp, Square } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
-export function Composer(props: { running: boolean; onSend: (text: string) => void; onStop: () => void; autoFocus?: boolean }) {
-  const [text, setText] = useState("");
+export function Composer(props: {
+  running: boolean;
+  onSend: (text: string) => void;
+  onStop: () => void;
+  autoFocus?: boolean;
+  initialText?: string;
+}) {
+  const [text, setText] = useState(props.initialText ?? "");
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {

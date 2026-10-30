@@ -85,6 +85,11 @@ export function ProviderRow({
           <p id={`${id}-status`} className={`truncate text-[11px] ${p.configured ? "text-success-fg" : "text-text-muted"}`}>
             {status(p)}
           </p>
+          {p.note && (
+            <p id={`${id}-note`} className="truncate text-[11px] text-text-muted">
+              {p.note}
+            </p>
+          )}
         </div>
         <div id={`${id}-actions`} className="flex shrink-0 flex-wrap justify-end gap-1.5">
           {!p.configured && p.methods.includes("oauth") && p.oauthLabel && (
@@ -104,19 +109,34 @@ export function ProviderRow({
           )}
           {p.configured && (
             <>
-              <button
-                id={`${id}-models-toggle`}
-                type="button"
-                aria-expanded={mode === "models"}
-                onClick={() => setMode(mode === "models" ? null : "models")}
-                className={`${ghost} inline-flex items-center gap-1`}
-              >
-                {`Models · ${p.enabled.length} on`}
-                <ChevronDown id={`${id}-models-chevron`} aria-hidden="true" size={12} className={mode === "models" ? "rotate-180" : ""} />
-              </button>
-              <button id={`${id}-test`} type="button" disabled={busy || !p.enabled.length} onClick={() => void runTest()} className={ghost}>
-                Test
-              </button>
+              {p.modelCount > 0 && (
+                <>
+                  <button
+                    id={`${id}-models-toggle`}
+                    type="button"
+                    aria-expanded={mode === "models"}
+                    onClick={() => setMode(mode === "models" ? null : "models")}
+                    className={`${ghost} inline-flex items-center gap-1`}
+                  >
+                    {`Models · ${p.enabled.length} on`}
+                    <ChevronDown
+                      id={`${id}-models-chevron`}
+                      aria-hidden="true"
+                      size={12}
+                      className={mode === "models" ? "rotate-180" : ""}
+                    />
+                  </button>
+                  <button
+                    id={`${id}-test`}
+                    type="button"
+                    disabled={busy || !p.enabled.length}
+                    onClick={() => void runTest()}
+                    className={ghost}
+                  >
+                    Test
+                  </button>
+                </>
+              )}
               <button id={`${id}-remove`} type="button" onClick={() => setMode("confirm")} className={ghost}>
                 Remove
               </button>

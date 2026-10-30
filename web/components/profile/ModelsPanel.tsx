@@ -4,24 +4,29 @@ import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { type ProviderView, providersApi } from "@/lib/providers";
 import { ProviderRow } from "./models/ProviderRow";
+import { SearchSettings } from "./models/SearchSettings";
 
-export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: () => void; onChanged: () => void; pollMs?: number }) {
+export function ProvidersList({
+  onChanged,
+  pollMs = 1000,
+  onProviders,
+}: {
+  onChanged: () => void;
+  pollMs?: number;
+  onProviders?: (providers: ProviderView[]) => void;
+}) {
   const [providers, setProviders] = useState<ProviderView[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setProviders(await providersApi.list());
-  }, []);
+    const list = await providersApi.list();
+    setProviders(list);
+    onProviders?.(list);
+  }, [onProviders]);
 
   useEffect(() => {
     refresh().catch((e: Error) => setLoadError(e.message));
   }, [refresh]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const section = (kind: ProviderView["kind"], title: string) => (
     <section id={`models-${kind}`} className="space-y-2">
@@ -37,6 +42,35 @@ export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: ()
       </ul>
     </section>
   );
+
+  return (
+    <div id="models-providers" className="space-y-6">
+      {loadError && (
+        <p id="models-panel-error" role="alert" className="text-sm text-danger-fg">
+          {loadError}
+        </p>
+      )}
+      {!providers && !loadError && (
+        <p id="models-panel-loading" className="text-sm text-text-muted">
+          Loading providers…
+        </p>
+      )}
+      {providers && (
+        <>
+          {section("cloud", "Cloud providers")}
+          {section("local", "Local and self-hosted")}
+        </>
+      )}
+    </div>
+  );
+}
+
+export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: () => void; onChanged: () => void; pollMs?: number }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
     <div id="models-panel" className="fixed inset-0 z-50 flex justify-end">
@@ -74,22 +108,8 @@ export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: ()
           </button>
         </header>
         <div id="models-panel-body" className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-6">
-          {loadError && (
-            <p id="models-panel-error" role="alert" className="text-sm text-danger-fg">
-              {loadError}
-            </p>
-          )}
-          {!providers && !loadError && (
-            <p id="models-panel-loading" className="text-sm text-text-muted">
-              Loading providers…
-            </p>
-          )}
-          {providers && (
-            <>
-              {section("cloud", "Cloud providers")}
-              {section("local", "Local and self-hosted")}
-            </>
-          )}
+          <ProvidersList onChanged={onChanged} pollMs={pollMs} />
+          <SearchSettings />
         </div>
       </aside>
     </div>

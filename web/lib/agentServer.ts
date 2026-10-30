@@ -23,3 +23,17 @@ export function agentHeaders(extra: Record<string, string> = {}): Record<string,
   const secret = agentSecret();
   return secret ? { ...extra, "x-agent-secret": secret } : extra;
 }
+
+export async function forwardToAgent(req: Request, path: string): Promise<Response> {
+  try {
+    const upstream = await fetch(agentUrl(path), {
+      method: req.method,
+      headers: agentHeaders({ "content-type": "application/json" }),
+      body: req.method === "GET" || req.method === "DELETE" ? undefined : await req.text(),
+      cache: "no-store",
+    });
+    return new Response(upstream.body, { status: upstream.status, headers: { "content-type": "application/json" } });
+  } catch {
+    return Response.json({ error: "The agent isn't reachable." }, { status: 502 });
+  }
+}

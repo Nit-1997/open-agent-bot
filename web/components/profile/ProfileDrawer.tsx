@@ -1,15 +1,32 @@
 "use client";
 
+import type { Profile } from "@shared/profile";
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { ModelList } from "@/lib/models";
-import { initials, type Profile } from "@/lib/profile";
-import { HomeField, InterestsField, ModelOptions, NameField } from "./fields";
+import { useOnboardingOptions } from "@/lib/onboardingApi";
+import { initials } from "@/lib/profile";
+import { ModelOptions } from "./ModelOptions";
+import { ShoppingSection, TravelSection, YouSection } from "./onboarding/sections";
+
+function Group({ id, title, children, action }: { id: string; title: string; children: ReactNode; action?: ReactNode }) {
+  return (
+    <section id={id} className="space-y-2">
+      <div id={`${id}-head`} className="flex items-center justify-between">
+        <h3 id={`${id}-title`} className="font-display text-[20px] leading-none text-text-primary">
+          {title}
+        </h3>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export function ProfileDrawer(props: {
   profile: Profile;
   models: ModelList | null;
-  onSave: (p: Profile) => void;
+  onSave: (p: Profile) => Promise<void>;
   onClose: () => void;
   onRestart: () => void;
   onClear: () => void;
@@ -17,6 +34,9 @@ export function ProfileDrawer(props: {
 }) {
   const [draft, setDraft] = useState<Profile>(props.profile);
   const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const options = useOnboardingOptions(draft.home);
   const { onClose } = props;
 
   useEffect(() => {
@@ -24,6 +44,17 @@ export function ProfileDrawer(props: {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await props.onSave(draft);
+    } catch (e) {
+      setError((e as Error).message);
+      setSaving(false);
+    }
+  };
 
   return (
     <div id="profile-drawer" className="fixed inset-0 z-40 flex justify-end">
@@ -39,7 +70,7 @@ export function ProfileDrawer(props: {
         role="dialog"
         aria-modal="true"
         aria-label="Profile"
-        className="relative flex h-full w-full max-w-[420px] animate-rise flex-col border-l border-border bg-bg shadow-lift"
+        className="relative flex h-full w-full max-w-[480px] animate-rise flex-col border-l border-border bg-bg shadow-lift"
       >
         <header id="profile-drawer-header" className="flex items-center justify-between px-6 pt-6">
           <div id="profile-drawer-who" className="flex items-center gap-3">
@@ -51,10 +82,10 @@ export function ProfileDrawer(props: {
             </span>
             <div id="profile-drawer-heading">
               <h2 id="profile-drawer-title" className="font-display text-[26px] leading-none text-text-primary">
-                {draft.name.trim() || "Your profile"}
+                {draft.name?.trim() || "Your profile"}
               </h2>
               <p id="profile-drawer-sub" className="eyebrow mt-1.5">
-                Saved in this browser only
+                Saved by the agent on this computer
               </p>
             </div>
           </div>
@@ -69,20 +100,20 @@ export function ProfileDrawer(props: {
           </button>
         </header>
         <div id="profile-drawer-body" className="min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6">
-          <NameField id="profile-name" value={draft} onChange={setDraft} />
-          <HomeField id="profile-home" value={draft} onChange={setDraft} />
-          <section id="profile-about" className="space-y-3">
-            <h3 id="profile-about-title" className="eyebrow">
-              About you
-            </h3>
-            <InterestsField id="profile-interests" value={draft} onChange={setDraft} />
-          </section>
-          <section id="profile-model" className="space-y-3">
-            <div id="profile-model-head" className="flex items-center justify-between">
-              <h3 id="profile-model-title" className="eyebrow">
-                Default model for new chats
-              </h3>
-              {props.onManageModels && (
+          <Group id="profile-group-you" title="You">
+            <YouSection id="profile-you" profile={draft} onChange={setDraft} options={options} />
+          </Group>
+          <Group id="profile-group-travel" title="Travel">
+            <TravelSection id="profile-travel" profile={draft} onChange={setDraft} options={options} />
+          </Group>
+          <Group id="profile-group-shopping" title="Shopping">
+            <ShoppingSection id="profile-shopping" profile={draft} onChange={setDraft} options={options} />
+          </Group>
+          <Group
+            id="profile-group-model"
+            title="Default model"
+            action={
+              props.onManageModels && (
                 <button
                   id="profile-manage-models"
                   type="button"
@@ -91,15 +122,30 @@ export function ProfileDrawer(props: {
                 >
                   Manage models
                 </button>
-              )}
-            </div>
+              )
+            }
+          >
             <ModelOptions
               id="profile-model-options"
               models={props.models}
               value={draft.defaultModel}
               onChange={(id) => setDraft({ ...draft, defaultModel: id })}
             />
-          </section>
+          </Group>
+          <Group id="profile-group-notes" title="Anything else">
+            <label id="profile-notes-label" htmlFor="profile-notes-input" className="sr-only">
+              Anything else I should keep in mind?
+            </label>
+            <textarea
+              id="profile-notes-input"
+              rows={3}
+              maxLength={1000}
+              value={draft.notes ?? ""}
+              onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+              placeholder="Anything else I should keep in mind?"
+              className="w-full resize-none rounded-xl border border-border bg-paper px-3.5 py-2.5 text-[15px] text-text-primary outline-none transition placeholder:text-text-faint focus:border-mist-300"
+            />
+          </Group>
           <p id="profile-drawer-note" className="text-xs leading-relaxed text-text-muted">
             Profile changes apply to new chats. To change the model for this chat, use the menu in the header.
           </p>
@@ -115,7 +161,7 @@ export function ProfileDrawer(props: {
             {confirming ? (
               <div id="profile-clear-confirm" className="flex items-center gap-2 text-sm">
                 <span id="profile-clear-question" className="text-text-secondary">
-                  Clear your name, home and notes?
+                  Clear everything I know about you?
                 </span>
                 <button
                   id="profile-clear-yes"
@@ -141,7 +187,12 @@ export function ProfileDrawer(props: {
             )}
           </div>
         </div>
-        <footer id="profile-drawer-footer" className="flex justify-end gap-2 border-t border-border px-6 py-4">
+        <footer id="profile-drawer-footer" className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
+          {error && (
+            <p id="profile-save-error" role="alert" className="mr-auto text-xs text-danger-fg">
+              {error}
+            </p>
+          )}
           <button
             id="profile-cancel"
             type="button"
@@ -153,8 +204,9 @@ export function ProfileDrawer(props: {
           <button
             id="profile-save"
             type="button"
-            onClick={() => props.onSave({ ...draft, name: draft.name.trim(), home: draft.home.trim(), notes: draft.notes.trim() })}
-            className="rounded-full bg-charcoal px-5 py-2 text-sm font-medium text-on-charcoal transition hover:opacity-85"
+            disabled={saving}
+            onClick={() => void save()}
+            className="rounded-full bg-charcoal px-5 py-2 text-sm font-medium text-on-charcoal transition hover:opacity-85 disabled:opacity-40"
           >
             Save
           </button>

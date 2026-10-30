@@ -7,6 +7,7 @@ export type ProviderView = {
   defaultBaseUrl?: string;
   methods: Array<"api_key" | "oauth">;
   oauthLabel?: string;
+  note?: string;
   configured: boolean;
   source?: "key" | "signin" | "server";
   baseUrl?: string;

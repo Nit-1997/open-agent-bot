@@ -1,27 +1,18 @@
-import type { Profile } from "./profile";
-
 export type UserContext = {
   timeZone: string;
   locale: string;
   localTime: string;
   model?: string;
   viewport?: { width: number; height: number };
-  profile?: Pick<Profile, "name" | "home" | "interests" | "notes">;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-type Extras = { model?: string; profile?: Profile };
-
-export function withChat(base: UserContext, { model, profile: p }: Extras): UserContext {
-  return {
-    ...base,
-    ...(model && { model }),
-    ...(p && { profile: { name: p.name, home: p.home, interests: p.interests, notes: p.notes } }),
-  };
+export function withChat(base: UserContext, { model }: { model?: string }): UserContext {
+  return { ...base, ...(model && { model }) };
 }
 
-export function getUserContext(now: Date = new Date(), extras: Extras = {}): UserContext {
+export function getUserContext(now: Date = new Date(), extras: { model?: string } = {}): UserContext {
   return withChat(
     {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,

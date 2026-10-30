@@ -40,7 +40,9 @@ export const ProfileSchema = Type.Object({
   }),
   defaultModel: Type.Optional(Type.String({ minLength: 3, maxLength: 200 })),
   notes: Type.Optional(Short(1000)),
-  skipped: Type.Array(Type.Union(SECTIONS.map((s) => Type.Literal(s))), { maxItems: SECTIONS.length }),
+  skipped: Type.Array(Type.Union([Type.Literal("you"), Type.Literal("travel"), Type.Literal("shopping"), Type.Literal("jev")]), {
+    maxItems: SECTIONS.length,
+  }),
   onboardedAt: Type.Optional(Type.String({ maxLength: 40 })),
 });
 

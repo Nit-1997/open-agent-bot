@@ -6,10 +6,10 @@ import { useCallback, useState } from "react";
 import { ChatSession } from "@/components/chat/ChatSession";
 import { ModelMenu } from "@/components/profile/ModelMenu";
 import { ModelsPanel } from "@/components/profile/ModelsPanel";
-import { Onboarding } from "@/components/profile/Onboarding";
+import { Onboarding } from "@/components/profile/onboarding/Onboarding";
 import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
 import { useModels } from "@/lib/models";
-import { clearProfile, initials, saveProfile, useProfile } from "@/lib/profile";
+import { clearedProfile, initials, type Profile, saveProfile, useProfile } from "@/lib/profile";
 import { getUserContext, type UserContext, withChat } from "@/lib/userContext";
 
 const AGENT_ID = "openagent";
@@ -38,29 +38,75 @@ function ThemeToggle() {
   );
 }
 
+function ProfileLoading({ error, onRetry }: { error?: string; onRetry: () => void }) {
+  return (
+    <div id="chat-profile-loading" className="flex h-dvh w-full flex-col items-center justify-center gap-3 px-4">
+      <span id="chat-profile-loading-orb" aria-hidden="true" className="orb h-10 w-10 animate-breathe" />
+      {error ? (
+        <>
+          <p id="chat-profile-loading-error" role="alert" className="text-sm text-danger-fg">
+            {`Couldn't reach the agent: ${error}`}
+          </p>
+          <button
+            id="chat-profile-loading-retry"
+            type="button"
+            onClick={onRetry}
+            className="rounded-full border border-border px-4 py-1.5 text-sm text-text-secondary transition hover:border-border-strong"
+          >
+            Try again
+          </button>
+        </>
+      ) : (
+        <p id="chat-profile-loading-text" className="text-sm text-text-muted">
+          Loading…
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Chat() {
-  const profile = useProfile();
+  const { profile, error, reload } = useProfile();
   const { list: models, reload: reloadModels } = useModels();
   const [modelsPanel, setModelsPanel] = useState(false);
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
   const [userContext, setUserContext] = useState<UserContext>(() => getUserContext());
   const [chatModel, setChatModel] = useState<string | undefined>(undefined);
   const [drawer, setDrawer] = useState(false);
-
-  const model = chatModel ?? profile.defaultModel;
+  const [draft, setDraft] = useState<string | undefined>(undefined);
 
   useAgentContext({
     description: "user_context",
-    value: JSON.stringify(withChat(userContext, { model, profile })),
+    value: JSON.stringify(withChat(userContext, { model: chatModel })),
   });
 
   const startNewChat = useCallback(() => {
     setThreadId(crypto.randomUUID());
     setUserContext(getUserContext());
     setChatModel(undefined);
+    setDraft(undefined);
   }, []);
 
-  if (!profile.onboarded) return <Onboarding models={models} onDone={saveProfile} />;
+  const save = async (p: Profile) => {
+    await saveProfile(p);
+    reloadModels();
+  };
+
+  if (!profile) return <ProfileLoading error={error} onRetry={reload} />;
+
+  if (!profile.onboardedAt) {
+    return (
+      <Onboarding
+        profile={profile}
+        models={models}
+        onModelsChanged={reloadModels}
+        onDone={async (p, starter) => {
+          await save(p);
+          setDraft(starter ?? undefined);
+        }}
+      />
+    );
+  }
 
   return (
     <div id="chat-shell" className="flex h-dvh w-full justify-center p-2 sm:p-4">
@@ -73,7 +119,7 @@ export function Chat() {
             </h1>
           </div>
           <div id="chat-actions" className="flex items-center gap-1.5">
-            <ModelMenu models={models} value={model} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
+            <ModelMenu models={models} value={chatModel} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
             <ThemeToggle />
             <button
               id="chat-profile-button"
@@ -98,7 +144,14 @@ export function Chat() {
           </div>
         </header>
         <main id="chat-main" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-bg">
-          <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext.locale} name={profile.name} />
+          <ChatSession
+            key={threadId}
+            agentId={AGENT_ID}
+            threadId={threadId}
+            locale={userContext.locale}
+            name={profile.name}
+            draft={draft}
+          />
         </main>
       </div>
       {drawer && (
@@ -106,16 +159,16 @@ export function Chat() {
           profile={profile}
           models={models}
           onClose={() => setDrawer(false)}
-          onSave={(p) => {
-            saveProfile(p);
+          onSave={async (p) => {
+            await save(p);
             setDrawer(false);
           }}
           onRestart={() => {
-            saveProfile({ ...profile, onboarded: false });
+            void save({ ...profile, onboardedAt: undefined });
             setDrawer(false);
           }}
           onClear={() => {
-            clearProfile();
+            void save(clearedProfile(profile));
             setDrawer(false);
           }}
           onManageModels={() => {

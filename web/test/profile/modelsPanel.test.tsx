@@ -55,6 +55,8 @@ beforeEach(() => {
       calls.push({ url, method, body });
       const ok = (v: unknown) => new Response(JSON.stringify(v), { status: 200 });
       if (url === "/api/providers" && method === "GET") return ok({ providers });
+      if (url === "/api/settings") return ok({ braveSearch: false });
+      if (url === "/api/settings/brave-search/key") return ok({ ok: true });
       if (url === "/api/providers/openai/key") {
         if (!body.apiKey.trim()) return new Response(JSON.stringify({ error: "the key is empty" }), { status: 400 });
         providers[0] = { ...providers[0], configured: true, source: "key", enabled: ["gpt-5.5"] };
@@ -199,5 +201,18 @@ describe("ModelsPanel", () => {
     const ids = [...container.querySelectorAll("*")].filter((e) => e.namespaceURI === "http://www.w3.org/1999/xhtml").map((e) => e.id);
     expect(ids.filter((id) => !id)).toEqual([]);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("ModelsPanel search settings", () => {
+  it("saves a Brave Search key without showing it again", async () => {
+    render(<ModelsPanel onClose={() => {}} onChanged={() => {}} />);
+    const field = await screen.findByLabelText("Brave Search API key");
+    expect(field).toHaveAttribute("type", "password");
+    fireEvent.change(field, { target: { value: "brv-1" } });
+    fireEvent.click(within(document.getElementById("models-search-brave") as HTMLElement).getByRole("button", { name: "Save key" }));
+    expect(await screen.findByText(/Connected · used when SearXNG returns nothing/)).toBeInTheDocument();
+    expect(calls.find((c) => c.url === "/api/settings/brave-search/key")?.body).toEqual({ apiKey: "brv-1" });
+    expect(screen.queryByDisplayValue("brv-1")).toBeNull();
   });
 });

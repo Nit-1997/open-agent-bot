@@ -1,96 +1,80 @@
-import { useSyncExternalStore } from "react";
+import { emptyProfile, type Profile } from "@shared/profile";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 
-export type Profile = { name: string; home: string; interests: string[]; notes: string; defaultModel?: string; onboarded: boolean };
+export type { Profile };
 
-export const EMPTY_PROFILE: Profile = { name: "", home: "", interests: [], notes: "", onboarded: false };
+type State = { status: "idle" | "loading" | "ready" | "error"; profile: Profile | null; error?: string };
 
-export const INTERESTS = [
-  "Vegetarian",
-  "Vegan",
-  "Budget-conscious",
-  "Has kids",
-  "Has pets",
-  "Prefers local shops",
-  "Eco-friendly",
-  "Loves to cook",
-  "Travels often",
-];
+let state: State = { status: "idle", profile: null };
+const listeners = new Set<() => void>();
 
-const KEY = "open-agent.profile";
-const EVENT = "open-agent:profile";
+const set = (next: State) => {
+  state = next;
+  for (const l of listeners) l();
+};
 
-const str = (v: unknown) => (typeof v === "string" ? v : "");
-
-function parse(raw: string | null): Profile {
-  if (!raw) return EMPTY_PROFILE;
-  try {
-    const v = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      name: str(v.name),
-      home: str(v.home),
-      interests: Array.isArray(v.interests) ? v.interests.filter((i): i is string => typeof i === "string") : [],
-      notes: str(v.notes),
-      ...(typeof v.defaultModel === "string" && { defaultModel: v.defaultModel }),
-      onboarded: v.onboarded === true,
-    };
-  } catch {
-    return EMPTY_PROFILE;
-  }
+async function call(init?: RequestInit): Promise<Profile> {
+  const res = await fetch("/api/profile", { cache: "no-store", headers: { "content-type": "application/json" }, ...init });
+  const body = (await res.json().catch(() => ({}))) as { profile?: Profile; error?: string };
+  if (!res.ok || !body.profile) throw new Error(body.error ?? `The agent didn't answer (${res.status}).`);
+  return body.profile;
 }
 
-function read(): string | null {
+export async function loadProfile(): Promise<Profile | null> {
+  set({ ...state, status: "loading", error: undefined });
   try {
-    return localStorage.getItem(KEY);
-  } catch {
+    const profile = await call();
+    set({ status: "ready", profile });
+    return profile;
+  } catch (e) {
+    set({ status: "error", profile: state.profile, error: (e as Error).message });
     return null;
   }
 }
 
-export function loadProfile(): Profile {
-  return parse(read());
+export async function saveProfile(p: Profile): Promise<Profile> {
+  const profile = await call({ method: "PUT", body: JSON.stringify({ profile: p }) });
+  set({ status: "ready", profile });
+  return profile;
 }
 
-export function saveProfile(p: Profile): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(p));
-  } catch {}
-  window.dispatchEvent(new Event(EVENT));
+export function resetProfileStore(): void {
+  set({ status: "idle", profile: null });
 }
 
-export function clearProfile(): void {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {}
-  window.dispatchEvent(new Event(EVENT));
+const subscribe = (cb: () => void) => {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+};
+
+const SERVER: State = { status: "idle", profile: null };
+
+export function useProfile(): State & { reload: () => void } {
+  const current = useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => SERVER,
+  );
+  useEffect(() => {
+    if (state.status === "idle") void loadProfile();
+  }, []);
+  return { ...current, reload: useCallback(() => void loadProfile(), []) };
 }
 
-export function initials(name: string): string {
-  return name
+export function clearedProfile(p: Profile): Profile {
+  return {
+    ...emptyProfile(),
+    ...(p.defaultModel && { defaultModel: p.defaultModel }),
+    ...(p.onboardedAt && { onboardedAt: p.onboardedAt }),
+  };
+}
+
+export function initials(name: string | undefined): string {
+  return (name ?? "")
     .trim()
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0].toUpperCase())
     .join("");
-}
-
-let cache: { raw: string | null; value: Profile } | undefined;
-
-function snapshot(): Profile {
-  const raw = read();
-  if (!cache || cache.raw !== raw) cache = { raw, value: parse(raw) };
-  return cache.value;
-}
-
-function subscribe(cb: () => void) {
-  window.addEventListener(EVENT, cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener(EVENT, cb);
-    window.removeEventListener("storage", cb);
-  };
-}
-
-export function useProfile(): Profile {
-  return useSyncExternalStore(subscribe, snapshot, () => EMPTY_PROFILE);
 }
