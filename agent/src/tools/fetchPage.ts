@@ -7,7 +7,7 @@ import { htmlToText, imagesText, truncate } from "./text.js";
 
 const MAX_BODY_BYTES = 5_000_000;
 
-export function httpErrorText(status: number, host: string): string {
+function httpErrorText(status: number, host: string): string {
   return BLOCKING_STATUSES.has(status)
     ? `HTTP ${status} from ${host} — the site may be blocking automated access`
     : `HTTP ${status} from ${host}`;

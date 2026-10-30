@@ -1,6 +1,6 @@
 import type { AnySource, Vertical } from "./types.js";
 
-export type Selector = { vertical: Vertical; region?: string; capability?: string };
+type Selector = { vertical: Vertical; region?: string; capability?: string };
 
 const ANY = "*";
 

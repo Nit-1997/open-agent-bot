@@ -1,8 +1,8 @@
 import type { YesNoCriteria } from "../index.js";
 
-export const STAY_MATCH_VERSION = "1";
+const STAY_MATCH_VERSION = "1";
 
-export const stayBrand: YesNoCriteria = {
+const stayBrand: YesNoCriteria = {
   id: "stayBrand",
   version: STAY_MATCH_VERSION,
   question: "A traveler wants a hotel from one of the brands listed in brands. Is this listing a property of one of those brands or their sub-brands?",
@@ -10,7 +10,7 @@ export const stayBrand: YesNoCriteria = {
   no: "An independent hotel, a different chain, a rental or apartment, or a name that only sounds similar to a listed brand.",
 };
 
-export const stayArea: YesNoCriteria = {
+const stayArea: YesNoCriteria = {
   id: "stayArea",
   version: STAY_MATCH_VERSION,
   question: "A traveler wants to stay in or near the place named in area, within the city in location. Is this listing in or near that place?",
@@ -18,7 +18,7 @@ export const stayArea: YesNoCriteria = {
   no: "The listing is in a different part of the city or far from the named place, or nothing in the listing places it there.",
 };
 
-export const stayVibe: YesNoCriteria = {
+const stayVibe: YesNoCriteria = {
   id: "stayVibe",
   version: STAY_MATCH_VERSION,
   question: "A traveler wants a stay with the character described in vibe. Does this listing fit it?",

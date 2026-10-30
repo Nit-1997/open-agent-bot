@@ -1,4 +1,4 @@
-export type Claim = { kind: "price" | "rating" | "stock" | "link"; text: string; index: number };
+type Claim = { kind: "price" | "rating" | "stock" | "link"; text: string; index: number };
 
 const PRICE = /(?:[$€£₹¥]\s?|\b(?:USD|INR|EUR|GBP|Rs\.?)\s?)\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|INR|EUR|GBP|dollars|rupees)\b/gi;
 const RATING = /\b\d(?:\.\d)?\s?(?:\/\s?5(?![\d/])|out of 5(?: stars)?|stars?\b|★)/gi;

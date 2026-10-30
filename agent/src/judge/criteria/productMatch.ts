@@ -1,6 +1,6 @@
 import type { ScoreCriteria } from "../index.js";
 
-export type MatchLevel = "exact" | "substitute" | "complement" | "irrelevant";
+type MatchLevel = "exact" | "substitute" | "complement" | "irrelevant";
 
 export const productMatch: ScoreCriteria<MatchLevel> = {
   id: "productMatch",

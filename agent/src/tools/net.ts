@@ -10,7 +10,7 @@ function isPrivateIPv4(ip: string): boolean {
   return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
 }
 
-export function isInternalHost(hostname: string): boolean {
+function isInternalHost(hostname: string): boolean {
   const h = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (!h) return true;
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;

@@ -6,7 +6,7 @@ import { type FlightPrefs, LAYOVER_OPTIONS, type LayoverPref, matchesPrefs, rank
 import type { FlightList as FlightListData } from "@shared/widgets";
 import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
-import { ExternalLink } from "./Card";
+import { ExternalLink } from "./ExternalLink";
 
 const VISIBLE_FLIGHTS = 8;
 

@@ -33,7 +33,7 @@ import { planTool } from "./plan.js";
 import { researchTool } from "./research.js";
 import type { Complete } from "../workflows/llm.js";
 
-export type ToolDeps = {
+type ToolDeps = {
   cfg: AgentConfig;
   artifacts: ArtifactStore;
   pool: BrowserPool;
@@ -51,7 +51,7 @@ export type ToolDeps = {
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2, research: 2 };
 
-export const CODEMODE_TOOLS: ReadonlySet<string> = new Set(["web_search", "fetch_page", "wikipedia", "music", "weather", "shop", "stays", "flights"]);
+const CODEMODE_TOOLS: ReadonlySet<string> = new Set(["web_search", "fetch_page", "wikipedia", "music", "weather", "shop", "stays", "flights"]);
 
 export function scopeToCodemode(tools: ToolDefinition<any, any, any>[]): ToolDefinition<any, any, any>[] {
   return tools.map((t) => (CODEMODE_TOOLS.has(t.name) ? t : { ...t, exposure: "model-only" as const }));

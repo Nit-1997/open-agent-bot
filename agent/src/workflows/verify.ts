@@ -2,9 +2,9 @@ import { claimSupported } from "../judge/criteria/claimSupported.js";
 import type { Judge } from "../judge/index.js";
 
 export type SourceDoc = { url: string; text: string };
-export type Verdict = "supported" | "unsupported" | "unchecked";
-export type ClaimResult = { text: string; url: string; verdict: Verdict };
-export type VerifyOutcome = { html: string; claims: ClaimResult[]; total: number; supported: number; flagged: number; removed: number; unchecked: number };
+type Verdict = "supported" | "unsupported" | "unchecked";
+type ClaimResult = { text: string; url: string; verdict: Verdict };
+type VerifyOutcome = { html: string; claims: ClaimResult[]; total: number; supported: number; flagged: number; removed: number; unchecked: number };
 
 const UNIT = /<(p|li|td|figcaption|blockquote)\b[^>]*>([\s\S]*?)<\/\1>|<div class="stat">([\s\S]*?)<\/div>/gi;
 const SOURCES_LIST = /<ol class="sources"[\s\S]*?<\/ol>/i;

@@ -2,7 +2,7 @@ import { timeoutSignal } from "./net.js";
 import { retryingFetch } from "../lib/retry.js";
 
 export type LatLon = { lat: number; lon: number };
-export type Airport = LatLon & { name: string };
+type Airport = LatLon & { name: string };
 
 export const AIRPORTS: Record<string, Airport> = {
   SFO: { name: "San Francisco", lat: 37.6213, lon: -122.379 },
@@ -106,7 +106,7 @@ export async function driveRoute(from: LatLon, to: LatLon, f: typeof fetch = ret
   return { miles: oneDecimal(milesBetween(from, to) * ROAD_FACTOR), source: "estimate" };
 }
 
-export type Place = LatLon & { name: string; country?: string };
+type Place = LatLon & { name: string; country?: string };
 
 export async function findPlace(name: string, f: typeof fetch = retryingFetch, signal?: AbortSignal): Promise<Place | null> {
   const u = new URL("https://geocoding-api.open-meteo.com/v1/search");

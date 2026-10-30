@@ -1,6 +1,6 @@
-export const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([408, 425, 429, 500, 502, 503, 504]);
+const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-export type RetryOptions = {
+type RetryOptions = {
   attempts: number;
   baseMs: number;
   maxDelayMs: number;

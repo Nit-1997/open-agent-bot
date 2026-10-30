@@ -35,7 +35,7 @@ export function htmlToText(html: string): string {
   return blockText(document.body, document);
 }
 
-export const MAX_IMAGES = 24;
+const MAX_IMAGES = 24;
 const SKIP_ALT = /\b(logo|icon|avatar|sprite|banner|badge)\b/i;
 const SKIP_SRC = /(icon|logo|sprite|favicon)[^/]*$/i;
 

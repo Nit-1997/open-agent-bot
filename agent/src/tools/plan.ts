@@ -6,7 +6,7 @@ import { VersionConflict } from "../workspace/conflict.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
-export const DEFAULT_ID = "main";
+const DEFAULT_ID = "main";
 
 const DESCRIPTION =
   'The chat\'s saved plan state: events/parties, trips and shortlists (plus the shopping cart, read-only here). Record every trip, event or shortlist you plan with action "set" (kind event: {title, date?, guests, budget?, currency?, location?, theme?, menu?, timeline?, notes?}; trip: {destination, start, end, travelers, budget?, stays, days}; shortlist: {title, items}). The workspace summary at the top of each turn lists what is saved. For follow-ups that change a detail ("make it 16 kids", "move it to the 20th") use action "patch" with ops like [{"op":"replace","path":"/guests","value":16}] (op: add, replace or remove; JSON-pointer path), then call shop with only the items whose quantities changed. Never rebuild the plan or re-search unchanged items. "get" reads an entity back. set and patch show a plan card.';

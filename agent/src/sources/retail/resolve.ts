@@ -2,7 +2,7 @@ import type { SourceRegistry } from "../registry.js";
 import { jsonldStore } from "./jsonldStore.js";
 import type { RetailSource, Store } from "./types.js";
 
-export function normalizeStore(input: string): string {
+function normalizeStore(input: string): string {
   return input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
 }
 

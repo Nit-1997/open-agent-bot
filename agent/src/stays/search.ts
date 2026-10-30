@@ -3,7 +3,7 @@ import { BOT_WALL, isBlockedUrl } from "../tools/browsePolicy.js";
 import { publicHttpUrlError } from "../tools/net.js";
 import type { Stay, StayQuery, StaySource } from "./types.js";
 
-export const MAX_PER_SOURCE = 10;
+const MAX_PER_SOURCE = 10;
 
 export type SourceResult = {
   source: StaySource;

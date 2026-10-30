@@ -2,7 +2,7 @@ import { staySource } from "./define.js";
 import { amount, cleanUrl, clip, count, currencyTag, httpImage, nightlyFromTotal } from "../../stays/parse.js";
 import type { Stay, StayQuery } from "../../stays/types.js";
 
-export type AirbnbCard = { title: string; name?: string; href?: string; image?: string; text: string };
+type AirbnbCard = { title: string; name?: string; href?: string; image?: string; text: string };
 
 function collect(): AirbnbCard[] {
   return [...document.querySelectorAll('[data-testid="card-container"]')].map((card) => ({

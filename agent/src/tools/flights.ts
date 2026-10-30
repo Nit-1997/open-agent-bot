@@ -17,7 +17,6 @@ import { type Browse, type FlightSource, googleFlightsUrl, parseGoogleFlights, p
 import { AIRPORTS, type Drive } from "./geo.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
-export type { AirportResult };
 export { googleFlightsUrl, parseGoogleFlights, priceBasis };
 
 const MAX_ORIGINS = 4;

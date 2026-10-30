@@ -22,7 +22,7 @@ type Deps = {
   fetchPage?: ReturnType<typeof fetchPageTool>;
 };
 
-export const WORKFLOW_STEP = "workflowStep";
+const WORKFLOW_STEP = "workflowStep";
 
 export function researchTool(deps: Deps) {
   const page = deps.fetchPage ?? fetchPageTool();

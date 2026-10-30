@@ -17,7 +17,6 @@
   "dependencies": {
     "@ag-ui/client": "1.0.2",
     "@copilotkit/react-core": "^1.81.0",
-    "@copilotkit/react-ui": "^1.81.0",
     "@copilotkit/runtime": "^1.81.0",
     "hono": "^4.13.14",
     "lucide-react": "0.525.0",

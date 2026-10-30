@@ -5,7 +5,7 @@ import type { EntityKind } from "../../../shared/workspace.js";
 import { VersionConflict } from "./conflict.js";
 import { type StoredEntity, summarize } from "./summary.js";
 
-export type Versioned = StoredEntity & { version: number; updatedAt: number };
+type Versioned = StoredEntity & { version: number; updatedAt: number };
 
 type Row = { kind: string; id: string; json: string; version: number; updated_at: number };
 

@@ -231,7 +231,7 @@ export function parseJsonLd(html: string, base?: string): LdRecord[] {
     });
 }
 
-export function describeRecord(r: LdRecord): string {
+function describeRecord(r: LdRecord): string {
   const money = r.price != null ? `${r.currency ? `${r.currency} ` : ""}${r.price}${r.highPrice ? `-${r.highPrice}` : ""}` : undefined;
   const bits = [
     money,

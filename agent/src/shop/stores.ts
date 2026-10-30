@@ -8,7 +8,7 @@ export function storeFor(input: string): Store {
   return resolveStore(registry, input);
 }
 
-export type StoreKind = "grocery" | "general";
+type StoreKind = "grocery" | "general";
 
 export function defaultStoresFor(country: string, kind: StoreKind): string[] {
   return registry.defaults({ vertical: "retail", region: country, kind }).map((s) => s.id);

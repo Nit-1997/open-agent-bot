@@ -10,8 +10,8 @@ export interface Budget {
 
 const ANSWER_NOW = "Answer now with what you already have, and offer to look up more if needed.";
 
-export const DEFAULT_TURN_CALLS = 24;
-export const DEFAULT_TURN_WALL_MS = 240_000;
+const DEFAULT_TURN_CALLS = 24;
+const DEFAULT_TURN_WALL_MS = 240_000;
 
 export class TurnBudget implements Budget {
   private used = new Map<string, number>();

@@ -7,7 +7,7 @@ type CardsBlock = Extract<UiBlock, { type: "cards" }>;
 type CardItem = CardsBlock["items"][number];
 type Mark = (id: string, text: string | undefined) => React.ReactNode;
 
-export const mapUrl = (place: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
+const mapUrl = (place: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
 
 export function Picture({ id, src, alt, fallback, className }: { id: string; src?: string; alt: string; fallback: string; className: string }) {
   const [failed, setFailed] = useState(false);

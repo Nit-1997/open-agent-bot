@@ -19,7 +19,7 @@ const CODEMODE = "codemode";
 
 export type PiSession = AgentSession;
 
-export type PiSessionHandle = {
+type PiSessionHandle = {
   session: PiSession;
   setModel: (model: Model<any>) => Promise<void>;
   codemodeActive: () => boolean;
@@ -39,7 +39,7 @@ export function codemodeFailure(isError: boolean, result: unknown): string | und
 
 type AgentMessage = ContextEvent["messages"][number];
 
-export type SeedMessage = { role: "user" | "assistant"; text: string };
+type SeedMessage = { role: "user" | "assistant"; text: string };
 
 function seed(sessionManager: SessionManager, model: Model<any>, history: SeedMessage[]): void {
   const timestamp = Date.now();

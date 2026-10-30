@@ -16,7 +16,7 @@ export function leadsWithPicture(html: string): boolean {
   return first !== -1 && first < LEAD_CHARS;
 }
 
-export function addHero(html: string, src: string, alt: string): string {
+function addHero(html: string, src: string, alt: string): string {
   const img = `<img src="${src.replace(/"/g, "&quot;")}" alt="${alt.replace(/[<>"]/g, "")}">`;
   const header = /<header\b[^>]*class="[^"]*\bhero\b[^"]*"[^>]*>/i.exec(html);
   if (header) {

@@ -12,7 +12,7 @@ import { useModels } from "@/lib/models";
 import { clearProfile, initials, saveProfile, useProfile } from "@/lib/profile";
 import { getUserContext, type UserContext, withChat } from "@/lib/userContext";
 
-export const AGENT_ID = "openagent";
+const AGENT_ID = "openagent";
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));

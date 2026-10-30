@@ -2,7 +2,7 @@ import { staySource } from "./define.js";
 import { amount, clip, count, currencyTag, httpImage, totalFromNightly } from "../../stays/parse.js";
 import type { Stay, StayQuery } from "../../stays/types.js";
 
-export type GoogleCard = { name: string; priceLabel: string; text: string; image?: string };
+type GoogleCard = { name: string; priceLabel: string; text: string; image?: string };
 
 function collect(): GoogleCard[] {
   const PRICE = 'a[aria-label^="Prices starting from"]';

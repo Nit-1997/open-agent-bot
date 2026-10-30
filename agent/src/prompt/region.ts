@@ -1,6 +1,6 @@
 import type { UserContext } from "./systemPrompt.js";
 
-export type Region = { country: string; currency: string };
+type Region = { country: string; currency: string };
 
 const CURRENCY: Record<string, string> = {
   US: "USD", IN: "INR", GB: "GBP", CA: "CAD", AU: "AUD", NZ: "NZD", SG: "SGD", AE: "AED", JP: "JPY", CH: "CHF", BR: "BRL", MX: "MXN",

@@ -16,7 +16,7 @@ export type AgentConfig = {
   modelCaps: Record<string, string[]>;
 };
 
-export type ModelCap = "codemode";
+type ModelCap = "codemode";
 
 function parseCaps(raw: string | undefined): Record<string, string[]> {
   return Object.fromEntries(

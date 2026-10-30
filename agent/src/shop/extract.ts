@@ -80,7 +80,7 @@ function inPage(opts: { groupSelector?: string; groupFromHref?: string; max: num
   return out;
 }
 
-export function normalize(raw: Raw): Tile | null {
+function normalize(raw: Raw): Tile | null {
   const sponsored = /\bsponsored\b/i.test(raw.text) || /^sponsored/i.test(raw.title);
   const title = raw.title.replace(/^sponsored( ad)?\s*[-–:]\s*/i, "").replace(/\s+/g, " ").trim();
   if (!title || !/^https?:/.test(raw.url)) return null;

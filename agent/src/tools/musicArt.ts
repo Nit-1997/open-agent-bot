@@ -8,7 +8,7 @@ const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
 const SPOTIFY_ITEM = /^\/(?:intl-[a-z-]+\/)?(playlist|album|track|artist)\/([A-Za-z0-9]+)/;
 const FILLER = new Set(["playlist", "playlists", "spotify", "apple", "music", "songs", "song", "mix", "the", "and", "for", "of", "by", "best"]);
 
-export type MusicCard = { title: string; url?: string; subtitle?: string };
+type MusicCard = { title: string; url?: string; subtitle?: string };
 
 const words = (s: string) =>
   new Set(

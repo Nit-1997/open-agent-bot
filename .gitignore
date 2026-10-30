@@ -11,3 +11,6 @@ dist/
 artifacts-data/
 .DS_Store
 .superpowers/
+
+# Local eval runs (baselines live in agent/evals/baseline/)
+agent/evals/results/

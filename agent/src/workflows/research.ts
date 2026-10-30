@@ -13,7 +13,7 @@ export type WorkflowStep = {
   detail?: { sources?: number; supported?: number; total?: number; unchecked?: number };
 };
 
-export type ResearchInput = { question: string; queries?: string[]; decision?: string; audience?: string };
+type ResearchInput = { question: string; queries?: string[]; decision?: string; audience?: string };
 
 export type ResearchDeps = {
   search: (query: string, signal?: AbortSignal) => Promise<Hit[]>;
@@ -25,7 +25,7 @@ export type ResearchDeps = {
   signal?: AbortSignal;
 };
 
-export type ResearchOutcome =
+type ResearchOutcome =
   | { ok: true; id: string; title: string; takeaway: string; sources: number; supported: number; flagged: number; removed: number; unchecked: number; total: number }
   | { ok: false; error: string };
 

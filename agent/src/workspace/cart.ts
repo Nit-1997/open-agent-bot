@@ -2,7 +2,7 @@ import { type CartEntity, validateEntity } from "../../../shared/workspace.js";
 import { ActiveCart } from "../shop/cart.js";
 import type { WorkspaceStore } from "./store.js";
 
-export const CART_ID = "main";
+const CART_ID = "main";
 
 export function workspaceCart(store: WorkspaceStore, threadId: string): ActiveCart {
   const cart = new ActiveCart();

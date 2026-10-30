@@ -89,7 +89,7 @@ export function restoreHistory(messages: Message[]): HistoryMessage[] {
   return recent[0]?.role === "assistant" ? recent.slice(1) : recent;
 }
 
-export type RunStats = {
+type RunStats = {
   inputTokens: number;
   outputTokens: number;
   cacheRead: number;

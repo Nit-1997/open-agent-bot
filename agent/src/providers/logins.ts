@@ -4,7 +4,7 @@ import type { AuthEvent, AuthInteraction, AuthPrompt } from "@earendil-works/pi-
 type Interaction = AuthInteraction & { signal: AbortSignal };
 type Login = (providerId: string, interaction: Interaction) => Promise<void>;
 
-export type FlowState = {
+type FlowState = {
   providerId: string;
   status: "running" | "done" | "error";
   authUrl?: string;

@@ -42,7 +42,7 @@ export function parseBudget(v: unknown, fallback: string): Budget | undefined {
   return { amount, currency: code ?? fallback, explicit: !!code };
 }
 
-export async function withinBudget(stays: Stay[], budget: Budget | undefined, listed: string, rate: Fx): Promise<{ stays: Stay[]; unconverted: boolean }> {
+async function withinBudget(stays: Stay[], budget: Budget | undefined, listed: string, rate: Fx): Promise<{ stays: Stay[]; unconverted: boolean }> {
   if (!budget) return { stays, unconverted: false };
   const rates = new Map<string, Promise<number | null>>();
   const toBudget = (from: string) => {

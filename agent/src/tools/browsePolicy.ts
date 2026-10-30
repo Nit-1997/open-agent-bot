@@ -10,9 +10,9 @@ export type BrowseAction =
 
 export type TargetInfo = { type?: string; name?: string; autocomplete?: string; text?: string };
 
-export type PolicyOptions = { allowPrivateHosts?: boolean };
+type PolicyOptions = { allowPrivateHosts?: boolean };
 
-export type PolicyResult = { allowed: true } | { allowed: false; reason: string };
+type PolicyResult = { allowed: true } | { allowed: false; reason: string };
 
 export const BOT_WALL = /(robot or human|are you a robot|captcha|access denied|unusual traffic|verify you are human|press and hold|sorry! something went wrong)/i;
 

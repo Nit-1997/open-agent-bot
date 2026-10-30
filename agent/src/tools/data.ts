@@ -61,4 +61,3 @@ export type StaysData = {
   sources: Array<{ id: string; label: string; site: string; url: string; status: "ok" | "blocked" | "failed" | "link"; stays: Stay[] }>;
 };
 
-export type ToolData = WeatherData | FlightsData | StaysData;

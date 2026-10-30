@@ -123,5 +123,5 @@ The 12 scenarios and pass criteria are the table in the build plan's Overview.
 ## Process
 
 - Each milestone is built on its own branch (worktree), merged into `feat/v1` by the orchestrator after review.
-- After each merge: agent and web lint, typecheck, test, build; Docker rebuild and restart; `npm run eval` on Sonnet (and Qwen for the scenarios the milestone proves); browser check; eval report committed under `agent/evals/results/`.
+- After each merge: agent and web lint, typecheck, test, build; Docker rebuild and restart; `npm run eval` on Sonnet (and Qwen for the scenarios the milestone proves); browser check; eval report compared against `agent/evals/baseline/`.
 - Kill criteria: a Jev-backed milestone that doesn't beat its baseline stays behind its flag, with the reason in `docs/findings.md`.

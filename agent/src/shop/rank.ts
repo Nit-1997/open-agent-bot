@@ -7,9 +7,9 @@ export type Match = "exact" | "substitute";
 export type Pick = Tile & { match?: Match; why?: string };
 export type ItemResult = { query: string; qty: number; picks: Pick[] };
 export type StoreResult = { store: string; home?: string; items: ItemResult[] };
-export type StoreSummary = { store: string; found: number; missing: string[]; total: number; substitutes?: string[] };
+type StoreSummary = { store: string; found: number; missing: string[]; total: number; substitutes?: string[] };
 
-export function matches(query: string, title: string): boolean {
+function matches(query: string, title: string): boolean {
   const want = [...new Set(keyWords(query))];
   if (!want.length) return false;
   const have = new Set(keyWords(title));

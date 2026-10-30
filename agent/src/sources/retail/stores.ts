@@ -2,7 +2,7 @@ import { browserStore } from "./browser.js";
 
 const q = encodeURIComponent;
 
-export const amazon = browserStore({
+const amazon = browserStore({
   id: "amazon",
   label: "Amazon",
   home: "https://www.amazon.com/",
@@ -11,7 +11,7 @@ export const amazon = browserStore({
   defaultFor: ["US:general", "*"],
 });
 
-export const amazonIndia = browserStore({
+const amazonIndia = browserStore({
   id: "amazon.in",
   label: "Amazon India",
   home: "https://www.amazon.in/",
@@ -21,7 +21,7 @@ export const amazonIndia = browserStore({
   defaultFor: ["IN"],
 });
 
-export const amazonUk = browserStore({
+const amazonUk = browserStore({
   id: "amazon.co.uk",
   label: "Amazon UK",
   home: "https://www.amazon.co.uk/",
@@ -31,7 +31,7 @@ export const amazonUk = browserStore({
   defaultFor: ["GB"],
 });
 
-export const flipkart = browserStore({
+const flipkart = browserStore({
   id: "flipkart",
   label: "Flipkart",
   home: "https://www.flipkart.com/",
@@ -40,7 +40,7 @@ export const flipkart = browserStore({
   defaultFor: ["IN"],
 });
 
-export const target = browserStore({
+const target = browserStore({
   id: "target",
   label: "Target",
   home: "https://www.target.com/",
@@ -49,7 +49,7 @@ export const target = browserStore({
   defaultFor: ["US:general"],
 });
 
-export const walmart = browserStore({
+const walmart = browserStore({
   id: "walmart",
   label: "Walmart",
   home: "https://www.walmart.com/",
@@ -57,7 +57,7 @@ export const walmart = browserStore({
   regions: ["US"],
 });
 
-export const costco = browserStore({
+const costco = browserStore({
   id: "costco",
   label: "Costco",
   home: "https://www.costco.com/",
@@ -65,7 +65,7 @@ export const costco = browserStore({
   regions: ["US", "CA"],
 });
 
-export const bestbuy = browserStore({
+const bestbuy = browserStore({
   id: "bestbuy",
   label: "Best Buy",
   home: "https://www.bestbuy.com/",
@@ -74,7 +74,7 @@ export const bestbuy = browserStore({
   regions: ["US"],
 });
 
-export const kroger = browserStore({
+const kroger = browserStore({
   id: "kroger",
   label: "Kroger",
   home: "https://www.kroger.com/",
@@ -83,7 +83,7 @@ export const kroger = browserStore({
   capabilities: ["search", "price", "grocery"],
 });
 
-export const safeway = browserStore({
+const safeway = browserStore({
   id: "safeway",
   label: "Safeway",
   home: "https://www.safeway.com/",

@@ -11,11 +11,11 @@ type AnyModel = Model<any>;
 type Complete = (model: AnyModel, context: Context, options?: { maxTokens?: number; signal?: AbortSignal }) => Promise<AssistantMessage>;
 
 type Cost = { input: number; output: number; cacheRead: number; cacheWrite: number };
-export type SeedModel = { id: string; label: string; note?: string; contextWindow?: number; maxTokens?: number; cost?: Cost };
+type SeedModel = { id: string; label: string; note?: string; contextWindow?: number; maxTokens?: number; cost?: Cost };
 type Custom = { kind: LocalKind | "litellm"; label: string; baseUrl: string; models: SeedModel[] };
 type Settings = { custom: Record<string, Custom>; enabled: Record<string, string[]>; hidden: string[] };
 
-export type ProviderView = {
+type ProviderView = {
   id: string;
   label: string;
   kind: CatalogEntry["kind"];
@@ -31,9 +31,9 @@ export type ProviderView = {
   modelCount: number;
 };
 
-export type EnabledModel = { id: string; label: string; provider: string; note?: string };
-export type ModelView = { id: string; label: string; contextWindow: number; note?: string; enabled: boolean };
-export type TestResult = { ok: boolean; toolCall: boolean; latencyMs: number; cost?: number; error?: string };
+type EnabledModel = { id: string; label: string; provider: string; note?: string };
+type ModelView = { id: string; label: string; contextWindow: number; note?: string; enabled: boolean };
+type TestResult = { ok: boolean; toolCall: boolean; latencyMs: number; cost?: number; error?: string };
 
 const LOCAL_MODEL = { reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens: 4096 };
 const MAX_OUTPUT_TOKENS = 32_000;

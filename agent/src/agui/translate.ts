@@ -11,7 +11,7 @@ export type PiEvent = AgentSessionEvent;
 type Widget = { kind: string };
 type Deps = { newId: () => string; render?: (data: unknown) => Widget | null; evidence?: Evidence };
 
-export function resultText(result: unknown): string {
+function resultText(result: unknown): string {
   const content = (result as { content?: Array<{ type: string; text?: string }> } | undefined)?.content;
   if (!Array.isArray(content)) return typeof result === "string" ? result : JSON.stringify(result ?? "");
   return content

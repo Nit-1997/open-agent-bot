@@ -9,7 +9,7 @@ import { fail, ok, type ToolResult } from "./result.js";
 import { BLOCKING_STATUSES, publicHttpUrlError } from "./net.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 
-export const MAX_ACTIONS = 10;
+const MAX_ACTIONS = 10;
 
 const ActionSchema = Type.Union([
   Type.Object({ op: Type.Literal("goto"), url: Type.String() }),
