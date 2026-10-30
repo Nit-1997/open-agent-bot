@@ -16,7 +16,7 @@ This is also the first step toward auth, user profiles and a database: the profi
 - Onboarding is a short slideshow, mostly taps: You → Travel → Shopping → Jev → "Here's what I know". About a minute end to end; every section can be skipped.
 - Suggestions are specific to where the user lives: nearby grocery stores, airlines from their airports, apps and shops for their country.
 - The agent uses the answers in every chat without the user repeating them.
-- The profile is stored by the agent and editable later, as a step toward per-user profiles.
+- The profile is stored by the agent and editable later. This is groundwork: there is no database or auth yet (Supabase comes later), so storage sits behind a small interface that a Supabase-backed version can replace.
 
 ## Non-goals
 
@@ -30,7 +30,6 @@ This is also the first step toward auth, user profiles and a database: the profi
 - It feels like a long form or an interview. If a slide needs scrolling on a laptop, it has too much.
 - A user picks a site expecting prices we can't fetch. Every travel site chip says whether we search it or only link to it.
 - The full home address reaches an AI provider. Only city, region and country go into prompts.
-- Setup breaks for someone who already has `.env` files. Existing files and variables keep working and override the generated defaults.
 
 ## Part 1: zero-setup launch
 
@@ -40,11 +39,11 @@ This is also the first step toward auth, user profiles and a database: the profi
 - **LiteLLM moves behind a compose profile** (`profiles: ["litellm"]`), like Ollama today. Without it the agent starts with no models and onboarding sends the user to add a provider. Anyone who wants the gateway turns it on with `COMPOSE_PROFILES=litellm`; with `LLM_API_KEY` set, the `litellm` provider appears as now.
 - **There is no server default model** (decided with the user). `AGENT_MODEL` and the `chat-default` fallback are removed. The user picks a default model in onboarding, it is saved in their profile (`defaultModel`), and every chat without a per-chat choice uses it. `GET /models` reports the profile's choice as `default`. If no model is chosen yet, a run fails with "Pick a model in Settings → Models" rather than guessing. When auth arrives, this moves to the user's row with the rest of the profile.
 - **Generated secrets**, created on first start and kept on volumes:
-  - **Web↔agent shared secret.** The agent creates it (32 random bytes, owner-only) on a small `shared` volume mounted read-write in the agent and read-only in web. Both read it at startup. `AGENT_SHARED_SECRET` in the environment, if set, wins.
-  - **SearXNG secret.** Generated once and kept on a volume. A small entrypoint wrapper exports it before SearXNG starts; `SEARXNG_SECRET` still overrides.
+  - **Web↔agent shared secret.** The agent creates it (32 random bytes, owner-only) on a small `shared` volume mounted read-write in the agent and read-only in web. Both read it at startup.
+  - **SearXNG secret.** Generated once and kept on a volume. A small entrypoint wrapper exports it before SearXNG starts.
 - **Keys in the app.** Chat providers already work this way. New:
   - **TypeSafe** joins the cloud provider list (API key only; pi already ships a `typesafe` provider) so Jev can run directly.
-  - **Brave Search key** moves to a settings field (stored with the other keys). `BRAVE_SEARCH_API_KEY` still works.
+  - **Brave Search key** moves to a settings field (stored with the other keys).
 - **Jev picks the provider the user has.** The judge resolver tries `typesafe/jev-latest`, then `openrouter/typesafe/jev-1.14`, and uses the first one with a key. `JEV_MODEL` still pins one.
 - **Advanced settings stay environment-only, all optional:** `AGENT_MODEL_CAPS`, `JEV_CONCURRENCY`, `LOG_LEVEL`. They're documented in one reference table instead of the example files. Codemode needs a default without `AGENT_MODEL_CAPS`: Claude Sonnet models from any provider are tagged `codemode` by default (builder's call how).
 - **README "Run"** becomes: install Docker, `docker compose up -d`, open http://localhost:3000. Ollama and LiteLLM become optional sections.
@@ -100,15 +99,15 @@ Profile {
   travel: { style?: "budget" | "comfort" | "luxury"; airlines: string[]; stays: ("hotel" | "rental")[]; hotelChains: string[]; sites: string[] }
   shopping: { style?: "save" | "balanced" | "treat"; groceries: string[]; retail: string[]; delivery: string[] }
   defaultModel?: string /* provider/model ref, chosen in onboarding; no server default */
-  notes?: string /* free text; the drawer keeps it, the old profile's interests and notes migrate here */
+  notes?: string /* free text, edited in the profile drawer */
   skipped: ("you" | "travel" | "shopping" | "jev")[]
   onboardedAt?: string
 }
 ```
 
 - A typebox schema in `shared/` validates it on both sides, with length and count caps.
-- Saved in a `profile` table in the agent's SQLite file. There's one row now (key `default`); auth later adds a user id column. Endpoints `GET /profile` and `PUT /profile` sit behind the shared secret, and the web proxies them like `/providers`.
-- **Migration:** on first load, if the agent has no profile and the browser has the old `open-agent.profile`, the web sends it up once (name and home text map across; interests and notes go into `notes`) and clears local storage. *(Builder check: my call.)*
+- Local only for now: one `profile.json` on the agent's data volume, written atomically, behind a `ProfileStore` interface (`get()`, `put(profile)`). Supabase with auth will later implement the same interface per user. Endpoints `GET /profile` and `PUT /profile` sit behind the shared secret, and the web proxies them like `/providers`.
+- No migration: the old browser profile (`open-agent.profile` in local storage) and the old onboarding are deleted, not carried over (decided with the user).
 - The profile drawer edits the same data, grouped like the slides.
 - The agent reads the profile itself for each run. The browser no longer sends it in `user_context`. A profile that is sent in `user_context` still overrides the stored one for that run, because the eval harness (`agent/evals/run.ts`) sets `profile.home` per scenario. *(Builder check: my call.)*
 
@@ -125,8 +124,8 @@ Profile {
 ## Constraints
 
 - Every HTML element gets a unique `id` (project rule), following the existing `onboarding-*` naming.
-- Tests: profile schema and migration, the places endpoint (fake Photon), Overpass fallback, the prompt line builder (no street address), the generated-secret bootstrap, compose running with no env files (CI job: `docker compose config` with no env files present).
-- Existing installs keep working: env files and variables override generated values, and the old local-storage profile is migrated.
+- Tests: profile schema and store, the places endpoint (fake Photon), Overpass fallback, the prompt line builder (no street address), the generated-secret bootstrap, compose running with no env files (CI job: `docker compose config` with no env files present).
+- No backward compatibility is needed (decided with the user): old env files, the `chat-default` fallback and the old browser profile can simply go.
 
 ## Left to the builder
 
