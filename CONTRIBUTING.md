@@ -34,7 +34,8 @@ agent/src/
   server.ts            process wiring: config, provider hub, session store, shutdown
   app.ts               composes the HTTP routes in http/
   http/                artifacts, providers (model admin), agui (chat stream)
-  agui/                pi session events → AG-UI events, run lifecycle
+  agui/                run lifecycle (runHandler), input parsing, pi events → AG-UI events,
+                       typed event builders (events.ts), run stats
   pi/                  creating and disposing pi agent sessions
   providers/           model provider catalog, keys, OAuth sign-in flows
   session/             per-thread session store with idle sweep

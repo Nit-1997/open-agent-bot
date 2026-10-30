@@ -1,159 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
-import type { UserContext, UserProfile, Viewport } from "../prompt/userContext.js";
+import type { BaseEvent, Message, RunAgentInput } from "@ag-ui/core";
+import type { UserContext } from "../prompt/userContext.js";
 import type { HistoryMessage, SessionEntry, SessionStore } from "../session/sessionStore.js";
-import { parseWorkspaceEdits, type WorkspaceEdits } from "../../../shared/workspace.js";
 import { applyEntityEdits } from "../workspace/edits.js";
 import type { WorkspaceStore } from "../workspace/store.js";
+import { custom, runError, runFinished, runStarted } from "./events.js";
+import { messageText, readUserContext, readWorkspaceEdits, restoreHistory } from "./input.js";
+import { createStatsCollector, type StatsCollector, type Usage } from "./stats.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
 export const EMPTY_REPLY_NUDGE =
   "Your reply so far shows me no answer. Answer my previous message now, in full, from what the tools already returned, without searching again.";
-
-function messageText(m: Message): string {
-  const c = (m as { content?: unknown }).content;
-  if (typeof c === "string") return c;
-  if (Array.isArray(c)) return c.map((p) => (p?.type === "text" ? p.text : "")).join("");
-  return "";
-}
-
-const clip = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
-
-function readProfile(v: unknown): UserProfile | undefined {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
-  const p = v as Record<string, unknown>;
-  const interests = Array.isArray(p.interests)
-    ? p.interests
-        .map((i) => clip(i, 40))
-        .filter((i): i is string => !!i)
-        .slice(0, 12)
-    : [];
-  const profile: UserProfile = {
-    ...(clip(p.name, 80) && { name: clip(p.name, 80) }),
-    ...(clip(p.home, 200) && { home: clip(p.home, 200) }),
-    ...(interests.length && { interests }),
-    ...(clip(p.notes, 1000) && { notes: clip(p.notes, 1000) }),
-  };
-  return Object.keys(profile).length ? profile : undefined;
-}
-
-function readViewport(v: unknown): Viewport | undefined {
-  if (!v || typeof v !== "object") return undefined;
-  const { width, height } = v as Record<string, unknown>;
-  const ok = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 200 && n <= 10000;
-  return ok(width) && ok(height) ? { width: Math.round(width), height: Math.round(height) } : undefined;
-}
-
-export function readUserContext(input: RunAgentInput): UserContext | null {
-  const item = input.context?.find((c) => c.description === "user_context");
-  if (!item) return null;
-  try {
-    const v = typeof item.value === "string" ? JSON.parse(item.value) : item.value;
-    if (v && typeof v.timeZone === "string" && typeof v.locale === "string" && typeof v.localTime === "string") {
-      const model = clip(v.model, 100);
-      const profile = readProfile(v.profile);
-      const viewport = readViewport(v.viewport);
-      return {
-        timeZone: v.timeZone,
-        locale: v.locale,
-        localTime: v.localTime,
-        ...(model && { model }),
-        ...(profile && { profile }),
-        ...(viewport && { viewport }),
-      };
-    }
-  } catch {}
-  return null;
-}
-
-function contextValue(input: RunAgentInput, description: string): unknown {
-  const item = input.context?.find((c) => c.description === description);
-  if (!item?.value) return undefined;
-  try {
-    return typeof item.value === "string" ? JSON.parse(item.value) : item.value;
-  } catch {
-    return undefined;
-  }
-}
-
-export function readWorkspaceEdits(input: RunAgentInput): WorkspaceEdits | null {
-  return parseWorkspaceEdits(contextValue(input, "workspace_edits"));
-}
-
-const HISTORY_LIMIT = 40;
-const HISTORY_CLIP = 4000;
-
-export function restoreHistory(messages: Message[]): HistoryMessage[] {
-  const lastUser = messages.map((m) => m.role).lastIndexOf("user");
-  const turns = messages.slice(0, Math.max(lastUser, 0)).flatMap((m): HistoryMessage[] => {
-    const text = messageText(m).trim().slice(0, HISTORY_CLIP);
-    return (m.role === "user" || m.role === "assistant") && text ? [{ role: m.role, text }] : [];
-  });
-  const merged = turns.reduce<HistoryMessage[]>((out, t) => {
-    const prev = out.at(-1);
-    if (prev?.role === t.role) prev.text = `${prev.text}\n\n${t.text}`;
-    else out.push({ ...t });
-    return out;
-  }, []);
-  const recent = merged.slice(-HISTORY_LIMIT);
-  return recent[0]?.role === "assistant" ? recent.slice(1) : recent;
-}
-
-type RunStats = {
-  inputTokens: number;
-  outputTokens: number;
-  cacheRead: number;
-  costUsd: number;
-  jevCalls: number;
-  jevCostUsd: number;
-  toolCalls: number;
-  llmTurns: number;
-  durationMs: number;
-  skills: string[];
-};
-
-type Usage = { input?: number; output?: number; cacheRead?: number; cost?: { total?: number } };
-
-function createStatsCollector(now: () => number = Date.now) {
-  const startedAt = now();
-  const totals = { inputTokens: 0, outputTokens: 0, cacheRead: 0, costUsd: 0, toolCalls: 0, llmTurns: 0 };
-  const script = { calls: 0, costUsd: 0 };
-  const skills: string[] = [];
-  return {
-    usage(u: Usage) {
-      totals.inputTokens += u.input ?? 0;
-      totals.outputTokens += u.output ?? 0;
-      totals.cacheRead += u.cacheRead ?? 0;
-      totals.costUsd += u.cost?.total ?? 0;
-      totals.llmTurns++;
-    },
-    scriptCost(u: Usage) {
-      script.costUsd += u.cost?.total ?? 0;
-    },
-    scriptCalls(result: unknown) {
-      const calls = (result as { details?: { calls?: { name?: string }[] } } | undefined)?.details?.calls;
-      script.calls += (calls ?? []).filter((c) => c.name?.startsWith("models.")).length;
-    },
-    toolStart(name: string, args: unknown) {
-      totals.toolCalls++;
-      const skill = (args as { name?: unknown } | undefined)?.name;
-      if (name === "load_skill" && typeof skill === "string" && !skills.includes(skill)) skills.push(skill);
-    },
-    snapshot(turn?: { jevCalls: number; jevCostUsd: number }): RunStats {
-      return {
-        ...totals,
-        jevCalls: (turn?.jevCalls ?? 0) + script.calls,
-        jevCostUsd: (turn?.jevCostUsd ?? 0) + script.costUsd,
-        durationMs: now() - startedAt,
-        skills: [...skills],
-      };
-    },
-  };
-}
-
-function runError(code: string, message: string): BaseEvent {
-  return { type: EventType.RUN_ERROR, code, message } as BaseEvent;
-}
 
 export type RunOptions = { workspace?: WorkspaceStore };
 
@@ -164,7 +21,7 @@ export async function* handleRun(
   opts: RunOptions = {},
 ): AsyncIterable<BaseEvent> {
   const { threadId, runId } = input;
-  yield { type: EventType.RUN_STARTED, threadId, runId } as BaseEvent;
+  yield runStarted(threadId, runId);
 
   const userMessages = input.messages.filter((m) => m.role === "user");
   const last = userMessages.at(-1);
@@ -216,7 +73,7 @@ type Turn = {
   last: Message;
   history: HistoryMessage[] | undefined;
   userContext: UserContext | null;
-  stats: ReturnType<typeof createStatsCollector>;
+  stats: StatsCollector;
 };
 
 async function* runTurn({ input, entry, signal, opts, last, history, userContext, stats }: Turn): AsyncGenerator<BaseEvent> {
@@ -250,7 +107,7 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
   if (opts.workspace) entry.evidence?.add(opts.workspace.summary(threadId));
   const statsEvent = (): BaseEvent => {
     const turn = entry.turnStats?.();
-    return { type: EventType.CUSTOM, name: "run_stats", value: stats.snapshot(turn) } as BaseEvent;
+    return custom("run_stats", stats.snapshot(turn));
   };
 
   const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });
@@ -284,7 +141,7 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
     push(translator.translate(e));
   });
 
-  const unwatch = entry.frames?.subscribe((value) => push([{ type: EventType.CUSTOM, name: "browser_frame", value } as BaseEvent]));
+  const unwatch = entry.frames?.subscribe((value) => push([custom("browser_frame", value)]));
 
   const onAbort = () => {
     void entry.session.abort();
@@ -327,7 +184,7 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
     console.log(`[run] thread=${threadId} done error=${modelError ?? "none"}`);
     yield statsEvent();
     if (modelError) yield runError("MODEL_ERROR", modelError);
-    else yield { type: EventType.RUN_FINISHED, threadId, runId } as BaseEvent;
+    else yield runFinished(threadId, runId);
   } finally {
     if (!done) await entry.session.abort().catch(() => {});
     await running;

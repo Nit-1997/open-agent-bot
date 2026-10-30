@@ -1,9 +1,10 @@
-import { type BaseEvent, EventType } from "@ag-ui/core";
+import type { BaseEvent } from "@ag-ui/core";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { fitWidget, type UiWidget, validateWidget } from "../../../shared/widgets.js";
 import { Evidence } from "../grounding/evidence.js";
 import { groundUi } from "../grounding/groundUi.js";
 import { renderData } from "../render/registry.js";
+import { custom, textContent, textEnd, textStart, toolArgs, toolEnd, toolResult, toolStart } from "./events.js";
 import { createFollowupSplitter } from "./followups.js";
 
 export type PiEvent = AgentSessionEvent;
@@ -35,21 +36,10 @@ export function createTranslator(ids: Deps) {
   let followupsShown = false;
 
   const widgetCall = (id: string, widget: Widget): BaseEvent[] => [
-    {
-      type: EventType.TOOL_CALL_START,
-      toolCallId: id,
-      toolCallName: "show_widget",
-      ...(assistantId ? { parentMessageId: assistantId } : {}),
-    } as BaseEvent,
-    { type: EventType.TOOL_CALL_ARGS, toolCallId: id, delta: JSON.stringify({ widget }) } as BaseEvent,
-    { type: EventType.TOOL_CALL_END, toolCallId: id } as BaseEvent,
-    {
-      type: EventType.TOOL_CALL_RESULT,
-      messageId: ids.newId(),
-      toolCallId: id,
-      content: `rendered ${widget.kind}`,
-      role: "tool",
-    } as BaseEvent,
+    toolStart(id, "show_widget", assistantId),
+    toolArgs(id, JSON.stringify({ widget })),
+    toolEnd(id),
+    toolResult(ids.newId(), id, `rendered ${widget.kind}`),
   ];
 
   const emitText = (chunk: string): BaseEvent[] => {
@@ -59,11 +49,11 @@ export function createTranslator(ids: Deps) {
     if (!textOpen) {
       textOpen = true;
       text = "";
-      out.push({ type: EventType.TEXT_MESSAGE_START, messageId: assistantId, role: "assistant" } as BaseEvent);
+      out.push(textStart(assistantId));
     }
     text += chunk;
     if (chunk.trim()) answered = true;
-    out.push({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: assistantId, delta: chunk } as BaseEvent);
+    out.push(textContent(assistantId, chunk));
     return out;
   };
 
@@ -80,7 +70,7 @@ export function createTranslator(ids: Deps) {
     const out = emitText(splitter.flush());
     if (textOpen && assistantId) {
       textOpen = false;
-      out.push({ type: EventType.TEXT_MESSAGE_END, messageId: assistantId } as BaseEvent);
+      out.push(textEnd(assistantId));
       const claims = evidence.unverified(text).filter((c) => !notedClaims.has(c));
       for (const c of claims) notedClaims.add(c);
       if (claims.length) out.push(...widgetCall(`${assistantId}-widget`, { kind: "grounding_note", claims } as Widget));
@@ -109,25 +99,18 @@ export function createTranslator(ids: Deps) {
         if (e.toolName === "codemode") scripts.add(e.toolCallId);
         return [
           ...closeText(),
-          {
-            type: EventType.TOOL_CALL_START,
-            toolCallId: e.toolCallId,
-            toolCallName: e.toolName,
-            ...(assistantId ? { parentMessageId: assistantId } : {}),
-          } as BaseEvent,
-          { type: EventType.TOOL_CALL_ARGS, toolCallId: e.toolCallId, delta: JSON.stringify(e.args ?? {}) } as BaseEvent,
-          { type: EventType.TOOL_CALL_END, toolCallId: e.toolCallId } as BaseEvent,
+          toolStart(e.toolCallId, e.toolName, assistantId),
+          toolArgs(e.toolCallId, JSON.stringify(e.args ?? {})),
+          toolEnd(e.toolCallId),
         ];
       case "tool_execution_update": {
         const step = (e.partialResult as { details?: { workflowStep?: unknown } } | undefined)?.details?.workflowStep;
-        return step ? [{ type: EventType.CUSTOM, name: "workflow_step", value: step } as BaseEvent] : [];
+        return step ? [custom("workflow_step", step)] : [];
       }
       case "tool_execution_end": {
         if (e.toolName === "codemode") scripts.delete(e.toolCallId);
         const content = resultText(e.result);
-        const out: BaseEvent[] = [
-          { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: e.toolCallId, content, role: "tool" } as BaseEvent,
-        ];
+        const out: BaseEvent[] = [toolResult(ids.newId(), e.toolCallId, content)];
         const details = (e.result as { details?: { widget?: Widget; data?: unknown; sourced?: string } } | undefined)?.details;
         if (details?.sourced) evidence.add(details.sourced);
         if (!e.toolName.startsWith("show_") && e.toolName !== "ask_user") {

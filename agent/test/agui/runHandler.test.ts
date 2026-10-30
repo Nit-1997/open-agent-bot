@@ -1,6 +1,7 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
-import { EMPTY_REPLY_NUDGE, handleRun, readUserContext } from "../../src/agui/runHandler.js";
+import { readUserContext } from "../../src/agui/input.js";
+import { EMPTY_REPLY_NUDGE, handleRun } from "../../src/agui/runHandler.js";
 import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import type { PiEvent } from "../../src/agui/translate.js";
