@@ -93,7 +93,7 @@ export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric
   return defineTool({
     name: "weather",
     label: "Weather",
-    description: `Weather for a place. Use it only when the user asks about weather or the plan depends on being outdoors (travel, an outdoor event or activity); it always shows a card. Without dates: current conditions and the next few days. With start_date/end_date (YYYY-MM-DD, up to ${MAX_RANGE_DAYS} days): the forecast for those dates if they are within ${FORECAST_DAYS} days, otherwise typical weather for those dates averaged over the last ${TYPICAL_YEARS} years (not a forecast; say so). The weather card is shown to the user automatically. Afterwards, add a one or two sentence summary.`,
+    description: `Weather for a place. Use it only when the user asks about weather or the plan depends on being outdoors (travel, an outdoor event or activity); it always shows a card. Without dates: current conditions and the next few days. With start_date/end_date (YYYY-MM-DD, up to ${MAX_RANGE_DAYS} days): the forecast for those dates if they are within ${FORECAST_DAYS} days, otherwise typical weather for those dates averaged over the last ${TYPICAL_YEARS} years (not a forecast; say so). The weather card is shown to the user automatically. Afterwards, add a one or two sentence summary.\n\nNever repeat its numbers in another card, table, or list. Typical weather for far-off dates is not a forecast: call it typical.`,
     parameters: Type.Object({
       location: Type.String({ minLength: 1, description: "city or place name" }),
       days: Type.Optional(Type.Number({ description: "1-7, default 3; ignored when dates are given" })),

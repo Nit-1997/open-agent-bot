@@ -90,8 +90,8 @@ describe("card length limits", () => {
 });
 
 describe("show_ui", () => {
-  it("describes picture cards and images to the model", () => {
-    const d = showUiTool().description;
+  it("describes picture cards and images to the model in the blocks parameter", () => {
+    const d = (showUiTool().parameters as { properties: { blocks: { description: string } } }).properties.blocks.description;
     expect(d).toContain(
       '{type:"cards", shape?:"square"|"wide", items:[{title, subtitle?, image?, url?, price?, rating?, source?, place?, note?, badge?}]}',
     );

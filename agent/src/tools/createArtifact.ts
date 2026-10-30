@@ -2,7 +2,6 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { withReportFrame } from "../artifacts/frame.js";
 import { type ImageCheck, vetImages } from "../artifacts/images.js";
-import { REPORT_GUIDE } from "../artifacts/reportKit.js";
 import type { ArtifactStore } from "../artifacts/store.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
@@ -60,7 +59,7 @@ export function createArtifactTool(artifacts: ArtifactStore, images?: ImageCheck
   return defineTool({
     name: "create_artifact",
     label: "Create artifact",
-    description: `Save a complete, self-contained HTML document (no scripts from other sites) as a rich report shown inline in the chat as a scrollable page, which the user can also open in a new tab, full screen, or as a PDF. Use for research, guides, comparisons, printable plans, and pages the user asks for. Make it look like a magazine feature, not a document: lead with a hero picture and the verdict, use pictures for every product, place, or option, numbers as stat tiles, and comparisons as option cards, tables, and bar charts.\n\n${REPORT_GUIDE}`,
+    description: `Save a complete, self-contained HTML document (no scripts from other sites) as a rich report shown inline in the chat as a scrollable page, which the user can also open in a new tab, full screen, or as a PDF. Use for research, guides, comparisons, printable plans, and pages the user asks for. Make it look like a magazine feature, not a document: lead with a hero picture and the verdict, use pictures for every product, place, or option, numbers as stat tiles, and comparisons as option cards, tables, and bar charts.\n\nUse for research reports, printable plans, and any page or PDF the user asks for. Before writing the HTML, call load_skill research: it has the report kit classes the page is styled with.`,
     parameters: Type.Object({
       title: Type.String({ minLength: 1, maxLength: 120 }),
       html: Type.String({ minLength: 1 }),

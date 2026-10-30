@@ -104,7 +104,8 @@ export function imageSearchTool(deps: Deps) {
     name: "image_search",
     label: "Image search",
     description:
-      'Find pictures: album and playlist covers, places, hotels, landmarks, dishes, people, or a product when its store page had none. Pass every name you need in queries (up to 10) in one call, e.g. ["Rumours Fleetwood Mac album cover", "Hotel California Eagles album cover"]; or one query for several results. Returns each image URL with the page it came from. Use those image URLs in show_ui cards.',
+      'Find pictures: album and playlist covers, places, hotels, landmarks, dishes, people, or a product when its store page had none. Pass every name you need in queries (up to 10) in one call, e.g. ["Rumours Fleetwood Mac album cover", "Hotel California Eagles album cover"]; or one query for several results. Returns each image URL with the page it came from. Use those image URLs in show_ui cards.\n\n' +
+      'Prefer image URLs from "images:" in pages you read or from music, wikipedia, or search; use this only for items still missing one (hotels, restaurants).',
     parameters: Type.Object({
       query: Type.Optional(Type.String({ description: "one search, for several pictures of one thing" })),
       queries: Type.Optional(

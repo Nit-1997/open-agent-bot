@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import { fitWidget, UI_BLOCK_TYPES, type UiWidget, validateWidget } from "../../../shared/widgets.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
-export const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at most 8 blocks, labels not sentences. Blocks, in display order:
+const BLOCKS_HELP = `Keep it lean: a short title (under 60 chars), at most 8 blocks, labels not sentences. Blocks, in display order:
 - {type:"heading", text}
 - {type:"text", text} (2 sentences max)
 - {type:"stats", items:[{label, value, note?}]} for a few key numbers
@@ -109,7 +109,7 @@ export const showUiTool = (deps: { findImage?: FindImage; isSourced?: (url: stri
   defineTool({
     name: "show_ui",
     label: "show_ui",
-    description: `Show the user a card you compose from blocks. Use it for comparisons, plans, menus, checklists, summaries, or anything easier to scan than prose. Only put prices, ratings, stock status, and links in it that a tool returned; anything else is marked unverified and unsourced links are removed.\n\n${BLOCKS_HELP}`,
+    description: `Show the user a card you compose from blocks. Use it for comparisons, plans, menus, checklists, summaries, or anything easier to scan than prose. Only put prices, ratings, stock status, and links in it that a tool returned; anything else is marked unverified and unsourced links are removed.\n\nCall it once per answer. Picture-recognizable things (products, albums, books, hotels, places, restaurants, articles) go in a cards block, not a list, even when some lack an image or link. A shopping list is one card per item; a checklist is only for steps. A single product you found is also a card. Never repeat what flights, weather, stays, or shop show. On a validation error, fix the fields and retry once, else answer in text.`,
     parameters: Type.Object({
       title: Type.String(),
       subtitle: Type.Optional(Type.String()),

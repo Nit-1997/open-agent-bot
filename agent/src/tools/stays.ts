@@ -158,7 +158,7 @@ export function staysTool(deps: Deps) {
         .filter((s) => !s.read)
         .map((s) => s.label)
         .join(", ") || "other sites"
-    } come back as links. Use it instead of web_search for where to stay. max_price is a nightly budget: a number in the user's currency, or { amount, currency } when they name one (e.g. { amount: 400, currency: "EUR" }); prices are shown in that currency.${wantsHelp}`,
+    } come back as links. Use it instead of web_search for where to stay. max_price is a nightly budget: a number in the user's currency, or { amount, currency } when they name one (e.g. { amount: 400, currency: "EUR" }); prices are shown in that currency.${wantsHelp}\n\nCall it once; type "rental" for homes and apartments, "hotel" for hotels. Don't browse booking sites or repeat its listings in show_ui. Then name the best one or two picks in a sentence.`,
     parameters: Type.Object({
       location: Type.String({ minLength: 2, description: 'city, neighborhood, or area, e.g. "Las Vegas Strip" or "Shibuya, Tokyo"' }),
       checkin: Type.String({ description: "YYYY-MM-DD" }),

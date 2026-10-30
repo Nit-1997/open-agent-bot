@@ -250,6 +250,18 @@ function render(stores: StoreResult[], results: JobResult[], wanted: Item[]): { 
   return { text: lines.join("\n").trim(), summary };
 }
 
+function shopDescription(registry: SourceRegistry, region: string | undefined, resolve: (name: string) => Store | undefined): string {
+  const grocery = defaultStoresFor(region ?? "US", "grocery");
+  const general = defaultStoresFor(region ?? "US", "general");
+  const market = grocery.find((id) => resolve(id)?.marketplace);
+  const viaMarket = market
+    ? ` Groceries from a store ${market} carries: pass ${market}, which reads that store's real prices; the store's own site usually blocks guests.`
+    : "";
+  return `Build the chat's one shopping cart from stores' real catalogs, browsing as a guest. First call: items with qty and 1-3 stores; it keeps the best-value stores. For follow-ups ("add tortillas", "make it for 6") pass only the new items, no stores. remove drops items; pass stores again only to switch stores, new_cart only for an unrelated list. Use the store the user named, else the defaults for their region: groceries ${grocery.join(", ")}; other products ${general.join(", ")}.${viaMarket} ${storesHelp(registry, region)}
+
+It shows its own cart card (products, prices, links, best value), so don't repeat products in show_ui and never use image_search pictures for products. For recipes skip pantry basics. Reply in a sentence or two: best-value store, how much cheaper than the next, missing items.`;
+}
+
 function storesHelp(registry: SourceRegistry, region?: string): string {
   const listed = registry.select<RetailSource>({ vertical: "retail", region }).map((s) => `${s.id}${s.note ? ` (${s.note})` : ""}`);
   return `Stores for the user's region: ${listed.join(", ")}. Any other store's domain also works: its product pages are read for prices. A store that blocks automated access comes back as blocked with a link for the user: give them the link, and don't retry it with fetch_page, browse or web_search.`;
@@ -262,7 +274,7 @@ export function shopTool(deps: Deps) {
   return defineTool({
     name: "shop",
     label: "Shop",
-    description: `Build and update the user's shopping cart from stores' real catalogs, browsing as a guest. The chat has one active cart: the first call searches every item at the stores you pass and keeps the best-value stores; later calls add items to that same cart and search only the new items at those same stores (pass just the new items, no stores). Pass stores again only when the user wants different stores (the whole list is re-checked there), remove to drop items, and new_cart:true only when the user starts an unrelated list. Returns the full cart per store: best matching catalog products (title, price, size, rating, product link, catalog image), items not found, and the best-value store. ${storesHelp(registry, deps.region)}`,
+    description: shopDescription(registry, deps.region, resolve),
     parameters: Type.Object({
       stores: Type.Optional(
         Type.Union([Type.Array(Type.String()), Type.String()], {

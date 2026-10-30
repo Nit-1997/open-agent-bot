@@ -146,7 +146,8 @@ export function flightsTool(args: Omit<Deps, "source"> & { source?: FlightSource
   return defineTool({
     name: "flights",
     label: "Flights",
-    description: `Search flights on ${source.label} and show one flight card (with links for the user to book themselves); afterwards summarize briefly. Dates are YYYY-MM-DD. 'from' is one airport code or city, or up to ${MAX_ORIGINS} nearby airport codes separated by commas (e.g. "JFK, LGA, EWR") to compare them in one search; the card ranks airports by fare plus an estimated rideshare from the user's home. Pass the user's layover and departure-time preferences when known.`,
+    description:
+      "Search flights and show one flight card with links for the user to book themselves. Dates are YYYY-MM-DD. from is an airport code or city, up to 4 codes separated by commas, or \"nearby\" for every airport near the user's home: use nearby when they fly from home, unless they chose the closest only. The card ranks airports by fare plus an estimated rideshare. Pass layover and departure-time preferences when known. Then explain the best value in a sentence and point to the search link; don't ask which airport or offer driving.",
     parameters: Type.Object({
       from: Type.String({ minLength: 2, description: "airport code or city, or comma-separated nearby airport codes" }),
       to: Type.String({ minLength: 2 }),

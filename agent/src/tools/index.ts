@@ -16,17 +16,15 @@ import { type FrameBus, watch } from "../browser/frames.js";
 import type { OpenTab } from "../stays/types.js";
 import type { ActiveCart } from "../shop/cart.js";
 import { type Judge, noJudge } from "../judge/index.js";
-import { askUserTool, FIELDS_HELP } from "./askUser.js";
-import { REPORT_GUIDE } from "../artifacts/reportKit.js";
+import { askUserTool } from "./askUser.js";
 import { musicCover } from "./musicArt.js";
-import { BLOCKS_HELP, showUiTool } from "./showWidget.js";
+import { showUiTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
 import { imageSearchTool, matchingImage, search as runSearch, webSearchTool } from "./webSearch.js";
 import { musicTool, wikipediaTool } from "./lookup.js";
 import { shopTool } from "./shop.js";
 import { staysTool } from "./stays.js";
 import { loadSkillTool } from "./loadSkill.js";
-import { RULES, shopRules, withRules } from "./rules.js";
 import type { SkillEntry } from "../skills/catalog.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import { planTool } from "./plan.js";
@@ -93,7 +91,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       }
     : undefined;
   const judge = deps.judge ?? noJudge;
-  const country = regionFor(deps.userContext).country;
+  const { country, currency } = regionFor(deps.userContext);
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
   const openTab: OpenTab = async (live) => {
     const page = await deps.pool.tab(deps.threadId, deps.userContext);
@@ -109,64 +107,46 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
   const browseDeps = { pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames };
   const tools: ToolDefinition<any, any, any>[] = [
     withBudget(webSearchTool(search), deps.budget, "search"),
-    withBudget(withRules(imageSearchTool(search), RULES.imageSearch), deps.budget, "images"),
+    withBudget(imageSearchTool(search), deps.budget, "images"),
     withBudget(musicTool({ country, judge }), deps.budget, "lookup"),
     withBudget(wikipediaTool(), deps.budget, "lookup"),
     withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browseTool(browseDeps), deps.budget, "read"),
     withBudget(
-      withRules(
-        shopTool({
-          pool: deps.pool,
-          threadId: deps.threadId,
-          userContext: deps.userContext,
-          frames: deps.frames,
-          cart: deps.cart,
-          judge,
-          region: country,
-          webSearch: (query) => runSearch(search, query, "web", 8),
-        }),
-        shopRules(country),
-      ),
+      shopTool({
+        pool: deps.pool,
+        threadId: deps.threadId,
+        userContext: deps.userContext,
+        frames: deps.frames,
+        cart: deps.cart,
+        judge,
+        region: country,
+        webSearch: (query) => runSearch(search, query, "web", 8),
+      }),
       deps.budget,
       "shop",
     ),
-    withRules(weatherTool({ defaultUnits: country === "US" ? "imperial" : "metric" }), RULES.weather),
+    weatherTool({ defaultUnits: country === "US" ? "imperial" : "metric" }),
     withBudget(
-      withRules(
-        flightsTool({
-          locale: deps.userContext?.locale ?? "en-US",
-          currency: regionFor(deps.userContext).currency,
-          browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
-          drive,
-          nearby,
-        }),
-        RULES.flights,
-      ),
+      flightsTool({
+        locale: deps.userContext?.locale ?? "en-US",
+        currency,
+        browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
+        drive,
+        nearby,
+      }),
       deps.budget,
       "flights",
     ),
-    withBudget(
-      withRules(staysTool({ openTab, region: country, currency: regionFor(deps.userContext).currency, judge }), RULES.stays),
-      deps.budget,
-      "stays",
-    ),
-    withRules(
-      showUiTool({
-        findMusicArt: musicCover({ country, judge }),
-        isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
-        findImage: async (name, source) =>
-          matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)),
-      }),
-      RULES.showUi,
-      BLOCKS_HELP,
-    ),
-    withRules(askUserTool(), RULES.askUser, FIELDS_HELP),
-    withRules(
-      createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }),
-      RULES.createArtifact,
-      REPORT_GUIDE,
-    ),
+    withBudget(staysTool({ openTab, region: country, currency, judge }), deps.budget, "stays"),
+    showUiTool({
+      findMusicArt: musicCover({ country, judge }),
+      isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
+      findImage: async (name, source) =>
+        matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)),
+    }),
+    askUserTool(),
+    createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }),
     ...(deps.complete
       ? [
           withBudget(

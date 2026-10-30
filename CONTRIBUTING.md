@@ -39,8 +39,8 @@ agent/src/
   providers/           model provider catalog, keys, OAuth sign-in flows
   session/             per-thread session store with idle sweep
   prompt/              system prompt and region/currency detection
-  tools/               one file per agent tool, plus the tool helpers budget.ts, rules.ts,
-                       result.ts, args.ts and text.ts
+  tools/               one file per agent tool, each owning its full description, plus
+                       the helpers budget.ts, result.ts, args.ts and text.ts
   browser/             Chromium pool (pool.ts), private-network guard (guard.ts), what the
                        browser may not do (policy.ts), live frames (frames.ts)
   shop/                catalog tile extraction, ranking and the per-chat cart
