@@ -9,8 +9,6 @@ import type { ProviderHub } from "./providers/hub.js";
 import type { LoginFlows } from "./providers/logins.js";
 import type { SessionStore } from "./session/sessionStore.js";
 
-export { defaultModelRef } from "./http/defaultModel.js";
-
 export function createApp(deps: {
   cfg: AgentConfig;
   store: SessionStore;

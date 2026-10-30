@@ -76,6 +76,7 @@ export class SessionStore {
   }
 
   async disposeAll(): Promise<void> {
+    await Promise.allSettled([...this.pending.values()]);
     const all = [...this.entries.values()];
     this.entries.clear();
     await Promise.allSettled(all.map((e) => e.dispose()));

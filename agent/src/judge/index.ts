@@ -322,3 +322,32 @@ export function scopeJudge(base: Judge): Judge & { reset(): void } {
     },
   };
 }
+
+const JUDGE_RETRY_MS = 30_000;
+
+export function judgeResolver(
+  create: () => Promise<Judge>,
+  opts: { retryMs?: number; now?: () => number; log?: (line: string) => void } = {},
+): () => Promise<Judge> {
+  const retryMs = opts.retryMs ?? JUDGE_RETRY_MS;
+  const now = opts.now ?? Date.now;
+  const log = opts.log ?? ((line: string) => console.log(line));
+  let current: Judge | undefined;
+  let checkedAt = Number.NEGATIVE_INFINITY;
+  let pending: Promise<Judge> | undefined;
+  return async () => {
+    if (current?.available || now() - checkedAt < retryMs) return current ?? noJudge;
+    pending ??= create()
+      .catch(() => noJudge)
+      .then((judge) => {
+        if (judge.available !== current?.available) log(`[jev] available=${judge.available}`);
+        current = judge;
+        checkedAt = now();
+        return judge;
+      })
+      .finally(() => {
+        pending = undefined;
+      });
+    return pending;
+  };
+}

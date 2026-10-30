@@ -6,6 +6,17 @@ function entry(): SessionEntry {
 }
 
 describe("SessionStore", () => {
+  it("disposeAll waits for sessions still being created and disposes them too", async () => {
+    let finish!: (e: SessionEntry) => void;
+    const store = new SessionStore({ idleMs: 1000, create: () => new Promise<SessionEntry>((r) => (finish = r)) });
+    const creating = store.getOrCreate("t1", null);
+    const e = entry();
+    const done = store.disposeAll();
+    finish(e);
+    await Promise.all([done, creating]);
+    expect(e.dispose).toHaveBeenCalled();
+  });
+
   it("getOrCreate twice returns same entry", async () => {
     const create = vi.fn(async () => entry());
     const store = new SessionStore({ idleMs: 1000, create });
