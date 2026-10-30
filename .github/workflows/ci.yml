@@ -46,3 +46,16 @@ jobs:
       - run: npm run build
         env:
           COPILOTKIT_TELEMETRY_DISABLED: "true"
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose starts from a fresh clone with no env files
+        run: |
+          ls deploy-config/.env-* 2>/dev/null && exit 1
+          docker compose config --quiet
+          docker compose --profile litellm --profile ollama config --quiet
+          sh deploy-config/searxng/entrypoint.sh true
+        env:
+          SEARXNG_SECRET_FILE: /tmp/searxng-secret/secret

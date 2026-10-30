@@ -30,6 +30,9 @@ import type { WorkspaceStore } from "../workspace/store.js";
 import { planTool } from "./plan.js";
 import { researchTool } from "./research.js";
 import type { Complete } from "../workflows/llm.js";
+import { shopDefaults, staysDefaults } from "../profile/defaults.js";
+import { defaultStoresFor } from "../shop/stores.js";
+import { registry as sourceRegistry } from "../sources/index.js";
 
 type ToolDeps = {
   cfg: AgentConfig;
@@ -45,6 +48,7 @@ type ToolDeps = {
   judge?: Judge;
   workspace?: WorkspaceStore;
   complete?: Complete;
+  braveApiKey?: string;
 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2, research: 2 };
@@ -70,8 +74,13 @@ function memo<T>(fn: () => Promise<T>): () => Promise<T> {
 }
 
 export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
-  const homeText = deps.userContext?.profile?.home;
-  const home = homeText ? memo<LatLon | null>(() => geocode(homeText)) : undefined;
+  const profile = deps.userContext?.profile;
+  const stored = profile?.home;
+  const home = !stored
+    ? undefined
+    : stored.lat != null && stored.lon != null
+      ? () => Promise.resolve<LatLon | null>({ lat: stored.lat!, lon: stored.lon! })
+      : memo<LatLon | null>(() => geocode(stored.label));
   const drives = new Map<string, Promise<Drive | null>>();
   const drive = home
     ? (code: string) => {
@@ -92,7 +101,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     : undefined;
   const judge = deps.judge ?? noJudge;
   const { country, currency } = regionFor(deps.userContext);
-  const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
+  const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.braveApiKey };
   const openTab: OpenTab = async (live) => {
     const page = await deps.pool.tab(deps.threadId, deps.userContext);
     const stop = live && deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
@@ -121,6 +130,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         cart: deps.cart,
         judge,
         region: country,
+        defaults: shopDefaults(profile, country, sourceRegistry, (kind) => defaultStoresFor(country, kind)),
         webSearch: (query) => runSearch(search, query, "web", 8),
       }),
       deps.budget,
@@ -138,7 +148,11 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       deps.budget,
       "flights",
     ),
-    withBudget(staysTool({ openTab, region: country, currency, judge }), deps.budget, "stays"),
+    withBudget(
+      staysTool({ openTab, region: country, currency, judge, preferred: (sources) => staysDefaults(profile, sources) }),
+      deps.budget,
+      "stays",
+    ),
     showUiTool({
       findMusicArt: musicCover({ country, judge }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,

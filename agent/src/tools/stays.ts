@@ -13,6 +13,7 @@ import { looseList } from "./args.js";
 import type { StaysData } from "../render/data.js";
 import { fail, ok, type ToolResult } from "./result.js";
 import { log } from "../lib/log.js";
+import type { StaysDefaults } from "../profile/defaults.js";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY = 86_400_000;
@@ -29,6 +30,7 @@ type Deps = {
   allowPrivateHosts?: boolean;
   judge?: Judge;
   fx?: Fx;
+  preferred?: (sources: StaySource[]) => StaysDefaults;
 };
 
 type Budget = { amount: number; currency: string; explicit: boolean };
@@ -186,6 +188,7 @@ export function staysTool(deps: Deps) {
   const all = deps.sources ?? (deps.registry ?? defaultRegistry).select<StaySource>({ vertical: "stays", region: deps.region });
   const rate = deps.fx ?? liveFx;
   const judge = deps.judge;
+  const preferred = deps.preferred?.(all) ?? { type: "any", sources: [], brands: [] };
   const wantsHelp = judge
     ? " Pass wants with brand (hotel chains, sub-brands count), area (a neighborhood or landmark) and vibe when the user names any: each listing is checked against them, matches are shown on the card, and listings that meet the most wishes come first. The result says plainly when no listing meets the brand."
     : "";
@@ -232,10 +235,12 @@ export function staysTool(deps: Deps) {
           ),
         ),
       }),
-      type: Type.Optional(Type.Enum(["any", "hotel", "rental"], { description: "default any; rental means homes and apartments" })),
+      type: Type.Optional(
+        Type.Enum(["any", "hotel", "rental"], { description: `default ${preferred.type}; rental means homes and apartments` }),
+      ),
       sources: Type.Optional(
         Type.Union([Type.Array(Type.String()), Type.String()], {
-          description: `only these sites, from: ${all.map((s) => s.id).join(", ")}`,
+          description: `only these sites, from: ${all.map((s) => s.id).join(", ")}${preferred.sources.length ? `; default the user's sites ${preferred.sources.join(", ")}` : ""}`,
         }),
       ),
     }),
@@ -244,7 +249,8 @@ export function staysTool(deps: Deps) {
       if (typeof nights === "string") return fail(nights);
       const budget = parseBudget(params.max_price, deps.currency);
       const wants = params.wants as Wants | undefined;
-      const brands = judge ? brandsOf(wants) : [];
+      const asked = brandsOf(wants);
+      const brands = judge ? (asked.length ? asked : preferred.brands) : [];
       const q: StayQuery = {
         location: params.location.trim(),
         checkin: params.checkin,
@@ -255,8 +261,10 @@ export function staysTool(deps: Deps) {
         currency: budget?.explicit ? budget.currency : deps.currency,
         ...(brands.length && { brands }),
       };
-      const kind = (params.type as StayKind | "any" | undefined) ?? "any";
-      const sources = pickSources(all, looseList<string>(params.sources).map(String), kind);
+      const kind = (params.type as StayKind | "any" | undefined) ?? preferred.type;
+      const named = looseList<string>(params.sources).map(String);
+      const mine = named.length ? [] : pickSources(all, preferred.sources, kind);
+      const sources = mine.length && preferred.sources.length ? mine : pickSources(all, named, kind);
       const results: SourceResult[] = await searchStays(sources, q, deps.openTab, { allowPrivateHosts: deps.allowPrivateHosts });
       const filtered = await Promise.all(results.map((r) => withinBudget(r.stays, budget, q.currency, rate)));
       const unconverted = filtered.some((f) => f.unconverted);
@@ -278,7 +286,7 @@ export function staysTool(deps: Deps) {
           stays: filtered[i].stays,
         })),
       };
-      const wishes = judge ? wishesOf(wants, q.location) : [];
+      const wishes = judge ? wishesOf(asked.length || !brands.length ? wants : { ...wants, brand: brands }, q.location) : [];
       const wishNote = judge && wishes.length ? await applyWishes(judge, wishes, data, unconverted ? undefined : budget) : "";
       return ok(resultText(data, q, budget, unconverted, wishNote), { data });
     },

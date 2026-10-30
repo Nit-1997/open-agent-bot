@@ -9,6 +9,7 @@ export type CatalogEntry = {
   oauthLabel?: string;
   defaultBaseUrl?: string;
   recommended?: string[];
+  note?: string;
 };
 
 export const CLOUD: CatalogEntry[] = [
@@ -60,6 +61,14 @@ export const CLOUD: CatalogEntry[] = [
     site: "ai.google.dev",
     keyUrl: "https://aistudio.google.com/apikey",
     recommended: ["gemini-3.5-flash", "gemini-pro-latest"],
+  },
+  {
+    id: "typesafe",
+    label: "TypeSafe",
+    kind: "cloud",
+    site: "typesafe.ai",
+    keyUrl: "https://typesafe.ai",
+    note: "Runs Jev for better picks; no chat models",
   },
 ];
 

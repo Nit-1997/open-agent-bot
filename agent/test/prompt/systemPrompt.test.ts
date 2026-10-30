@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
+import { emptyProfile, type Profile } from "../../../shared/profile.js";
 import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
+
+const profile: Profile = {
+  ...emptyProfile(),
+  name: "Nitin",
+  home: {
+    label: "555 California St, San Francisco, CA",
+    city: "San Francisco",
+    region: "California",
+    country: "US",
+    lat: 37.79,
+    lon: -122.4,
+  },
+  food: ["Vegetarian"],
+};
 
 describe("buildSystemPrompt", () => {
   it("includes user context and the core rules", () => {
@@ -40,12 +55,13 @@ describe("buildSystemPrompt", () => {
       timeZone: "America/Los_Angeles",
       locale: "en-US",
       localTime: "2026-10-27T18:00",
-      profile: { name: "Nitin", home: "Sunnyvale, CA 94087", interests: ["Vegetarian"], notes: "Two cats." },
+      profile: { ...profile, notes: "Two cats." },
     });
     expect(p).toContain("Name: Nitin");
-    expect(p).toContain("Home: Sunnyvale, CA 94087");
-    expect(p).toContain("Interests: Vegetarian");
+    expect(p).toContain("Home: San Francisco, California, US");
+    expect(p).toContain("Food: Vegetarian");
     expect(p).toContain("Notes: Two cats.");
+    expect(p).toContain("Country: US (from their home address)");
     expect(p).toMatch(/use their home/i);
   });
 

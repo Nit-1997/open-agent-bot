@@ -119,11 +119,11 @@ describe("system prompt", () => {
       timeZone: "America/Los_Angeles",
       locale: "en-US",
       localTime: "2026-10-27T18:00",
-      profile: { name: "Nitin", home: "Sunnyvale, CA 94087" },
+      profile: { name: "Nitin", home: { label: "Sunnyvale, CA 94087", city: "Sunnyvale", region: "CA", country: "US" } },
     };
     const p = buildSystemPrompt(ctx, skills);
     expect(p).toContain("Country: US");
-    expect(p).toContain("Home: Sunnyvale, CA 94087");
+    expect(p).toContain("Home: Sunnyvale, CA, US");
   });
 
   it("picks up a new skill directory with no code change", async () => {

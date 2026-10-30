@@ -25,12 +25,15 @@ type ProviderView = {
   defaultBaseUrl?: string;
   methods: Array<"api_key" | "oauth">;
   oauthLabel?: string;
+  note?: string;
   configured: boolean;
   source?: "key" | "signin" | "server";
   baseUrl?: string;
   enabled: string[];
   modelCount: number;
 };
+
+export type SecretName = "brave-search";
 
 type EnabledModel = { id: string; label: string; provider: string; note?: string };
 type ModelView = { id: string; label: string; contextWindow: number; note?: string; enabled: boolean };
@@ -74,8 +77,12 @@ async function withGatewayLimits(f: typeof fetch, gateway: { baseUrl: string; ap
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return gateway.models;
-    const info = new Map(((await res.json()) as LiteLlmInfo).data?.map((d) => [d.model_name, d.model_info]) ?? []);
-    return gateway.models.map((m) => {
+    const data = ((await res.json()) as LiteLlmInfo).data ?? [];
+    const info = new Map(data.map((d) => [d.model_name, d.model_info]));
+    const seeds = gateway.models.length
+      ? gateway.models
+      : [...new Set(data.map((d) => d.model_name).filter((n): n is string => !!n))].map((id) => ({ id, label: id }));
+    return seeds.map((m) => {
       const i = info.get(m.id);
       return {
         ...m,
@@ -146,7 +153,7 @@ export class ProviderHub {
       const models = await withGatewayLimits(opts.fetch ?? fetch, opts.litellm);
       settings.custom.litellm = { kind: "litellm", label: "LiteLLM gateway", baseUrl: opts.litellm.baseUrl, models };
       keys.litellm = opts.litellm.apiKey;
-      settings.enabled.litellm ??= opts.litellm.models.map((m) => m.id);
+      settings.enabled.litellm ??= models.map((m) => m.id);
     }
     for (const id of Object.keys(settings.custom)) hub.registerCustom(id);
     return hub;
@@ -201,6 +208,7 @@ export class ProviderHub {
         ...(e.defaultBaseUrl && { defaultBaseUrl: e.defaultBaseUrl }),
         methods: e.kind === "local" ? [] : e.oauthLabel ? ["api_key", "oauth"] : ["api_key"],
         ...(e.oauthLabel && { oauthLabel: e.oauthLabel }),
+        ...(e.note && { note: e.note }),
         configured,
         ...(configured && { source: e.kind === "local" ? "server" : this.signedIn.get(e.id) }),
         ...(custom && { baseUrl: custom.baseUrl }),
@@ -353,6 +361,22 @@ export class ProviderHub {
     } catch (err) {
       return { ok: false, toolCall: false, latencyMs: Date.now() - started, error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  secret(name: SecretName): string | undefined {
+    return this.keys[`secret:${name}`] || undefined;
+  }
+
+  async setSecret(name: SecretName, value: string): Promise<void> {
+    const v = value.trim();
+    if (!v) throw new UserError("the key is empty");
+    this.keys[`secret:${name}`] = v;
+    await this.save();
+  }
+
+  async removeSecret(name: SecretName): Promise<void> {
+    delete this.keys[`secret:${name}`];
+    await this.save();
   }
 
   async deviceId(): Promise<string> {

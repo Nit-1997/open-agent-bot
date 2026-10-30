@@ -1,7 +1,9 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { readUserContext } from "../../src/agui/input.js";
-import { EMPTY_REPLY_NUDGE, handleRun } from "../../src/agui/runHandler.js";
+import { EMPTY_REPLY_NUDGE, handleRun, withStoredProfile } from "../../src/agui/runHandler.js";
+import { MemoryProfileStore } from "../../src/profile/store.js";
+import { emptyProfile } from "../../../shared/profile.js";
 import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import type { PiEvent } from "../../src/agui/translate.js";
@@ -435,22 +437,41 @@ describe("readUserContext", () => {
     expect(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", viewport: { width: 50, height: 698 } })?.viewport).toBeUndefined();
   });
 
-  it("reads the model and a trimmed profile", () => {
+  it("reads the model and a profile override, keeping only the fields sent", () => {
     const r = ctx({
       timeZone: "UTC",
       locale: "en-US",
       localTime: "t",
       model: "chat-sonnet-5.5",
-      profile: {
-        name: "  Nitin ",
-        home: "Sunnyvale",
-        interests: ["Vegetarian", 7, "x".repeat(80)],
-        notes: "n".repeat(2000),
-        extra: "dropped",
-      },
+      profile: { name: "  Nitin ", home: "Sunnyvale", food: ["Vegetarian", 7], notes: "n".repeat(2000), extra: "dropped" },
     });
     expect(r?.model).toBe("chat-sonnet-5.5");
-    expect(r?.profile).toEqual({ name: "Nitin", home: "Sunnyvale", interests: ["Vegetarian", "x".repeat(40)], notes: "n".repeat(1000) });
+    expect(r?.profile).toEqual({
+      name: "Nitin",
+      home: { label: "Sunnyvale", city: "Sunnyvale" },
+      food: ["Vegetarian"],
+      notes: "n".repeat(1000),
+    });
+  });
+
+  it("lets a profile sent in user_context override the stored one for that run", async () => {
+    const stored = new MemoryProfileStore({
+      ...emptyProfile(),
+      name: "Stored",
+      defaultModel: "groq/x",
+      home: { label: "1 Main St, Austin", city: "Austin", country: "US" },
+    });
+    const merged = await withStoredProfile(
+      ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", profile: { home: "Sunnyvale, CA" } }),
+      stored,
+    );
+    expect(merged?.profile).toMatchObject({
+      name: "Stored",
+      defaultModel: "groq/x",
+      home: { label: "Sunnyvale, CA", city: "Sunnyvale, CA" },
+    });
+    const plain = await withStoredProfile(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t" }), stored);
+    expect(plain?.profile?.home?.city).toBe("Austin");
   });
 
   it("ignores a profile that isn't an object and empty fields", () => {

@@ -12,6 +12,7 @@ ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
 COPY --from=build /app/web/.next/standalone ./
 COPY --from=build /app/web/.next/static ./web/.next/static
 COPY --from=build /app/web/public ./web/public
+RUN groupadd -g 1500 agentsecret && usermod -aG agentsecret node
 USER node
 EXPOSE 3000
 CMD ["node", "web/server.js"]

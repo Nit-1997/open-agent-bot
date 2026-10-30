@@ -200,9 +200,14 @@ describe("helpers", () => {
     expect(() => loadScenarios(new URL("../../evals/scenarios", import.meta.url).pathname, ["nope"])).toThrow(/nope/);
   });
 
-  it("reads the secret from the environment first, then the env file", () => {
-    expect(readSecret("/nonexistent", { AGENT_SHARED_SECRET: "env" })).toBe("env");
-    expect(readSecret("/nonexistent", {})).toBeUndefined();
+  it("reads the secret from the environment first, then from the running agent container", () => {
+    expect(readSecret({ AGENT_SHARED_SECRET: "env" }, () => "file")).toBe("env");
+    expect(readSecret({}, () => "abc123\n")).toBe("abc123");
+    expect(
+      readSecret({}, () => {
+        throw new Error("no docker");
+      }),
+    ).toBeUndefined();
   });
 
   it("builds RunAgentInput with a unique run id", () => {

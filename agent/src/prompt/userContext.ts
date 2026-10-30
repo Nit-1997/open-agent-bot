@@ -1,10 +1,12 @@
-export type UserProfile = { name?: string; home?: string; interests?: string[]; notes?: string };
+import type { Profile } from "../../../shared/profile.js";
+
+export type ProfileOverride = Partial<Profile>;
 export type Viewport = { width: number; height: number };
 export type UserContext = {
   timeZone: string;
   locale: string;
   localTime: string;
   model?: string;
-  profile?: UserProfile;
+  profile?: ProfileOverride;
   viewport?: Viewport;
 };

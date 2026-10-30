@@ -1,6 +1,6 @@
 import type { UserContext } from "./userContext.js";
 
-type Region = { country: string; currency: string };
+type Region = { country: string; currency: string; from: "home" | "browser" };
 
 const CURRENCY: Record<string, string> = {
   US: "USD",
@@ -63,9 +63,16 @@ function countryFromZone(tz: string): string | undefined {
   return ZONE_COUNTRY[tz];
 }
 
+export const currencyOf = (country: string | undefined): string | undefined => (country ? CURRENCY[country.toUpperCase()] : undefined);
+
+export const unitsOf = (country: string | undefined): "imperial" | "metric" =>
+  ["US", "LR", "MM"].includes(country?.toUpperCase() ?? "") ? "imperial" : "metric";
+
 export function regionFor(ctx: UserContext | null): Region {
+  const home = ctx?.profile?.home?.country;
+  if (home && home in CURRENCY) return { country: home, currency: CURRENCY[home], from: "home" };
   const fromZone = ctx ? countryFromZone(ctx.timeZone) : undefined;
   const fromLocale = ctx?.locale.split(/[-_]/)[1]?.toUpperCase();
   const country = [fromZone, fromLocale].find((c): c is string => !!c && c in CURRENCY) ?? "US";
-  return { country, currency: CURRENCY[country] };
+  return { country, currency: CURRENCY[country], from: "browser" };
 }

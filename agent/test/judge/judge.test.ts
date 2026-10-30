@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createJudge, noJudge, scopeJudge } from "../../src/judge/index.js";
+import { createJudge, createJudgeFrom, noJudge, scopeJudge } from "../../src/judge/index.js";
 import { productMatch } from "../../src/judge/criteria/productMatch.js";
 
 type Call = { state: Record<string, unknown>; questions: Record<string, any> };
@@ -25,6 +25,22 @@ const choice = (label: string, p: number, cost = 0.00002) => ({
 });
 
 const items = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `t${i}`, state: { query: "milk", title: `Milk ${i}` } }));
+
+describe("createJudgeFrom", () => {
+  it("uses the first Jev model whose provider has a key, TypeSafe before OpenRouter", async () => {
+    const both = fakeRuntime({
+      models: [
+        { provider: "typesafe", id: "jev-latest" },
+        { provider: "openrouter", id: "typesafe/jev-1.14" },
+      ],
+    });
+    const models = ["typesafe/jev-latest", "openrouter/typesafe/jev-1.14"];
+    expect((await createJudgeFrom({ runtime: both.runtime, models })).model).toBe("typesafe/jev-latest");
+    const onlyRouter = fakeRuntime({ models: [{ provider: "openrouter", id: "typesafe/jev-1.14" }] });
+    expect((await createJudgeFrom({ runtime: onlyRouter.runtime, models })).model).toBe("openrouter/typesafe/jev-1.14");
+    expect((await createJudgeFrom({ runtime: fakeRuntime({ models: [] }).runtime, models })).available).toBe(false);
+  });
+});
 
 describe("createJudge", () => {
   it("does not leave a rejection behind when the caller aborts after a call finished", async () => {

@@ -1,6 +1,7 @@
 import type { Message, RunAgentInput } from "@ag-ui/core";
 import { parseWorkspaceEdits, type WorkspaceEdits } from "../../../shared/workspace.js";
-import type { UserContext, UserProfile, Viewport } from "../prompt/userContext.js";
+import { type Profile, parseProfile } from "../../../shared/profile.js";
+import type { ProfileOverride, UserContext, Viewport } from "../prompt/userContext.js";
 import type { HistoryMessage } from "../session/sessionStore.js";
 
 export function messageText(m: Message): string {
@@ -12,22 +13,15 @@ export function messageText(m: Message): string {
 
 const clip = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
 
-function readProfile(v: unknown): UserProfile | undefined {
+function readProfile(v: unknown): ProfileOverride | undefined {
   if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
-  const p = v as Record<string, unknown>;
-  const interests = Array.isArray(p.interests)
-    ? p.interests
-        .map((i) => clip(i, 40))
-        .filter((i): i is string => !!i)
-        .slice(0, 12)
-    : [];
-  const profile: UserProfile = {
-    ...(clip(p.name, 80) && { name: clip(p.name, 80) }),
-    ...(clip(p.home, 200) && { home: clip(p.home, 200) }),
-    ...(interests.length && { interests }),
-    ...(clip(p.notes, 1000) && { notes: clip(p.notes, 1000) }),
-  };
-  return Object.keys(profile).length ? profile : undefined;
+  const raw = { ...(v as Record<string, unknown>) };
+  const homeText = clip(raw.home, 200);
+  if (homeText) raw.home = { label: homeText, city: homeText };
+  const parsed = parseProfile(raw);
+  if (!parsed) return undefined;
+  const override = Object.fromEntries(Object.keys(raw).flatMap((k) => (k in parsed ? [[k, parsed[k as keyof Profile]]] : [])));
+  return Object.keys(override).length ? (override as ProfileOverride) : undefined;
 }
 
 function readViewport(v: unknown): Viewport | undefined {

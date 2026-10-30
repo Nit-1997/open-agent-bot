@@ -275,6 +275,18 @@ export async function createJudge(opts: {
   };
 }
 
+export async function createJudgeFrom(opts: {
+  runtime: Runtime;
+  models: string[];
+  concurrency?: number;
+}): Promise<Judge & { model?: string }> {
+  for (const model of opts.models) {
+    const judge = await createJudge({ runtime: opts.runtime, model, concurrency: opts.concurrency });
+    if (judge.available) return Object.assign(judge, { model });
+  }
+  return noJudge;
+}
+
 export function scopeJudge(base: Judge): Judge & { reset(): void } {
   let sink: Usage = { calls: 0, failures: 0, costUsd: 0 };
   return {

@@ -1,9 +1,12 @@
 services:
   llm:
-    # LiteLLM 1.106.5, pinned so restarts don't pull a different proxy
+    # LiteLLM 1.106.5, pinned so restarts don't pull a different proxy. Opt in with COMPOSE_PROFILES=litellm
     image: ghcr.io/berriai/litellm:main-stable@sha256:7d6ae6c8d73d1b6aea4cb75d07c4a8a953f0809b0764522b8eab693734c5e905
+    profiles: ["litellm"]
     command: ["--config", "/app/config.yaml", "--port", "4000"]
-    env_file: deploy-config/.env-llm
+    env_file:
+      - path: deploy-config/.env-llm
+        required: false
     volumes:
       - ./deploy-config/litellm/config.yaml:/app/config.yaml:ro
     extra_hosts:
@@ -15,9 +18,14 @@ services:
   search:
     # pinned so restarts don't pull a different SearXNG
     image: searxng/searxng:latest@sha256:0f48ffe2152f388f5eaede27f96b610449cebfc890d0ad457304475a54ad7b6e
-    env_file: deploy-config/.env-search
+    entrypoint: ["/bin/sh", "/opt/open-agent/entrypoint.sh", "/usr/local/searxng/entrypoint.sh"]
+    env_file:
+      - path: deploy-config/.env-search
+        required: false
     volumes:
       - ./deploy-config/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./deploy-config/searxng/entrypoint.sh:/opt/open-agent/entrypoint.sh:ro
+      - searxng-data:/var/lib/searxng-secret
     ports:
       - "127.0.0.1:8081:8080"
     restart: unless-stopped
@@ -26,18 +34,19 @@ services:
     build:
       context: .
       dockerfile: agent/Dockerfile
-    env_file: deploy-config/.env-agent
+    env_file:
+      - path: deploy-config/.env-agent
+        required: false
     environment:
-      AGENT_MODEL: ${AGENT_MODEL:-chat-default}
       PI_OAUTH_CALLBACK_HOST: 0.0.0.0
     volumes:
       - artifacts-data:/data/artifacts
       - agent-data:/data/agent
+      - shared:/data/shared
     ports:
       - "127.0.0.1:8000:8000"
       - "127.0.0.1:1455:1455"
     depends_on:
-      - llm
       - search
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
@@ -51,7 +60,13 @@ services:
     build:
       context: .
       dockerfile: web/Dockerfile
-    env_file: deploy-config/.env-nextjs
+    env_file:
+      - path: deploy-config/.env-nextjs
+        required: false
+    environment:
+      AGENT_URL: ${AGENT_URL:-http://agent:8000}
+    volumes:
+      - shared:/data/shared:ro
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
@@ -76,4 +91,6 @@ services:
 volumes:
   artifacts-data:
   agent-data:
+  shared:
+  searxng-data:
   ollama-data:

@@ -3,14 +3,18 @@ import { CopilotRuntime, createCopilotEndpoint, InMemoryAgentRunner } from "@cop
 import { handle } from "hono/vercel";
 import { agentHeaders, agentUrl } from "@/lib/agentServer";
 
-const copilotRuntime = new CopilotRuntime({
-  agents: { openagent: new HttpAgent({ url: agentUrl("/agui"), headers: agentHeaders() }) },
-  runner: new InMemoryAgentRunner(),
-});
+let handler: ReturnType<typeof handle> | undefined;
 
-const app = createCopilotEndpoint({ runtime: copilotRuntime, basePath: "/api/copilotkit" });
+function endpoint(): ReturnType<typeof handle> {
+  if (handler) return handler;
+  const copilotRuntime = new CopilotRuntime({
+    agents: { openagent: new HttpAgent({ url: agentUrl("/agui"), headers: agentHeaders() }) },
+    runner: new InMemoryAgentRunner(),
+  });
+  handler = handle(createCopilotEndpoint({ runtime: copilotRuntime, basePath: "/api/copilotkit" }));
+  return handler;
+}
 
-export const GET = handle(app);
-export const POST = handle(app);
-export const PATCH = handle(app);
-export const DELETE = handle(app);
+const route = (req: Request) => endpoint()(req);
+
+export { route as DELETE, route as GET, route as PATCH, route as POST };

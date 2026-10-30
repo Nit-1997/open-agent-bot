@@ -48,9 +48,13 @@ const sources = [
   source("linkonly", ["hotel"], [], false),
 ];
 
-const run = (params: Record<string, unknown>, pages: Record<string, string> = { "walled.test": "Are you a robot?" }) => {
+const run = (
+  params: Record<string, unknown>,
+  pages: Record<string, string> = { "walled.test": "Are you a robot?" },
+  preferred?: Parameters<typeof staysTool>[0]["preferred"],
+) => {
   const tab = fakeTab(pages);
-  const tool = staysTool({ openTab: tab.openTab, currency: "USD", sources });
+  const tool = staysTool({ openTab: tab.openTab, currency: "USD", sources, preferred });
   return {
     tab,
     result: tool.execute(
@@ -84,6 +88,17 @@ describe("stays tool", () => {
     const r = await run({ max_price: 150 }).result;
     const data = (r.details as { data: { sources: Array<{ id: string; stays: Array<{ title: string }> }> } }).data;
     expect(data.sources.find((s) => s.id === "hotels")?.stays.map((s) => s.title)).toEqual(["Grand"]);
+  });
+
+  it("defaults to the user's stay type and sites, unless the request names others", async () => {
+    const preferred = () => ({ type: "rental" as const, sources: ["homes"], brands: [] });
+    const mine = run({}, {}, preferred);
+    const asked = run({ type: "hotel", sources: ["hotels"] }, {}, preferred);
+    const wrongType = run({ type: "hotel" }, {}, preferred);
+    await Promise.all([mine.result, asked.result, wrongType.result]);
+    expect(mine.tab.opened.map((u) => new URL(u).host)).toEqual(["homes.test"]);
+    expect(asked.tab.opened.map((u) => new URL(u).host)).toEqual(["hotels.test"]);
+    expect(wrongType.tab.opened.map((u) => new URL(u).host).sort()).toEqual(["hotels.test", "walled.test"]);
   });
 
   it("validates dates", async () => {

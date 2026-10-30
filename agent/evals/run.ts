@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
@@ -277,18 +278,21 @@ export function loadScenarios(dir: string, only?: string[], set?: string): Scena
   return inSet.filter((s) => only.includes(s.id));
 }
 
-export function readSecret(envFile: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+type ReadContainerSecret = () => string;
+
+const fromContainer: ReadContainerSecret = () =>
+  execFileSync("docker", ["compose", "exec", "-T", "agent", "cat", "/data/shared/agent-secret"], {
+    cwd: resolve(evalsDir, "../.."),
+    stdio: ["ignore", "pipe", "ignore"],
+  }).toString();
+
+export function readSecret(env: NodeJS.ProcessEnv = process.env, container: ReadContainerSecret = fromContainer): string | undefined {
   if (env.AGENT_SHARED_SECRET) return env.AGENT_SHARED_SECRET;
-  if (!existsSync(envFile)) return undefined;
-  const line = readFileSync(envFile, "utf8")
-    .split("\n")
-    .find((l) => l.startsWith("AGENT_SHARED_SECRET="));
-  return (
-    line
-      ?.slice("AGENT_SHARED_SECRET=".length)
-      .trim()
-      .replace(/^["']|["']$/g, "") || undefined
-  );
+  try {
+    return container().trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function pool<T>(items: T[], concurrency: number, work: (item: T) => Promise<void>): Promise<void> {
@@ -311,7 +315,6 @@ async function main() {
       url: { type: "string", default: "http://localhost:8000/agui" },
       concurrency: { type: "string", default: "1" },
       "timeout-s": { type: "string", default: "420" },
-      "env-file": { type: "string", default: resolve(evalsDir, "../../deploy-config/.env-agent") },
       "write-baseline": { type: "boolean", default: false },
       rescore: { type: "string" },
       price: { type: "string" },
@@ -329,7 +332,7 @@ async function main() {
       .filter(Boolean),
     values.set,
   );
-  const secret = readSecret(values["env-file"] as string);
+  const secret = readSecret();
   const date = new Date().toISOString().slice(0, 10);
   const outDir = join(evalsDir, "results", `${date}-${label}-${model}`);
   await mkdir(outDir, { recursive: true });

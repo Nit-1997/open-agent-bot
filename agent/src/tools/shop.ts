@@ -12,6 +12,7 @@ import type { SourceRegistry } from "../sources/registry.js";
 import { browserSearch } from "../sources/retail/browser.js";
 import { resolveStore } from "../sources/retail/resolve.js";
 import { defaultStoresFor } from "../shop/stores.js";
+import type { ShopDefaults } from "../profile/defaults.js";
 import type { RetailCtx, RetailSource, Store } from "../sources/retail/types.js";
 import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "../browser/pool.js";
@@ -44,6 +45,7 @@ type Deps = {
   registry?: SourceRegistry;
   fetch?: typeof fetch;
   webSearch?: RetailCtx["webSearch"];
+  defaults?: ShopDefaults;
 };
 
 type Lane = { label: string; home: string; item: Item; tiles: Tile[]; grouped: boolean };
@@ -251,9 +253,18 @@ function render(stores: StoreResult[], results: JobResult[], wanted: Item[]): { 
   return { text: lines.join("\n").trim(), summary };
 }
 
-function shopDescription(registry: SourceRegistry, region: string | undefined, resolve: (name: string) => Store | undefined): string {
-  const grocery = defaultStoresFor(region ?? "US", "grocery");
-  const general = defaultStoresFor(region ?? "US", "general");
+const regionalDefaults = (region: string | undefined): ShopDefaults => ({
+  grocery: defaultStoresFor(region ?? "US", "grocery"),
+  general: defaultStoresFor(region ?? "US", "general"),
+});
+
+function shopDescription(
+  registry: SourceRegistry,
+  region: string | undefined,
+  defaults: ShopDefaults,
+  resolve: (name: string) => Store | undefined,
+): string {
+  const { grocery, general } = defaults;
   const market = grocery.find((id) => resolve(id)?.marketplace);
   const viaMarket = market
     ? ` Groceries from a store ${market} carries: pass ${market}, which reads that store's real prices; the store's own site usually blocks guests.`
@@ -270,12 +281,15 @@ function storesHelp(registry: SourceRegistry, region?: string): string {
 
 type CartUpdate = { added: CartItem[]; search: CartItem[]; fresh: boolean };
 
-function updateCart(cart: ActiveCart, req: { ids: string[]; asked: CartItem[]; newCart: boolean; region: string }): CartUpdate | string {
-  const { ids, asked, region } = req;
+function updateCart(
+  cart: ActiveCart,
+  req: { ids: string[]; asked: CartItem[]; newCart: boolean; defaults: ShopDefaults },
+): CartUpdate | string {
+  const { ids, asked, defaults } = req;
   if (req.newCart || !cart.stores.length) {
     if (!asked.length) return "pass items to add";
     if (!ids.length) {
-      return `pass stores for this new cart: the store the user named, else this region's defaults (groceries ${defaultStoresFor(region, "grocery").join(", ")}; other products ${defaultStoresFor(region, "general").join(", ")})`;
+      return `pass stores for this new cart: the store the user named, else this region's defaults (groceries ${defaults.grocery.join(", ")}; other products ${defaults.general.join(", ")})`;
     }
     cart.start(ids, asked);
     return { added: cart.items, search: cart.items, fresh: true };
@@ -299,10 +313,11 @@ export function shopTool(deps: Deps) {
   const registry = deps.registry ?? defaultRegistry;
   const resolve = deps.storeFor ?? ((name: string) => resolveStore(registry, name));
   const fallbackCart = new ActiveCart();
+  const defaults = deps.defaults ?? regionalDefaults(deps.region);
   return defineTool({
     name: "shop",
     label: "Shop",
-    description: shopDescription(registry, deps.region, resolve),
+    description: shopDescription(registry, deps.region, defaults, resolve),
     parameters: Type.Object({
       stores: Type.Optional(
         Type.Union([Type.Array(Type.String()), Type.String()], {
@@ -326,7 +341,7 @@ export function shopTool(deps: Deps) {
         .slice(0, MAX_STORES);
       const ids = picked.map((x) => x.id);
       if (params.remove) cart.remove(looseList<string>(params.remove).map(String));
-      const update = updateCart(cart, { ids, asked, newCart: !!params.new_cart, region: deps.region ?? "US" });
+      const update = updateCart(cart, { ids, asked, newCart: !!params.new_cart, defaults });
       if (typeof update === "string") return fail(update);
       const { added, search, fresh } = update;
       if (!cart.items.length) {

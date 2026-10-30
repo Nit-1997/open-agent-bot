@@ -3,8 +3,16 @@ import { regionFor } from "../../src/prompt/region.js";
 
 describe("regionFor", () => {
   it("prefers the time zone over the browser language", () => {
-    expect(regionFor({ timeZone: "America/Los_Angeles", locale: "en-IN", localTime: "" })).toEqual({ country: "US", currency: "USD" });
-    expect(regionFor({ timeZone: "Asia/Kolkata", locale: "en-US", localTime: "" })).toEqual({ country: "IN", currency: "INR" });
+    expect(regionFor({ timeZone: "America/Los_Angeles", locale: "en-IN", localTime: "" })).toEqual({
+      country: "US",
+      currency: "USD",
+      from: "browser",
+    });
+    expect(regionFor({ timeZone: "Asia/Kolkata", locale: "en-US", localTime: "" })).toEqual({
+      country: "IN",
+      currency: "INR",
+      from: "browser",
+    });
   });
 
   it("covers common zones", () => {
@@ -17,8 +25,18 @@ describe("regionFor", () => {
   });
 
   it("falls back to the locale region, then US", () => {
-    expect(regionFor({ timeZone: "Etc/UTC", locale: "en-GB", localTime: "" })).toEqual({ country: "GB", currency: "GBP" });
-    expect(regionFor({ timeZone: "Etc/UTC", locale: "en", localTime: "" })).toEqual({ country: "US", currency: "USD" });
-    expect(regionFor(null)).toEqual({ country: "US", currency: "USD" });
+    expect(regionFor({ timeZone: "Etc/UTC", locale: "en-GB", localTime: "" })).toEqual({ country: "GB", currency: "GBP", from: "browser" });
+    expect(regionFor({ timeZone: "Etc/UTC", locale: "en", localTime: "" })).toEqual({ country: "US", currency: "USD", from: "browser" });
+    expect(regionFor(null)).toEqual({ country: "US", currency: "USD", from: "browser" });
+  });
+
+  it("uses the home address country over the time zone", () => {
+    const ctx = {
+      timeZone: "America/Los_Angeles",
+      locale: "en-US",
+      localTime: "",
+      profile: { home: { label: "Pune", city: "Pune", country: "IN" } },
+    };
+    expect(regionFor(ctx)).toEqual({ country: "IN", currency: "INR", from: "home" });
   });
 });

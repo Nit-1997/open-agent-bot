@@ -5,6 +5,7 @@ import type { HistoryMessage, SessionEntry, SessionStore } from "../session/sess
 import { log } from "../lib/log.js";
 import { applyEntityEdits } from "../workspace/edits.js";
 import type { WorkspaceStore } from "../workspace/store.js";
+import type { ProfileStore } from "../profile/store.js";
 import { custom, runError, runFinished, runStarted } from "./events.js";
 import { messageText, readUserContext, readWorkspaceEdits, restoreHistory } from "./input.js";
 import { createStatsCollector, type StatsCollector, type Usage } from "./stats.js";
@@ -13,7 +14,7 @@ import { createTranslator, type PiEvent } from "./translate.js";
 export const EMPTY_REPLY_NUDGE =
   "Your reply so far shows me no answer. Answer my previous message now, in full, from what the tools already returned, without searching again.";
 
-export type RunOptions = { workspace?: WorkspaceStore };
+export type RunOptions = { workspace?: WorkspaceStore; profiles?: ProfileStore };
 
 type AssistantEnd = {
   role?: string;
@@ -51,6 +52,15 @@ function logEvent(threadId: string, e: PiEvent): void {
   }
 }
 
+export async function withStoredProfile(ctx: UserContext | null, profiles: ProfileStore | undefined): Promise<UserContext | null> {
+  if (!ctx || !profiles) return ctx;
+  const stored = await profiles.get().catch((err: unknown) => {
+    log.warn("[run] couldn't read the profile", err);
+    return undefined;
+  });
+  return stored ? { ...ctx, profile: { ...stored, ...ctx.profile } } : ctx;
+}
+
 export async function* handleRun(
   input: RunAgentInput,
   store: SessionStore,
@@ -69,7 +79,7 @@ export async function* handleRun(
 
   const history = !store.get(threadId) && userMessages.length > 1 ? restoreHistory(input.messages) : undefined;
 
-  const userContext = readUserContext(input);
+  const userContext = await withStoredProfile(readUserContext(input), opts.profiles);
   log.info(`[run] thread=${threadId} run=${runId} model=${userContext?.model ?? "default"}`);
   log.debug(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(messageText(last).slice(0, 200))}`);
 

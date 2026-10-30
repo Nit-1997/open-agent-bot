@@ -1,37 +1,14 @@
-import { type Context, type Handler, Hono, type MiddlewareHandler } from "hono";
-import type { AgentConfig } from "../config.js";
+import { type Context, Hono, type MiddlewareHandler } from "hono";
+import type { ProfileStore } from "../profile/store.js";
 import type { ProviderHub } from "../providers/hub.js";
 import type { LoginFlows } from "../providers/logins.js";
-import { defaultModelRef } from "./defaultModel.js";
-import { UserError, type UserErrorKind } from "../lib/errors.js";
-import { log } from "../lib/log.js";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { defaultModelRef } from "../session/createSession.js";
+import { UserError } from "../lib/errors.js";
+import { type Authorized, body, safe } from "./handlers.js";
 
-type Deps = { cfg: AgentConfig; hub?: ProviderHub; logins?: LoginFlows; authorized: (secret: string | undefined) => boolean };
-
-const STATUS: Record<UserErrorKind, ContentfulStatusCode> = {
-  invalid: 400,
-  not_found: 404,
-  conflict: 409,
-  upstream: 502,
-  unavailable: 503,
-};
-
-const safe =
-  (handler: (c: Context) => Promise<Response> | Response): Handler =>
-  async (c) => {
-    try {
-      return await handler(c);
-    } catch (err) {
-      if (err instanceof UserError) return c.json({ error: err.message }, STATUS[err.kind]);
-      log.error(`[providers] ${c.req.method} ${c.req.path} failed`, err);
-      return c.json({ error: "Something went wrong on the agent. Check its logs." }, 500);
-    }
-  };
+type Deps = { hub?: ProviderHub; logins?: LoginFlows; profiles?: ProfileStore; authorized: Authorized };
 
 const param = (c: Context, name: string) => c.req.param(name) ?? "";
-
-const body = async (c: Context) => ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
 
 export function providerRoutes(deps: Deps) {
   const app = new Hono();
@@ -51,7 +28,10 @@ export function providerRoutes(deps: Deps) {
 
   app.get(
     "/models",
-    safe((c) => c.json({ default: defaultModelRef(deps.cfg, hub()), models: hub().enabledModels() })),
+    safe(async (c) => {
+      const chosen = (await deps.profiles?.get())?.defaultModel;
+      return c.json({ default: defaultModelRef(hub(), chosen), models: hub().enabledModels() });
+    }),
   );
   app.get(
     "/providers",
