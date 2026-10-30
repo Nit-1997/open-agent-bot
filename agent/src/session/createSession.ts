@@ -20,7 +20,7 @@ import { log } from "../lib/log.js";
 
 type CreateSession = ConstructorParameters<typeof SessionStore>[0]["create"];
 
-export type SessionDeps = {
+type SessionDeps = {
   cfg: AgentConfig;
   hub: ProviderHub;
   artifacts: ArtifactStore;
