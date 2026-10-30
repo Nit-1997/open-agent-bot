@@ -6,7 +6,7 @@ export const BLOCKING_STATUSES = new Set([401, 403, 429, 503]);
 const MAX_REDIRECTS = 5;
 
 function isPrivateIPv4(ip: string): boolean {
-  const [a, b] = ip.split(".").map(Number);
+  const [a, b, c] = ip.split(".").map(Number);
   return (
     a === 0 ||
     a === 10 ||
@@ -14,9 +14,16 @@ function isPrivateIPv4(ip: string): boolean {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 198 && (b === 18 || b === 19)) ||
     (a === 100 && b >= 64 && b <= 127) ||
     a >= 224
   );
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const h = new URL(`http://[${ip}]/`).hostname.slice(1, -1);
+  return h.startsWith("::") || /^f[c-f]/.test(h) || h.startsWith("64:ff9b:") || h.startsWith("2001:db8:");
 }
 
 function isInternalHost(hostname: string): boolean {
@@ -25,8 +32,7 @@ function isInternalHost(hostname: string): boolean {
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return true;
   const v = isIP(h);
   if (v === 4) return isPrivateIPv4(h);
-  if (v === 6)
-    return h === "::1" || h === "::" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80") || h.startsWith("::ffff:");
+  if (v === 6) return isPrivateIPv6(h);
   return !h.includes(".");
 }
 
