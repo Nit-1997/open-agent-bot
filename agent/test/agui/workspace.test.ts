@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { handleRun, readCartEdits, readWorkspaceEdits, restoreHistory } from "../../src/agui/runHandler.js";
+import { parseWorkspaceEdits } from "../../../shared/workspace.js";
+import { handleRun, readWorkspaceEdits, restoreHistory } from "../../src/agui/runHandler.js";
 import { type HistoryMessage, type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
 import { workspaceCart, workspaceNote } from "../../src/workspace/cart.js";
-import { parseWorkspaceEdits } from "../../src/workspace/edits.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
 import { Evidence } from "../../src/grounding/evidence.js";
 import { ev, fakeSession, type Script } from "./fakeSession.js";
@@ -132,33 +132,19 @@ describe("workspace_edits", () => {
     expect(workspace.summary("t1")).toContain("event main: 8th birthday, 16 guests, 2026-11-21, budget $350");
   });
 
-  it("still accepts cart_edits", async () => {
-    const { store, workspace } = setup();
-    const cart = workspaceCart(workspace, "t1");
-    cart.start(["target"], [{ query: "pizza", qty: 3 }]);
-    cart.save();
-    await collect(handleRun(input({ context: ctx({ qty: { pizza: 7 } }, "cart_edits") }), store, new AbortController().signal, { workspace }));
-    expect((workspace.get("t1", "cart", "main")!.value as { items: unknown }).items).toEqual([{ query: "pizza", qty: 7 }]);
-  });
-
-  it("ignores workspace_edits when the flag is off, as before", async () => {
-    const { store, workspace } = setup();
-    workspace.put("t1", "event", "main", party);
-    await collect(handleRun(input({ context: ctx({ event: { guests: 16 } }) }), store, new AbortController().signal));
-    expect(workspace.get("t1", "event", "main")?.version).toBe(1);
-  });
-
-  it("drops invalid fields and empty edits", () => {
+  it("drops invalid sections, strips unknown fields and returns null when nothing is left", () => {
     expect(parseWorkspaceEdits({ event: { guests: -2, date: "tomorrow", budget: "lots" }, trip: { travelers: 0 } })).toBeNull();
-    expect(parseWorkspaceEdits({ event: { guests: 16.4, date: "2026-11-21T10:00", extra: 1 } })).toEqual({ event: { guests: 16, date: "2026-11-21T10:00" } });
+    expect(parseWorkspaceEdits({ event: { guests: 16, date: "2026-11-21T10:00", extra: 1 } })).toEqual({ event: { guests: 16, date: "2026-11-21T10:00" } });
+    expect(parseWorkspaceEdits({ event: { guests: 16.4 } })).toBeNull();
     expect(parseWorkspaceEdits("nope")).toBeNull();
-    expect(parseWorkspaceEdits({ cart: { removed: ["a", 3], qty: { a: 2 } } })).toEqual({ cart: { removed: ["a"], qty: { a: 2 }, picks: undefined } });
+    expect(parseWorkspaceEdits({ cart: { removed: ["a", 3], qty: { a: 2 } }, trip: { budget: 900 } })).toEqual({ trip: { budget: 900 } });
+    expect(parseWorkspaceEdits({ cart: { picks: { target: null } } })).toBeNull();
+    expect(parseWorkspaceEdits({ cart: { qty: { a: 2 } } })).toEqual({ cart: { qty: { a: 2 } } });
   });
 
   it("reads them from the AG-UI context, as a string or an object", () => {
     expect(readWorkspaceEdits(input({ context: ctx({ event: { guests: 9 } }) }))).toEqual({ event: { guests: 9 } });
     expect(readWorkspaceEdits(input({ context: [{ description: "workspace_edits", value: { trip: { start: "2026-12-01" } } as never }] }))).toEqual({ trip: { start: "2026-12-01" } });
     expect(readWorkspaceEdits(input({ context: [{ description: "workspace_edits", value: "{bad" }] }))).toBeNull();
-    expect(readCartEdits(input({ context: ctx({ removed: ["x"] }, "cart_edits") }))).toMatchObject({ removed: ["x"] });
   });
 });

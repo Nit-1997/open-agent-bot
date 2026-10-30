@@ -5,8 +5,7 @@ import type { Turn } from "@/lib/turns";
 import { ActivitySteps } from "./ActivitySteps";
 import { Followups } from "./Followups";
 import { type BrowserFrame, LiveBrowser } from "./LiveBrowser";
-import type { CartEdits } from "@/components/widgets/CartCard";
-import type { PlanEdits } from "@/lib/workspaceEdits";
+import type { CartEdits, PlanEdits } from "@shared/workspace";
 import { Markdown } from "./Markdown";
 import { SourcesRow } from "./SourcesRow";
 

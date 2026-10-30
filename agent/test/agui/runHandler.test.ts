@@ -121,9 +121,26 @@ describe("handleRun", () => {
     const cart = new ActiveCart();
     cart.start(["shipt"], [{ query: "rice", qty: 1 }, { query: "black beans", qty: 2 }]);
     const { store } = setup(say, undefined, undefined, undefined, cart);
-    const edits = { removed: ["black beans"], qty: { rice: 4 } };
-    await collect(handleRun(input({ context: [{ description: "cart_edits", value: JSON.stringify(edits) }] }), store, new AbortController().signal));
+    const edits = { cart: { removed: ["black beans"], qty: { rice: 4 } } };
+    await collect(handleRun(input({ context: [{ description: "workspace_edits", value: JSON.stringify(edits) }] }), store, new AbortController().signal));
     expect(cart.items).toEqual([{ query: "rice", qty: 4 }]);
+  });
+
+  it("ignores malformed edits and still answers", async () => {
+    const cart = new ActiveCart();
+    cart.start(["shipt"], [{ query: "rice", qty: 1 }]);
+    cart.addResults([{ store: "Shipt", home: "https://shipt.com", items: [{ query: "rice", qty: 1, picks: [] }] }]);
+    const { store } = setup(say, undefined, undefined, undefined, cart);
+    const out = await collect(handleRun(input({ context: [{ description: "workspace_edits", value: JSON.stringify({ cart: { picks: { Shipt: null } } }) }] }), store, new AbortController().signal));
+    expect(out.at(-1)?.type).toBe(EventType.RUN_FINISHED);
+    expect(store.get("t1")?.busy).toBe(false);
+  });
+
+  it("reports an internal error and frees the thread when the turn throws before the model runs", async () => {
+    const { store } = setup(say, undefined, undefined, undefined, undefined, { onRunStart: () => { throw new Error("boom"); } });
+    const first = await collect(handleRun(input(), store, new AbortController().signal));
+    expect(first.at(-1)).toMatchObject({ type: EventType.RUN_ERROR, code: "INTERNAL_ERROR" });
+    expect(store.get("t1")?.busy).toBe(false);
   });
 
   it("forwards browser frames published during the run as CUSTOM events, and none after", async () => {

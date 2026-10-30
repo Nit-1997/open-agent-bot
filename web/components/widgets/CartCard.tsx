@@ -1,6 +1,7 @@
 "use client";
 
 import type { Cart } from "@shared/widgets";
+import type { CartEdits } from "@shared/workspace";
 import { Info, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { money as formatMoney } from "@/lib/format";
@@ -8,7 +9,6 @@ import { Picture } from "./CardRow";
 
 type Line = { qty: number; choice: number; removed: boolean };
 type Shared = Record<string, { qty: number; removed: boolean }>;
-export type CartEdits = { removed: string[]; qty: Record<string, number>; picks: Record<string, Record<string, string>> };
 
 const portalOf = (name: string) => name.match(/\(([^)]+)\)\s*$/)?.[1] ?? name;
 

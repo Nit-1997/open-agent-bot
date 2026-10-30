@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
 import type { UserContext, UserProfile, Viewport } from "../prompt/systemPrompt.js";
 import type { HistoryMessage, SessionEntry, SessionStore } from "../session/sessionStore.js";
-import type { CartEdits } from "../shop/cart.js";
-import { applyEntityEdits, parseCartEdits, parseWorkspaceEdits, type WorkspaceEdits } from "../workspace/edits.js";
+import { parseWorkspaceEdits, type WorkspaceEdits } from "../../../shared/workspace.js";
+import { applyEntityEdits } from "../workspace/edits.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
@@ -64,10 +64,6 @@ function contextValue(input: RunAgentInput, description: string): unknown {
   } catch {
     return undefined;
   }
-}
-
-export function readCartEdits(input: RunAgentInput): CartEdits | null {
-  return parseCartEdits(contextValue(input, "cart_edits")) ?? null;
 }
 
 export function readWorkspaceEdits(input: RunAgentInput): WorkspaceEdits | null {
@@ -156,7 +152,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     return;
   }
 
-  const restoring = !store.get(threadId) && userMessages.length > 1;
+  const history = !store.get(threadId) && userMessages.length > 1 ? restoreHistory(input.messages) : undefined;
 
   const userContext = readUserContext(input);
   console.log(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(messageText(last).slice(0, 200))}`);
@@ -164,7 +160,7 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   const stats = createStatsCollector();
   let made: { entry: SessionEntry } | { error: unknown };
   try {
-    made = { entry: await store.getOrCreate(threadId, userContext, restoring ? restoreHistory(input.messages) : undefined) };
+    made = { entry: await store.getOrCreate(threadId, userContext, history) };
   } catch (error) {
     made = { error };
   }
@@ -180,6 +176,30 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   }
   if (signal.aborted) return;
   entry.busy = true;
+  try {
+    yield* runTurn({ input, entry, signal, opts, last, history, userContext, stats });
+  } catch (err) {
+    console.error(`[run] thread=${threadId} failed`, err);
+    yield runError("INTERNAL_ERROR", "Something went wrong on the agent. Try again.");
+  } finally {
+    entry.busy = false;
+    store.touch(threadId);
+  }
+}
+
+type Turn = {
+  input: RunAgentInput;
+  entry: SessionEntry;
+  signal: AbortSignal;
+  opts: RunOptions;
+  last: Message;
+  history: HistoryMessage[] | undefined;
+  userContext: UserContext | null;
+  stats: ReturnType<typeof createStatsCollector>;
+};
+
+async function* runTurn({ input, entry, signal, opts, last, history, userContext, stats }: Turn): AsyncGenerator<BaseEvent> {
+  const { threadId, runId } = input;
   entry.onRunStart?.();
 
   const queue: BaseEvent[] = [];
@@ -196,18 +216,16 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     try {
       await entry.setModel(userContext.model);
     } catch (err) {
-      entry.busy = false;
       yield runError("MODEL_ERROR", err instanceof Error ? err.message : String(err));
       return;
     }
   }
 
-  const wsEdits = opts.workspace ? readWorkspaceEdits(input) : null;
-  const edits = wsEdits ? wsEdits.cart : readCartEdits(input);
-  if (edits) entry.cart?.applyEdits(edits);
-  if (wsEdits && opts.workspace) applyEntityEdits(opts.workspace, threadId, wsEdits);
+  const edits = readWorkspaceEdits(input);
+  if (edits?.cart) entry.cart?.applyEdits(edits.cart);
+  if (edits && opts.workspace) applyEntityEdits(opts.workspace, threadId, edits);
   entry.evidence?.add(messageText(last));
-  if (restoring) for (const m of restoreHistory(input.messages)) entry.evidence?.add(m.text);
+  for (const m of history ?? []) entry.evidence?.add(m.text);
   if (opts.workspace) entry.evidence?.add(opts.workspace.summary(threadId));
   const statsEvent = (): BaseEvent => {
     const turn = entry.turnStats?.();
@@ -284,7 +302,5 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
     signal.removeEventListener("abort", onAbort);
     unsubscribe();
     unwatch?.();
-    entry.busy = false;
-    store.touch(threadId);
   }
 }

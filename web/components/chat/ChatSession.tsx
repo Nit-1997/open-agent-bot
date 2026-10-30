@@ -9,8 +9,8 @@ import type { WorkflowStepEvent } from "@/lib/steps";
 import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
-import type { CartEdits } from "@/components/widgets/CartCard";
-import { cartContextValue, type PlanEdits, type WorkspaceEdits, withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
+import type { CartEdits, PlanEdits, WorkspaceEdits } from "@shared/workspace";
+import { withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
 import type { BrowserFrame } from "./LiveBrowser";
 import { QUIET_ANSWER, TurnView } from "./TurnView";
 
@@ -53,7 +53,6 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
       }
     return new Set(latest.values());
   }, [turns]);
-  useAgentContext({ description: "cart_edits", value: cartContextValue(edits) });
   useAgentContext({ description: "workspace_edits", value: workspaceContextValue(edits) });
 
   useEffect(() => {

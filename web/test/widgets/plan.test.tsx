@@ -4,7 +4,7 @@ import type { Plan } from "@shared/widgets";
 import { PlanCard } from "@/components/widgets/PlanCard";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import { stepLabel } from "@/lib/steps";
-import { cartContextValue, hasEdits, withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
+import { hasEdits, withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
 
 const event: Plan = {
   kind: "plan",
@@ -118,11 +118,9 @@ describe("workspace edits queue", () => {
     expect(withPlanEdits(e, { trip: { travelers: 3 } }).cart).toBeDefined();
   });
 
-  it("serializes both context values and stays empty when there are no edits", () => {
+  it("serializes the edits and stays empty when there are none", () => {
     expect(workspaceContextValue({})).toBe("");
-    expect(cartContextValue({ event: { guests: 3 } })).toBe("");
     const e = withPlanEdits(withCartEdits({}, { removed: [], qty: { rice: 2 }, picks: {} }), { event: { guests: 16 } });
-    expect(JSON.parse(cartContextValue(e))).toEqual({ removed: [], qty: { rice: 2 }, picks: {} });
     expect(JSON.parse(workspaceContextValue(e))).toEqual({ cart: { removed: [], qty: { rice: 2 }, picks: {} }, event: { guests: 16 } });
     expect(hasEdits(e)).toBe(true);
   });

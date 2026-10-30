@@ -3,7 +3,7 @@
 import type { Plan } from "@shared/widgets";
 import { Minus, Plus } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type { PlanEdits } from "@/lib/workspaceEdits";
+import type { PlanEdits } from "@shared/workspace";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const INPUT = "rounded-lg border border-border bg-paper px-2 py-1 text-sm disabled:opacity-60";

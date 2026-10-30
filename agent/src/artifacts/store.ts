@@ -2,9 +2,8 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Browser, chromium } from "playwright";
+import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
 import { blockInternalRequests } from "../tools/browserGuard.js";
-
-const ID_RE = /^[A-Za-z0-9_-]{12}$/;
 
 export class ArtifactStore {
   private browser?: Promise<Browser>;
@@ -20,7 +19,7 @@ export class ArtifactStore {
   }
 
   async get(id: string): Promise<{ title: string; html: string } | null> {
-    if (!ID_RE.test(id)) return null;
+    if (!ARTIFACT_ID_RE.test(id)) return null;
     try {
       const [html, meta] = await Promise.all([
         readFile(join(this.dir, `${id}.html`), "utf8"),

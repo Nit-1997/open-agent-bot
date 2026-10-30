@@ -1,7 +1,7 @@
 import { validateWidget } from "@shared/widgets";
-import type { PlanEdits } from "@/lib/workspaceEdits";
+import type { CartEdits, PlanEdits } from "@shared/workspace";
 import { AskCard } from "./AskCard";
-import { type CartEdits, CartCard } from "./CartCard";
+import { CartCard } from "./CartCard";
 import { FlightList } from "./FlightList";
 import { GroundingNote } from "./GroundingNote";
 import { PlanCard } from "./PlanCard";

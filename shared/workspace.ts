@@ -16,6 +16,49 @@ export const CartEntitySchema = Type.Object({
   picks: Type.Record(Type.String(), Type.Record(Type.String(), Type.Array(PickSchema, { maxItems: 10 }))),
 });
 
+const Count = Type.Integer({ minimum: 1, maximum: 10_000 });
+const Day = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}", maxLength: 40 });
+const Money = Type.Number({ minimum: 0 });
+
+export const CartEditsSchema = Type.Object(
+  {
+    removed: Type.Optional(Type.Array(Str, { maxItems: 50 })),
+    qty: Type.Optional(Type.Record(Type.String(), Count)),
+    picks: Type.Optional(Type.Record(Type.String(), Type.Record(Type.String(), Str))),
+  },
+  { additionalProperties: false },
+);
+
+export const EventEditsSchema = Type.Object(
+  { guests: Type.Optional(Count), date: Type.Optional(Day), budget: Type.Optional(Money) },
+  { additionalProperties: false },
+);
+
+export const TripEditsSchema = Type.Object(
+  { start: Type.Optional(Day), end: Type.Optional(Day), travelers: Type.Optional(Count), budget: Type.Optional(Money) },
+  { additionalProperties: false },
+);
+
+export type CartEdits = Static<typeof CartEditsSchema>;
+export type EventEdits = Static<typeof EventEditsSchema>;
+export type TripEdits = Static<typeof TripEditsSchema>;
+export type PlanEdits = { event?: EventEdits; trip?: TripEdits };
+export type WorkspaceEdits = PlanEdits & { cart?: CartEdits };
+
+const EDIT_SECTIONS = { cart: CartEditsSchema, event: EventEditsSchema, trip: TripEditsSchema } as const;
+
+export function parseWorkspaceEdits(v: unknown): WorkspaceEdits | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const out: Record<string, unknown> = {};
+  for (const [key, schema] of Object.entries(EDIT_SECTIONS)) {
+    const raw = (v as Record<string, unknown>)[key];
+    if (!raw || typeof raw !== "object") continue;
+    const section = Value.Clean(schema, structuredClone(raw));
+    if (Value.Check(schema, section) && Object.keys(section as object).length) out[key] = section;
+  }
+  return Object.keys(out).length ? (out as WorkspaceEdits) : null;
+}
+
 export const ENTITY_SCHEMAS = {
   cart: CartEntitySchema,
   trip: TripEntitySchema,

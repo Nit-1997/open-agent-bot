@@ -1,11 +1,9 @@
-import { ARTIFACT_CSP } from "@shared/artifacts";
+import { ARTIFACT_CSP, ARTIFACT_ID_RE } from "@shared/artifacts";
 import { agentHeaders, agentUrl } from "@/lib/agentServer";
-
-const ID_RE = /^[A-Za-z0-9_-]{12}$/;
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!ID_RE.test(id)) return new Response("not found", { status: 404 });
+  if (!ARTIFACT_ID_RE.test(id)) return new Response("not found", { status: 404 });
   const pdf = new URL(req.url).searchParams.get("format") === "pdf";
   let upstream: Response;
   try {

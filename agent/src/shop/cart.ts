@@ -1,9 +1,8 @@
-import type { CartEntity } from "../../../shared/workspace.js";
+import type { CartEdits, CartEntity } from "../../../shared/workspace.js";
 import type { Tile } from "./extract.js";
 import type { StoreResult } from "./rank.js";
 
 export type CartItem = { query: string; qty: number };
-export type CartEdits = { removed?: string[]; qty?: Record<string, number>; picks?: Record<string, Record<string, string>> };
 
 const key = (q: string) => q.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -96,7 +95,7 @@ export class ActiveCart {
     if (e.removed?.length) this.remove(e.removed);
     for (const [q, n] of Object.entries(e.qty ?? {})) {
       const item = this.items.find((i) => key(i.query) === key(q));
-      if (item && Number.isFinite(n) && n >= 1) item.qty = Math.round(n);
+      if (item) item.qty = n;
     }
     for (const [store, chosen] of Object.entries(e.picks ?? {})) {
       const m = this.picks.get(store);
