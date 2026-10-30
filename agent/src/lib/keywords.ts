@@ -34,3 +34,13 @@ export const keyWords = (s: string) =>
     .split(/\s+/)
     .filter((w) => w.length > 1 && !FILLER.has(w))
     .map((w) => w.replace(/(es|s)$/, ""));
+
+export const wordSet = (s: string, skip?: ReadonlySet<string>) =>
+  new Set(
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !skip?.has(w)),
+  );

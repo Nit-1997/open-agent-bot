@@ -3,6 +3,7 @@ import { coverMatch } from "../judge/criteria/coverMatch.js";
 import { type ITunes, pickMusic } from "./lookup.js";
 import { timeoutSignal } from "../lib/net.js";
 import { withRetry } from "../lib/retry.js";
+import { wordSet } from "../lib/keywords.js";
 
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
 const SPOTIFY_ITEM = /^\/(?:intl-[a-z-]+\/)?(playlist|album|track|artist)\/([A-Za-z0-9]+)/;
@@ -25,15 +26,7 @@ const FILLER = new Set([
 
 type MusicCard = { title: string; url?: string; subtitle?: string };
 
-const words = (s: string) =>
-  new Set(
-    s
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[^a-z0-9 ]+/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 1 && !FILLER.has(w)),
-  );
+const words = (s: string) => wordSet(s, FILLER);
 
 export function spotifyItemUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;

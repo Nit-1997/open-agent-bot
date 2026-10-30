@@ -7,6 +7,7 @@ import { queryList } from "./args.js";
 import { timeoutSignal } from "../lib/net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 import { withRetry } from "../lib/retry.js";
+import { wordSet } from "../lib/keywords.js";
 
 const MAX_BATCH = 10;
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
@@ -41,15 +42,7 @@ function describeMusic(r: ITunes, kind: "album" | "song"): string {
   return `${title} — ${parts.filter(Boolean).join(" · ")}${link ? `\n   link: ${link}` : ""}${image ? `\n   image: ${image}` : ""}`;
 }
 
-const words = (s: string) =>
-  new Set(
-    s
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[^a-z0-9 ]+/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 1),
-  );
+const words = (s: string) => wordSet(s);
 
 export function bestMatch(results: ITunes[], query: string, kind: "album" | "song"): ITunes | undefined {
   const want = words(query);

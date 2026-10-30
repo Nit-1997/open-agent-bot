@@ -146,12 +146,29 @@ export async function createJudge(opts: {
   const chosen = (a: Answer) =>
     a.type === "choice" ? { choice: a.choice, p: a.probabilities?.[a.choice] ?? a.confidence ?? 0, probabilities: a.probabilities } : null;
 
-  async function scoreBatched<L extends string>(
+  type Noted = { tag: string; h: string; ms: number };
+  type YesNo = { id: string; yes: boolean; p: number };
+
+  const toScored = <L extends string>(c: ScoreCriteria<L>, r: Noted, id: string, a: Answer | undefined): Scored<L> | null => {
+    const pick = a && chosen(a);
+    if (!pick || !(pick.choice in c.levels)) return null;
+    note(r, pick.choice, pick.p);
+    return { id, level: pick.choice as L, p: pick.p, probabilities: pick.probabilities as Record<L, number> };
+  };
+
+  const toYesNo = (r: Noted, id: string, a: Answer | undefined): YesNo | null => {
+    if (a?.type !== "bool") return null;
+    note(r, a.probability >= 0.5 ? "yes" : "no", a.probability);
+    return { id, yes: a.probability >= 0.5, p: a.probability };
+  };
+
+  async function batched<T>(
     items: Item[],
-    c: ScoreCriteria<L>,
-    criteria: Record<string, string>,
+    c: { id: string; version: string },
     o: CallOpts,
-  ): Promise<Scored<L>[] | null> {
+    question: (n: number) => Question,
+    read: (r: Noted, id: string, a: Answer | undefined) => T | null,
+  ): Promise<T[] | null> {
     const max = o.batch?.max ?? DEFAULT_BATCH;
     const groups: Item[][] = [];
     for (let i = 0; i < items.length; i += max) groups.push(items.slice(i, i + max));
@@ -159,21 +176,9 @@ export async function createJudge(opts: {
       groups.map((group) =>
         limit(async () => {
           const state = { ...o.batch?.shared, tiles: group.map((it, n) => ({ i: n, ...it.state })) };
-          const questions = Object.fromEntries(
-            group.map((_, n) => [
-              `t${n}`,
-              { type: "choice", instructions: `${c.question} Judge only the product with i=${n} in tiles.`, criteria } as Question,
-            ]),
-          );
+          const questions = Object.fromEntries(group.map((_, n) => [`t${n}`, question(n)]));
           const r = await ask(c, state, questions, o);
-          if (!r) return null;
-          const scored = group.map((it, n) => {
-            const pick = r.answers[`t${n}`] && chosen(r.answers[`t${n}`]);
-            if (!pick || !(pick.choice in c.levels)) return null;
-            note(r, pick.choice, pick.p);
-            return { id: it.id, level: pick.choice as L, p: pick.p, probabilities: pick.probabilities as Record<L, number> };
-          });
-          return all(scored);
+          return r ? all(group.map((it, n) => read(r, it.id, r.answers[`t${n}`]))) : null;
         }),
       ),
     );
@@ -181,39 +186,22 @@ export async function createJudge(opts: {
     return flat ? flat.flat() : null;
   }
 
-  async function yesnoBatched(
+  async function oneByOne<T>(
     items: Item[],
-    c: YesNoCriteria,
+    c: { id: string; version: string },
     question: Question,
-    o: CallOpts,
-  ): Promise<{ id: string; yes: boolean; p: number }[] | null> {
-    const max = o.batch?.max ?? DEFAULT_BATCH;
-    const groups: Item[][] = [];
-    for (let i = 0; i < items.length; i += max) groups.push(items.slice(i, i + max));
-    const parts = await Promise.all(
-      groups.map((group) =>
+    o: CallOpts | undefined,
+    read: (r: Noted, id: string, a: Answer | undefined) => T | null,
+  ): Promise<T[] | null> {
+    const out = await Promise.all(
+      items.map((item) =>
         limit(async () => {
-          const state = { ...o.batch?.shared, tiles: group.map((it, n) => ({ i: n, ...it.state })) };
-          const questions = Object.fromEntries(
-            group.map((_, n) => [
-              `t${n}`,
-              { ...question, instructions: `${c.question} Judge only the item with i=${n} in tiles.` } as Question,
-            ]),
-          );
-          const r = await ask(c, state, questions, o);
-          if (!r) return null;
-          const judged = group.map((it, n) => {
-            const a = r.answers[`t${n}`];
-            if (a?.type !== "bool") return null;
-            note(r, a.probability >= 0.5 ? "yes" : "no", a.probability);
-            return { id: it.id, yes: a.probability >= 0.5, p: a.probability };
-          });
-          return all(judged);
+          const r = await one(c, item.state, question, o);
+          return r && read(r, item.id, r.answer);
         }),
       ),
     );
-    const flat = all(parts);
-    return flat ? flat.flat() : null;
+    return all(out);
   }
 
   return {
@@ -222,43 +210,23 @@ export async function createJudge(opts: {
 
     async score<L extends string>(items: Item[], c: ScoreCriteria<L>, o?: CallOpts) {
       const criteria = Object.fromEntries(Object.entries<Level>(c.levels).map(([k, v]) => [k, `${v.means} Not: ${v.not}`]));
-      const question: Question = { type: "choice", instructions: c.question, criteria };
+      const read = (r: Noted, id: string, a: Answer | undefined) => toScored(c, r, id, a);
       if (o?.batch && items.length > 1) {
-        const batched = await scoreBatched(items, c, criteria, o);
-        if (batched) return batched;
+        const instructions = (n: number) => `${c.question} Judge only the product with i=${n} in tiles.`;
+        const out = await batched(items, c, o, (n) => ({ type: "choice", instructions: instructions(n), criteria }) as Question, read);
+        if (out) return out;
       }
-      const out = await Promise.all(
-        items.map((item) =>
-          limit(async () => {
-            const r = await one(c, item.state, question, o);
-            const pick = r && chosen(r.answer);
-            if (!r || !pick || !(pick.choice in c.levels)) return null;
-            note(r, pick.choice, pick.p);
-            return { id: item.id, level: pick.choice as L, p: pick.p, probabilities: pick.probabilities as Record<L, number> };
-          }),
-        ),
-      );
-      return all(out);
+      return oneByOne(items, c, { type: "choice", instructions: c.question, criteria }, o, read);
     },
 
     async yesno(items: Item[], c: YesNoCriteria, o?: CallOpts) {
       const question: Question = { type: "bool", instructions: c.question, criteria: { true: c.yes, false: c.no } };
       if (o?.batch && items.length > 1) {
-        const batched = await yesnoBatched(items, c, question, o);
-        if (batched) return batched;
+        const instructions = (n: number) => `${c.question} Judge only the item with i=${n} in tiles.`;
+        const out = await batched(items, c, o, (n) => ({ ...question, instructions: instructions(n) }) as Question, toYesNo);
+        if (out) return out;
       }
-      const out = await Promise.all(
-        items.map((item) =>
-          limit(async () => {
-            const r = await one(c, item.state, question, o);
-            if (r?.answer.type !== "bool") return null;
-            const p = r.answer.probability;
-            note(r, p >= 0.5 ? "yes" : "no", p);
-            return { id: item.id, yes: p >= 0.5, p };
-          }),
-        ),
-      );
-      return all(out);
+      return oneByOne(items, c, question, o, toYesNo);
     },
 
     async classify(
