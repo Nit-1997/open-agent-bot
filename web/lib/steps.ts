@@ -39,55 +39,63 @@ function workflowLabel(args: StepArgs): string {
     : label;
 }
 
+const verb = (done: boolean, past: string, present: string) => (done ? past : present);
+const host = (u: unknown) => hostOf(String(u ?? "")) ?? "a page";
+const capitalize = (st: string) => st.charAt(0).toUpperCase() + st.slice(1);
+
+type Label = (args: StepArgs, done: boolean) => string;
+
+function picturesOf(args: StepArgs): string {
+  const many = list(args.queries);
+  return many.length > 1 ? `${many.length} things` : `“${String(many[0] ?? args.query ?? "")}”`;
+}
+
+function browsedHost(args: StepArgs): string {
+  const actions = Array.isArray(args.actions) ? (args.actions as Array<{ op?: string; url?: string }>) : [];
+  const goto = actions.find((a) => a.op === "goto");
+  return goto ? host(goto.url) : "a page";
+}
+
+function musicLabel(args: StepArgs, done: boolean): string {
+  const n = list(args.queries).length;
+  const what = args.kind === "song" ? "song" : "album";
+  return `${verb(done, "Looked up", "Looking up")} ${n} ${n === 1 ? what : `${what}s`}`;
+}
+
+function shopLabel(args: StepArgs, done: boolean): string {
+  const n = list(args.items).length;
+  return `${verb(done, "Shopped", "Shopping")} ${n} ${n === 1 ? "item" : "items"} at ${list(args.stores).map(capitalize).join(", ")}`;
+}
+
+function wikipediaLabel(args: StepArgs, done: boolean): string {
+  const many = list(args.queries);
+  return `${verb(done, "Read", "Reading")} Wikipedia on ${many.length === 1 ? many[0] : `${many.length} topics`}`;
+}
+
+function planLabel(args: StepArgs, done: boolean): string {
+  const action = args.action === "get" ? verb(done, "Read", "Reading") : verb(done, "Saved", "Saving");
+  return `${action} the ${String(args.kind ?? "plan")}`;
+}
+
+const LABELS: Record<string, Label> = {
+  web_search: (a, d) => `${verb(d, "Searched", "Searching")} “${String(a.query ?? "")}”`,
+  image_search: (a, d) => `${verb(d, "Found", "Finding")} pictures of ${picturesOf(a)}`,
+  music: musicLabel,
+  shop: shopLabel,
+  wikipedia: wikipediaLabel,
+  fetch_page: (a, d) => `${verb(d, "Read", "Reading")} ${host(a.url)}`,
+  browse: (a, d) => `${verb(d, "Browsed", "Browsing")} ${browsedHost(a)}`,
+  stays: (a, d) => `${verb(d, "Searched", "Searching")} stays in ${String(a.location ?? "…")}`,
+  weather: (a, d) => `${verb(d, "Checked", "Checking")} weather in ${String(a.location ?? "…")}`,
+  flights: (a, d) => `${verb(d, "Searched", "Searching")} flights ${String(a.from ?? "?")} → ${String(a.to ?? "?")}`,
+  plan: planLabel,
+  create_artifact: (a, d) => `${verb(d, "Wrote", "Writing")} “${String(a.title ?? "page")}”`,
+  research: (a, d) => `${verb(d, "Researched", "Researching")} “${String(a.question ?? "the question")}”`,
+  workflow_step: (a) => workflowLabel(a),
+};
+
 export function stepLabel(name: string, args: StepArgs, done = true): string {
-  const host = (u: unknown) => hostOf(String(u ?? "")) ?? "a page";
-  switch (name) {
-    case "web_search":
-      return `${done ? "Searched" : "Searching"} “${String(args.query ?? "")}”`;
-    case "image_search": {
-      const many = list(args.queries);
-      return `${done ? "Found" : "Finding"} pictures of ${many.length > 1 ? `${many.length} things` : `“${String(many[0] ?? args.query ?? "")}”`}`;
-    }
-    case "music": {
-      const n = list(args.queries).length;
-      const what = args.kind === "song" ? "song" : "album";
-      return `${done ? "Looked up" : "Looking up"} ${n} ${n === 1 ? what : `${what}s`}`;
-    }
-    case "shop": {
-      const n = list(args.items).length;
-      const stores = list(args.stores)
-        .map((st) => st.charAt(0).toUpperCase() + st.slice(1))
-        .join(", ");
-      return `${done ? "Shopped" : "Shopping"} ${n} ${n === 1 ? "item" : "items"} at ${stores}`;
-    }
-    case "wikipedia": {
-      const many = list(args.queries);
-      return `${done ? "Read" : "Reading"} Wikipedia on ${many.length === 1 ? many[0] : `${many.length} topics`}`;
-    }
-    case "fetch_page":
-      return `${done ? "Read" : "Reading"} ${host(args.url)}`;
-    case "browse": {
-      const actions = Array.isArray(args.actions) ? (args.actions as Array<{ op?: string; url?: string }>) : [];
-      const goto = actions.find((a) => a.op === "goto");
-      return `${done ? "Browsed" : "Browsing"} ${goto ? host(goto.url) : "a page"}`;
-    }
-    case "stays":
-      return `${done ? "Searched" : "Searching"} stays in ${String(args.location ?? "…")}`;
-    case "weather":
-      return `${done ? "Checked" : "Checking"} weather in ${String(args.location ?? "…")}`;
-    case "flights":
-      return `${done ? "Searched" : "Searching"} flights ${String(args.from ?? "?")} → ${String(args.to ?? "?")}`;
-    case "plan":
-      return `${args.action === "get" ? (done ? "Read" : "Reading") : done ? "Saved" : "Saving"} the ${String(args.kind ?? "plan")}`;
-    case "create_artifact":
-      return `${done ? "Wrote" : "Writing"} “${String(args.title ?? "page")}”`;
-    case "research":
-      return `${done ? "Researched" : "Researching"} “${String(args.question ?? "the question")}”`;
-    case "workflow_step":
-      return workflowLabel(args);
-    default:
-      return name;
-  }
+  return Object.hasOwn(LABELS, name) ? LABELS[name](args, done) : name;
 }
 
 export function stepKind(name: string): "search" | "read" | "weather" | "flight" | "write" | "other" {

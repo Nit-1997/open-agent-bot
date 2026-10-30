@@ -33,6 +33,24 @@ function textOf(content: unknown): string {
   return "";
 }
 
+function itemFor(name: string, id: string, args: Record<string, unknown>, result: string | undefined): TurnItem | null {
+  if (name === "show_widget") return { kind: "widget", id, widget: args.widget };
+  if (name === "create_artifact") return { kind: "artifact", id, title: String(args.title ?? "Page"), result };
+  if (name === "research")
+    return { kind: "artifact", id, title: /artifact [\w-]{12} created: ([^\n]+)/.exec(result ?? "")?.[1] ?? "Report", result };
+  return null;
+}
+
+function openedBy(name: string, args: Record<string, unknown>): Source[] {
+  const urls =
+    name === "fetch_page"
+      ? [args.url]
+      : name === "browse" && Array.isArray(args.actions)
+        ? (args.actions as Array<{ op?: string; url?: string }>).filter((a) => a.op === "goto").map((a) => a.url)
+        : [];
+  return urls.map((u) => toSource(String(u ?? ""))).filter((s): s is Source => s !== null);
+}
+
 export function buildTurns(messages: readonly ChatMessage[]): Turn[] {
   const results = new Map<string, string>();
   for (const m of messages) if (m.role === "tool" && "toolCallId" in m) results.set(m.toolCallId, String(m.content ?? ""));
@@ -65,25 +83,12 @@ export function buildTurns(messages: readonly ChatMessage[]): Turn[] {
       const name = c.function.name;
       const args = parseArgs(c.function.arguments);
       const result = results.get(c.id);
-      if (name === "show_widget") t.items.push({ kind: "widget", id: c.id, widget: args.widget });
-      if (name === "create_artifact") t.items.push({ kind: "artifact", id: c.id, title: String(args.title ?? "Page"), result });
-      if (name === "research")
-        t.items.push({
-          kind: "artifact",
-          id: c.id,
-          title: /artifact [\w-]{12} created: ([^\n]+)/.exec(result ?? "")?.[1] ?? "Report",
-          result,
-        });
+      const item = itemFor(name, c.id, args, result);
+      if (item) t.items.push(item);
       if (RENDER_TOOLS.has(name)) continue;
       const found = name === "web_search" && result ? searchResults(result) : [];
       p.searched.push(...found);
-      if (name === "fetch_page") p.opened.push(...[toSource(String(args.url ?? ""))].filter((s): s is Source => s !== null));
-      if (name === "browse" && Array.isArray(args.actions)) {
-        for (const act of args.actions as Array<{ op?: string; url?: string }>) {
-          const s = act.op === "goto" ? toSource(String(act.url ?? "")) : null;
-          if (s) p.opened.push(s);
-        }
-      }
+      p.opened.push(...openedBy(name, args));
       t.steps.push({ id: c.id, name, args, done: result !== undefined, result, sites: [...new Set(found.map((s) => s.host))] });
     }
   }
