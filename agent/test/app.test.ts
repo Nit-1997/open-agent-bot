@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { mkdtempSync } from "node:fs";
@@ -57,7 +57,7 @@ describe("createApp", () => {
       const app = createApp({ cfg, store: store(), hub, logins });
       const call = (path: string, init: RequestInit = {}) =>
         app.request(path, { ...init, headers: { "x-agent-secret": "s3", "content-type": "application/json", ...(init.headers ?? {}) } });
-      return { app, call };
+      return { app, call, hub };
     };
 
     it("keeps every model and provider route behind the shared secret", async () => {
@@ -134,12 +134,28 @@ describe("createApp", () => {
       expect(await res.json()).toEqual({ error: "Anthropic has no sign-in option here" });
     });
 
-    it("turns bad requests into readable 400s", async () => {
+    it("answers caller mistakes with 400, 404 or 409 and a readable message", async () => {
       const { call } = await setup();
       const res = await call("/providers/groq/key", { method: "POST", body: JSON.stringify({ apiKey: " " }) });
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "the key is empty" });
-      expect((await call("/providers/amazon-bedrock/key", { method: "POST", body: JSON.stringify({ apiKey: "x" }) })).status).toBe(400);
+      expect((await call("/providers/amazon-bedrock/key", { method: "POST", body: JSON.stringify({ apiKey: "x" }) })).status).toBe(404);
+      const expired = "00000000-0000-0000-0000-000000000000";
+      expect((await call(`/providers/logins/${expired}/answer`, { method: "POST", body: JSON.stringify({ value: "x" }) })).status).toBe(
+        404,
+      );
+    });
+
+    it("answers unexpected failures with a 500 that hides the internal message", async () => {
+      const { call, hub } = await setup();
+      const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.spyOn(hub, "list").mockImplementation(() => {
+        throw new Error("EACCES: /data/agent/providers.json");
+      });
+      const res = await call("/providers");
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({ error: "Something went wrong on the agent. Check its logs." });
+      quiet.mockRestore();
     });
   });
 });

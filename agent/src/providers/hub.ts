@@ -6,6 +6,7 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { readJsonFile, writeFileAtomic } from "../lib/files.js";
 import { type CatalogEntry, catalogEntry, CLOUD, LOCAL, LOCAL_KINDS, type LocalKind } from "./catalog.js";
+import { UserError } from "../lib/errors.js";
 
 type AnyModel = Model<any>;
 type Complete = (model: AnyModel, context: Context, options?: { maxTokens?: number; signal?: AbortSignal }) => Promise<AssistantMessage>;
@@ -211,21 +212,21 @@ export class ProviderHub {
 
   private cloud(id: string): CatalogEntry {
     const e = catalogEntry(id);
-    if (e?.kind !== "cloud") throw new Error(`provider ${id} is not supported`);
+    if (e?.kind !== "cloud") throw new UserError(`provider ${id} is not supported`, "not_found");
     return e;
   }
 
   async setKey(id: string, key: string): Promise<void> {
     this.cloud(id);
     const value = key.trim();
-    if (!value) throw new Error("the key is empty");
+    if (!value) throw new UserError("the key is empty");
     await this.rt.login(id, "api_key", { prompt: async () => value, notify: () => {} });
     this.signedIn.set(id, "key");
     await this.lockAuthFile();
   }
 
   async login(id: string, interaction: Parameters<ModelRuntime["login"]>[2]): Promise<void> {
-    if (!this.cloud(id).oauthLabel) throw new Error(`${id} has no sign-in option here`);
+    if (!this.cloud(id).oauthLabel) throw new UserError(`${id} has no sign-in option here`);
     const deviceId = await this.deviceId();
     await this.rt.login(id, "oauth", interaction, { agentName: "Open Agent", getDeviceId: () => deviceId }).catch((err: unknown) => {
       throw signInError(id, err);
@@ -236,7 +237,7 @@ export class ProviderHub {
 
   async remove(id: string): Promise<void> {
     const entry = catalogEntry(id);
-    if (!entry) throw new Error(`provider ${id} is not supported`);
+    if (!entry) throw new UserError(`provider ${id} is not supported`, "not_found");
     if (entry.kind === "cloud") {
       await this.rt.logout(id);
       this.signedIn.delete(id);
@@ -253,15 +254,15 @@ export class ProviderHub {
   }
 
   async addLocal(input: { kind: string; baseUrl: string; apiKey?: string; label?: string }): Promise<ProviderView> {
-    if (!(LOCAL_KINDS as readonly string[]).includes(input.kind)) throw new Error(`unknown local server type ${input.kind}`);
+    if (!(LOCAL_KINDS as readonly string[]).includes(input.kind)) throw new UserError(`unknown local server type ${input.kind}`);
     const kind = input.kind as LocalKind;
     let base: URL;
     try {
       base = new URL(input.baseUrl.trim().replace(/\/+$/, ""));
     } catch {
-      throw new Error("the base URL isn't a valid URL");
+      throw new UserError("the base URL isn't a valid URL");
     }
-    if (!/^https?:$/.test(base.protocol)) throw new Error("the base URL must start with http:// or https://");
+    if (!/^https?:$/.test(base.protocol)) throw new UserError("the base URL must start with http:// or https://");
     const baseUrl = base.href.replace(/\/+$/, "");
     let ids: string[];
     try {
@@ -272,9 +273,9 @@ export class ProviderHub {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       ids = (((await res.json()) as { data?: Array<{ id?: string }> }).data ?? []).map((m) => m.id).filter((m): m is string => !!m);
     } catch (err) {
-      throw new Error(`couldn't list models at ${baseUrl}/models (${err instanceof Error ? err.message : String(err)})`);
+      throw new UserError(`couldn't list models at ${baseUrl}/models (${err instanceof Error ? err.message : String(err)})`, "upstream");
     }
-    if (!ids.length) throw new Error(`the server at ${baseUrl} has no models`);
+    if (!ids.length) throw new UserError(`the server at ${baseUrl} has no models`, "upstream");
     const label = input.label?.trim() || catalogEntry(kind)!.label;
     this.settings.custom[kind] = { kind, label, baseUrl, models: ids.map((m) => ({ id: m, label: m })) };
     this.settings.enabled[kind] = ids;
@@ -286,7 +287,7 @@ export class ProviderHub {
   }
 
   models(id: string): ModelView[] {
-    if (!catalogEntry(id)) throw new Error(`provider ${id} is not supported`);
+    if (!catalogEntry(id)) throw new UserError(`provider ${id} is not supported`, "not_found");
     const enabled = new Set(this.enabledFor(id));
     return this.rt.getModels(id).map((m) => ({
       id: m.id,
@@ -298,9 +299,9 @@ export class ProviderHub {
   }
 
   async setEnabled(id: string, modelIds: string[]): Promise<void> {
-    if (!catalogEntry(id)) throw new Error(`provider ${id} is not supported`);
+    if (!catalogEntry(id)) throw new UserError(`provider ${id} is not supported`, "not_found");
     const unknown = modelIds.find((m) => !this.rt.getModel(id, m));
-    if (unknown) throw new Error(`unknown model ${unknown} for ${id}`);
+    if (unknown) throw new UserError(`unknown model ${unknown} for ${id}`);
     this.settings.enabled[id] = [...new Set(modelIds)];
     await this.save();
   }

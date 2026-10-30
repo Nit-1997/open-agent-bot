@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AuthEvent, AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
 import { log } from "../lib/log.js";
+import { UserError } from "../lib/errors.js";
 
 type Interaction = AuthInteraction & { signal: AbortSignal };
 type Login = (providerId: string, interaction: Interaction) => Promise<void>;
@@ -107,8 +108,8 @@ export class LoginFlows {
 
   answer(id: string, value: string): void {
     const flow = this.live(id);
-    if (!flow) throw new Error("This sign-in expired. Start it again.");
-    if (!flow.pending) throw new Error("The sign-in isn't waiting for anything right now.");
+    if (!flow) throw new UserError("This sign-in expired. Start it again.", "not_found");
+    if (!flow.pending) throw new UserError("The sign-in isn't waiting for anything right now.", "conflict");
     flow.pending.resolve(value.trim());
   }
 

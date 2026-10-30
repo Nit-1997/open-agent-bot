@@ -3,8 +3,19 @@ import type { AgentConfig } from "../config.js";
 import type { ProviderHub } from "../providers/hub.js";
 import type { LoginFlows } from "../providers/logins.js";
 import { defaultModelRef } from "./defaultModel.js";
+import { UserError, type UserErrorKind } from "../lib/errors.js";
+import { log } from "../lib/log.js";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 type Deps = { cfg: AgentConfig; hub?: ProviderHub; logins?: LoginFlows; authorized: (secret: string | undefined) => boolean };
+
+const STATUS: Record<UserErrorKind, ContentfulStatusCode> = {
+  invalid: 400,
+  not_found: 404,
+  conflict: 409,
+  upstream: 502,
+  unavailable: 503,
+};
 
 const safe =
   (handler: (c: Context) => Promise<Response> | Response): Handler =>
@@ -12,7 +23,9 @@ const safe =
     try {
       return await handler(c);
     } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+      if (err instanceof UserError) return c.json({ error: err.message }, STATUS[err.kind]);
+      log.error(`[providers] ${c.req.method} ${c.req.path} failed`, err);
+      return c.json({ error: "Something went wrong on the agent. Check its logs." }, 500);
     }
   };
 
@@ -32,7 +45,7 @@ export function providerRoutes(deps: Deps) {
 
   const hub = () => deps.hub!;
   const logins = () => {
-    if (!deps.logins) throw new Error("sign-in is not available");
+    if (!deps.logins) throw new UserError("sign-in is not available", "unavailable");
     return deps.logins;
   };
 
@@ -90,8 +103,8 @@ export function providerRoutes(deps: Deps) {
       const provider = hub()
         .list()
         .find((p) => p.id === id);
-      if (!provider) throw new Error(`provider ${id} is not supported`);
-      if (!provider.methods.includes("oauth")) throw new Error(`${provider.label} has no sign-in option here`);
+      if (!provider) throw new UserError(`provider ${id} is not supported`, "not_found");
+      if (!provider.methods.includes("oauth")) throw new UserError(`${provider.label} has no sign-in option here`);
       return c.json({ flow: logins().start(id) });
     }),
   );
