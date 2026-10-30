@@ -1,8 +1,7 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { defaultStoresFor, storeFor } from "../shop/stores.js";
 
-export function withRules<T extends ToolDefinition<any, any, any>>(tool: T, rules: string | ((base: string) => string), on: boolean, drop?: string): T {
-  if (!on) return tool;
+export function withRules<T extends ToolDefinition<any, any, any>>(tool: T, rules: string | ((base: string) => string), drop?: string): T {
   const base = drop ? tool.description.replace(`\n\n${drop}`, "") : tool.description;
   return { ...tool, description: typeof rules === "function" ? rules(base) : `${base}\n\n${rules}` };
 }

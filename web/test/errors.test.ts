@@ -3,7 +3,6 @@ import { classifyRunError } from "@/lib/errors";
 
 describe("classifyRunError", () => {
   it("finds agent error codes in the error message or context", () => {
-    expect(classifyRunError({ error: new Error("SESSION_EXPIRED: x"), context: {} })).toBe("SESSION_EXPIRED");
     expect(classifyRunError({ error: new Error("run failed"), context: { event: { code: "THREAD_BUSY" } } })).toBe("THREAD_BUSY");
     expect(classifyRunError({ error: new Error("connection refused"), context: { code: "MODEL_ERROR" } })).toBe("MODEL_ERROR");
     expect(classifyRunError({ error: new Error("network down"), context: {} })).toBe("UNKNOWN");
@@ -13,11 +12,5 @@ describe("classifyRunError", () => {
 describe("classifyRunError (runtime wording)", () => {
   it("maps the runtime's thread-locked rejection to THREAD_BUSY", () => {
     expect(classifyRunError({ error: new Error("Thread already running"), context: {} })).toBe("THREAD_BUSY");
-  });
-
-  it("maps the agent's expiry message to SESSION_EXPIRED even without the code", () => {
-    expect(classifyRunError({ error: new Error("This chat's session ended (the agent restarted or the chat sat idle). Start a new chat."), context: {} })).toBe(
-      "SESSION_EXPIRED",
-    );
   });
 });

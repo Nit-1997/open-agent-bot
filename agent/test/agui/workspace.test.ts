@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { handleRun, readCartEdits, readWorkspaceEdits, restoreHistory, SESSION_EXPIRED_MESSAGE } from "../../src/agui/runHandler.js";
+import { handleRun, readCartEdits, readWorkspaceEdits, restoreHistory } from "../../src/agui/runHandler.js";
 import { type HistoryMessage, type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
 import { workspaceCart, workspaceNote } from "../../src/workspace/cart.js";
 import { parseWorkspaceEdits } from "../../src/workspace/edits.js";
@@ -53,12 +53,6 @@ const party = { title: "8th birthday", guests: 12, date: "2026-11-14", budget: 3
 const prior = [msg("m1", "user", "plan a party"), msg("m2", "assistant", "Here is the plan."), msg("m3", "tool", "ignored"), msg("m4", "user", "make it 16 kids")];
 
 describe("session restore", () => {
-  it("keeps SESSION_EXPIRED when the workspace flag is off", async () => {
-    const { store } = setup();
-    const out = await collect(handleRun(input({ messages: prior }), store, new AbortController().signal));
-    expect(out.find((e) => e.type === EventType.RUN_ERROR)).toMatchObject({ code: "SESSION_EXPIRED", message: SESSION_EXPIRED_MESSAGE });
-  });
-
   it("creates the session with the prior user and assistant text and prompts with the last message", async () => {
     const { store, workspace, session, created } = setup();
     const out = await collect(handleRun(input({ messages: prior }), store, new AbortController().signal, { workspace }));

@@ -16,7 +16,7 @@ import { QUIET_ANSWER, TurnView } from "./TurnView";
 
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string; onNewChat: () => void }) {
+export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string }) {
   const { agent } = useAgent({ agentId: `chat-${props.threadId}`, runtimeAgentId: props.agentId, threadId: props.threadId });
   const { copilotkit } = useCopilotKit();
   const [sending, setSending] = useState(false);
@@ -173,7 +173,6 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
           <ErrorBanner
             kind={error.kind}
             message={error.message}
-            onNewChat={props.onNewChat}
             onRetry={() => {
               setError(null);
               void run();

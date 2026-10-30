@@ -10,8 +10,6 @@ import { createTranslator, type PiEvent } from "./translate.js";
 export const EMPTY_REPLY_NUDGE =
   "Your reply so far shows me no answer. Answer my previous message now, in full, from what the tools already returned, without searching again.";
 
-export const SESSION_EXPIRED_MESSAGE = "This chat's session ended (the agent restarted or the chat sat idle). Start a new chat.";
-
 function messageText(m: Message): string {
   const c = (m as { content?: unknown }).content;
   if (typeof c === "string") return c;
@@ -159,10 +157,6 @@ export async function* handleRun(input: RunAgentInput, store: SessionStore, sign
   }
 
   const restoring = !store.get(threadId) && userMessages.length > 1;
-  if (restoring && !opts.workspace) {
-    yield runError("SESSION_EXPIRED", SESSION_EXPIRED_MESSAGE);
-    return;
-  }
 
   const userContext = readUserContext(input);
   console.log(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(messageText(last).slice(0, 200))}`);

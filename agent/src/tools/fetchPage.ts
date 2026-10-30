@@ -13,7 +13,7 @@ export function httpErrorText(status: number, host: string): string {
     : `HTTP ${status} from ${host}`;
 }
 
-export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup; structured?: boolean } = {}) {
+export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup } = {}) {
   const f = deps.fetch ?? fetch;
   return defineTool({
     name: "fetch_page",
@@ -35,7 +35,7 @@ export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup; str
         if (type === "text/html" || type === "application/xhtml+xml") {
           const page = await readCapped(res, MAX_BODY_BYTES);
           const body = truncate(htmlToText(page));
-          const records = deps.structured ? structuredLines(parseJsonLd(page, at)) : [];
+          const records = structuredLines(parseJsonLd(page, at));
           const structured = records.length ? `\n\nstructured:\n${records.join("\n")}` : "";
           return ok(`url: ${at}\n\n${body}${imagesText(page, at, body)}${structured}`);
         }

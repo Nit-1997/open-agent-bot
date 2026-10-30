@@ -88,13 +88,9 @@ describe("fetch_page network guard", () => {
 describe("fetch_page structured data", () => {
   const ld = JSON.stringify({ "@context": "https://schema.org", "@graph": [{ "@type": "Product", name: "Kettle", offers: { "@type": "Offer", price: "39.90", priceCurrency: "EUR", availability: "https://schema.org/InStock" } }] });
   const f = fakeFetch([[/kettle/, () => html(`<script type="application/ld+json">${ld}</script><p>A kettle.</p>`)]]);
-  const run = (structured: boolean) => fetchPageTool({ fetch: f, lookup: publicDns, structured }).execute("c", { url: "https://shop.example.com/kettle" }, undefined, undefined, {} as never);
+  const run = () => fetchPageTool({ fetch: f, lookup: publicDns }).execute("c", { url: "https://shop.example.com/kettle" }, undefined, undefined, {} as never);
 
-  it("appends compact structured lines when on", async () => {
-    expect(text(await run(true))).toMatch(/\n\nstructured:\n- product: Kettle — EUR 39.9, InStock$/);
-  });
-
-  it("leaves the result unchanged when off", async () => {
-    expect(text(await run(false))).not.toContain("structured:");
+  it("appends compact structured lines", async () => {
+    expect(text(await run())).toMatch(/\n\nstructured:\n- product: Kettle — EUR 39.9, InStock$/);
   });
 });

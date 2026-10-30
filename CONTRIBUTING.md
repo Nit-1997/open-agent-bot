@@ -77,7 +77,7 @@ Every provider (a store, a stay site, a flight search) is a `Source` in `agent/s
 2. Add it to `SIMPLE_STORES`.
 3. Add a resolution case to `agent/test/sources/registry.test.ts`.
 
-A store with no entry still works: with `SOURCES_V2` on, `shop` reads any unknown domain through its schema.org JSON-LD (`sources/jsonld.ts`, `sources/retail/jsonldStore.ts`): it finds product pages with a `site:` search, reads their offers, and reports a block with a link when the site denies access. `fetch_page` appends the same data as `structured:` lines.
+A store with no entry still works: `shop` reads any unknown domain through its schema.org JSON-LD (`sources/jsonld.ts`, `sources/retail/jsonldStore.ts`): it finds product pages with a `site:` search, reads their offers, and reports a block with a link when the site denies access. `fetch_page` appends the same data as `structured:` lines.
 
 ### A stay site
 

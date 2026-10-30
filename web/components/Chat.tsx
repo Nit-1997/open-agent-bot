@@ -98,7 +98,7 @@ export function Chat() {
           </div>
         </header>
         <main id="chat-main" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-bg">
-          <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext.locale} name={profile.name} onNewChat={startNewChat} />
+          <ChatSession key={threadId} agentId={AGENT_ID} threadId={threadId} locale={userContext.locale} name={profile.name} />
         </main>
       </div>
       {drawer && (

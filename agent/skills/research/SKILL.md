@@ -5,7 +5,7 @@ description: Load for research, "is X a good buy", decisions, comparisons, and b
 
 # Research and reports
 
-[rpiv] When the research tool is listed, call it once for any report or decision (question, 1-4 queries from different angles, the decision it supports) instead of steps 1, 2 and 4: it searches, reads, writes the report, and checks each claim against its source. For something to buy, do step 3 after it. Then reply per step 6, mentioning claims it could not confirm. Use the steps below only if it fails.
+When the research tool is listed, call it once for any report or decision (question, 1-4 queries from different angles, the decision it supports) instead of steps 1, 2 and 4: it searches, reads, writes the report, and checks each claim against its source. For something to buy, do step 3 after it. Then reply per step 6, mentioning claims it could not confirm. Use the steps below only if it fails.
 1. Search and read the key sources: up to four web searches (parallel when independent) and six pages. Don't keep searching for marginal gains. Use wikipedia once for people, places, or events.
 2. If the subject or options are recognizable by sight (products, cars, places, food, gear, buildings), call image_search once with one query per item, e.g. ["2026 Mazda MX-5 Miata", "Toyota GR86"], unless the pages you read already listed good images. For a quick "tell me about" overview, start the card with an image block from image_search, then the key facts.
 3. Something to buy (a phone, an appliance, gear): once you have the top 2-3 picks, call shop once with them at the user's regional default stores, so the report and reply carry live local prices and buy links in their currency.

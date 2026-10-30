@@ -219,19 +219,6 @@ describe("handleRun", () => {
     expect(runStarts.count).toBe(2);
   });
 
-  it("expired thread yields SESSION_EXPIRED", async () => {
-    const { store } = setup();
-    const msgs = [
-      { id: "m1", role: "user", content: "a" },
-      { id: "m2", role: "assistant", content: "b" },
-      { id: "m3", role: "user", content: "c" },
-    ] as RunAgentInput["messages"];
-    const out = await collect(handleRun(input({ messages: msgs }), store, new AbortController().signal));
-    expect(out.map((e) => e.type)).toEqual([EventType.RUN_STARTED, EventType.RUN_ERROR]);
-    expect(out[1]).toMatchObject({ code: "SESSION_EXPIRED" });
-    expect(store.get("t1")).toBeUndefined();
-  });
-
   it("rejects concurrent run on same thread", async () => {
     const { store, session } = setup(async (emit) => {
       emit(ev.assistantStart);

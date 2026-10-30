@@ -1,7 +1,6 @@
 import type { RunErrorKind } from "@/lib/errors";
 
 const TEXT: Record<RunErrorKind, string> = {
-  SESSION_EXPIRED: "This chat's session ended (the agent restarted or the chat sat idle). Start a new chat to continue.",
   THREAD_BUSY: "Still working on the last message — wait for it to finish.",
   MODEL_ERROR: "The model hit an error.",
   UNKNOWN: "Something went wrong talking to the agent.",
@@ -10,7 +9,6 @@ const TEXT: Record<RunErrorKind, string> = {
 export function ErrorBanner(props: {
   kind: RunErrorKind;
   message?: string;
-  onNewChat: () => void;
   onRetry: () => void;
   onDismiss: () => void;
 }) {
@@ -23,13 +21,8 @@ export function ErrorBanner(props: {
     >
       <span id="error-banner-text" className="flex-1">
         {TEXT[props.kind]}
-        {props.message && props.kind !== "SESSION_EXPIRED" ? ` ${props.message}` : ""}
+        {props.message ? ` ${props.message}` : ""}
       </span>
-      {props.kind === "SESSION_EXPIRED" && (
-        <button id="error-banner-new-chat" type="button" onClick={props.onNewChat} className="rounded-full bg-charcoal px-3 py-1 text-xs font-medium text-on-charcoal">
-          Start new chat
-        </button>
-      )}
       {showRetry && (
         <button id="error-banner-retry" type="button" onClick={props.onRetry} className="rounded-full bg-charcoal px-3 py-1 text-xs font-medium text-on-charcoal">
           Retry

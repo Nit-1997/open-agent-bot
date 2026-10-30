@@ -150,9 +150,7 @@ describe("flights tool", () => {
     expect(r.content[0].text).toContain("Ask them which airport");
   });
 
-  it("names no Bay Area example in the v2 description", () => {
-    const base = { locale: "en-US", currency: "USD", browse: async () => ok("") };
-    expect(flightsTool(base).description).toContain("SJC, SFO, OAK");
-    expect(flightsTool({ ...base, v2: true }).description).not.toContain("SJC");
+  it("names no Bay Area example in its description", () => {
+    expect(flightsTool({ locale: "en-US", currency: "USD", browse: async () => ok("") }).description).not.toContain("SJC");
   });
 });

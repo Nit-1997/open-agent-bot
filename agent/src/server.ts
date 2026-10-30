@@ -4,8 +4,8 @@ import { createApp, defaultModelRef } from "./app.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { loadConfig, hasCap } from "./config.js";
 import { FrameBus } from "./browser/frames.js";
-import { ActiveCart } from "./shop/cart.js";
 import { workspaceCart, workspaceNote } from "./workspace/cart.js";
+import { WorkspaceStore } from "./workspace/store.js";
 import { Evidence } from "./grounding/evidence.js";
 import { createPiSession } from "./pi/createPiSession.js";
 import { createJudge, scopeJudge } from "./judge/index.js";
@@ -15,7 +15,7 @@ import { loadSkillCatalog, skillsDir } from "./skills/catalog.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { BrowserPool } from "./tools/browserPool.js";
-import { ToolBudget, TurnBudget } from "./tools/budget.js";
+import { TurnBudget } from "./tools/budget.js";
 import { completeWith } from "./workflows/llm.js";
 import { buildTools, PER_REPLY_LIMITS } from "./tools/index.js";
 
@@ -23,7 +23,7 @@ const SESSION_IDLE_MS = 30 * 60 * 1000;
 
 const cfg = loadConfig(process.env);
 const artifacts = new ArtifactStore(cfg.artifactsDir);
-const workspace = cfg.flags.workspace ? (await import("./workspace/store.js")).WorkspaceStore.at(cfg.dataDir) : undefined;
+const workspace = WorkspaceStore.at(cfg.dataDir);
 const pool = new BrowserPool();
 const hub = await ProviderHub.create({
   dataDir: cfg.dataDir,
@@ -31,7 +31,7 @@ const hub = await ProviderHub.create({
 });
 
 const judge = await createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: cfg.jevConcurrency });
-console.log(`[jev] model=${cfg.jevModel} available=${judge.available} rerank=${cfg.flags.jevRerank}`);
+console.log(`[jev] model=${cfg.jevModel} available=${judge.available}`);
 
 const modelRef = (m: Model<any>) => `${m.provider}/${m.id}`;
 
@@ -45,24 +45,24 @@ function modelFor(ref: string | undefined) {
 const store = new SessionStore({
   idleMs: SESSION_IDLE_MS,
   create: async (threadId, userContext, history) => {
-    const budget = cfg.flags.turnBudget ? new TurnBudget(PER_REPLY_LIMITS) : new ToolBudget(PER_REPLY_LIMITS);
+    const budget = new TurnBudget(PER_REPLY_LIMITS);
     const evidence = new Evidence();
     const frames = new FrameBus();
-    const cart = workspace ? workspaceCart(workspace, threadId) : new ActiveCart();
+    const cart = workspaceCart(workspace, threadId);
     const codemode = hasCap(cfg, modelRef(modelFor(userContext?.model)), "codemode");
-    const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv, codemode }) : [];
+    const skills = loadSkillCatalog(skillsDir(), { codemode });
     const turnJudge = scopeJudge(judge);
     let current = modelFor(userContext?.model);
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: current,
-      systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
+      systemPrompt: buildSystemPrompt(userContext, skills),
       tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, judge: turnJudge, workspace, complete: completeWith(hub.runtime, () => current) }),
-      ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
+      skillsDir: skillsDir(),
       codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
       onCodemodeOff: (reason: string) => console.log(`[codemode] thread=${threadId} off for this chat: ${reason}`),
-      ...(workspace && { history }),
-      ...(workspace && { contextNote: () => workspaceNote(workspace, threadId) }),
+      history,
+      contextNote: () => workspaceNote(workspace, threadId),
     });
     return {
       session: handle.session,

@@ -1,11 +1,10 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 
 describe("buildSystemPrompt", () => {
   it("includes user context and the core rules", () => {
     const p = buildSystemPrompt({ timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T14:00" });
-    for (const s of ["Asia/Kolkata", "en-IN", "2026-10-27T14:00", "checkout", "show_ui", "unverified", "create_artifact", "ask_user", "start_date", "typical", "nearby airports", "Don't offer driving", "max_layover", "depart_times", "Compare nearby airports?", "Lead with the answer in one sentence", "Only check the weather when", "never mention that you can't buy", "cards block", "even when some have no image", "image_search", "shape \"wide\"", "queries listing every item", "start the card with an image block", "call music once", "call wikipedia once", "even a single product", "one card per item, even without a link or price", "<followups>", "call shop once", "shop shows its own cart card", "the same cart", "pantry basics"]) {
+    for (const s of ["Asia/Kolkata", "en-IN", "2026-10-27T14:00", "Country: IN", "Currency: INR", "checkout", "unverified", "ask_user", "<followups>"]) {
       expect(p).toContain(s);
     }
   });
@@ -42,16 +41,5 @@ describe("buildSystemPrompt", () => {
 
   it("leaves the profile section out when there is none", () => {
     expect(buildSystemPrompt({ timeZone: "UTC", locale: "en-US", localTime: "2026-10-27T18:00" })).not.toContain("About the user");
-  });
-});
-
-describe("buildSystemPrompt with promptV2 off", () => {
-  const fixture = (n: string) => readFileSync(new URL(`../fixtures/${n}`, import.meta.url), "utf8");
-
-  it("matches the pre-v2 prompt exactly", () => {
-    const ctx = { timeZone: "America/Los_Angeles", locale: "en-US", localTime: "2026-10-27T18:00", profile: { name: "Nitin", home: "Sunnyvale, CA 94087", interests: ["Vegetarian"], notes: "Two cats." } };
-    expect(buildSystemPrompt(ctx)).toBe(fixture("legacyPrompt.us.txt"));
-    expect(buildSystemPrompt(ctx, { promptV2: false, skills: [{ name: "x", description: "y" }] })).toBe(fixture("legacyPrompt.us.txt"));
-    expect(buildSystemPrompt(null)).toBe(fixture("legacyPrompt.none.txt"));
   });
 });

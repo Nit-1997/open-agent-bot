@@ -60,18 +60,15 @@ describe("codemode skills", () => {
   });
 });
 
-describe("workspace lines", () => {
-  const body = (workspace: boolean, name: string) => loadSkillCatalog(skillsDir({}), { workspace }).find((x) => x.name === name)!.body;
+describe("planning skills", () => {
+  const body = (name: string) => loadSkillCatalog(skillsDir({})).find((x) => x.name === name)!.body;
 
-  it("appear in party and trip planning only when the workspace flag is on", () => {
-    for (const name of ["party-planning", "trip-planning"]) {
-      expect(body(false, name)).not.toContain("plan set");
-      expect(body(false, name)).not.toContain("[workspace]");
-      expect(body(true, name)).toContain("plan set");
-      expect(body(true, name)).not.toContain("[workspace]");
-    }
-    expect(body(true, "party-planning")).toContain("plan patch guests");
-    expect(body(true, "trip-planning")).toContain("Follow-ups patch it");
+  it("record plans in the workspace and point research at the research tool", () => {
+    for (const name of ["party-planning", "trip-planning"]) expect(body(name)).toContain("plan set");
+    expect(body("party-planning")).toContain("plan patch guests");
+    expect(body("trip-planning")).toContain("Follow-ups patch it");
+    expect(body("research")).toContain("When the research tool is listed");
+    for (const name of ["party-planning", "trip-planning", "research"]) expect(body(name)).not.toMatch(/\[(workspace|rpiv)\]/);
   });
 });
 
@@ -94,7 +91,7 @@ describe("skill content", () => {
   });
 });
 
-describe("prompt v2", () => {
+describe("system prompt", () => {
   const skills = loadSkillCatalog(skillsDir({}));
 
   it("keeps the core under 2,000 characters", () => {
@@ -102,7 +99,7 @@ describe("prompt v2", () => {
   });
 
   it("lists every skill in the index after the core", () => {
-    const p = buildSystemPrompt(null, { promptV2: true, skills });
+    const p = buildSystemPrompt(null, skills);
     expect(p.startsWith(CORE_PROMPT)).toBe(true);
     for (const s of skills) expect(p).toContain(`- ${s.name}: ${s.description}`);
     expect(p).toContain("call load_skill");
@@ -110,15 +107,14 @@ describe("prompt v2", () => {
   });
 
   it("names no hard-coded Bay Area airports", () => {
-    expect(buildSystemPrompt(null, { promptV2: true, skills })).not.toMatch(/SJC|SFO|OAK|Bay Area/);
+    expect(buildSystemPrompt(null, skills)).not.toMatch(/SJC|SFO|OAK|Bay Area/);
   });
 
-  it("is far smaller than the legacy prompt and keeps the user context", () => {
+  it("keeps the user context", () => {
     const ctx = { timeZone: "America/Los_Angeles", locale: "en-US", localTime: "2026-10-27T18:00", profile: { name: "Nitin", home: "Sunnyvale, CA 94087" } };
-    const v2 = buildSystemPrompt(ctx, { promptV2: true, skills });
-    expect(v2).toContain("Country: US");
-    expect(v2).toContain("Home: Sunnyvale, CA 94087");
-    expect(v2.length).toBeLessThan(buildSystemPrompt(ctx).length * 0.6);
+    const p = buildSystemPrompt(ctx, skills);
+    expect(p).toContain("Country: US");
+    expect(p).toContain("Home: Sunnyvale, CA 94087");
   });
 
   it("picks up a new skill directory with no code change", async () => {
@@ -126,7 +122,7 @@ describe("prompt v2", () => {
     for (const n of NAMES) dummy(dir, n);
     dummy(dir, "pet-care");
     const found = loadSkillCatalog(skillsDir({ SKILLS_DIR: dir }));
-    expect(buildSystemPrompt(null, { promptV2: true, skills: found })).toContain("- pet-care: Load for pet grooming questions.");
+    expect(buildSystemPrompt(null, found)).toContain("- pet-care: Load for pet grooming questions.");
     expect(text(await run(found, "pet-care"))).toBe("# Grooming\n\nBrush daily.");
   });
 });
@@ -153,16 +149,5 @@ describe("load_skill", () => {
       expect(r.isError).toBe(true);
       expect(text(r)).toContain("Unknown skill");
     }
-  });
-});
-
-describe("rpiv lines", () => {
-  const body = (rpiv: boolean) => loadSkillCatalog(skillsDir({}), { rpiv }).find((x) => x.name === "research")!.body;
-
-  it("point the research skill at the research tool only when the flag is on", () => {
-    expect(body(false)).not.toContain("research tool");
-    expect(body(false)).not.toContain("[rpiv]");
-    expect(body(true)).toContain("When the research tool is listed");
-    expect(body(true)).not.toContain("[rpiv]");
   });
 });

@@ -14,8 +14,8 @@ describe("no store or provider names in the core prompt or skills", () => {
   it("finds none in the v2 core prompt, with or without user context", () => {
     expect(CORE_PROMPT).not.toMatch(pattern);
     const ctx = { timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T14:00" };
-    expect(buildSystemPrompt(ctx, { promptV2: true })).not.toMatch(pattern);
-    expect(buildSystemPrompt(null, { promptV2: true })).not.toMatch(pattern);
+    expect(buildSystemPrompt(ctx)).not.toMatch(pattern);
+    expect(buildSystemPrompt(null)).not.toMatch(pattern);
   });
 
   it.each(skills.map((s) => [s.name, s.body]))("finds none in the %s skill", (_name, body) => {

@@ -8,7 +8,7 @@ import { Type } from "typebox";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { codemodeFailure, createPiSession } from "../../src/pi/createPiSession.js";
 import { ProviderHub } from "../../src/providers/hub.js";
-import { ToolBudget, TurnBudget, withBudget } from "../../src/tools/budget.js";
+import { TurnBudget, withBudget } from "../../src/tools/budget.js";
 import { fetchPageTool } from "../../src/tools/fetchPage.js";
 import { scopeToCodemode } from "../../src/tools/index.js";
 import { fail } from "../../src/tools/result.js";
@@ -134,7 +134,7 @@ describe("codemode sandbox guards", () => {
 
   it("applies the per-reply budget to calls made from a script", async () => {
     const hits: string[] = [];
-    const budget = new ToolBudget({ search: 2 });
+    const budget = new TurnBudget({}, { total: 2 });
     const search = withBudget(fakeTool("web_search", hits), budget, "search");
     const r = await run(`const rs = await Promise.allSettled([1,2,3,4].map((i) => tools.web_search({ q: "q" + i }))); return rs.map((x) => x.status === "fulfilled" ? "ok" : "budget:" + /used up/.test(String(x.reason))).join(",");`, [search]);
     expect(hits).toHaveLength(2);
@@ -271,7 +271,7 @@ describe("codemode switches itself off for the chat when a script goes wrong", (
     const clean = await prompted(`return await tools.weather({ q: "Rome" });`, [fakeTool("weather", [])]);
     expect(clean.reasons).toEqual([]);
     expect(clean.active).toBe(true);
-    const budget = new ToolBudget({ search: 0 });
+    const budget = new TurnBudget({}, { total: 0 });
     const limited = await prompted(`try { await tools.web_search({ q: "x" }); } catch {} return "ok";`, [withBudget(fakeTool("web_search", []), budget, "search")]);
     expect(limited.reasons).toEqual([]);
     expect(limited.active).toBe(true);

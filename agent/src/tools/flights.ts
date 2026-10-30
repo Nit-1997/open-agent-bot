@@ -36,7 +36,7 @@ function summary(o: FlightOption, currency: string): string {
 
 type Attempt = Awaited<ReturnType<FlightSource["search"]>>;
 type Search = { code: string; url: string; last: Attempt };
-type Deps = { source: FlightSource; locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null>; nearby?: () => Promise<string[]>; v2?: boolean };
+type Deps = { source: FlightSource; locale: string; currency: string; browse: Browse; drive?: (airportCode: string) => Promise<Drive | null>; nearby?: () => Promise<string[]> };
 type Params = { from: string; to: string; date: string; returnDate?: string; adults?: number; max_layover?: string; depart_times?: string };
 
 function readPrefs(params: Params): FlightPrefs {
@@ -124,7 +124,7 @@ export function flightsTool(args: Omit<Deps, "source"> & { source?: FlightSource
   return defineTool({
     name: "flights",
     label: "Flights",
-    description: `Search flights on ${source.label} and show one flight card (with links for the user to book themselves); afterwards summarize briefly. Dates are YYYY-MM-DD. 'from' is one airport code or city, or up to ${MAX_ORIGINS} nearby airport codes separated by commas (e.g. "${deps.v2 ? "JFK, LGA, EWR" : "SJC, SFO, OAK"}") to compare them in one search; the card ranks airports by fare plus an estimated rideshare from the user's home. Pass the user's layover and departure-time preferences when known.`,
+    description: `Search flights on ${source.label} and show one flight card (with links for the user to book themselves); afterwards summarize briefly. Dates are YYYY-MM-DD. 'from' is one airport code or city, or up to ${MAX_ORIGINS} nearby airport codes separated by commas (e.g. "JFK, LGA, EWR") to compare them in one search; the card ranks airports by fare plus an estimated rideshare from the user's home. Pass the user's layover and departure-time preferences when known.`,
     parameters: Type.Object({
       from: Type.String({ minLength: 2, description: "airport code or city, or comma-separated nearby airport codes" }),
       to: Type.String({ minLength: 2 }),

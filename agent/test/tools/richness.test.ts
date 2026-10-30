@@ -42,7 +42,7 @@ describe("reports lead with a picture", () => {
   const store = { save: async (_t: string, html: string) => ({ id: "a1", html }) };
   const images = { isSourced: () => true, loads: async () => true };
   const pic = '<img src="https://img.example/miata.jpg" alt="Miata RF">';
-  const filler = "<p>" + "x".repeat(7000) + "</p>";
+  const filler = `<p>${"x".repeat(7000)}</p>`;
 
   it("knows when a picture is near the top", () => {
     expect(leadsWithPicture(`<body><h1>Miata</h1>${pic}<p>text</p></body>`)).toBe(true);

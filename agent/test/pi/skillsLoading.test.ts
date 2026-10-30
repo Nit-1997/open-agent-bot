@@ -19,7 +19,7 @@ async function open(skills?: string) {
   return createPiSession({
     runtime: hub.runtime,
     model,
-    systemPrompt: buildSystemPrompt(null, { promptV2: true, skills: catalog }),
+    systemPrompt: buildSystemPrompt(null, catalog),
     tools: [loadSkillTool(() => catalog)],
     ...(skills && { skillsDir: skills }),
   });
@@ -34,15 +34,6 @@ describe("pi skill loading", () => {
       expect(p).not.toContain("<available_skills>");
       expect(p.match(/trip-planning/g)?.length).toBe(1);
       expect(handle.session.getActiveToolNames()).toEqual(["load_skill"]);
-    } finally {
-      await handle.dispose();
-    }
-  });
-
-  it("legacy path loads no skills", async () => {
-    const handle = await open();
-    try {
-      expect(handle.session.resourceLoader.getSkills().skills).toEqual([]);
     } finally {
       await handle.dispose();
     }

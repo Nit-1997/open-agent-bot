@@ -342,7 +342,7 @@ async function rescoreDir(dir: string, priceArg: string | undefined, writeBaseli
       return s ? rescore(r, s, price) : r;
     })
     .sort((a, b) => a.scenario.localeCompare(b.scenario) || a.run - b.run);
-  await writeFile(join(dir, "runs.jsonl"), records.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  await writeFile(join(dir, "runs.jsonl"), `${records.map((r) => JSON.stringify(r)).join("\n")}\n`);
   const model = records[0].model;
   const name = basename(dir);
   const date = name.slice(0, 10);

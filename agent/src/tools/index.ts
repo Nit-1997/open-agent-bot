@@ -81,8 +81,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         const h = await home();
         return h ? nearbyAirports(h) : [];
       } : undefined;
-  const v2 = deps.cfg.flags.promptV2;
-  const sourcesV2 = deps.cfg.flags.sourcesV2;
+  const judge = deps.judge ?? noJudge;
   const country = regionFor(deps.userContext).country;
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.cfg.braveApiKey };
   const openTab: OpenTab = async (live) => {
@@ -99,31 +98,30 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
   const browseDeps = { pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames };
   const tools: ToolDefinition<any, any, any>[] = [
     withBudget(webSearchTool(search), deps.budget, "search"),
-    withBudget(withRules(imageSearchTool(search), RULES.imageSearch, v2), deps.budget, "images"),
-    withBudget(musicTool({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }), deps.budget, "lookup"),
+    withBudget(withRules(imageSearchTool(search), RULES.imageSearch), deps.budget, "images"),
+    withBudget(musicTool({ country, judge }), deps.budget, "lookup"),
     withBudget(wikipediaTool(), deps.budget, "lookup"),
-    withBudget(fetchPageTool({ structured: sourcesV2 }), deps.budget, "read"),
+    withBudget(fetchPageTool(), deps.budget, "read"),
     withBudget(browseTool(browseDeps), deps.budget, "read"),
-    withBudget(withRules(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart, judge: deps.cfg.flags.jevRerank ? (deps.judge ?? noJudge) : undefined, sourcesV2, region: country, webSearch: sourcesV2 ? (query) => runSearch(search, query, "web", 8) : undefined }), shopRules(country), v2), deps.budget, "shop"),
-    withRules(weatherTool({ defaultUnits: country === "US" ? "imperial" : "metric" }), RULES.weather, v2),
+    withBudget(withRules(shopTool({ pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames, cart: deps.cart, judge, region: country, webSearch: (query) => runSearch(search, query, "web", 8) }), shopRules(country)), deps.budget, "shop"),
+    withRules(weatherTool({ defaultUnits: country === "US" ? "imperial" : "metric" }), RULES.weather),
     withBudget(withRules(flightsTool({
       locale: deps.userContext?.locale ?? "en-US",
       currency: regionFor(deps.userContext).currency,
       browse: (actions, opts) => runBrowse(browseDeps, actions, opts),
       drive,
       nearby,
-      v2,
-    }), RULES.flights, v2), deps.budget, "flights"),
-    withBudget(withRules(staysTool({ openTab, region: country, currency: regionFor(deps.userContext).currency, judge: deps.cfg.flags.jevStays ? (deps.judge ?? noJudge) : undefined }), RULES.stays, v2), deps.budget, "stays"),
+    }), RULES.flights), deps.budget, "flights"),
+    withBudget(withRules(staysTool({ openTab, region: country, currency: regionFor(deps.userContext).currency, judge }), RULES.stays), deps.budget, "stays"),
     withRules(showUiTool({
-      findMusicArt: musicCover({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }),
+      findMusicArt: musicCover({ country, judge }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
-      findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, v2, BLOCKS_HELP),
-    withRules(askUserTool(), RULES.askUser, v2, FIELDS_HELP),
-    withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, v2, REPORT_GUIDE),
-    ...(deps.cfg.flags.rpiv && deps.complete ? [withBudget(researchTool({ search, artifacts: deps.artifacts, images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }, complete: deps.complete, judge: deps.judge, evidence: deps.evidence }), deps.budget, "research")] : []),
-    ...(v2 ? [loadSkillTool(() => deps.skills ?? [])] : []),
-    ...(deps.cfg.flags.workspace && deps.workspace ? [planTool({ store: deps.workspace, threadId: deps.threadId })] : []),
+      findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, BLOCKS_HELP),
+    withRules(askUserTool(), RULES.askUser, FIELDS_HELP),
+    withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, REPORT_GUIDE),
+    ...(deps.complete ? [withBudget(researchTool({ search, artifacts: deps.artifacts, images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }, complete: deps.complete, judge, evidence: deps.evidence }), deps.budget, "research")] : []),
+    loadSkillTool(() => deps.skills ?? []),
+    ...(deps.workspace ? [planTool({ store: deps.workspace, threadId: deps.threadId })] : []),
   ];
   return scopeToCodemode(tools);
 }

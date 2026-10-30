@@ -72,9 +72,8 @@ describe("resolveStore", () => {
     expect(id("Best Buy")).toBe("bestbuy");
   });
 
-  it("gives unknown domains the structured-data reader only when asked", () => {
-    expect(resolveStore(r, "www.bhphotovideo.com").search).toBeUndefined();
-    const s = resolveStore(r, "newegg.com", { jsonld: true });
+  it("gives unknown domains the structured-data reader", () => {
+    const s = resolveStore(r, "newegg.com");
     expect(s).toMatchObject({ id: "newegg.com", home: "https://www.newegg.com/" });
     expect(s.search).toBeTypeOf("function");
   });

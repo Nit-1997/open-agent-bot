@@ -1,18 +1,5 @@
 export type ModelOption = { id: string; label: string; note?: string };
 
-export const FLAG_ENV = {
-  jevRerank: "JEV_RERANK",
-  promptV2: "PROMPT_V2",
-  jevStays: "JEV_STAYS",
-  jevMusic: "JEV_MUSIC",
-  turnBudget: "TURN_BUDGET",
-  sourcesV2: "SOURCES_V2",
-  workspace: "WORKSPACE",
-  rpiv: "RPIV",
-} as const;
-
-export type Flags = Record<keyof typeof FLAG_ENV, boolean>;
-
 export type AgentConfig = {
   port: number;
   llmBaseUrl: string;
@@ -26,11 +13,10 @@ export type AgentConfig = {
   models: ModelOption[];
   jevModel: string;
   jevConcurrency: number;
-  flags: Flags;
   modelCaps: Record<string, string[]>;
 };
 
-export type ModelCap = "frontier" | "codemode";
+export type ModelCap = "codemode";
 
 function parseCaps(raw: string | undefined): Record<string, string[]> {
   return Object.fromEntries(
@@ -46,12 +32,6 @@ export function hasCap(cfg: Pick<AgentConfig, "modelCaps">, ref: string | undefi
   if (!ref) return false;
   const bare = ref.startsWith("litellm/") ? ref.slice("litellm/".length) : ref;
   return (cfg.modelCaps[ref] ?? cfg.modelCaps[bare] ?? []).includes(cap);
-}
-
-const on = (v: string | undefined) => ["1", "true", "on", "yes"].includes((v ?? "").trim().toLowerCase());
-
-function parseFlags(env: NodeJS.ProcessEnv): Flags {
-  return Object.fromEntries(Object.entries(FLAG_ENV).map(([k, name]) => [k, on(env[name])])) as Flags;
 }
 
 function parseModels(raw: string | undefined, fallback: string): ModelOption[] {
@@ -78,7 +58,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
     models: parseModels(env.AGENT_MODELS, model),
     jevModel: env.JEV_MODEL || "openrouter/typesafe/jev-1.14",
     jevConcurrency: Math.max(1, Number(env.JEV_CONCURRENCY) || 64),
-    flags: parseFlags(env),
     modelCaps: parseCaps(env.AGENT_MODEL_CAPS),
   };
 }

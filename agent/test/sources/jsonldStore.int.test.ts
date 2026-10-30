@@ -93,7 +93,6 @@ describe("JSON-LD store for unknown domains", () => {
       threadId: "jsonld-t",
       userContext: null,
       allowPrivateHosts: true,
-      sourcesV2: true,
       webSearch: ctx().webSearch,
       storeFor: (s) => stores[s],
       cart: new ActiveCart(),

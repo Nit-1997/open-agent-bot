@@ -26,7 +26,7 @@ Source documents: `open-bot-architecture.html` (target state) and `open-bot-buil
 | `SOURCES_V2` | M4 | source registry + JSON-LD reader |
 | ~~`CODEMODE`~~ | M5 | removed 2026-10-30: codemode is on for every model tagged `codemode` in `AGENT_MODEL_CAPS` |
 | `WORKSPACE` | M6 | SQLite workspace, `plan` tool, session restore |
-| `ROUTER` | M7 | pre-turn Jev router hints and policy hand-off |
+| ~~`ROUTER`~~ | M7 | pre-turn Jev router hints and policy hand-off |
 | `RPIV` | M8 | research workflow with verify step |
 
 Flags are part of `AgentConfig`. When a flag is off, behavior is exactly today's.
