@@ -2,6 +2,7 @@ import type { Judge } from "../judge/index.js";
 import { coverMatch } from "../judge/criteria/coverMatch.js";
 import { type ITunes, pickMusic } from "./lookup.js";
 import { timeoutSignal } from "./net.js";
+import { withRetry } from "../lib/retry.js";
 
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
 const SPOTIFY_ITEM = /^\/(?:intl-[a-z-]+\/)?(playlist|album|track|artist)\/([A-Za-z0-9]+)/;
@@ -102,7 +103,7 @@ async function appleSearch(name: string, country: string, f: typeof fetch, entit
 }
 
 export function musicCover(deps: { country: string; fetch?: typeof fetch; judge?: Judge }) {
-  const f = deps.fetch ?? fetch;
+  const f = withRetry(deps.fetch ?? fetch);
   return async (card: MusicCard): Promise<string | undefined> => {
     const spotify = spotifyItemUrl(card.url);
     if (spotify) {

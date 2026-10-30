@@ -9,7 +9,9 @@ Use codemode only when it replaces many reads or turns: exact arithmetic (totals
 
 Script rules:
 - Scripts reach web_search, fetch_page, wikipedia, music, weather, shop, stays and flights. Nothing else (no show_ui, ask_user, create_artifact); do those yourself after the script.
-- Run independent calls together with Promise.allSettled and skip the ones that failed.
+- Run independent calls together with Promise.allSettled. Never drop failures silently: return which items failed and why, like "failed: Barcelona (HTTP 429)", next to the results.
+- If items failed, call the plain tool for just those items (codemode may be gone after a failed script), then answer with every item accounted for.
+- The script's output is only for you. Always write the final answer yourself, in full, with the numbers; never refer to results "above" that the user cannot see.
 - Return a short summary (the top picks with the numbers or reasons that matter, and counts like "ranked 14 of 16"), never raw lists. Then show the result with show_ui yourself.
 - Set `// @options: {"max_output_tokens": 1500}` as the first line when you expect a lot of output.
 

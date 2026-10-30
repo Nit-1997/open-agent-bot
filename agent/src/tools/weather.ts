@@ -4,6 +4,7 @@ import type { WeatherData } from "./data.js";
 import { findPlace } from "./geo.js";
 import { timeoutSignal } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
+import { withRetry } from "../lib/retry.js";
 
 export function wmoCondition(code: number): string {
   if (code === 0) return "Clear";
@@ -74,7 +75,7 @@ function pastDays(archives: Archive[], date: string): PastDay[] {
 }
 
 export function weatherTool(deps: { fetch?: typeof fetch; defaultUnits?: "metric" | "imperial"; today?: () => string } = {}) {
-  const f = deps.fetch ?? fetch;
+  const f = withRetry(deps.fetch ?? fetch);
   const today = deps.today ?? (() => toIso(new Date()));
   return defineTool({
     name: "weather",

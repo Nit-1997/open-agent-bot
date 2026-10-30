@@ -5,6 +5,7 @@ import { keyWords } from "../lib/keywords.js";
 import { queryList } from "./args.js";
 import { timeoutSignal } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
+import { withRetry } from "../lib/retry.js";
 
 type Deps = { searxngUrl: string; braveApiKey?: string; fetch?: typeof fetch };
 type Hit = { title: string; url: string; snippet?: string; image?: string };
@@ -48,7 +49,7 @@ async function brave(deps: Deps, f: typeof fetch, query: string, kind: Kind, cou
 }
 
 export async function search(deps: Deps, query: string, kind: Kind, count: number, signal?: AbortSignal): Promise<Hit[]> {
-  const f = deps.fetch ?? fetch;
+  const f = withRetry(deps.fetch ?? fetch);
   let hits: Hit[] = [];
   let error: unknown;
   try {

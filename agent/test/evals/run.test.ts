@@ -149,7 +149,7 @@ describe("runScenario", () => {
 describe("helpers", () => {
   it("loads every committed scenario and each assertion evaluates without a config error", () => {
     const ids = loadScenarios(new URL("../../evals/scenarios", import.meta.url).pathname).map((s) => s.id);
-    expect(ids.sort()).toEqual(["car", "dining", "events", "gifts", "grocery-offlist", "hotel-brand", "india-shop", "party", "party-followup", "playlist", "recipe-cart", "research", "store-domain", "trip"]);
+    expect(ids.sort()).toEqual(["car", "cities-fanout", "dining", "events", "gifts", "grocery-offlist", "hotel-brand", "india-shop", "party", "party-followup", "playlist", "recipe-cart", "research", "store-domain", "trip"]);
     for (const s of loadScenarios(new URL("../../evals/scenarios", import.meta.url).pathname)) {
       const empty = [{ prompt: "", tools: [], widgets: [], unverifiedClaims: 0, text: "", askedUser: false, durationMs: 0 }];
       for (const r of evaluateAll([...s.assert, ...s.future_assert], [...empty, ...empty])) expect(r.detail, `${s.id} ${r.label}`).not.toMatch(/needs|unknown assertion|Invalid regular/);

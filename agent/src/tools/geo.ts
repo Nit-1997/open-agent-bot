@@ -1,4 +1,5 @@
 import { timeoutSignal } from "./net.js";
+import { retryingFetch } from "../lib/retry.js";
 
 export type LatLon = { lat: number; lon: number };
 export type Airport = LatLon & { name: string };
@@ -95,7 +96,7 @@ export type Drive = { miles: number; minutes?: number; source: "road" | "estimat
 
 const oneDecimal = (n: number) => Math.round(n * 10) / 10;
 
-export async function driveRoute(from: LatLon, to: LatLon, f: typeof fetch = fetch): Promise<Drive> {
+export async function driveRoute(from: LatLon, to: LatLon, f: typeof fetch = retryingFetch): Promise<Drive> {
   try {
     const u = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=false`;
     const res = await f(u, { signal: AbortSignal.timeout(8000) });
@@ -107,7 +108,7 @@ export async function driveRoute(from: LatLon, to: LatLon, f: typeof fetch = fet
 
 export type Place = LatLon & { name: string; country?: string };
 
-export async function findPlace(name: string, f: typeof fetch = fetch, signal?: AbortSignal): Promise<Place | null> {
+export async function findPlace(name: string, f: typeof fetch = retryingFetch, signal?: AbortSignal): Promise<Place | null> {
   const u = new URL("https://geocoding-api.open-meteo.com/v1/search");
   u.searchParams.set("name", name);
   u.searchParams.set("count", "1");
@@ -117,7 +118,7 @@ export async function findPlace(name: string, f: typeof fetch = fetch, signal?: 
   return hit ? { name: hit.name, ...(hit.country && { country: hit.country }), lat: hit.latitude, lon: hit.longitude } : null;
 }
 
-export async function geocode(place: string, f: typeof fetch = fetch): Promise<LatLon | null> {
+export async function geocode(place: string, f: typeof fetch = retryingFetch): Promise<LatLon | null> {
   const tries = [...new Set([place, place.split(",")[0]].map((s) => s.trim()).filter(Boolean))];
   for (const name of tries) {
     const hit = await findPlace(name, f).catch(() => null);

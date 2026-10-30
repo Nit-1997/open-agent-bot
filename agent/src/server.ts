@@ -59,7 +59,10 @@ const store = new SessionStore({
       systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
       tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, judge: turnJudge, workspace, complete: completeWith(hub.runtime, () => current) }),
       ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
-      ...(cfg.flags.codemode && { codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode") }),
+      ...(cfg.flags.codemode && {
+        codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
+        onCodemodeOff: (reason: string) => console.log(`[codemode] thread=${threadId} off for this chat: ${reason}`),
+      }),
       ...(workspace && { history }),
       ...(workspace && { contextNote: () => workspaceNote(workspace, threadId) }),
     });

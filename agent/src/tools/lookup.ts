@@ -6,6 +6,7 @@ import { mapLimit } from "../lib/concurrency.js";
 import { queryList } from "./args.js";
 import { timeoutSignal } from "./net.js";
 import { fail, ok, type ToolResult } from "./result.js";
+import { withRetry } from "../lib/retry.js";
 
 const MAX_BATCH = 10;
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };
@@ -67,7 +68,7 @@ export async function pickMusic(results: ITunes[], query: string, kind: "album" 
 }
 
 export function musicTool(deps: { country: string; fetch?: typeof fetch; judge?: Judge }) {
-  const f = deps.fetch ?? fetch;
+  const f = withRetry(deps.fetch ?? fetch);
   return defineTool({
     name: "music",
     label: "Music",
@@ -104,7 +105,7 @@ export function musicTool(deps: { country: string; fetch?: typeof fetch; judge?:
 type WikiPage = { title?: string; description?: string; extract?: string; thumbnail?: { source?: string }; fullurl?: string };
 
 export function wikipediaTool(deps: { fetch?: typeof fetch } = {}) {
-  const f = deps.fetch ?? fetch;
+  const f = withRetry(deps.fetch ?? fetch);
   return defineTool({
     name: "wikipedia",
     label: "Wikipedia",

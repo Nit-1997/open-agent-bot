@@ -10,5 +10,5 @@ export default defineConfig({
       { find: /^typebox$/, replacement: nm("typebox/build/index.mjs") },
     ],
   },
-  test: { include: ["test/**/*.test.ts"], testTimeout: 30000, execArgv: ["--disable-warning=ExperimentalWarning"] },
+  test: { include: ["test/**/*.test.ts"], setupFiles: ["test/setup.ts"], testTimeout: 30000, execArgv: ["--disable-warning=ExperimentalWarning"] },
 });

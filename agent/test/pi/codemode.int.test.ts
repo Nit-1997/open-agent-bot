@@ -6,11 +6,12 @@ import { join } from "node:path";
 import { defineTool, type ModelRuntime, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPiSession } from "../../src/pi/createPiSession.js";
+import { codemodeFailure, createPiSession } from "../../src/pi/createPiSession.js";
 import { ProviderHub } from "../../src/providers/hub.js";
 import { ToolBudget, TurnBudget, withBudget } from "../../src/tools/budget.js";
 import { fetchPageTool } from "../../src/tools/fetchPage.js";
 import { scopeToCodemode } from "../../src/tools/index.js";
+import { fail } from "../../src/tools/result.js";
 
 let server: Server;
 let hub: ProviderHub;
@@ -228,5 +229,62 @@ describe("codemode availability follows the model", () => {
     } finally {
       await handle.dispose();
     }
+  });
+});
+
+describe("codemode switches itself off for the chat when a script goes wrong", () => {
+  function failingTool(name: string, text: string): ToolDefinition<any, any, any> {
+    return defineTool({ name, label: name, description: `fake ${name}`, parameters: Type.Object({ q: Type.Optional(Type.String()) }), execute: async () => fail(text) });
+  }
+
+  async function prompted(code: string, tools: ToolDefinition<any, any, any>[]) {
+    const model = hub.resolve("litellm/m");
+    if (!model) throw new Error("no model");
+    const reasons: string[] = [];
+    const handle = await createPiSession({ runtime: hub.runtime, model, systemPrompt: "sys", tools: scopeToCodemode(tools), codemode: () => true, onCodemodeOff: (r) => reasons.push(r) });
+    script = code;
+    toolNamesSeen = [];
+    try {
+      await handle.session.prompt("go");
+      return { reasons, seen: toolNamesSeen, active: handle.codemodeActive(), handle };
+    } finally {
+      await handle.dispose();
+    }
+  }
+
+  it("drops codemode before the next model call when a tool inside the script fails", async () => {
+    const r = await prompted(`const rs = await Promise.allSettled(["a", "b"].map((q) => tools.weather({ q }))); return rs.map((x) => x.status).join(",");`, [failingTool("weather", "weather service error: HTTP 429")]);
+    expect(r.reasons).toEqual(["2 tool call(s) in the script failed (weather)"]);
+    expect(r.seen[0]).toContain("codemode");
+    expect(r.seen.at(-1)).not.toContain("codemode");
+    expect(r.seen.at(-1)).toContain("weather");
+    expect(r.active).toBe(false);
+  }, 60000);
+
+  it("drops codemode when the script itself throws", async () => {
+    const r = await prompted(`throw new Error("bad script");`, []);
+    expect(r.reasons).toEqual(["the script failed"]);
+    expect(r.active).toBe(false);
+  }, 60000);
+
+  it("keeps codemode after a clean script or a per-reply limit refusal", async () => {
+    const clean = await prompted(`return await tools.weather({ q: "Rome" });`, [fakeTool("weather", [])]);
+    expect(clean.reasons).toEqual([]);
+    expect(clean.active).toBe(true);
+    const budget = new ToolBudget({ search: 0 });
+    const limited = await prompted(`try { await tools.web_search({ q: "x" }); } catch {} return "ok";`, [withBudget(fakeTool("web_search", []), budget, "search")]);
+    expect(limited.reasons).toEqual([]);
+    expect(limited.active).toBe(true);
+  }, 60000);
+});
+
+describe("codemodeFailure", () => {
+  it("names failed calls and ignores cancelled ones and budget refusals", () => {
+    const details = (calls: { name: string; status: string; error?: string }[]) => ({ details: { calls } });
+    expect(codemodeFailure(false, details([{ name: "weather", status: "ok" }]))).toBeUndefined();
+    expect(codemodeFailure(false, details([{ name: "weather", status: "cancelled" }]))).toBeUndefined();
+    expect(codemodeFailure(false, details([{ name: "web_search", status: "error", error: "Budget for web_search in this reply is used up" }]))).toBeUndefined();
+    expect(codemodeFailure(false, details([{ name: "weather", status: "error" }, { name: "music", status: "error" }]))).toBe("2 tool call(s) in the script failed (weather, music)");
+    expect(codemodeFailure(true, undefined)).toBe("the script failed");
   });
 });

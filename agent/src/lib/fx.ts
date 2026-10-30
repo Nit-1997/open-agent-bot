@@ -1,4 +1,5 @@
 import { timeoutSignal } from "../tools/net.js";
+import { withRetry } from "./retry.js";
 
 const BASE_URL = "https://api.frankfurter.app/latest";
 const DAY_MS = 86_400_000;
@@ -9,7 +10,7 @@ export type Fx = (from: string, to: string) => Promise<number | null>;
 type Opts = { fetch?: typeof fetch; now?: () => number; timeoutMs?: number; log?: (line: string) => void };
 
 export function createFx(opts: Opts = {}): Fx {
-  const f = opts.fetch ?? fetch;
+  const f = withRetry(opts.fetch ?? fetch);
   const now = opts.now ?? Date.now;
   const log = opts.log ?? ((line: string) => console.log(line));
   const cache = new Map<string, Rates>();

@@ -22,8 +22,20 @@ export type PiSession = AgentSession;
 export type PiSessionHandle = {
   session: PiSession;
   setModel: (model: Model<any>) => Promise<void>;
+  codemodeActive: () => boolean;
   dispose: () => Promise<void>;
 };
+
+type CodemodeCall = { name?: string; status?: string; error?: string };
+
+const BUDGET_REFUSAL = /^Budget for /;
+
+export function codemodeFailure(isError: boolean, result: unknown): string | undefined {
+  if (isError) return "the script failed";
+  const calls = (result as { details?: { calls?: CodemodeCall[] } } | undefined)?.details?.calls ?? [];
+  const failed = calls.filter((c) => c.status === "error" && !BUDGET_REFUSAL.test(c.error ?? ""));
+  return failed.length ? `${failed.length} tool call(s) in the script failed (${[...new Set(failed.map((c) => c.name))].join(", ")})` : undefined;
+}
 
 type AgentMessage = ContextEvent["messages"][number];
 
@@ -65,6 +77,7 @@ export async function createPiSession(opts: {
   history?: SeedMessage[];
   contextNote?: () => string | undefined;
   codemode?: (model: Model<any>) => boolean;
+  onCodemodeOff?: (reason: string) => void;
 }): Promise<PiSessionHandle> {
   const dir = await mkdtemp(join(tmpdir(), "pi-session-"));
   const settingsManager = SettingsManager.inMemory();
@@ -114,12 +127,23 @@ export async function createPiSession(opts: {
     settingsManager,
   });
 
+  let codemodeOff = false;
   const syncCodemode = (model: Model<any>) => {
     if (!opts.codemode) return;
     const active = session.getActiveToolNames().filter((n) => n !== CODEMODE);
-    session.setActiveToolsByName(opts.codemode(model) ? [...active, CODEMODE] : active);
+    session.setActiveToolsByName(!codemodeOff && opts.codemode(model) ? [...active, CODEMODE] : active);
   };
   syncCodemode(opts.model);
+  if (opts.codemode) {
+    session.subscribe((e) => {
+      if (codemodeOff || e.type !== "tool_execution_end" || e.toolName !== CODEMODE || !session.getActiveToolNames().includes(CODEMODE)) return;
+      const reason = codemodeFailure(e.isError, e.result);
+      if (!reason) return;
+      codemodeOff = true;
+      syncCodemode(session.model ?? opts.model);
+      opts.onCodemodeOff?.(reason);
+    });
+  }
 
   return {
     session,
@@ -128,6 +152,7 @@ export async function createPiSession(opts: {
       await session.setModel(model);
       syncCodemode(model);
     },
+    codemodeActive: () => session.getActiveToolNames().includes(CODEMODE),
     dispose: async () => {
       session.dispose();
       await rm(dir, { recursive: true, force: true });
