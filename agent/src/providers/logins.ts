@@ -80,6 +80,7 @@ export class LoginFlows {
         flow.state.status = "error";
         flow.state.prompt = undefined;
         flow.state.error = flow.abort.signal.aborted ? "Sign-in cancelled" : err instanceof Error ? err.message : String(err);
+        if (!flow.abort.signal.aborted) console.error(`[login] ${providerId} failed: ${flow.state.error}`);
       });
     return id;
   }

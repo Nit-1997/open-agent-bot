@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AssistantMessage, Context, Model } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { readJsonFile, writeFileAtomic } from "../lib/files.js";
 import { type CatalogEntry, catalogEntry, CLOUD, LOCAL, LOCAL_KINDS, type LocalKind } from "./catalog.js";
 
 type AnyModel = Model<any>;
@@ -110,8 +111,8 @@ export class ProviderHub {
       refreshOnCreate: false,
       allowModelNetwork: false,
     });
-    const settings: Settings = { custom: {}, enabled: {}, hidden: [], ...(await readJson(join(opts.dataDir, "providers.json"))) };
-    const keys = (await readJson<Record<string, string>>(join(opts.dataDir, "local-keys.json"))) ?? {};
+    const settings: Settings = { custom: {}, enabled: {}, hidden: [], ...(await readJsonFile<Partial<Settings>>(join(opts.dataDir, "providers.json"))) };
+    const keys = (await readJsonFile<Record<string, string>>(join(opts.dataDir, "local-keys.json"))) ?? {};
     const signedIn = new Map<string, "key" | "signin">();
     for (const e of CLOUD) {
       const check = await rt.checkAuth(e.id).catch(() => undefined);
@@ -204,7 +205,9 @@ export class ProviderHub {
   async login(id: string, interaction: Parameters<ModelRuntime["login"]>[2]): Promise<void> {
     if (!this.cloud(id).oauthLabel) throw new Error(`${id} has no sign-in option here`);
     const deviceId = await this.deviceId();
-    await this.rt.login(id, "oauth", interaction, { agentName: "Open Agent", getDeviceId: () => deviceId });
+    await this.rt.login(id, "oauth", interaction, { agentName: "Open Agent", getDeviceId: () => deviceId }).catch((err: unknown) => {
+      throw signInError(id, err);
+    });
     this.signedIn.set(id, "signin");
     await this.lockAuthFile();
   }
@@ -223,7 +226,7 @@ export class ProviderHub {
     delete this.settings.custom[id];
     delete this.settings.enabled[id];
     delete this.keys[id];
-    if (id === "litellm") this.settings.hidden.push("litellm");
+    if (id === "litellm" && !this.settings.hidden.includes("litellm")) this.settings.hidden.push("litellm");
     await this.save();
   }
 
@@ -330,7 +333,7 @@ export class ProviderHub {
     const existing = (await readFile(path, "utf8").catch(() => "")).trim();
     if (existing) return existing;
     const id = randomUUID();
-    await writeFile(path, id, { mode: 0o600 });
+    await writeFileAtomic(path, id);
     return id;
   }
 
@@ -339,16 +342,18 @@ export class ProviderHub {
   }
 
   private async save(): Promise<void> {
-    await writeFile(join(this.dir, "providers.json"), JSON.stringify(this.settings, null, 2), { mode: 0o600 });
+    await writeFileAtomic(join(this.dir, "providers.json"), JSON.stringify(this.settings, null, 2));
     const secrets = Object.fromEntries(Object.entries(this.keys).filter(([id]) => id !== "litellm"));
-    await writeFile(join(this.dir, "local-keys.json"), JSON.stringify(secrets), { mode: 0o600 });
+    await writeFileAtomic(join(this.dir, "local-keys.json"), JSON.stringify(secrets));
   }
 }
 
-async function readJson<T>(path: string): Promise<T | undefined> {
-  try {
-    return JSON.parse(await readFile(path, "utf8")) as T;
-  } catch {
-    return undefined;
+function signInError(providerId: string, err: unknown): Error {
+  const message = err instanceof Error ? err.message : String(err);
+  if (providerId === "openai" && message.includes("invalid_grant")) {
+    return new Error(
+      "OpenAI accepted the sign-in but refused to issue a token (invalid_grant). Sign in with ChatGPT needs a paid ChatGPT plan such as Plus or Pro. Use an OpenAI API key instead, or sign in with a paid account.",
+    );
   }
+  return err instanceof Error ? err : new Error(message);
 }

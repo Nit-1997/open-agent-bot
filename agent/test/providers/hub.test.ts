@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -18,6 +18,12 @@ const make = (dir = mkdtempSync(join(tmpdir(), "hub-")), extra: Partial<Paramete
   ProviderHub.create({ dataDir: dir, litellm: seed, fetch: fakeFetch([]), ...extra }).then((hub) => ({ hub, dir }));
 
 describe("ProviderHub", () => {
+  it("refuses to start on a corrupt providers.json instead of dropping the settings", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "hub-"));
+    writeFileSync(join(dir, "providers.json"), '{"custom":');
+    await expect(make(dir)).rejects.toThrow(/providers\.json is not valid JSON/);
+  });
+
   it("takes context and output limits for gateway models from LiteLLM, keeping safe defaults for unknown ones", async () => {
     const f = fakeFetch([
       [/model\/info/, () => json({ data: [{ model_name: "chat-sonnet-5.5", model_info: { max_input_tokens: 1_000_000, max_output_tokens: 128_000 } }, { model_name: "chat-default", model_info: null }] })],
