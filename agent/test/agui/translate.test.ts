@@ -217,3 +217,28 @@ describe("grounding", () => {
     expect(run([update, plain])).toEqual([{ type: EventType.CUSTOM, name: "workflow_step", value: step }]);
   });
 });
+
+describe("answered", () => {
+  const start = (id: string, name: string) => ({ type: "tool_execution_start", toolCallId: id, toolName: name, args: {} }) as unknown as PiEvent;
+  const end = (id: string, name: string, details: Record<string, unknown> = {}) =>
+    ({ type: "tool_execution_end", toolCallId: id, toolName: name, isError: false, result: { content: [{ type: "text", text: "ok" }], details } }) as unknown as PiEvent;
+  const weatherData = { data: { kind: "weather" } };
+  const answeredAfter = (events: PiEvent[]) => {
+    const t = createTranslator(ids());
+    for (const e of events) t.translate(e);
+    return t.answered();
+  };
+
+  it("counts a card from a plain tool call as an answer", () => {
+    expect(answeredAfter([start("w1", "weather"), end("w1", "weather", weatherData)])).toBe(true);
+  });
+
+  it("does not count a card from a tool called inside a codemode script", () => {
+    expect(answeredAfter([start("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData), end("c1", "codemode")])).toBe(false);
+  });
+
+  it("counts cards and text again once the script has finished", () => {
+    expect(answeredAfter([start("c1", "codemode"), end("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData)])).toBe(true);
+    expect(answeredAfter([start("c1", "codemode"), end("c1", "codemode"), assistantStart, delta("Valletta is warmest."), assistantEnd])).toBe(true);
+  });
+});

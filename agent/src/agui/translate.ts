@@ -27,6 +27,7 @@ export function createTranslator(ids: Deps) {
   let text = "";
   const renderedKinds = new Set<string>();
   const NOT_AN_ANSWER = new Set(["followups", "grounding_note"]);
+  const scripts = new Set<string>();
   let answered = false;
   const notedClaims = new Set<string>();
 
@@ -79,6 +80,7 @@ export function createTranslator(ids: Deps) {
       case "message_end":
         return (e.message as { role?: string }).role === "assistant" ? closeText() : [];
       case "tool_execution_start":
+        if (e.toolName === "codemode") scripts.add(e.toolCallId);
         return [
           ...closeText(),
           {
@@ -95,6 +97,7 @@ export function createTranslator(ids: Deps) {
         return step ? [{ type: EventType.CUSTOM, name: "workflow_step", value: step } as BaseEvent] : [];
       }
       case "tool_execution_end": {
+        if (e.toolName === "codemode") scripts.delete(e.toolCallId);
         const content = resultText(e.result);
         const out: BaseEvent[] = [
           { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: e.toolCallId, content, role: "tool" } as BaseEvent,
@@ -111,7 +114,7 @@ export function createTranslator(ids: Deps) {
         if ((e.toolName === "create_artifact" || e.toolName === "research") && !e.isError) answered = true;
         if (widget && !(fromData && renderedKinds.has(widget.kind))) {
           if (fromData) renderedKinds.add(widget.kind);
-          if (!NOT_AN_ANSWER.has(widget.kind)) answered = true;
+          if (!NOT_AN_ANSWER.has(widget.kind) && !scripts.size) answered = true;
           out.push(...widgetCall(`${e.toolCallId}-widget`, widget));
         }
         return out;
