@@ -13,8 +13,10 @@ cd ../web && npm ci
 
 To run the whole stack, follow **Run** in the [README](README.md). To work on one side, run the other in Docker and point at it:
 
-- Agent: `cd agent && npm run build && npm start` (reads the same env vars as `deploy-config/.env-agent`)
-- Web: `cd web && AGENT_URL=http://localhost:8000 npm run dev`
+- Agent: `cd agent && npm run build && AGENT_DATA_DIR=./.data/agent AGENT_SHARED_SECRET=dev npm start` (settings in the README's reference table)
+- Web: `cd web && AGENT_URL=http://localhost:8000 AGENT_SHARED_SECRET=dev npm run dev`
+
+In Docker the agent generates the secret on the `shared` volume and web reads it from there.
 
 ## Checks
 
@@ -33,11 +35,15 @@ Agent tests marked `.int.test.ts` start a real Chromium against local fixture se
 agent/src/
   server.ts            process wiring: config, provider hub, session store, shutdown
   app.ts               composes the HTTP routes in http/
-  http/                artifacts, providers (model admin), agui (chat stream)
+  http/                artifacts, providers (model admin), profile, settings, onboarding
+                       (places, chip options), agui (chat stream); handlers.ts holds shared helpers
   agui/                run lifecycle (runHandler), input parsing, pi events → AG-UI events,
                        typed event builders (events.ts), run stats
   pi/                  creating and disposing pi agent sessions
   providers/           model provider catalog, keys, OAuth sign-in flows
+  profile/             ProfileStore (profile.json today, a database later), the prompt lines
+                       built from it, and the tool defaults it implies
+  onboarding/          Photon address search, Overpass nearby groceries, onboarding chip rows
   session/             per-thread session store with idle sweep
   prompt/              system prompt and region/currency detection
   tools/               one file per agent tool, each owning its full description, plus
@@ -52,14 +58,16 @@ agent/src/
   artifacts/           report storage, PDF export, and the report kit (reportKit.ts: CSS
                        components plus the guide the model sees in create_artifact)
   lib/                 small shared helpers with no tool dependencies: net.ts (URL guard,
-                       safe fetch), retry, files, fx, concurrency
-shared/                widget schemas and flight helpers used by both agent and web
+                       safe fetch), retry, files, fx, concurrency, secret (first-start secret)
+shared/                schemas used by both agent and web: widgets, workspace edits, the profile
+                       (profile.ts), curated onboarding lists per country (onboarding.ts), flights
 web/
   app/api/             thin proxies to the agent (lib/agentServer.ts holds URL + secret)
   components/chat/     chat session, turns, activity steps, sources
   components/widgets/  one component per widget kind
-  components/profile/  onboarding, profile drawer, model management
-  lib/                 pure helpers (turn building, sources, profile storage)
+  components/profile/  onboarding slides (onboarding/, sections shared with the drawer),
+                       profile drawer, model management
+  lib/                 pure helpers (turn building, sources, onboarding), profile client
 ```
 
 ## Adding a tool
@@ -98,12 +106,16 @@ Check that the site's search results load for the agent's browser first: run the
 
 Export a `FlightSource` like `sources/flights/google.ts` and register it. The `flights` tool uses the first registered source (or pass `source` to `flightsTool`).
 
+## Adding a country to onboarding
+
+Onboarding chips come from `shared/onboarding.ts`: one `CURATED` entry per country code (airlines, hotel chains, extra booking sites, groceries, other shops, delivery apps), with `"*"` as the fallback. Adding a country is adding an entry. Travel sites read by a source in `agent/src/sources/` are tagged "searched" automatically; the rest are "linked". Nearby grocery stores come from Overpass and fall back to the country's list.
+
 ## Conventions
 
 - TypeScript strict mode everywhere. Prefer small pure functions; keep I/O at the edges.
 - Code explains itself through names. Add a comment only for a non-obvious reason.
 - Every rendered HTML element in `web/` has a unique, stable `id` derived from its parent's id.
-- Secrets live in `deploy-config/.env-*` files, which are git-ignored. Only commit the `.example` files.
+- Keys are added in the app and stored by the agent. Optional settings live in `deploy-config/.env-*` files, which are git-ignored; never commit them.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).
 
 ## Safety rails

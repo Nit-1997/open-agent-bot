@@ -2,7 +2,6 @@
 .env.*
 !.env.example
 deploy-config/.env*
-!deploy-config/*.example
 *.pem
 *.key
 node_modules/
