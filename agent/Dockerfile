@@ -7,6 +7,8 @@ COPY agent/tsconfig.json ./
 COPY agent/src ./src
 COPY agent/skills ./skills
 RUN npm run build && npm prune --omit=dev
+RUN mkdir -p /data/agent /data/artifacts && chown -R pwuser:pwuser /data
+USER pwuser
 ENV NODE_ENV=production
 EXPOSE 8000
 CMD ["node", "dist/agent/src/server.js"]

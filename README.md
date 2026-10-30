@@ -20,6 +20,8 @@ web (Next.js + CopilotKit) → AG-UI → agent (Node + pi SDK) → llm (LiteLLM)
 
 Ports: web 3000, agent 8000, LiteLLM 4000, SearXNG 8081.
 
+The agent and web containers run as non-root users (`pwuser`, `node`) and report health to Docker. If your volumes were created by an older build that ran as root, hand them over once: `docker compose run --rm --no-deps --user root --entrypoint chown agent -R pwuser:pwuser /data/agent /data/artifacts`.
+
 ## Models
 
 Manage models in the app: header model menu → **Manage models…** (or Profile → Manage models).
