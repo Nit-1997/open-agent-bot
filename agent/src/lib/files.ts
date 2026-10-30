@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 
-export async function writeFileAtomic(path: string, data: string, mode = 0o600): Promise<void> {
+export async function writeFileAtomic(path: string, data: string | Uint8Array, mode = 0o600): Promise<void> {
   const tmp = `${path}.${randomBytes(6).toString("hex")}.tmp`;
   try {
     await writeFile(tmp, data, { mode });
