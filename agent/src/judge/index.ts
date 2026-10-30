@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { createLimiter } from "../lib/concurrency.js";
+import { log as logger } from "../lib/log.js";
 
 export type Level = { means: string; not: string };
 export type ScoreCriteria<L extends string> = { id: string; version: string; question: string; levels: Record<L, Level> };
@@ -84,7 +85,7 @@ export async function createJudge(opts: {
   concurrency?: number;
   log?: (line: string) => void;
 }): Promise<Judge> {
-  const log = opts.log ?? ((line: string) => console.log(line));
+  const log = opts.log ?? logger.debug;
   const ref = splitModel(opts.model);
   const model = ref ? await findModel(opts.runtime, ref) : undefined;
   if (!model) return noJudge;
@@ -299,7 +300,7 @@ export function judgeResolver(
 ): () => Promise<Judge> {
   const retryMs = opts.retryMs ?? JUDGE_RETRY_MS;
   const now = opts.now ?? Date.now;
-  const log = opts.log ?? ((line: string) => console.log(line));
+  const log = opts.log ?? logger.info;
   let current: Judge | undefined;
   let checkedAt = Number.NEGATIVE_INFINITY;
   let pending: Promise<Judge> | undefined;

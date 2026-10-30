@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AuthEvent, AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
+import { log } from "../lib/log.js";
 
 type Interaction = AuthInteraction & { signal: AbortSignal };
 type Login = (providerId: string, interaction: Interaction) => Promise<void>;
@@ -84,7 +85,7 @@ export class LoginFlows {
         flow.state.status = "error";
         flow.state.prompt = undefined;
         flow.state.error = flow.abort.signal.aborted ? "Sign-in cancelled" : err instanceof Error ? err.message : String(err);
-        if (!flow.abort.signal.aborted) console.error(`[login] ${providerId} failed: ${flow.state.error}`);
+        if (!flow.abort.signal.aborted) log.warn(`[login] ${providerId} failed: ${flow.state.error}`);
       });
     return id;
   }

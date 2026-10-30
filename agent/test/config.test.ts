@@ -26,7 +26,13 @@ describe("loadConfig", () => {
       jevModel: "openrouter/typesafe/jev-1.14",
       jevConcurrency: 64,
       modelCaps: {},
+      logLevel: "info",
     });
+  });
+
+  it("reads LOG_LEVEL and ignores unknown levels", () => {
+    expect(loadConfig({ LOG_LEVEL: "debug" }).logLevel).toBe("debug");
+    expect(loadConfig({ LOG_LEVEL: "loud" }).logLevel).toBe("info");
   });
 
   it("reads the Jev model", () => {

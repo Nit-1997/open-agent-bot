@@ -3,6 +3,7 @@ import type { Evidence } from "../grounding/evidence.js";
 import type { ActiveCart } from "../shop/cart.js";
 import type { PiSession } from "../pi/createPiSession.js";
 import type { UserContext } from "../prompt/userContext.js";
+import { log } from "../lib/log.js";
 
 export type HistoryMessage = { role: "user" | "assistant"; text: string };
 
@@ -70,7 +71,7 @@ export class SessionStore {
     for (const [id, e] of this.entries) {
       if (!e.busy && e.lastUsed < cutoff) {
         this.entries.delete(id);
-        await e.dispose().catch((err: unknown) => console.error(`[session] dispose failed thread=${id}`, err));
+        await e.dispose().catch((err: unknown) => log.error(`[session] dispose failed thread=${id}`, err));
       }
     }
   }

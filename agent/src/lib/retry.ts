@@ -1,3 +1,5 @@
+import { log } from "./log.js";
+
 const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 type RetryOptions = {
@@ -29,7 +31,7 @@ const defaults: RetryOptions = {
   maxDelayMs: 4000,
   sleep: abortableSleep,
   random: Math.random,
-  log: (line) => console.log(line),
+  log: (line) => log.info(line),
 };
 
 export function setRetryDefaults(overrides: Partial<RetryOptions>): void {

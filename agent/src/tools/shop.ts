@@ -17,6 +17,7 @@ import { type FrameBus, watch } from "../browser/frames.js";
 import type { BrowserPool } from "../browser/pool.js";
 import { looseList } from "./args.js";
 import { fail, ok, type ToolResult } from "./result.js";
+import { log } from "../lib/log.js";
 
 const MAX_STORES = 3;
 const MAX_ITEMS = 12;
@@ -108,7 +109,7 @@ async function rankLanes(judge: Judge | undefined, lanes: Lane[]): Promise<Pick[
   const keyword = (l: Lane) => rankTiles(l.item.query, l.tiles);
   if (!judge) return lanes.map(keyword);
   if (!judge.available) {
-    console.log("[shop] rerank fallback reason=unavailable");
+    log.info("[shop] rerank fallback reason=unavailable");
     return lanes.map(keyword);
   }
   const started = Date.now();
@@ -125,8 +126,8 @@ async function rankLanes(judge: Judge | undefined, lanes: Lane[]): Promise<Pick[
     }),
   );
   if (failed.length)
-    console.log(`[shop] rerank fallback reason=${signal.aborted ? "budget" : "judge"} lanes=${failed.length}/${lanes.length}`);
-  console.log(`[shop] rerank ms=${Date.now() - started} tiles=${tiles}`);
+    log.info(`[shop] rerank fallback reason=${signal.aborted ? "budget" : "judge"} lanes=${failed.length}/${lanes.length}`);
+  log.debug(`[shop] rerank ms=${Date.now() - started} tiles=${tiles}`);
   return ranked;
 }
 

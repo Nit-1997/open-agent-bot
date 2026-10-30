@@ -1,5 +1,6 @@
 import { timeoutSignal } from "./net.js";
 import { withRetry } from "./retry.js";
+import { log } from "./log.js";
 
 const BASE_URL = "https://api.frankfurter.app/latest";
 const DAY_MS = 86_400_000;
@@ -12,7 +13,7 @@ type Opts = { fetch?: typeof fetch; now?: () => number; timeoutMs?: number; log?
 export function createFx(opts: Opts = {}): Fx {
   const f = withRetry(opts.fetch ?? fetch);
   const now = opts.now ?? Date.now;
-  const log = opts.log ?? ((line: string) => console.log(line));
+  const warn = opts.log ?? log.warn;
   const cache = new Map<string, Rates>();
   const inflight = new Map<string, Promise<Rates | null>>();
 
@@ -34,7 +35,7 @@ export function createFx(opts: Opts = {}): Fx {
         cache.set(base, loaded);
         return loaded;
       } catch (err) {
-        log(`[fx] ${base} failed: ${err instanceof Error ? err.message : String(err)}`);
+        warn(`[fx] ${base} failed: ${err instanceof Error ? err.message : String(err)}`);
         return null;
       } finally {
         inflight.delete(base);

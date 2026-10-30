@@ -12,6 +12,7 @@ import type { Stay, StayKind, StayQuery, StaySource } from "../stays/types.js";
 import { looseList } from "./args.js";
 import type { StaysData } from "../render/data.js";
 import { fail, ok, type ToolResult } from "./result.js";
+import { log } from "../lib/log.js";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY = 86_400_000;
@@ -257,7 +258,7 @@ export function staysTool(deps: Deps) {
             wishNote = `No ${brand.label.replace(/\//g, " or ")}${under} in these results.`;
           }
         } else {
-          console.log(`[stays] wants fallback: judge unavailable, price ranking kept (${wishes.map((w) => w.criteria.id).join(",")})`);
+          log.info(`[stays] wants fallback: judge unavailable, price ranking kept (${wishes.map((w) => w.criteria.id).join(",")})`);
           wishNote =
             "Preferences (brand, area, vibe) could not be checked automatically, so listings are in price order. Check names yourself before saying a listing matches.";
         }

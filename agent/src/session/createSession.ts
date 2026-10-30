@@ -16,6 +16,7 @@ import { completeWith } from "../workflows/llm.js";
 import { workspaceCart, workspaceNote } from "../workspace/cart.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import type { SessionStore } from "./sessionStore.js";
+import { log } from "../lib/log.js";
 
 type CreateSession = ConstructorParameters<typeof SessionStore>[0]["create"];
 
@@ -68,7 +69,7 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       }),
       skillsDir: skillsDir(),
       codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
-      onCodemodeOff: (reason: string) => console.log(`[codemode] thread=${threadId} off for this chat: ${reason}`),
+      onCodemodeOff: (reason: string) => log.info(`[codemode] thread=${threadId} off for this chat: ${reason}`),
       history,
       contextNote: () => workspaceNote(workspace, threadId),
     });
@@ -92,7 +93,7 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
         if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);
         await handle.setModel(model);
         current = model;
-        console.log(`[run] thread=${threadId} model=${ref}`);
+        log.debug(`[run] thread=${threadId} model=${ref}`);
       },
       dispose: async () => {
         await Promise.all([handle.dispose(), pool.close(threadId)]);

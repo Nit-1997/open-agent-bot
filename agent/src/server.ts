@@ -9,10 +9,12 @@ import { LoginFlows } from "./providers/logins.js";
 import { sessionFactory } from "./session/createSession.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { WorkspaceStore } from "./workspace/store.js";
+import { log, setLogLevel } from "./lib/log.js";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 
 const cfg = loadConfig(process.env);
+setLogLevel(cfg.logLevel);
 const artifacts = new ArtifactStore(cfg.artifactsDir);
 const workspace = WorkspaceStore.at(cfg.dataDir);
 const pool = new BrowserPool();
@@ -22,7 +24,7 @@ const hub = await ProviderHub.create({
 });
 
 const judge = judgeResolver(() => createJudge({ runtime: hub.runtime, model: cfg.jevModel, concurrency: cfg.jevConcurrency }));
-console.log(`[jev] model=${cfg.jevModel}`);
+log.info(`[jev] model=${cfg.jevModel}`);
 await judge();
 
 const store = new SessionStore({ idleMs: SESSION_IDLE_MS, create: sessionFactory({ cfg, hub, artifacts, pool, workspace, judge }) });
@@ -31,7 +33,7 @@ setInterval(() => void store.sweep(), 60_000).unref();
 const logins = new LoginFlows((id, ui) => hub.login(id, ui));
 const app = createApp({ cfg, store, artifacts, hub, logins, run: { workspace } });
 const server = serve({ fetch: app.fetch, port: cfg.port, hostname: "0.0.0.0" }, (info) => {
-  console.log(`agent listening on :${info.port}`);
+  log.info(`agent listening on :${info.port}`);
 });
 
 let stopping = false;

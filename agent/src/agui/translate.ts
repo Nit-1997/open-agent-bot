@@ -21,9 +21,9 @@ function resultText(result: unknown): string {
     .join("");
 }
 
-export function createTranslator(ids: Deps) {
-  const render = ids.render ?? renderData;
-  const evidence = ids.evidence ?? new Evidence();
+export function createTranslator(deps: Deps) {
+  const render = deps.render ?? renderData;
+  const evidence = deps.evidence ?? new Evidence();
   let assistantId: string | undefined;
   let textOpen = false;
   let text = "";
@@ -39,13 +39,13 @@ export function createTranslator(ids: Deps) {
     toolStart(id, "show_widget", assistantId),
     toolArgs(id, JSON.stringify({ widget })),
     toolEnd(id),
-    toolResult(ids.newId(), id, `rendered ${widget.kind}`),
+    toolResult(deps.newId(), id, `rendered ${widget.kind}`),
   ];
 
   const emitText = (chunk: string): BaseEvent[] => {
     if (!chunk) return [];
     const out: BaseEvent[] = [];
-    if (!assistantId) assistantId = ids.newId();
+    if (!assistantId) assistantId = deps.newId();
     if (!textOpen) {
       textOpen = true;
       text = "";
@@ -63,7 +63,7 @@ export function createTranslator(ids: Deps) {
     const r = validateWidget(fitWidget({ kind: "followups", replies }));
     if (!r.ok) return [];
     followupsShown = true;
-    return widgetCall(`${assistantId ?? ids.newId()}-followups`, r.value);
+    return widgetCall(`${assistantId ?? deps.newId()}-followups`, r.value);
   };
 
   const closeText = (): BaseEvent[] => {
@@ -79,22 +79,52 @@ export function createTranslator(ids: Deps) {
     return out;
   };
 
+  type ToolEnd = Extract<PiEvent, { type: "tool_execution_end" }>;
+  type Details = { widget?: Widget; data?: unknown; sourced?: string };
+
+  const recordEvidence = (toolName: string, content: string, details: Details | undefined) => {
+    if (details?.sourced) evidence.add(details.sourced);
+    if (toolName.startsWith("show_") || toolName === "ask_user") return;
+    evidence.add(content);
+    if (details?.data) evidence.add(JSON.stringify(details.data));
+  };
+
+  const widgetFor = (e: ToolEnd, details: Details | undefined): Widget | null => {
+    if (e.isError) return null;
+    const widget = details?.widget ?? (details?.data ? render(details.data) : null);
+    if (!details?.widget && widget && renderedKinds.has(widget.kind)) return null;
+    if (!details?.widget && widget) renderedKinds.add(widget.kind);
+    return widget?.kind === "ui" ? groundUi(widget as UiWidget, evidence) : widget;
+  };
+
+  const toolEnded = (e: ToolEnd): BaseEvent[] => {
+    if (e.toolName === "codemode") scripts.delete(e.toolCallId);
+    const content = resultText(e.result);
+    const details = (e.result as { details?: Details } | undefined)?.details;
+    recordEvidence(e.toolName, content, details);
+    if ((e.toolName === "create_artifact" || e.toolName === "research") && !e.isError) answered = true;
+    const widget = widgetFor(e, details);
+    if (!widget) return [toolResult(deps.newId(), e.toolCallId, content)];
+    if (!NOT_AN_ANSWER.has(widget.kind) && !scripts.size) answered = true;
+    return [toolResult(deps.newId(), e.toolCallId, content), ...widgetCall(`${e.toolCallId}-widget`, widget)];
+  };
+
+  const isAssistant = (m: unknown) => (m as { role?: string }).role === "assistant";
+
   const translate = (e: PiEvent): BaseEvent[] => {
     switch (e.type) {
-      case "message_start":
-        if ((e.message as { role?: string }).role === "assistant") {
-          const closed = closeText();
-          assistantId = ids.newId();
-          return closed;
-        }
-        return [];
+      case "message_start": {
+        if (!isAssistant(e.message)) return [];
+        const closed = closeText();
+        assistantId = deps.newId();
+        return closed;
+      }
       case "message_update": {
         const a = e.assistantMessageEvent;
-        if (a.type !== "text_delta" || !a.delta) return [];
-        return emitText(splitter.push(a.delta));
+        return a.type === "text_delta" && a.delta ? emitText(splitter.push(a.delta)) : [];
       }
       case "message_end":
-        return (e.message as { role?: string }).role === "assistant" ? closeText() : [];
+        return isAssistant(e.message) ? closeText() : [];
       case "tool_execution_start":
         if (e.toolName === "codemode") scripts.add(e.toolCallId);
         return [
@@ -107,27 +137,8 @@ export function createTranslator(ids: Deps) {
         const step = (e.partialResult as { details?: { workflowStep?: unknown } } | undefined)?.details?.workflowStep;
         return step ? [custom("workflow_step", step)] : [];
       }
-      case "tool_execution_end": {
-        if (e.toolName === "codemode") scripts.delete(e.toolCallId);
-        const content = resultText(e.result);
-        const out: BaseEvent[] = [toolResult(ids.newId(), e.toolCallId, content)];
-        const details = (e.result as { details?: { widget?: Widget; data?: unknown; sourced?: string } } | undefined)?.details;
-        if (details?.sourced) evidence.add(details.sourced);
-        if (!e.toolName.startsWith("show_") && e.toolName !== "ask_user") {
-          evidence.add(content);
-          if (details?.data) evidence.add(JSON.stringify(details.data));
-        }
-        const fromData = !details?.widget;
-        let widget = e.isError ? null : (details?.widget ?? (details?.data ? render(details.data) : null));
-        if (widget?.kind === "ui") widget = groundUi(widget as UiWidget, evidence);
-        if ((e.toolName === "create_artifact" || e.toolName === "research") && !e.isError) answered = true;
-        if (widget && !(fromData && renderedKinds.has(widget.kind))) {
-          if (fromData) renderedKinds.add(widget.kind);
-          if (!NOT_AN_ANSWER.has(widget.kind) && !scripts.size) answered = true;
-          out.push(...widgetCall(`${e.toolCallId}-widget`, widget));
-        }
-        return out;
-      }
+      case "tool_execution_end":
+        return toolEnded(e);
       default:
         return [];
     }

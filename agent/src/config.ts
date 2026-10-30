@@ -1,3 +1,5 @@
+import { LOG_LEVELS, type LogLevel } from "./lib/log.js";
+
 export type ModelOption = { id: string; label: string; note?: string };
 
 export type AgentConfig = {
@@ -13,6 +15,7 @@ export type AgentConfig = {
   models: ModelOption[];
   jevModel: string;
   jevConcurrency: number;
+  logLevel: LogLevel;
   modelCaps: Record<string, string[]>;
 };
 
@@ -65,5 +68,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
     jevModel: env.JEV_MODEL || "openrouter/typesafe/jev-1.14",
     jevConcurrency: Math.max(1, Number(env.JEV_CONCURRENCY) || 64),
     modelCaps: parseCaps(env.AGENT_MODEL_CAPS),
+    logLevel: (LOG_LEVELS as readonly string[]).includes(env.LOG_LEVEL ?? "") ? (env.LOG_LEVEL as LogLevel) : "info",
   };
 }
