@@ -125,5 +125,5 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     ...(v2 ? [loadSkillTool(() => deps.skills ?? [])] : []),
     ...(deps.cfg.flags.workspace && deps.workspace ? [planTool({ store: deps.workspace, threadId: deps.threadId })] : []),
   ];
-  return deps.cfg.flags.codemode ? scopeToCodemode(tools) : tools;
+  return scopeToCodemode(tools);
 }

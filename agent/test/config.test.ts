@@ -32,7 +32,6 @@ describe("loadConfig", () => {
         jevMusic: false,
         turnBudget: false,
         sourcesV2: false,
-        codemode: false,
         workspace: false,
         rpiv: false,
       },
@@ -41,10 +40,10 @@ describe("loadConfig", () => {
   });
 
   it("reads feature flags and the Jev model", () => {
-    const cfg = loadConfig({ JEV_RERANK: "1", WORKSPACE: "true", CODEMODE: "off", JEV_MODEL: "typesafe/jev-latest" });
+    const cfg = loadConfig({ JEV_RERANK: "1", WORKSPACE: "true", RPIV: "off", JEV_MODEL: "typesafe/jev-latest" });
     expect(cfg.flags.jevRerank).toBe(true);
     expect(cfg.flags.workspace).toBe(true);
-    expect(cfg.flags.codemode).toBe(false);
+    expect(cfg.flags.rpiv).toBe(false);
     expect(cfg.jevModel).toBe("typesafe/jev-latest");
   });
 

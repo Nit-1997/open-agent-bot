@@ -49,7 +49,7 @@ const store = new SessionStore({
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = workspace ? workspaceCart(workspace, threadId) : new ActiveCart();
-    const codemode = cfg.flags.codemode && hasCap(cfg, modelRef(modelFor(userContext?.model)), "codemode");
+    const codemode = hasCap(cfg, modelRef(modelFor(userContext?.model)), "codemode");
     const skills = cfg.flags.promptV2 ? loadSkillCatalog(skillsDir(), { workspace: cfg.flags.workspace, rpiv: cfg.flags.rpiv, codemode }) : [];
     const turnJudge = scopeJudge(judge);
     let current = modelFor(userContext?.model);
@@ -59,10 +59,8 @@ const store = new SessionStore({
       systemPrompt: buildSystemPrompt(userContext, { promptV2: cfg.flags.promptV2, skills }),
       tools: buildTools({ cfg, artifacts, pool, threadId, userContext, budget, evidence, frames, cart, skills, judge: turnJudge, workspace, complete: completeWith(hub.runtime, () => current) }),
       ...(cfg.flags.promptV2 && { skillsDir: skillsDir() }),
-      ...(cfg.flags.codemode && {
-        codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
-        onCodemodeOff: (reason: string) => console.log(`[codemode] thread=${threadId} off for this chat: ${reason}`),
-      }),
+      codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
+      onCodemodeOff: (reason: string) => console.log(`[codemode] thread=${threadId} off for this chat: ${reason}`),
       ...(workspace && { history }),
       ...(workspace && { contextNote: () => workspaceNote(workspace, threadId) }),
     });

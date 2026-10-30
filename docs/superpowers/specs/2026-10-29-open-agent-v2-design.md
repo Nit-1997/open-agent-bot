@@ -24,7 +24,7 @@ Source documents: `open-bot-architecture.html` (target state) and `open-bot-buil
 | `JEV_MUSIC` | M3 | music cover match chooses with Jev |
 | `TURN_BUDGET` | M3 | turn-level budget instead of per-group caps |
 | `SOURCES_V2` | M4 | source registry + JSON-LD reader |
-| `CODEMODE` | M5 | codemode for models with the `codemode` capability |
+| ~~`CODEMODE`~~ | M5 | removed 2026-10-30: codemode is on for every model tagged `codemode` in `AGENT_MODEL_CAPS` |
 | `WORKSPACE` | M6 | SQLite workspace, `plan` tool, session restore |
 | `ROUTER` | M7 | pre-turn Jev router hints and policy hand-off |
 | `RPIV` | M8 | research workflow with verify step |

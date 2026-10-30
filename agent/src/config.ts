@@ -7,7 +7,6 @@ export const FLAG_ENV = {
   jevMusic: "JEV_MUSIC",
   turnBudget: "TURN_BUDGET",
   sourcesV2: "SOURCES_V2",
-  codemode: "CODEMODE",
   workspace: "WORKSPACE",
   rpiv: "RPIV",
 } as const;
