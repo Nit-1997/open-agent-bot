@@ -117,6 +117,20 @@ async function rankLanes(judge: Judge | undefined, lanes: Lane[]): Promise<Pick[
   return ranked;
 }
 
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const carries = (group: string | undefined, store: Store) => !!group && (norm(group).includes(norm(store.label)) || norm(store.label).includes(norm(group)));
+
+type Search = (jobs: Job[]) => Promise<JobResult[]>;
+
+async function viaMarketplace(market: Store | undefined, stores: Store[], results: JobResult[], wanted: Item[], run: Search): Promise<{ results: JobResult[]; routed: Store[] } | null> {
+  if (!market || !wanted.length || stores.some((s) => s.id === market.id)) return null;
+  const stuck = stores.filter((s) => !s.marketplace && results.filter((r) => r.store.id === s.id).every((r) => r.blocked || r.error || !r.tiles.length));
+  if (!stuck.length) return null;
+  const found = await run(wanted.map((item) => ({ store: market, item })));
+  const kept = found.map((r) => ({ ...r, tiles: r.tiles.filter((t) => stuck.some((s) => carries(t.group, s))) }));
+  return { results: kept, routed: stuck.filter((s) => kept.some((r) => r.tiles.some((t) => carries(t.group, s)))) };
+}
+
 function storeResults(lanes: Lane[], ranked: Pick[][], wanted: Item[]): StoreResult[] {
   const byStore = new Map<string, StoreResult>();
   lanes.forEach((l, n) => {
@@ -250,13 +264,19 @@ export function shopTool(deps: Deps) {
         return ok("The cart is empty.", { data: { kind: "shop", stores: [], summary: [] } });
       }
       const stores = cart.stores.map((id) => resolve(id)).filter((x): x is Store => !!x);
-      const results = search.length ? await (deps.search ?? ((jobs) => runAll(deps, jobs)))(stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
-      const lanes = lanesOf(results);
+      const run: Search = deps.search ?? ((jobs) => runAll(deps, jobs));
+      const results = search.length ? await run(stores.flatMap((store) => search.map((item) => ({ store, item })))) : [];
+      const market = defaultStoresFor(deps.region ?? "US", "grocery").map((id) => resolve(id)).find((x): x is Store => !!x?.marketplace);
+      const via = await viaMarketplace(market, stores, results, search, run);
+      if (via?.routed.length && market) cart.stores = [...new Set([...cart.stores.filter((id) => !via.routed.some((s) => s.id === id)), market.id])];
+      const lanes = lanesOf([...results, ...(via?.results ?? [])]);
       cart.addResults(storeResults(lanes, await rankLanes(deps.judge, lanes), search));
       if (fresh) cart.scopeTo(bestValue(cart.view()).filter((x) => x.found > 0).slice(0, SCOPE).map((x) => x.store));
       cart.save();
       const view = cart.view();
-      const { text, summary } = render(view, results, cart.items);
+      const { text: body, summary } = render(view, results, cart.items);
+      const routedNote = via?.routed.map((x) => `${x.label} blocked direct browsing, so its prices were read through ${market?.label}.`).join(" ") ?? "";
+      const text = [routedNote, body].filter(Boolean).join("\n");
       const n = cart.items.length;
       const head = `Cart: ${n} ${n === 1 ? "item" : "items"} at ${cart.scope.join(", ") || stores.map((x) => x.label).join(", ")}.${added.length && !fresh ? ` Added: ${added.map((i) => i.query).join(", ")}.` : ""} Later additions stay at these stores.`;
       return ok(`${head}\n${text || "No products read from any store."}`, { data: { kind: "shop", stores: view, summary } });
