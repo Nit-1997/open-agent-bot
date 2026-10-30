@@ -10,6 +10,7 @@ export type HistoryMessage = { role: "user" | "assistant"; text: string };
 export type SessionEntry = {
   session: PiSession;
   busy: boolean;
+  lastRunId?: string;
   lastUsed: number;
   dispose: () => Promise<void>;
   onRunStart?: () => void;

@@ -90,8 +90,13 @@ export async function* handleRun(
     yield runError("THREAD_BUSY", "Still working on the last message.");
     return;
   }
+  if (entry.lastRunId === runId) {
+    yield runError("DUPLICATE_RUN", "This message was already handled.");
+    return;
+  }
   if (signal.aborted) return;
   entry.busy = true;
+  entry.lastRunId = runId;
   try {
     yield* runTurn({ input, entry, signal, opts, last, history, userContext, stats });
   } catch (err) {

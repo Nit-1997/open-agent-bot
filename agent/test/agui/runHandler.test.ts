@@ -207,6 +207,16 @@ describe("handleRun", () => {
     expect(store.get("t1")?.busy).toBe(false);
   });
 
+  it("refuses a replayed run id instead of answering the same message twice", async () => {
+    const { store, session } = setup();
+    await collect(handleRun(input(), store, new AbortController().signal));
+    const again = await collect(handleRun(input(), store, new AbortController().signal));
+    expect(again.at(-1)).toMatchObject({ type: EventType.RUN_ERROR, code: "DUPLICATE_RUN" });
+    const next = await collect(handleRun(input({ runId: "r2" }), store, new AbortController().signal));
+    expect(next.at(-1)?.type).toBe(EventType.RUN_FINISHED);
+    expect(session.prompts).toHaveLength(2);
+  });
+
   it("reports an internal error and frees the thread when the turn throws before the model runs", async () => {
     const { store } = setup(say, undefined, undefined, undefined, undefined, {
       onRunStart: () => {
