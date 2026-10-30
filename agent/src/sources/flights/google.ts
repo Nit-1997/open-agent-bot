@@ -1,5 +1,5 @@
-import type { BrowseAction } from "../../tools/browsePolicy.js";
-import type { FlightOption } from "../../tools/data.js";
+import type { BrowseAction } from "../../browser/policy.js";
+import type { FlightOption } from "../../render/data.js";
 import type { ToolResult } from "../../tools/result.js";
 import type { Source } from "../types.js";
 

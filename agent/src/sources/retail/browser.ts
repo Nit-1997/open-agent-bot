@@ -1,7 +1,7 @@
 import type { Page } from "playwright";
 import { extractTiles } from "../../shop/extract.js";
-import { BOT_WALL, isBlockedUrl } from "../../tools/browsePolicy.js";
-import { publicHttpUrlError } from "../../tools/net.js";
+import { BOT_WALL, isBlockedUrl } from "../../browser/policy.js";
+import { publicHttpUrlError } from "../../lib/net.js";
 import type { RetailCtx, RetailQuery, RetailResult, RetailSource, Store } from "./types.js";
 
 async function searchBox(page: Page, store: Store, query: string): Promise<void> {

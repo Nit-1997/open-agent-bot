@@ -1,8 +1,8 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { WeatherData } from "./data.js";
+import type { WeatherData } from "../render/data.js";
 import { findPlace } from "./geo.js";
-import { timeoutSignal } from "./net.js";
+import { timeoutSignal } from "../lib/net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 import { withRetry } from "../lib/retry.js";
 

@@ -1,12 +1,12 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { Locator, Page } from "playwright";
 import { Type } from "typebox";
-import type { UserContext } from "../prompt/systemPrompt.js";
+import type { UserContext } from "../prompt/userContext.js";
 import { type FrameBus, watch } from "../browser/frames.js";
-import type { BrowserPool } from "./browserPool.js";
-import { BOT_WALL, type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "./browsePolicy.js";
+import type { BrowserPool } from "../browser/pool.js";
+import { BOT_WALL, type BrowseAction, checkAction, isBlockedUrl, type TargetInfo } from "../browser/policy.js";
 import { fail, ok, type ToolResult } from "./result.js";
-import { BLOCKING_STATUSES, publicHttpUrlError } from "./net.js";
+import { BLOCKING_STATUSES, publicHttpUrlError } from "../lib/net.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 
 const MAX_ACTIONS = 10;

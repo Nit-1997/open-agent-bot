@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
 import { renderData } from "../../src/render/registry.js";
-import type { OpenTab } from "../../src/stays/search.js";
+import type { OpenTab } from "../../src/stays/types.js";
 import { staySource } from "../../src/sources/stays/define.js";
 import type { StaySource } from "../../src/stays/types.js";
 import { pickSources, staysTool } from "../../src/tools/stays.js";

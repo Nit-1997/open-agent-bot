@@ -3,7 +3,7 @@ import { validateWidget } from "../../../shared/widgets.js";
 import { type Judge, noJudge, type YesNoCriteria } from "../../src/judge/index.js";
 import { stayMatch } from "../../src/judge/criteria/stayMatch.js";
 import { renderData } from "../../src/render/registry.js";
-import type { OpenTab } from "../../src/stays/search.js";
+import type { OpenTab } from "../../src/stays/types.js";
 import { staySource } from "../../src/sources/stays/define.js";
 import type { StaySource } from "../../src/stays/types.js";
 import { parseBudget, staysTool } from "../../src/tools/stays.js";

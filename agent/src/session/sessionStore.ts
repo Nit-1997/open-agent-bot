@@ -2,7 +2,7 @@ import type { FrameBus } from "../browser/frames.js";
 import type { Evidence } from "../grounding/evidence.js";
 import type { ActiveCart } from "../shop/cart.js";
 import type { PiSession } from "../pi/createPiSession.js";
-import type { UserContext } from "../prompt/systemPrompt.js";
+import type { UserContext } from "../prompt/userContext.js";
 
 export type HistoryMessage = { role: "user" | "assistant"; text: string };
 

@@ -1,4 +1,4 @@
-import { timeoutSignal } from "./net.js";
+import { timeoutSignal } from "../lib/net.js";
 import { retryingFetch } from "../lib/retry.js";
 
 export type LatLon = { lat: number; lon: number };

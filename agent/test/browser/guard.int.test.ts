@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { type Browser, chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { blockInternalRequests } from "../../src/tools/browserGuard.js";
+import { blockInternalRequests } from "../../src/browser/guard.js";
 
 let server: Server;
 let base: string;

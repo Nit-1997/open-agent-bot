@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAction, isBlockedUrl } from "../../src/tools/browsePolicy.js";
+import { checkAction, isBlockedUrl } from "../../src/browser/policy.js";
 
 describe("checkAction", () => {
   it("allows search input typing on amazon.in", () => {

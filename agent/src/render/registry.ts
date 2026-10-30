@@ -1,7 +1,7 @@
 import { validateWidget, type WidgetPayload } from "../../../shared/widgets.js";
 import { currencyOf } from "../shop/currency.js";
 import type { ItemResult } from "../shop/rank.js";
-import type { FlightsData, StaysData, WeatherData } from "../tools/data.js";
+import type { FlightsData, StaysData, WeatherData } from "./data.js";
 
 const MAX_FLIGHTS = 8;
 const MAX_COMPARED_FLIGHTS = 24;

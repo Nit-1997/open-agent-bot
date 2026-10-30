@@ -1,7 +1,7 @@
 import type { Judge } from "../judge/index.js";
 import { coverMatch } from "../judge/criteria/coverMatch.js";
 import { type ITunes, pickMusic } from "./lookup.js";
-import { timeoutSignal } from "./net.js";
+import { timeoutSignal } from "../lib/net.js";
 import { withRetry } from "../lib/retry.js";
 
 const UA = { "user-agent": "OpenAgent/0.1 (personal assistant prototype)" };

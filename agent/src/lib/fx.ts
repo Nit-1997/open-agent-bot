@@ -1,4 +1,4 @@
-import { timeoutSignal } from "../tools/net.js";
+import { timeoutSignal } from "./net.js";
 import { withRetry } from "./retry.js";
 
 const BASE_URL = "https://api.frankfurter.app/latest";

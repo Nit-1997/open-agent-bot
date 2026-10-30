@@ -39,17 +39,19 @@ agent/src/
   providers/           model provider catalog, keys, OAuth sign-in flows
   session/             per-thread session store with idle sweep
   prompt/              system prompt and region/currency detection
-  tools/               one file per agent tool, plus net.ts (URL guard, safe fetch),
-                       browsePolicy.ts (what the browser may not do),
-                       browserGuard.ts (blocks private-network requests), budget.ts
+  tools/               one file per agent tool, plus the tool helpers budget.ts, rules.ts,
+                       result.ts, args.ts and text.ts
+  browser/             Chromium pool (pool.ts), private-network guard (guard.ts), what the
+                       browser may not do (policy.ts), live frames (frames.ts)
   shop/                catalog tile extraction, ranking and the per-chat cart
   stays/               hotel and rental search: one file per site in sources/
   workspace/           per-chat saved plan state (SQLite): store, summary, edits, cart binding
   grounding/           checks prices, ratings and links against tool evidence
-  render/              tool data → widget payloads
+  render/              tool data shapes (data.ts) → widget payloads
   artifacts/           report storage, PDF export, and the report kit (reportKit.ts: CSS
                        components plus the guide the model sees in create_artifact)
-  lib/                 small shared helpers with no tool dependencies
+  lib/                 small shared helpers with no tool dependencies: net.ts (URL guard,
+                       safe fetch), retry, files, fx, concurrency
 shared/                widget schemas and flight helpers used by both agent and web
 web/
   app/api/             thin proxies to the agent (lib/agentServer.ts holds URL + secret)
@@ -62,7 +64,7 @@ web/
 ## Adding a tool
 
 1. Add `agent/src/tools/<name>.ts` that exports a factory returning `defineTool({...})`. Take network access (`fetch`) and other services as injectable deps so tests can fake them.
-2. Validate URLs from the model with `publicHttpUrlError` and fetch them with `fetchPublic` from `tools/net.ts`. Never call `fetch` on a model-supplied URL directly.
+2. Validate URLs from the model with `publicHttpUrlError` and fetch them with `fetchPublic` from `lib/net.ts`. Never call `fetch` on a model-supplied URL directly.
 3. Register it in `tools/index.ts`. Wrap it in `withBudget` if it costs a network round trip.
 4. If it returns structured data for a card, add a renderer in `render/registry.ts` and a schema in `shared/widgets.ts`.
 5. Add a step label in `web/lib/steps.ts` and tests under `agent/test/tools/`.
@@ -105,4 +107,4 @@ Export a `FlightSource` like `sources/flights/google.ts` and register it. The `f
 
 ## Safety rails
 
-The agent is read-only by design: it never logs in, adds to cart, pays, or books. Changes that weaken `tools/browsePolicy.ts` or `tools/net.ts` need a clear reason in the pull request and tests that pin the new behavior.
+The agent is read-only by design: it never logs in, adds to cart, pays, or books. Changes that weaken `browser/policy.ts`, `browser/guard.ts` or `lib/net.ts` need a clear reason in the pull request and tests that pin the new behavior.

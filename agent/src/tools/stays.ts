@@ -4,12 +4,13 @@ import type { Judge, YesNoCriteria } from "../judge/index.js";
 import { stayMatch } from "../judge/criteria/stayMatch.js";
 import { type Fx, fx as liveFx } from "../lib/fx.js";
 import { formatMoney } from "../shop/currency.js";
-import { type OpenTab, type SourceResult, searchStays } from "../stays/search.js";
+import { searchStays } from "../stays/search.js";
+import type { OpenTab, SourceResult } from "../stays/types.js";
 import { registry as defaultRegistry } from "../sources/index.js";
 import type { SourceRegistry } from "../sources/registry.js";
 import type { Stay, StayKind, StayQuery, StaySource } from "../stays/types.js";
 import { looseList } from "./args.js";
-import type { StaysData } from "./data.js";
+import type { StaysData } from "../render/data.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;

@@ -1,7 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fail, ok, type ToolResult } from "./result.js";
-import { BLOCKING_STATUSES, fetchPublic, type Lookup, publicHttpUrlError, readCapped, timeoutSignal } from "./net.js";
+import { BLOCKING_STATUSES, fetchPublic, type Lookup, publicHttpUrlError, readCapped, timeoutSignal } from "../lib/net.js";
 import { structuredLines, parseJsonLd } from "../sources/jsonld.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 

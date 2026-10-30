@@ -1,7 +1,7 @@
 import type { Tile } from "../../shop/extract.js";
 import { formatMoney } from "../../shop/currency.js";
-import { BOT_WALL } from "../../tools/browsePolicy.js";
-import { BLOCKING_STATUSES, fetchPublic, readCapped, timeoutSignal } from "../../tools/net.js";
+import { BOT_WALL } from "../../browser/policy.js";
+import { BLOCKING_STATUSES, fetchPublic, readCapped, timeoutSignal } from "../../lib/net.js";
 import { type LdRecord, parseJsonLd } from "../jsonld.js";
 import type { RetailCtx, RetailQuery, RetailResult, RetailSource } from "./types.js";
 

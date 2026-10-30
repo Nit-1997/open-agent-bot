@@ -1,6 +1,5 @@
 import type { Page } from "playwright";
 import type { Source } from "../sources/types.js";
-import type { OpenTab, SourceResult } from "./search.js";
 
 export type StayKind = "hotel" | "rental";
 
@@ -30,6 +29,16 @@ export type Stay = {
   currency?: string;
   met?: string[];
 };
+
+export type SourceResult = {
+  source: StaySource;
+  url: string;
+  status: "ok" | "blocked" | "failed" | "link";
+  stays: Stay[];
+  error?: string;
+};
+
+export type OpenTab = (live: boolean) => Promise<{ page: Page; close: () => Promise<void> }>;
 
 export type StayCtx = { openTab: OpenTab; live: boolean; allowPrivateHosts?: boolean };
 

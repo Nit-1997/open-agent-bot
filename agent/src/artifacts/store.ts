@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Browser, chromium } from "playwright";
 import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
-import { blockInternalRequests } from "../tools/browserGuard.js";
+import { blockInternalRequests } from "../browser/guard.js";
 
 export class ArtifactStore {
   private browser?: Promise<Browser>;

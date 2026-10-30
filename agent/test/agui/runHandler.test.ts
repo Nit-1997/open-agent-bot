@@ -5,7 +5,7 @@ import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import type { PiEvent } from "../../src/agui/translate.js";
 import { Evidence } from "../../src/grounding/evidence.js";
-import type { UserContext } from "../../src/prompt/systemPrompt.js";
+import type { UserContext } from "../../src/prompt/userContext.js";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
 import { ev, fakeSession, type Script } from "./fakeSession.js";
 

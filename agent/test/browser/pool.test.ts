@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { browseViewport } from "../../src/tools/browserPool.js";
+import { browseViewport } from "../../src/browser/pool.js";
 
 const base = { timeZone: "UTC", locale: "en-US", localTime: "t" };
 

@@ -11,7 +11,7 @@ import {
   TIME_OPTIONS,
   type TimeBucket,
 } from "../../../shared/flights.js";
-import type { AirportResult, FlightOption, FlightsData } from "./data.js";
+import type { AirportResult, FlightOption, FlightsData } from "../render/data.js";
 import { registry } from "../sources/index.js";
 import { type Browse, type FlightSource, googleFlightsUrl, parseGoogleFlights, priceBasis } from "../sources/flights/google.js";
 import { AIRPORTS, type Drive } from "./geo.js";

@@ -4,7 +4,7 @@ import type { Judge } from "../judge/index.js";
 import { musicMatch } from "../judge/criteria/musicMatch.js";
 import { mapLimit } from "../lib/concurrency.js";
 import { queryList } from "./args.js";
-import { timeoutSignal } from "./net.js";
+import { timeoutSignal } from "../lib/net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 import { withRetry } from "../lib/retry.js";
 

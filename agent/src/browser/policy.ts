@@ -1,4 +1,4 @@
-import { publicHttpUrlError } from "./net.js";
+import { publicHttpUrlError } from "../lib/net.js";
 
 export type BrowseAction =
   | { op: "goto"; url: string }

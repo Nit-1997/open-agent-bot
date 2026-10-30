@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BrowserPool } from "../../src/tools/browserPool.js";
+import { BrowserPool } from "../../src/browser/pool.js";
 import { browseTool } from "../../src/tools/browse.js";
 
 let server: Server;

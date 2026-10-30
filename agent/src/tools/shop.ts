@@ -1,7 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { Page } from "playwright";
 import { Type } from "typebox";
-import type { UserContext } from "../prompt/systemPrompt.js";
+import type { UserContext } from "../prompt/userContext.js";
 import { ActiveCart, type CartItem } from "../shop/cart.js";
 import type { Tile } from "../shop/extract.js";
 import { currencyOf, formatMoney } from "../shop/currency.js";
@@ -14,7 +14,7 @@ import { resolveStore } from "../sources/retail/resolve.js";
 import { defaultStoresFor } from "../shop/stores.js";
 import type { RetailCtx, RetailSource, Store } from "../sources/retail/types.js";
 import { type FrameBus, watch } from "../browser/frames.js";
-import type { BrowserPool } from "./browserPool.js";
+import type { BrowserPool } from "../browser/pool.js";
 import { looseList } from "./args.js";
 import { fail, ok, type ToolResult } from "./result.js";
 

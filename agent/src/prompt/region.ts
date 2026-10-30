@@ -1,4 +1,4 @@
-import type { UserContext } from "./systemPrompt.js";
+import type { UserContext } from "./userContext.js";
 
 type Region = { country: string; currency: string };
 

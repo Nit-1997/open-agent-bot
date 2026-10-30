@@ -14,7 +14,7 @@ import { LoginFlows } from "./providers/logins.js";
 import { loadSkillCatalog, skillsDir } from "./skills/catalog.js";
 import { buildSystemPrompt } from "./prompt/systemPrompt.js";
 import { SessionStore } from "./session/sessionStore.js";
-import { BrowserPool } from "./tools/browserPool.js";
+import { BrowserPool } from "./browser/pool.js";
 import { TurnBudget } from "./tools/budget.js";
 import { completeWith } from "./workflows/llm.js";
 import { buildTools, PER_REPLY_LIMITS } from "./tools/index.js";

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ActiveCart } from "../../src/shop/cart.js";
 import { jsonldStore } from "../../src/sources/retail/jsonldStore.js";
 import type { RetailCtx } from "../../src/sources/retail/types.js";
-import { BrowserPool } from "../../src/tools/browserPool.js";
+import { BrowserPool } from "../../src/browser/pool.js";
 import { shopTool } from "../../src/tools/shop.js";
 
 const product = (name: string, price: string, extra: object = {}) => ({

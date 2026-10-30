@@ -288,15 +288,13 @@ export class ProviderHub {
   models(id: string): ModelView[] {
     if (!catalogEntry(id)) throw new Error(`provider ${id} is not supported`);
     const enabled = new Set(this.enabledFor(id));
-    return this.rt
-      .getModels(id)
-      .map((m) => ({
-        id: m.id,
-        label: m.name || m.id,
-        contextWindow: m.contextWindow,
-        ...(priceNote(m) && { note: priceNote(m) }),
-        enabled: enabled.has(m.id),
-      }));
+    return this.rt.getModels(id).map((m) => ({
+      id: m.id,
+      label: m.name || m.id,
+      contextWindow: m.contextWindow,
+      ...(priceNote(m) && { note: priceNote(m) }),
+      enabled: enabled.has(m.id),
+    }));
   }
 
   async setEnabled(id: string, modelIds: string[]): Promise<void> {

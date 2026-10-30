@@ -5,7 +5,7 @@ import type { Store } from "../../src/shop/stores.js";
 import type { Judge } from "../../src/judge/index.js";
 import { noJudge } from "../../src/judge/index.js";
 import { ActiveCart } from "../../src/shop/cart.js";
-import { BrowserPool } from "../../src/tools/browserPool.js";
+import { BrowserPool } from "../../src/browser/pool.js";
 import { shopTool } from "../../src/tools/shop.js";
 
 let server: Server;

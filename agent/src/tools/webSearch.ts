@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import { mapLimit } from "../lib/concurrency.js";
 import { keyWords } from "../lib/keywords.js";
 import { queryList } from "./args.js";
-import { timeoutSignal } from "./net.js";
+import { timeoutSignal } from "../lib/net.js";
 import { fail, ok, type ToolResult } from "./result.js";
 import { withRetry } from "../lib/retry.js";
 

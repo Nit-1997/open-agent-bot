@@ -1,19 +1,9 @@
 import type { Page } from "playwright";
-import { BOT_WALL, isBlockedUrl } from "../tools/browsePolicy.js";
-import { publicHttpUrlError } from "../tools/net.js";
-import type { Stay, StayQuery, StaySource } from "./types.js";
+import { BOT_WALL, isBlockedUrl } from "../browser/policy.js";
+import { publicHttpUrlError } from "../lib/net.js";
+import type { OpenTab, SourceResult, StayQuery, StaySource } from "./types.js";
 
 const MAX_PER_SOURCE = 10;
-
-export type SourceResult = {
-  source: StaySource;
-  url: string;
-  status: "ok" | "blocked" | "failed" | "link";
-  stays: Stay[];
-  error?: string;
-};
-
-export type OpenTab = (live: boolean) => Promise<{ page: Page; close: () => Promise<void> }>;
 
 async function settle(page: Page): Promise<void> {
   await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});

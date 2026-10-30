@@ -1,6 +1,6 @@
 import { parseHTML } from "linkedom";
 import { mapLimit } from "../lib/concurrency.js";
-import { fetchPublic, timeoutSignal } from "../tools/net.js";
+import { fetchPublic, timeoutSignal } from "../lib/net.js";
 
 const THUMBNAIL = /^https:\/\/encrypted-tbn\d\.gstatic\.com\//i;
 

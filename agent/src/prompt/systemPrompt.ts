@@ -1,16 +1,6 @@
 import type { SkillEntry } from "../skills/catalog.js";
 import { regionFor } from "./region.js";
-
-export type UserProfile = { name?: string; home?: string; interests?: string[]; notes?: string };
-export type Viewport = { width: number; height: number };
-export type UserContext = {
-  timeZone: string;
-  locale: string;
-  localTime: string;
-  model?: string;
-  profile?: UserProfile;
-  viewport?: Viewport;
-};
+import type { UserContext, UserProfile } from "./userContext.js";
 
 function profileSection(p: UserProfile | undefined): string {
   if (!p) return "";

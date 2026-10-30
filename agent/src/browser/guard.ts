@@ -1,5 +1,5 @@
 import type { BrowserContext } from "playwright";
-import { dnsLookup, type Lookup, publicHttpUrlError, resolvesInternal } from "./net.js";
+import { dnsLookup, type Lookup, publicHttpUrlError, resolvesInternal } from "../lib/net.js";
 
 const CACHE_MS = 60_000;
 

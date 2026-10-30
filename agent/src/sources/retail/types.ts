@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import type { Tile } from "../../shop/extract.js";
-import type { Lookup } from "../../tools/net.js";
+import type { Lookup } from "../../lib/net.js";
 import type { Source } from "../types.js";
 
 export type RetailQuery = { query: string };

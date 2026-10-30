@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
-import type { UserContext, UserProfile, Viewport } from "../prompt/systemPrompt.js";
+import type { UserContext, UserProfile, Viewport } from "../prompt/userContext.js";
 import type { HistoryMessage, SessionEntry, SessionStore } from "../session/sessionStore.js";
 import { parseWorkspaceEdits, type WorkspaceEdits } from "../../../shared/workspace.js";
 import { applyEntityEdits } from "../workspace/edits.js";
