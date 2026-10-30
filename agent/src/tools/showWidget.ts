@@ -125,27 +125,3 @@ export const showUiTool = (deps: { findImage?: FindImage; isSourced?: (url: stri
       );
     },
   });
-
-export const suggestRepliesTool = () =>
-  defineTool({
-    name: "suggest_replies",
-    label: "suggest_replies",
-    description:
-      "Show 2-4 tappable follow-ups under your reply, written as the user would say them (under 40 characters), e.g. [\"Make it high protein\", \"Gluten-free options\", \"Compare with Costco\"]. Each should refine or extend what you just answered.",
-    parameters: Type.Object({
-      replies: Type.Union([Type.Array(Type.String()), Type.String()], { description: "2-4 short follow-ups" }),
-    }),
-    async execute(_id, params): Promise<ToolResult> {
-      let replies: unknown = params.replies;
-      if (typeof replies === "string") {
-        try {
-          replies = JSON.parse(replies);
-        } catch {
-          replies = [replies];
-        }
-      }
-      const r = validateWidget(fitWidget({ kind: "followups", replies }));
-      if (!r.ok) return fail(`invalid replies:\n${r.errors.join("\n")}`);
-      return ok("Follow-ups shown. Don't repeat them in your text.", { widget: r.value });
-    },
-  });

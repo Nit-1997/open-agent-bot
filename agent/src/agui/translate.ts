@@ -1,9 +1,10 @@
 import { type BaseEvent, EventType } from "@ag-ui/core";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { UiWidget } from "../../../shared/widgets.js";
+import { fitWidget, type UiWidget, validateWidget } from "../../../shared/widgets.js";
 import { Evidence } from "../grounding/evidence.js";
 import { groundUi } from "../grounding/groundUi.js";
 import { renderData } from "../render/registry.js";
+import { createFollowupSplitter } from "./followups.js";
 
 export type PiEvent = AgentSessionEvent;
 
@@ -30,6 +31,8 @@ export function createTranslator(ids: Deps) {
   const scripts = new Set<string>();
   let answered = false;
   const notedClaims = new Set<string>();
+  const splitter = createFollowupSplitter();
+  let followupsShown = false;
 
   const widgetCall = (id: string, widget: Widget): BaseEvent[] => [
     {
@@ -43,13 +46,40 @@ export function createTranslator(ids: Deps) {
     { type: EventType.TOOL_CALL_RESULT, messageId: ids.newId(), toolCallId: id, content: `rendered ${widget.kind}`, role: "tool" } as BaseEvent,
   ];
 
+  const emitText = (chunk: string): BaseEvent[] => {
+    if (!chunk) return [];
+    const out: BaseEvent[] = [];
+    if (!assistantId) assistantId = ids.newId();
+    if (!textOpen) {
+      textOpen = true;
+      text = "";
+      out.push({ type: EventType.TEXT_MESSAGE_START, messageId: assistantId, role: "assistant" } as BaseEvent);
+    }
+    text += chunk;
+    if (chunk.trim()) answered = true;
+    out.push({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: assistantId, delta: chunk } as BaseEvent);
+    return out;
+  };
+
+  const followupsWidget = (): BaseEvent[] => {
+    const replies = splitter.take();
+    if (!replies?.length || followupsShown) return [];
+    const r = validateWidget(fitWidget({ kind: "followups", replies }));
+    if (!r.ok) return [];
+    followupsShown = true;
+    return widgetCall(`${assistantId ?? ids.newId()}-followups`, r.value);
+  };
+
   const closeText = (): BaseEvent[] => {
-    if (!textOpen || !assistantId) return [];
-    textOpen = false;
-    const out: BaseEvent[] = [{ type: EventType.TEXT_MESSAGE_END, messageId: assistantId } as BaseEvent];
-    const claims = evidence.unverified(text).filter((c) => !notedClaims.has(c));
-    for (const c of claims) notedClaims.add(c);
-    if (claims.length) out.push(...widgetCall(`${assistantId}-widget`, { kind: "grounding_note", claims } as Widget));
+    const out = emitText(splitter.flush());
+    if (textOpen && assistantId) {
+      textOpen = false;
+      out.push({ type: EventType.TEXT_MESSAGE_END, messageId: assistantId } as BaseEvent);
+      const claims = evidence.unverified(text).filter((c) => !notedClaims.has(c));
+      for (const c of claims) notedClaims.add(c);
+      if (claims.length) out.push(...widgetCall(`${assistantId}-widget`, { kind: "grounding_note", claims } as Widget));
+    }
+    out.push(...followupsWidget());
     return out;
   };
 
@@ -65,17 +95,7 @@ export function createTranslator(ids: Deps) {
       case "message_update": {
         const a = e.assistantMessageEvent;
         if (a.type !== "text_delta" || !a.delta) return [];
-        const out: BaseEvent[] = [];
-        if (!assistantId) assistantId = ids.newId();
-        if (!textOpen) {
-          textOpen = true;
-          text = "";
-          out.push({ type: EventType.TEXT_MESSAGE_START, messageId: assistantId, role: "assistant" } as BaseEvent);
-        }
-        text += a.delta;
-        if (a.delta.trim()) answered = true;
-        out.push({ type: EventType.TEXT_MESSAGE_CONTENT, messageId: assistantId, delta: a.delta } as BaseEvent);
-        return out;
+        return emitText(splitter.push(a.delta));
       }
       case "message_end":
         return (e.message as { role?: string }).role === "assistant" ? closeText() : [];
@@ -104,7 +124,7 @@ export function createTranslator(ids: Deps) {
         ];
         const details = (e.result as { details?: { widget?: Widget; data?: unknown; sourced?: string } } | undefined)?.details;
         if (details?.sourced) evidence.add(details.sourced);
-        if (!e.toolName.startsWith("show_") && e.toolName !== "ask_user" && e.toolName !== "suggest_replies") {
+        if (!e.toolName.startsWith("show_") && e.toolName !== "ask_user") {
           evidence.add(content);
           if (details?.data) evidence.add(JSON.stringify(details.data));
         }

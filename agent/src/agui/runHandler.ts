@@ -8,7 +8,7 @@ import type { WorkspaceStore } from "../workspace/store.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
 export const EMPTY_REPLY_NUDGE =
-  "Your reply so far shows me nothing but follow-up suggestions. Answer my previous message now from what the tools already returned, without searching again.";
+  "Your reply so far shows me no answer. Answer my previous message now, in full, from what the tools already returned, without searching again.";
 
 export const SESSION_EXPIRED_MESSAGE = "This chat's session ended (the agent restarted or the chat sat idle). Start a new chat.";
 

@@ -19,7 +19,7 @@ import { type Judge, noJudge } from "../judge/index.js";
 import { askUserTool, FIELDS_HELP } from "./askUser.js";
 import { REPORT_GUIDE } from "../artifacts/reportKit.js";
 import { musicCover } from "./musicArt.js";
-import { BLOCKS_HELP, showUiTool, suggestRepliesTool } from "./showWidget.js";
+import { BLOCKS_HELP, showUiTool } from "./showWidget.js";
 import { weatherTool } from "./weather.js";
 import { imageSearchTool, matchingImage, search as runSearch, webSearchTool } from "./webSearch.js";
 import { musicTool, wikipediaTool } from "./lookup.js";
@@ -48,8 +48,6 @@ export type ToolDeps = {
   workspace?: WorkspaceStore;
   complete?: Complete;
 };
-
-export const HARD_LIMITS = { followups: 1 };
 
 export const PER_REPLY_LIMITS = { search: 4, images: 4, lookup: 4, read: 6, flights: 2, shop: 2, stays: 2, research: 2 };
 
@@ -121,7 +119,6 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       findMusicArt: musicCover({ country, judge: deps.cfg.flags.jevMusic ? (deps.judge ?? noJudge) : undefined }),
       isSourced: (u) => deps.evidence?.hasUrl(u) ?? true,
       findImage: async (name, source) => matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)) }), RULES.showUi, v2, BLOCKS_HELP),
-    withBudget(suggestRepliesTool(), deps.budget, "followups", "Follow-ups are already shown for this reply. Your reply is complete: stop without writing more."),
     withRules(askUserTool(), RULES.askUser, v2, FIELDS_HELP),
     withRules(createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }), RULES.createArtifact, v2, REPORT_GUIDE),
     ...(deps.cfg.flags.rpiv && deps.complete ? [withBudget(researchTool({ search, artifacts: deps.artifacts, images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }, complete: deps.complete, judge: deps.judge, evidence: deps.evidence }), deps.budget, "research")] : []),

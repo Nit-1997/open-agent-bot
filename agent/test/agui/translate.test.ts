@@ -173,8 +173,7 @@ describe("grounding", () => {
   });
 
   it("follow-up suggestions are not evidence", () => {
-    const sug = { ...toolEnd, toolCallId: "s1", toolName: "suggest_replies", result: { content: [{ type: "text", text: "Under $20" }], details: {} } } as unknown as PiEvent;
-    const out = run([sug, assistantStart, delta("Picks under $20."), assistantEnd]);
+    const out = run([assistantStart, delta("Picks under $20.\n<followups>Under $20 | Vegan</followups>"), assistantEnd]);
     expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$20"] }]);
   });
 

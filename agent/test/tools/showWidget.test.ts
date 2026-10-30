@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateWidget } from "../../../shared/widgets.js";
-import { showUiTool, suggestRepliesTool } from "../../src/tools/showWidget.js";
+import { showUiTool } from "../../src/tools/showWidget.js";
 import { validWidgets } from "../fixtures/widgets.js";
 
 const exec = (params: unknown) =>
@@ -170,23 +170,6 @@ describe("show_ui replaces unsourced pictures", () => {
       ] }],
     }, undefined, undefined, {}] as never[]))) as { details: { widget: { blocks: Array<{ items: Array<{ image?: string }> }> } } };
     expect(res.details.widget.blocks[0].items.map((i) => i.image)).toEqual(["https://tse1.mm.bing.net/real.jpg", "https://target.scene7.com/ok.jpg"]);
-  });
-});
-
-describe("suggest_replies", () => {
-  const run = (params: unknown) =>
-    suggestRepliesTool().execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{ isError?: boolean; details: { widget?: unknown } }>;
-
-  it("shows 1-4 short replies as a followups widget", async () => {
-    const r = await run({ replies: ["Make it high protein", "Gluten-free options"] });
-    expect(r.details.widget).toEqual({ kind: "followups", replies: ["Make it high protein", "Gluten-free options"] });
-  });
-
-  it("accepts replies sent as a JSON string and trims long or extra ones", async () => {
-    expect((await run({ replies: '["Cheaper picks"]' })).details.widget).toEqual({ kind: "followups", replies: ["Cheaper picks"] });
-    expect(((await run({ replies: ["x".repeat(41)] })).details.widget as { replies: string[] }).replies[0]).toHaveLength(40);
-    expect(((await run({ replies: ["a", "b", "c", "d", "e"] })).details.widget as { replies: string[] }).replies).toEqual(["a", "b", "c", "d"]);
-    expect((await run({ replies: [] })).isError).toBe(true);
   });
 });
 

@@ -43,7 +43,7 @@ How to answer:
 - Shopping (a product, a comparison, a cart, a recipe's groceries): call shop once with the items and 1-3 stores (the store the user named; groceries default to "shipt", which compares the nearby stores it carries). For a recipe, list the ingredients to buy and skip pantry basics (salt, pepper, sugar, oil, water, common dried spices). shop shows its own cart card per store with catalog photos, prices, quantities, and a hand-off link, so don't repeat its products in show_ui. The chat has one cart: when the user adds or removes things ("add tortillas", "drop the cheese", "make it for 6"), call shop again with only the new items or remove, and no stores, so they go into the same cart at the same stores; pass stores only if the user asks for different stores, and new_cart only for an unrelated list; reply in one or two sentences with the best-value store, how much cheaper it is than the next, and any missing items. Never use image_search pictures for products.
 - Shopping lists and carts: a cards block with one card per item, even without a link or price (the app finds a picture for each); use a checklist only for steps or to-dos.
 - When you find a specific product, even a single product (checking availability, a price, "do they have X"), show it as a cards block with its picture, price, and link rather than only describing it.
-- After answering, call suggest_replies with 2–4 short follow-ups the user is likely to tap, written in their voice: ways to refine (e.g. "Make it high protein", "Gluten-free options", "Under $20"), compare, or take the next step. Skip it after ask_user.
+- End your answer with one last line of 2–4 short follow-ups the user is likely to tap, written in their voice and separated by |: ways to refine, compare, or take the next step, e.g. <followups>Make it high protein | Gluten-free options | Under $20</followups>. The app turns it into buttons. Write your full answer before it and nothing after it. Skip it after ask_user.
 - Albums, songs, and playlists: call music once with every title (kind "song" for tracks) to get official cover art and Apple Music links, then show them as square cards.
 - Places, landmarks, people, events, and research topics: call wikipedia once with every name for a summary, picture, and link.
 - Pictures: use the image URLs listed under "images:" in a page you read, or returned by music, wikipedia, or search. For items still missing one (hotels, restaurants, products), call image_search once with queries listing every item, e.g. ["Memmo Alfama hotel Lisbon", "1908 Lisboa Hotel"]. Never make up an image URL.
@@ -75,7 +75,7 @@ How to answer:
 - Turn holidays and relative dates into exact dates (Thanksgiving 2026 is Thursday, Nov 26).
 - If a plan or purchase depends on details not given (dates, travelers, city, budget), call ask_user once with a prefilled form, then end your reply. Don't ask for what they already gave.
 - Search efficiently: one or two targeted searches in parallel, read a couple of pages, answer.
-- After answering, call suggest_replies (not after ask_user).`;
+- End your answer with one last line of 2-4 short follow-ups in the user's voice, separated by |, e.g. <followups>Make it high protein | Gluten-free options | Under $20</followups>. The app turns it into buttons. Write your full answer before it, nothing after it, and skip it after ask_user.`;
 
 export function skillIndex(skills: Pick<SkillEntry, "name" | "description">[]): string {
   if (!skills.length) return "";
