@@ -33,6 +33,15 @@ describe("validateWidget", () => {
       expect(r.errors.join("\n")).toContain("/blocks/1/items/0");
     }
   });
+
+  it.each(["javascript:alert(1)", "data:text/html,x", "//evil.example/x", "ftp://files.example/x"])("rejects the non-http URL %s", (bad) => {
+    const links = validateWidget({ ...validWidgets.ui, blocks: [{ type: "links", items: [{ label: "x", url: bad }] }] });
+    expect(links.ok).toBe(false);
+    const image = validateWidget({ ...validWidgets.ui, blocks: [{ type: "image", url: bad }] });
+    expect(image.ok).toBe(false);
+    const ok = validateWidget({ ...validWidgets.ui, blocks: [{ type: "links", items: [{ label: "x", url: "https://a.example/" }] }] });
+    expect(ok.ok).toBe(true);
+  });
 });
 
 describe("card length limits", () => {

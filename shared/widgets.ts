@@ -1,7 +1,7 @@
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
 
-const Url = Type.String({ minLength: 1 });
+const Url = Type.String({ minLength: 1, pattern: "^https?://" });
 
 export const WeatherCardSchema = Type.Object({
   kind: Type.Literal("weather_card"),

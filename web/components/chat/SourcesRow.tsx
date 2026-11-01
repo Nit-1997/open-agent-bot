@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { ExternalLink } from "@/components/widgets/ExternalLink";
 import type { Source } from "@/lib/sources";
 import { Favicon } from "./Favicon";
 
@@ -35,11 +36,9 @@ export function SourcesRow({ id, sources }: { id: string; sources: Source[] }) {
         <ol id={`${id}-list`} className="mt-2 grid animate-rise gap-2 sm:grid-cols-2">
           {sources.map((s, i) => (
             <li id={`${id}-item-${i}`} key={s.url}>
-              <a
+              <ExternalLink
                 id={`${id}-link-${i}`}
                 href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="flex items-start gap-2.5 rounded-xl border border-border bg-paper p-2.5 transition hover:border-border-strong hover:shadow-float"
               >
                 <span id={`${id}-num-${i}`} className="mt-0.5 font-mono text-[11px] sm:text-[10px] text-text-faint">
@@ -54,7 +53,7 @@ export function SourcesRow({ id, sources }: { id: string; sources: Source[] }) {
                     {s.host}
                   </span>
                 </span>
-              </a>
+              </ExternalLink>
             </li>
           ))}
         </ol>

@@ -1,7 +1,9 @@
 "use client";
 
 import type { UiBlock } from "@shared/widgets";
+import { safeHttpUrl } from "@shared/workspace";
 import { useEffect, useRef, useState } from "react";
+import { ExternalLink } from "./ExternalLink";
 
 type CardsBlock = Extract<UiBlock, { type: "cards" }>;
 type CardItem = CardsBlock["items"][number];
@@ -23,7 +25,8 @@ export function Picture({
   className: string;
 }) {
   const [failed, setFailed] = useState(false);
-  if (!src || failed) {
+  const safe = safeHttpUrl(src);
+  if (!safe || failed) {
     return (
       <span id={id} aria-hidden="true" className="flex h-full w-full items-center justify-center font-serif text-4xl text-text-muted">
         {fallback.charAt(0).toUpperCase()}
@@ -32,7 +35,7 @@ export function Picture({
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img id={id} src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={className} />
+    <img id={id} src={safe} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={className} />
   );
 }
 
@@ -82,10 +85,10 @@ function Card({ id, item, wide, folded, m }: { id: string; item: CardItem; wide:
         id={`${id}-card`}
         className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-paper transition hover:border-border-strong hover:shadow-sm"
       >
-        {item.url ? (
-          <a id={`${id}-link`} href={item.url} target="_blank" rel="noopener noreferrer" className="flex flex-col">
+        {safeHttpUrl(item.url) ? (
+          <ExternalLink id={`${id}-link`} href={item.url} className="flex flex-col">
             {head}
-          </a>
+          </ExternalLink>
         ) : (
           head
         )}
@@ -183,13 +186,14 @@ export function CardRow({ id, label, block, m }: { id: string; label: string; bl
 
 export function ImageBlock({ id, block, m }: { id: string; block: Extract<UiBlock, { type: "image" }>; m: Mark }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return null;
+  const src = safeHttpUrl(block.url);
+  if (failed || !src) return null;
   return (
     <figure id={id} className="mt-2 overflow-hidden rounded-xl border border-border bg-surface">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         id={`${id}-img`}
-        src={block.url}
+        src={src}
         alt={block.caption ?? ""}
         loading="lazy"
         referrerPolicy="no-referrer"
