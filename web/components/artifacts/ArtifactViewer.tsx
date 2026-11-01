@@ -1,7 +1,8 @@
 "use client";
 
-import { ARTIFACT_SANDBOX } from "@shared/artifacts";
 import { useEffect } from "react";
+import { reportPdfHref } from "@/lib/reports";
+import { ArtifactFrame } from "./ArtifactFrame";
 
 export function ArtifactViewer({ artifactId, title, onClose }: { artifactId: string; title: string; onClose: () => void }) {
   const id = `artifact-viewer-${artifactId}`;
@@ -19,7 +20,7 @@ export function ArtifactViewer({ artifactId, title, onClose }: { artifactId: str
         <div id={`${id}-actions`} className="flex gap-2">
           <a
             id={`${id}-pdf`}
-            href={`/api/artifacts/${artifactId}?format=pdf`}
+            href={reportPdfHref(artifactId)}
             className="rounded-full border border-border px-3.5 py-1.5 text-[13px] font-medium"
           >
             Download PDF
@@ -34,13 +35,7 @@ export function ArtifactViewer({ artifactId, title, onClose }: { artifactId: str
           </button>
         </div>
       </div>
-      <iframe
-        id={`${id}-frame`}
-        title={title}
-        sandbox={ARTIFACT_SANDBOX}
-        src={`/api/artifacts/${artifactId}`}
-        className="min-h-0 w-full flex-1 bg-white"
-      />
+      <ArtifactFrame id={`${id}-frame`} artifactId={artifactId} title={title} className="min-h-0 w-full flex-1 bg-white" />
     </div>
   );
 }

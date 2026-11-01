@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink } from "./ExternalLink";
 import type { Plan } from "@shared/widgets";
 import { Minus, Plus } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
@@ -261,15 +262,9 @@ export function PlanCard({
           {widget.value.stays.map((s, i) => (
             <li id={`${id}-stays-${i}`} key={i}>
               {s.url ? (
-                <a
-                  id={`${id}-stays-${i}-link`}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
+                <ExternalLink id={`${id}-stays-${i}-link`} href={s.url} className="font-medium hover:underline">
                   {s.name}
-                </a>
+                </ExternalLink>
               ) : (
                 <span id={`${id}-stays-${i}-name`} className="font-medium">
                   {s.name}
@@ -303,15 +298,9 @@ export function PlanCard({
           {widget.value.items.map((s, i) => (
             <li id={`${id}-items-${i}`} key={i}>
               {s.url ? (
-                <a
-                  id={`${id}-items-${i}-link`}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
+                <ExternalLink id={`${id}-items-${i}-link`} href={s.url} className="font-medium hover:underline">
                   {s.name}
-                </a>
+                </ExternalLink>
               ) : (
                 <span id={`${id}-items-${i}-name`} className="font-medium">
                   {s.name}

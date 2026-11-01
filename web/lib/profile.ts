@@ -67,6 +67,7 @@ export function clearedProfile(p: Profile): Profile {
     ...emptyProfile(),
     ...(p.defaultModel && { defaultModel: p.defaultModel }),
     ...(p.onboardedAt && { onboardedAt: p.onboardedAt }),
+    ...(p.agent && { agent: p.agent }),
   };
 }
 

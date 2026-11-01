@@ -32,9 +32,9 @@ describe("profile store", () => {
     await expect(saveProfile(emptyProfile())).rejects.toThrow("The agent isn't reachable.");
   });
 
-  it("clearing keeps the chosen model and finished onboarding", () => {
-    const p = { ...emptyProfile(), name: "N", food: ["Vegan"], defaultModel: "a/b", onboardedAt: "t" };
-    expect(clearedProfile(p)).toEqual({ ...emptyProfile(), defaultModel: "a/b", onboardedAt: "t" });
+  it("clearing keeps the chosen model, finished onboarding and the agent", () => {
+    const p = { ...emptyProfile(), name: "N", food: ["Vegan"], defaultModel: "a/b", onboardedAt: "t", agent: { name: "Ivy" } };
+    expect(clearedProfile(p)).toEqual({ ...emptyProfile(), defaultModel: "a/b", onboardedAt: "t", agent: { name: "Ivy" } });
     expect(initials(" nitin  bhat ")).toBe("NB");
   });
 });

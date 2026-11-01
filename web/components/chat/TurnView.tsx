@@ -1,4 +1,6 @@
+import type { AgentPersona } from "@shared/profile";
 import { Check } from "lucide-react";
+import { AgentOrb } from "@/components/agent/AgentOrb";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import type { Turn } from "@/lib/turns";
@@ -13,7 +15,9 @@ export const QUIET_ANSWER = "answer-";
 const isQuietAnswer = (messageId: string) => messageId.startsWith(QUIET_ANSWER);
 
 export function TurnView(props: {
+  idPrefix: string;
   turn: Turn;
+  persona: AgentPersona;
   running: boolean;
   locale: string;
   startedAt?: number;
@@ -28,7 +32,7 @@ export function TurnView(props: {
   onPlanEdit?: (e: PlanEdits) => void;
 }) {
   const { turn, running } = props;
-  const id = `turn-${turn.id}`;
+  const id = `${props.idPrefix}-turn-${turn.id}`;
   const isFollowups = (w: unknown) => (w as { kind?: string } | null)?.kind === "followups";
   const replies = turn.items.flatMap((it) =>
     it.kind === "widget" && isFollowups(it.widget) ? ((it.widget as { replies?: string[] }).replies ?? []) : [],
@@ -62,55 +66,58 @@ export function TurnView(props: {
           </p>
         </div>
       )}
-      <div id={`${id}-agent`} className="mt-3 sm:mt-5">
-        <ActivitySteps
-          id={`${id}-steps`}
-          steps={turn.steps}
-          running={running}
-          startedAt={props.startedAt}
-          endedAt={props.endedAt}
-          now={props.now}
-        />
-        {props.frame && <LiveBrowser id={`${id}-browser`} frame={props.frame} live={running} />}
-        <div id={`${id}-body`} className="space-y-3">
-          {turn.items.map((item) => {
-            if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
-            if (item.kind === "widget" && isFollowups(item.widget)) return null;
-            if (item.kind === "widget")
-              return (
-                <WidgetRenderer
-                  key={item.id}
-                  toolCallId={item.id}
-                  args={{ widget: item.widget }}
-                  locale={props.locale}
-                  answered={props.answered}
-                  onAnswer={(text) => props.onAnswer(text, true)}
-                  staleCart={item.id !== props.latestCart}
-                  onCartEdit={props.onCartEdit}
-                  stalePlan={!props.latestPlans?.has(item.id)}
-                  onPlanEdit={props.onPlanEdit}
-                />
-              );
-            if (item.result === undefined) {
-              return (
-                <div
-                  id={`${id}-artifact-pending-${item.id}`}
-                  key={item.id}
-                  role="status"
-                  aria-label="Writing the report"
-                  className="flex h-40 animate-pulse items-center justify-center rounded-2xl border border-border bg-surface text-sm text-text-muted"
-                >
-                  Writing the report…
-                </div>
-              );
-            }
-            return <ArtifactCard key={item.id} toolCallId={item.id} title={item.title} result={item.result} />;
-          })}
+      <div id={`${id}-agent-row`} className="mt-3 flex gap-3 sm:mt-5">
+        <AgentOrb id={`${id}-orb`} look={props.persona.look} size={28} className="mt-0.5 hidden sm:inline-block" />
+        <div id={`${id}-agent`} className="min-w-0 flex-1">
+          <ActivitySteps
+            id={`${id}-steps`}
+            steps={turn.steps}
+            running={running}
+            startedAt={props.startedAt}
+            endedAt={props.endedAt}
+            now={props.now}
+          />
+          {props.frame && <LiveBrowser id={`${id}-browser`} frame={props.frame} live={running} />}
+          <div id={`${id}-body`} className="space-y-3">
+            {turn.items.map((item) => {
+              if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
+              if (item.kind === "widget" && isFollowups(item.widget)) return null;
+              if (item.kind === "widget")
+                return (
+                  <WidgetRenderer
+                    key={item.id}
+                    toolCallId={item.id}
+                    args={{ widget: item.widget }}
+                    locale={props.locale}
+                    answered={props.answered}
+                    onAnswer={(text) => props.onAnswer(text, true)}
+                    staleCart={item.id !== props.latestCart}
+                    onCartEdit={props.onCartEdit}
+                    stalePlan={!props.latestPlans?.has(item.id)}
+                    onPlanEdit={props.onPlanEdit}
+                  />
+                );
+              if (item.result === undefined) {
+                return (
+                  <div
+                    id={`${id}-artifact-pending-${item.id}`}
+                    key={item.id}
+                    role="status"
+                    aria-label="Writing the report"
+                    className="flex h-40 animate-pulse items-center justify-center rounded-2xl border border-border bg-surface text-sm text-text-muted"
+                  >
+                    Writing the report…
+                  </div>
+                );
+              }
+              return <ArtifactCard key={item.id} toolCallId={item.id} title={item.title} result={item.result} />;
+            })}
+          </div>
+          {!running && <SourcesRow id={`${id}-sources`} sources={turn.sources} />}
+          {!running && !props.answered && replies.length > 0 && (
+            <Followups id={`${id}-followups`} replies={replies.slice(0, 4)} onPick={props.onAnswer} />
+          )}
         </div>
-        {!running && <SourcesRow id={`${id}-sources`} sources={turn.sources} />}
-        {!running && !props.answered && replies.length > 0 && (
-          <Followups id={`${id}-followups`} replies={replies.slice(0, 4)} onPick={props.onAnswer} />
-        )}
       </div>
     </article>
   );

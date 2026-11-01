@@ -88,5 +88,3 @@ export function hrefFor(route: Route): string {
       return "/admin";
   }
 }
-
-export const isChatRoute = (r: Route | null): r is Extract<Route, { section: "chat" }> => r?.section === "chat";

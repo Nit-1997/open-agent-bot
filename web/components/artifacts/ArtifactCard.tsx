@@ -1,8 +1,9 @@
 "use client";
 
-import { ARTIFACT_SANDBOX } from "@shared/artifacts";
 import { Download, ExternalLink, Maximize2 } from "lucide-react";
 import { useState } from "react";
+import { reportHtmlHref, reportPdfHref } from "@/lib/reports";
+import { ArtifactFrame } from "./ArtifactFrame";
 import { ArtifactViewer } from "./ArtifactViewer";
 
 export function parseArtifactId(result: string | undefined): string | null {
@@ -24,7 +25,7 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
       </p>
     );
   }
-  const src = `/api/artifacts/${artifactId}`;
+  const src = reportHtmlHref(artifactId);
   return (
     <section id={id} aria-label={title} className="my-2 overflow-hidden rounded-2xl border border-border bg-paper">
       <header id={`${id}-bar`} className="flex items-center gap-3 border-b border-border px-3 py-2">
@@ -66,17 +67,16 @@ export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string
           >
             <ExternalLink id={`${id}-new-tab-icon`} aria-hidden="true" size={15} />
           </a>
-          <a id={`${id}-pdf`} aria-label="Download PDF" title="Download PDF" href={`${src}?format=pdf`} className={action}>
+          <a id={`${id}-pdf`} aria-label="Download PDF" title="Download PDF" href={reportPdfHref(artifactId)} className={action}>
             <Download id={`${id}-pdf-icon`} aria-hidden="true" size={15} />
           </a>
         </div>
       </header>
-      <iframe
+      <ArtifactFrame
         id={`${id}-frame`}
+        artifactId={artifactId}
         title={title}
-        sandbox={ARTIFACT_SANDBOX}
-        src={src}
-        loading="lazy"
+        lazy
         className="block h-[min(58vh,520px)] min-h-[280px] sm:h-[min(70vh,640px)] sm:min-h-[360px] w-full bg-white"
       />
       {fullScreen && <ArtifactViewer artifactId={artifactId} title={title} onClose={() => setFullScreen(false)} />}

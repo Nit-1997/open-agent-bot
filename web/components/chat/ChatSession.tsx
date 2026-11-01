@@ -1,6 +1,8 @@
 "use client";
 
-import { useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
+import { EventType } from "@ag-ui/client";
+import { useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
+import type { AgentPersona } from "@shared/profile";
 import { ArrowDown } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -13,21 +15,36 @@ import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import type { CartEdits, PlanEdits, WorkspaceEdits } from "@shared/workspace";
 import { withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
+import { threadAgentId, useThreadContext } from "@/lib/useThreadContext";
 import type { BrowserFrame } from "./LiveBrowser";
 import { QUIET_ANSWER, TurnView } from "./TurnView";
 
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-export function ChatSession(props: {
+export type ChatSessionProps = {
+  id: string;
   agentId: string;
   threadId: string;
   locale: string;
   name?: string;
+  persona: AgentPersona;
   draft?: string;
   history?: HistoryMessage[];
   composerAccessory?: ReactNode;
-}) {
-  const { agent } = useAgent({ agentId: `chat-${props.threadId}`, runtimeAgentId: props.agentId, threadId: props.threadId });
+  composerPlaceholder: string;
+  composerLabel: string;
+  autoFocus: boolean;
+  emptyHeading: "h1" | "h2";
+  memory: string | null;
+  onOpenProfile: () => void;
+  onRunningChange: (running: boolean) => void;
+  onClaimed: (firstText: string) => void;
+  onRunEnd: () => void;
+};
+
+export function ChatSession(props: ChatSessionProps) {
+  const agentId = threadAgentId(props.threadId);
+  const { agent } = useAgent({ agentId, runtimeAgentId: props.agentId, threadId: props.threadId });
   const { copilotkit } = useCopilotKit();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ kind: RunErrorKind; message?: string } | null>(null);
@@ -65,7 +82,13 @@ export function ChatSession(props: {
       }
     return new Set(latest.values());
   }, [turns]);
-  useAgentContext({ description: "workspace_edits", value: workspaceContextValue(edits) });
+  useThreadContext(agentId, "workspace_edits", workspaceContextValue(edits));
+
+  const { onRunningChange, onClaimed, onRunEnd } = props;
+  const claim = useRef<{ text: string; waiting: boolean; done: boolean }>({ text: "", waiting: false, done: false });
+  useEffect(() => {
+    onRunningChange(running);
+  }, [running, onRunningChange]);
 
   const { history } = props;
   useEffect(() => {
@@ -74,6 +97,17 @@ export function ChatSession(props: {
 
   useEffect(() => {
     const sub = agent.subscribe({
+      onRunStartedEvent: () => {
+        if (!claim.current.done) claim.current.waiting = true;
+      },
+      onEvent: ({ event }) => {
+        const c = claim.current;
+        if (!c.waiting || event.type === EventType.RUN_STARTED) return;
+        c.waiting = false;
+        if (event.type === EventType.RUN_ERROR) return;
+        c.done = true;
+        onClaimed(c.text);
+      },
       onCustomEvent: ({ event }) => {
         const id = lastRef.current;
         if (event.name === "browser_frame" && id) setFrames((f) => ({ ...f, [id]: event.value as BrowserFrame }));
@@ -88,7 +122,7 @@ export function ChatSession(props: {
       },
     });
     return () => sub.unsubscribe();
-  }, [agent]);
+  }, [agent, onClaimed]);
 
   useEffect(() => {
     if (!running) return;
@@ -103,13 +137,13 @@ export function ChatSession(props: {
 
   useLayoutEffect(() => {
     const id = reveal.current;
-    const mine = id ? document.getElementById(`turn-${id}-user`) : null;
+    const mine = id ? document.getElementById(`${props.id}-turn-${id}-user`) : null;
     if (mine) {
       reveal.current = null;
       mine.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
     }
     measure();
-  }, [turns, measure]);
+  }, [turns, measure, props.id]);
 
   const run = useCallback(async () => {
     setSending(true);
@@ -122,10 +156,11 @@ export function ChatSession(props: {
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
     } finally {
       setSending(false);
+      onRunEnd();
       const id = lastRef.current;
       if (id) setTiming((t) => (t[id] && !t[id].end ? { ...t, [id]: { ...t[id], end: Date.now() } } : t));
     }
-  }, [agent, copilotkit]);
+  }, [agent, copilotkit, onRunEnd]);
 
   const send = useCallback(
     (text: string, quiet = false) => {
@@ -133,6 +168,7 @@ export function ChatSession(props: {
       setUnsaved(null);
       const id = `${quiet ? QUIET_ANSWER : ""}${crypto.randomUUID()}`;
       if (!quiet) reveal.current = id;
+      if (!claim.current.done && !claim.current.text) claim.current.text = text;
       setTiming((t) => ({ ...t, [id]: { start: Date.now() } }));
       agent.addMessage({ id, role: "user", content: text });
       void run();
@@ -144,17 +180,28 @@ export function ChatSession(props: {
     void copilotkit.stopAgent({ agent });
   }, [agent, copilotkit]);
 
+  const sid = props.id;
   return (
-    <div id="chat-session" className="flex min-h-0 flex-1 flex-col">
-      <div id="chat-scroller" ref={scroller} onScroll={measure} className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div id={`${sid}-session`} className="flex min-h-0 flex-1 flex-col">
+      <div id={`${sid}-scroller`} ref={scroller} onScroll={measure} className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
         {turns.length === 0 ? (
-          <EmptyState name={props.name?.trim().split(/\s+/)[0]} onPick={send} />
+          <EmptyState
+            id={`${sid}-empty`}
+            name={props.name?.trim().split(/\s+/)[0]}
+            persona={props.persona}
+            heading={props.emptyHeading}
+            memory={props.memory}
+            onOpenProfile={props.onOpenProfile}
+            onPick={send}
+          />
         ) : (
-          <div id="chat-turns" className="mx-auto w-full max-w-[720px] space-y-6 px-3 pb-6 pt-4 sm:space-y-10 sm:px-4 sm:pb-8 sm:pt-6">
+          <div id={`${sid}-turns`} className="mx-auto w-full max-w-[760px] space-y-6 px-3 pb-6 pt-4 sm:space-y-10 sm:px-6 sm:pb-8 sm:pt-7">
             {turns.map((t) => (
-              <div id={`turn-wrap-${t.id}`} key={t.id}>
+              <div id={`${sid}-turn-wrap-${t.id}`} key={t.id}>
                 <TurnView
+                  idPrefix={sid}
                   turn={t}
+                  persona={props.persona}
                   running={running && t.id === lastId}
                   locale={props.locale}
                   startedAt={timing[t.id]?.start}
@@ -173,34 +220,35 @@ export function ChatSession(props: {
           </div>
         )}
       </div>
-      <div id="chat-footer" className="relative mx-auto w-full max-w-[720px] px-3 pb-3 sm:px-4 sm:pb-4">
+      <div id={`${sid}-footer`} className="relative mx-auto w-full max-w-[760px] px-3 pb-3 sm:px-6 sm:pb-5">
         {below && (
           <button
-            id="chat-jump-bottom"
+            id={`${sid}-jump-bottom`}
             type="button"
             onClick={() =>
               scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: prefersReducedMotion() ? "auto" : "smooth" })
             }
             className="absolute -top-11 left-1/2 flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-paper px-3 text-[12px] font-medium text-text-secondary shadow-float transition hover:text-text-primary focus-visible:outline-2 focus-visible:outline-mist-500"
           >
-            <ArrowDown id="chat-jump-bottom-icon" aria-hidden="true" size={14} />
-            <span id="chat-jump-bottom-text">{running ? "Reply loading below" : "Latest below"}</span>
+            <ArrowDown id={`${sid}-jump-bottom-icon`} aria-hidden="true" size={14} />
+            <span id={`${sid}-jump-bottom-text`}>{running ? "Reply loading below" : "Latest below"}</span>
           </button>
         )}
         {unsaved && (
           <p
-            id="chat-not-saved"
+            id={`${sid}-not-saved`}
             role="status"
             className="mb-2 flex items-center justify-between gap-2 rounded-xl bg-warn-bg px-3 py-2 text-xs text-warn-fg"
           >
-            <span id="chat-not-saved-text">{unsaved}</span>
-            <button id="chat-not-saved-dismiss" type="button" onClick={() => setUnsaved(null)} className="underline underline-offset-2">
+            <span id={`${sid}-not-saved-text`}>{unsaved}</span>
+            <button id={`${sid}-not-saved-dismiss`} type="button" onClick={() => setUnsaved(null)} className="underline underline-offset-2">
               Dismiss
             </button>
           </p>
         )}
         {error && (
           <ErrorBanner
+            id={`${sid}-error`}
             kind={error.kind}
             message={error.message}
             onRetry={() => {
@@ -210,9 +258,19 @@ export function ChatSession(props: {
             onDismiss={() => setError(null)}
           />
         )}
-        <Composer running={running} onSend={send} onStop={stop} autoFocus initialText={props.draft} accessory={props.composerAccessory} />
-        <p id="chat-disclaimer" className="mt-1.5 text-center text-[11px] text-text-muted">
-          Read-only: I look things up and plan, but never buy, book, or sign in for you.
+        <Composer
+          id={`${sid}-composer`}
+          running={running}
+          onSend={send}
+          onStop={stop}
+          autoFocus={props.autoFocus}
+          initialText={props.draft}
+          accessory={props.composerAccessory}
+          placeholder={props.composerPlaceholder}
+          label={props.composerLabel}
+        />
+        <p id={`${sid}-disclaimer`} className="mt-1.5 text-center text-[11px] text-text-muted">
+          {`Read-only: ${props.persona.name} looks things up and plans, but never buys, books, or signs in for you.`}
         </p>
       </div>
     </div>

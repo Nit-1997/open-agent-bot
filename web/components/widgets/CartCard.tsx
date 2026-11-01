@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink } from "./ExternalLink";
 import type { Cart } from "@shared/widgets";
 import type { CartEdits } from "@shared/workspace";
 import { Info, Minus, Plus, Trash2 } from "lucide-react";
@@ -26,6 +27,7 @@ export function CartCard({
   stale?: boolean;
 }) {
   const id = `cart-${toolCallId}`;
+  const locked = stale || !onEdit;
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState<Shared>({});
   const [choices, setChoices] = useState<Record<string, Record<string, number>>>({});
@@ -149,15 +151,13 @@ export function CartCard({
                         />
                       </div>
                       <div id={`${rid}-info`} className="min-w-0 flex-1">
-                        <a
+                        <ExternalLink
                           id={`${rid}-link`}
                           href={pick.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="line-clamp-2 text-sm font-medium text-text-primary hover:underline"
                         >
                           {pick.title}
-                        </a>
+                        </ExternalLink>
                         <p id={`${rid}-meta`} className="mt-0.5 text-xs text-text-muted">
                           <span id={`${rid}-price`} className="font-semibold text-text-primary">
                             {pick.priceText ?? "Price not shown"}
@@ -186,7 +186,7 @@ export function CartCard({
                             </span>
                           )}
                         </p>
-                        {item.picks.length > 1 && !stale && (
+                        {item.picks.length > 1 && !locked && (
                           <button
                             id={`${rid}-swap`}
                             type="button"
@@ -203,7 +203,7 @@ export function CartCard({
                             id={`${rid}-dec`}
                             type="button"
                             aria-label="Decrease quantity"
-                            disabled={stale || line.qty <= 1}
+                            disabled={locked || line.qty <= 1}
                             onClick={() => update(i, { qty: line.qty - 1 })}
                             className="p-1.5 text-text-secondary disabled:opacity-30"
                           >
@@ -216,26 +216,27 @@ export function CartCard({
                             id={`${rid}-inc`}
                             type="button"
                             aria-label="Increase quantity"
-                            disabled={stale}
+                            disabled={locked}
                             onClick={() => update(i, { qty: line.qty + 1 })}
                             className="p-1.5 text-text-secondary disabled:opacity-30"
                           >
                             <Plus id={`${rid}-inc-icon`} aria-hidden="true" size={12} />
                           </button>
                         </div>
-                        <button
-                          id={`${rid}-remove`}
-                          type="button"
-                          aria-label="Remove"
-                          disabled={stale}
-                          onClick={() => update(i, { removed: true })}
-                          className="rounded-full bg-surface p-1.5 text-text-secondary hover:text-text-primary"
-                        >
-                          <Trash2 id={`${rid}-remove-icon`} aria-hidden="true" size={13} />
-                        </button>
+                        {!locked && (
+                          <button
+                            id={`${rid}-remove`}
+                            type="button"
+                            aria-label="Remove"
+                            onClick={() => update(i, { removed: true })}
+                            className="rounded-full bg-surface p-1.5 text-text-secondary hover:text-text-primary"
+                          >
+                            <Trash2 id={`${rid}-remove-icon`} aria-hidden="true" size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    {swapping === i && (
+                    {swapping === i && !locked && (
                       <div id={`${rid}-alts`} className="ml-[76px] mt-2 space-y-1">
                         {item.picks.map((alt, n) =>
                           n === line.choice ? null : (
@@ -331,15 +332,13 @@ export function CartCard({
               {outside} {outside === 1 ? "substitute is" : "substitutes are"} not in this total
             </p>
           )}
-          <a
+          <ExternalLink
             id={`${id}-handoff`}
             href={store.url}
-            target="_blank"
-            rel="noopener noreferrer"
             className="mt-3 flex w-full items-center justify-center rounded-full bg-charcoal px-4 py-2 text-sm font-medium text-on-charcoal hover:opacity-90"
           >
             Continue on {portal} ↗
-          </a>
+          </ExternalLink>
           <p id={`${id}-handoff-note`} className="mt-2 text-center text-[12px] sm:text-[11px] leading-snug text-text-muted">
             Guest prices for your area. You sign in and check out on {portal}.
           </p>

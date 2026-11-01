@@ -14,7 +14,7 @@ export function Pager(props: {
   const { id, page, pageSize, total, busy } = props;
   const last = pageCount(pageSize, total);
   return (
-    <nav id={id} aria-label="Pages" className="flex items-center justify-between gap-2 pt-2">
+    <nav id={id} aria-label="Pages" className="flex items-center justify-between gap-2 pt-4">
       <p id={`${id}-range`} className="text-[12px] text-text-muted">
         {rangeText(page, pageSize, total)}
       </p>

@@ -8,12 +8,13 @@
   --surface: #f2f0ed;
   --surface-accent: #eceae6;
   --paper: #ffffff;
+  --sidebar: #f6f4f1;
   --border: #e5e3df;
   --border-strong: #d8d5cf;
   --text-primary: #111111;
   --text-secondary: #555555;
-  --text-muted: #6b6b6b;
-  --text-faint: #8a8a8a;
+  --text-muted: #5c5c5c;
+  --text-faint: #666666;
   --charcoal: #111111;
   --on-charcoal: #ffffff;
   --mist-50: #eef3f4;
@@ -46,12 +47,13 @@ html.dark {
   --surface: #1a1c21;
   --surface-accent: #23262d;
   --paper: #2c2f36;
+  --sidebar: #131418;
   --border: #383b42;
   --border-strong: #4a4d55;
   --text-primary: #f2f1ef;
   --text-secondary: #d4d2cf;
   --text-muted: #adabac;
-  --text-faint: #8f9094;
+  --text-faint: #9a9b9f;
   --charcoal: #e8e6e2;
   --on-charcoal: #111111;
   --mist-50: color-mix(in srgb, #4d7f87 20%, #2c2f36);
@@ -82,6 +84,7 @@ html.dark {
   --color-surface: var(--surface);
   --color-surface-accent: var(--surface-accent);
   --color-paper: var(--paper);
+  --color-sidebar: var(--sidebar);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-text-primary: var(--text-primary);
@@ -116,6 +119,36 @@ html.dark {
   --animate-rise: rise 0.35s var(--ease-out) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-breathe: breathe 2.4s ease-in-out infinite;
+  --animate-slide-left: slide-left 0.2s var(--ease-out) both;
+  --animate-slide-right: slide-right 0.2s var(--ease-out) both;
+  --animate-slide-up: slide-up 0.2s var(--ease-out) both;
+}
+
+@keyframes slide-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 @keyframes rise {
@@ -185,6 +218,34 @@ html.dark {
 @utility orb {
   background: var(--orb);
   border-radius: 9999px;
+}
+
+.orb[data-look="mist"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #d5e3e5 32%, #6f9aa1 70%, #23474d 100%);
+}
+.orb[data-look="ember"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #f6d9c7 32%, #d9895e 70%, #5a2614 100%);
+}
+.orb[data-look="moss"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #dde9cc 32%, #8fae6a 70%, #2c3d1a 100%);
+}
+.orb[data-look="dusk"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #ddd6f1 32%, #9a8bc9 70%, #2d2550 100%);
+}
+html.dark .orb[data-look="mist"] {
+  --orb: radial-gradient(circle at 35% 30%, #e3eff1, #7fa6ac 45%, #183a40);
+}
+html.dark .orb[data-look="ember"] {
+  --orb: radial-gradient(circle at 35% 30%, #fbe3d4, #d9895e 45%, #5a2614);
+}
+html.dark .orb[data-look="moss"] {
+  --orb: radial-gradient(circle at 35% 30%, #e6f0d8, #8fae6a 45%, #2c3d1a);
+}
+html.dark .orb[data-look="dusk"] {
+  --orb: radial-gradient(circle at 35% 30%, #e7e1f6, #9a8bc9 45%, #2d2550);
+}
+.orb-glow {
+  box-shadow: 0 0 60px rgba(127, 166, 172, 0.25);
 }
 
 @utility glass {

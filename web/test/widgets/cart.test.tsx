@@ -40,7 +40,7 @@ const subtotal = () => screen.getByTestId("cart-subtotal").textContent;
 
 describe("CartCard", () => {
   it("shows the best-value store's items like a store cart, with a hand-off link", () => {
-    const { container } = render(<CartCard toolCallId="c1" widget={cart} />);
+    const { container } = render(<CartCard toolCallId="c1" widget={cart} onEdit={() => {}} />);
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(["Target (Shipt)$4.37Best value", "Safeway (Shipt)$6.50"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -57,7 +57,7 @@ describe("CartCard", () => {
   });
 
   it("updates the subtotal as quantities change or items are removed", () => {
-    render(<CartCard toolCallId="c2" widget={cart} />);
+    render(<CartCard toolCallId="c2" widget={cart} onEdit={() => {}} />);
     const beans = screen.getByRole("listitem", { name: "black beans" });
     fireEvent.click(within(beans).getByRole("button", { name: "Increase quantity" }));
     expect(within(beans).getByText("3")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("CartCard", () => {
   });
 
   it("swaps an item for another match from the same store", () => {
-    render(<CartCard toolCallId="c3" widget={cart} />);
+    render(<CartCard toolCallId="c3" widget={cart} onEdit={() => {}} />);
     const rice = screen.getByRole("listitem", { name: "rice" });
     fireEvent.click(within(rice).getByRole("button", { name: "Swap" }));
     fireEvent.click(within(rice).getByRole("button", { name: /Instant Rice 14oz/ }));
@@ -78,7 +78,7 @@ describe("CartCard", () => {
   });
 
   it("switches to another store's cart", () => {
-    render(<CartCard toolCallId="c4" widget={cart} />);
+    render(<CartCard toolCallId="c4" widget={cart} onEdit={() => {}} />);
     fireEvent.click(screen.getByRole("tab", { name: /Safeway/ }));
     expect(screen.getByRole("link", { name: "Signature Rice 2 lb" })).toBeInTheDocument();
     expect(subtotal()).toBe("$3.50");
@@ -124,7 +124,7 @@ describe("CartCard match labels", () => {
 
 describe("CartCard edits", () => {
   it("treats the list as one cart: quantities and removals carry across store tabs", () => {
-    render(<CartCard toolCallId="c5" widget={cart} />);
+    render(<CartCard toolCallId="c5" widget={cart} onEdit={() => {}} />);
     fireEvent.click(within(screen.getByRole("listitem", { name: "rice" })).getByRole("button", { name: "Increase quantity" }));
     fireEvent.click(screen.getByRole("tab", { name: /Safeway/ }));
     expect(within(screen.getByRole("listitem", { name: "rice" })).getByText("2")).toBeInTheDocument();
@@ -171,5 +171,28 @@ describe("CartCard currency", () => {
     render(<CartCard toolCallId="inr" widget={inr} locale="en-IN" />);
     expect(screen.getAllByRole("tab")[0].textContent).toContain("₹350.00");
     expect(screen.getByTestId("cart-subtotal").textContent).toBe("₹350.00");
+  });
+});
+
+describe("CartCard without edits", () => {
+  it("is read-only: no swap or remove, steppers disabled, store tabs still switch, unsafe links render as text", () => {
+    const unsafe = {
+      ...cart,
+      stores: cart.stores.map((st, n) =>
+        n === 0
+          ? {
+              ...st,
+              items: st.items.map((i, k) => (k === 0 ? { ...i, picks: i.picks.map((p) => ({ ...p, url: "javascript:alert(1)" })) } : i)),
+            }
+          : st,
+      ),
+    };
+    const { container } = render(<CartCard toolCallId="ro" widget={unsafe} />);
+    expect(screen.queryByRole("button", { name: "Swap" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    for (const b of screen.getAllByRole("button", { name: /quantity/ })) expect(b).toBeDisabled();
+    expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
+    fireEvent.click(screen.getAllByRole("tab")[1]);
+    expect(screen.getAllByRole("tab")[1]).toHaveAttribute("aria-selected", "true");
   });
 });

@@ -8,6 +8,7 @@ export const STOPPED_MARK = "(stopped)";
 
 export const chatsApi = {
   page: async (page: number) => readApi<PageResponse<ChatSummary>>(await fetch(`/api/chats?page=${page}`, { cache: "no-store" })),
+  get: async (id: string) => readApi<{ chat: ChatSummary }>(await fetch(`/api/chats/${encodeURIComponent(id)}`, { cache: "no-store" })),
   messages: async (id: string) =>
     readApi<Page<StoredMessage>>(await fetch(`/api/chats/${encodeURIComponent(id)}/messages`, { cache: "no-store" })),
 };
