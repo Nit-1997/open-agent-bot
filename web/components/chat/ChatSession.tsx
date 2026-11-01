@@ -2,7 +2,7 @@
 
 import { useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
 import { ArrowDown } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { errorCodeIn, noteRunFailure } from "@/lib/authState";
 import type { HistoryMessage } from "@/lib/chats";
@@ -25,6 +25,7 @@ export function ChatSession(props: {
   name?: string;
   draft?: string;
   history?: HistoryMessage[];
+  composerAccessory?: ReactNode;
 }) {
   const { agent } = useAgent({ agentId: `chat-${props.threadId}`, runtimeAgentId: props.agentId, threadId: props.threadId });
   const { copilotkit } = useCopilotKit();
@@ -209,7 +210,7 @@ export function ChatSession(props: {
             onDismiss={() => setError(null)}
           />
         )}
-        <Composer running={running} onSend={send} onStop={stop} autoFocus initialText={props.draft} />
+        <Composer running={running} onSend={send} onStop={stop} autoFocus initialText={props.draft} accessory={props.composerAccessory} />
         <p id="chat-disclaimer" className="mt-1.5 text-center text-[11px] text-text-muted">
           Read-only: I look things up and plan, but never buy, book, or sign in for you.
         </p>

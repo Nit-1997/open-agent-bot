@@ -149,7 +149,6 @@ export function Chat({ email, name, isAdmin }: { email: string; name: string; is
               </h1>
             </div>
             <div id="chat-actions" className="flex items-center gap-1.5">
-              <ModelMenu models={models} value={chatModel} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
               <ThemeToggle />
               <AccountMenu name={profile.name} email={email} isAdmin={isAdmin} onOpenProfile={() => setDrawer(true)} />
               <button
@@ -174,6 +173,9 @@ export function Chat({ email, name, isAdmin }: { email: string; name: string; is
               name={profile.name}
               draft={draft}
               history={history}
+              composerAccessory={
+                <ModelMenu models={models} value={chatModel} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
+              }
             />
           </main>
         </div>

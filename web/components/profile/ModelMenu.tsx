@@ -36,10 +36,9 @@ export function ModelMenu(props: {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="glass-pill inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] text-text-primary transition hover:bg-paper"
+        className="inline-flex h-9 items-center gap-1 rounded-full px-2.5 text-[13px] text-text-secondary transition hover:bg-surface hover:text-text-primary"
       >
-        <span id="model-menu-dot" aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-mist-500" />
-        <span id="model-menu-label" className="max-w-[140px] truncate">
+        <span id="model-menu-label" className="max-w-[160px] truncate sm:max-w-[220px]">
           {modelLabel(models, current)}
         </span>
         <ChevronDown
@@ -54,7 +53,7 @@ export function ModelMenu(props: {
           id="model-menu-list"
           role="menu"
           aria-label="Model for this chat"
-          className="absolute right-0 top-full z-30 mt-2 w-72 animate-rise rounded-2xl border border-border bg-paper p-1.5 shadow-lift"
+          className="absolute bottom-full right-0 z-30 mb-2 w-72 animate-rise rounded-2xl border border-border bg-paper p-1.5 shadow-lift"
         >
           <p id="model-menu-hint" className="eyebrow px-2.5 pb-1.5 pt-1">
             This chat · from your next message

@@ -6,7 +6,9 @@ import { noteAuthFailure, resetAuthState } from "@/lib/authState";
 import { resetProfileStore } from "@/lib/profile";
 
 vi.mock("@copilotkit/react-core/v2", () => ({ useAgentContext: () => {} }));
-vi.mock("@/components/chat/ChatSession", () => ({ ChatSession: () => <div id="chat-session-stub" /> }));
+vi.mock("@/components/chat/ChatSession", () => ({
+  ChatSession: (props: { composerAccessory?: React.ReactNode }) => <div id="chat-session-stub">{props.composerAccessory}</div>,
+}));
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -48,6 +50,22 @@ describe("Chat header", () => {
     expectUniqueIds(container);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("keeps the model picker in the message box, not the header", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/profile") return Response.json({ profile: { ...emptyProfile(), name: "Nitin", onboardedAt: "2026-10-30" } });
+        if (url === "/api/models")
+          return Response.json({ default: "or/m", models: [{ id: "or/m", label: "Model M", provider: "OpenRouter" }] });
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }),
+    );
+    const { container } = render(<Chat email="ntn@example.test" name="" isAdmin={false} />);
+    const picker = await screen.findByRole("button", { name: /Model M/ });
+    expect(container.querySelector("#chat-header")?.contains(picker)).toBe(false);
+    expect(container.querySelector("#chat-session-stub")?.contains(picker)).toBe(true);
   });
 
   it("opens the profile drawer from the menu", async () => {
