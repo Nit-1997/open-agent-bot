@@ -112,6 +112,26 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     await expect(page.locator(`#search-hit-chat-${s.bigSur}-snippet mark`)).toHaveText("McWay");
     await page.goBack();
     await expect(page).toHaveURL(before);
+    await page.locator("#rail-search").click();
+    const field = page.locator("#search-field-input");
+    await expect(field).toBeFocused();
+    await field.pressSequentially("mcway", { delay: 60 });
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue("mcway");
+    await expect(page).toHaveURL(/\/search\?q=mcway$/);
+    await expect(page.locator(`#search-hit-chat-${s.bigSur}-snippet mark`)).toHaveText("McWay");
+    await page.locator("#search-scopes-all").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator("#search-scopes-chats")).toBeFocused();
+    await expect(page).toHaveURL(/\/search\?q=mcway&scope=chats$/);
+    await expect(page.locator("#search-scopes-chats")).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("End");
+    await expect(page.locator("#search-scopes-reports")).toBeFocused();
+    await expect(page).toHaveURL(/scope=reports$/);
+    await page.keyboard.press("Home");
+    await expect(page.locator("#search-scopes-all")).toBeFocused();
+    await expect(page).toHaveURL(/\/search\?q=mcway$/);
+    await page.goto(before);
   });
 
   await test.step("6. Reports: grid, paging, a report and its PDF", async () => {
