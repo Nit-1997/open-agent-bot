@@ -62,7 +62,11 @@ export function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollM
             Open ChatGPT sign-in ↗
           </a>
           <p id={`${id}-hint`} className="text-[11px] text-text-muted">
-            Sign in on OpenAI&apos;s page. It uses your ChatGPT plan&apos;s included usage. This usually finishes on its own.
+            Sign in on OpenAI&apos;s page. It uses your ChatGPT plan&apos;s included usage.
+          </p>
+          <p id={`${id}-paste-help`} className="text-[11px] text-text-muted">
+            When you finish, the browser lands on an http://localhost:1455/… page that won&apos;t load. That&apos;s expected: copy the whole
+            address from the address bar and paste it into the box below.
           </p>
         </div>
       )}
@@ -82,6 +86,8 @@ export function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollM
           <div id={`${id}-answer-row`} className="flex gap-2">
             <input
               id={`${id}-answer`}
+              autoComplete="off"
+              spellCheck={false}
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               placeholder={state.prompt.placeholder}

@@ -31,6 +31,7 @@ export function ProfileDrawer(props: {
   onRestart: () => void;
   onClear: () => void;
   onManageModels?: () => void;
+  recentChats?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Profile>(props.profile);
   const [confirming, setConfirming] = useState(false);
@@ -85,7 +86,7 @@ export function ProfileDrawer(props: {
                 {draft.name?.trim() || "Your profile"}
               </h2>
               <p id="profile-drawer-sub" className="eyebrow mt-1.5">
-                Saved by the agent on this computer
+                Saved to your account
               </p>
             </div>
           </div>
@@ -100,6 +101,11 @@ export function ProfileDrawer(props: {
           </button>
         </header>
         <div id="profile-drawer-body" className="min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6">
+          {props.recentChats && (
+            <Group id="profile-group-chats" title="Recent chats">
+              {props.recentChats}
+            </Group>
+          )}
           <Group id="profile-group-you" title="You">
             <YouSection id="profile-you" profile={draft} onChange={setDraft} options={options} />
           </Group>
@@ -158,6 +164,16 @@ export function ProfileDrawer(props: {
             >
               Run setup again
             </button>
+            <form id="profile-signout-all-form" method="post" action="/auth/signout">
+              <input id="profile-signout-all-scope" type="hidden" name="scope" value="global" />
+              <button
+                id="profile-signout-all"
+                type="submit"
+                className="block text-sm text-text-secondary underline-offset-4 hover:underline"
+              >
+                Sign out everywhere
+              </button>
+            </form>
             {confirming ? (
               <div id="profile-clear-confirm" className="flex items-center gap-2 text-sm">
                 <span id="profile-clear-question" className="text-text-secondary">

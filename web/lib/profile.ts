@@ -1,5 +1,6 @@
 import { emptyProfile, type Profile } from "@shared/profile";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { readApi } from "@/lib/api";
 
 export type { Profile };
 
@@ -15,8 +16,8 @@ const set = (next: State) => {
 
 async function call(init?: RequestInit): Promise<Profile> {
   const res = await fetch("/api/profile", { cache: "no-store", headers: { "content-type": "application/json" }, ...init });
-  const body = (await res.json().catch(() => ({}))) as { profile?: Profile; error?: string };
-  if (!res.ok || !body.profile) throw new Error(body.error ?? `The agent didn't answer (${res.status}).`);
+  const body = await readApi<{ profile?: Profile }>(res);
+  if (!body.profile) throw new Error("The agent didn't send a profile.");
   return body.profile;
 }
 

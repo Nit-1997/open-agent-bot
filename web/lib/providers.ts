@@ -1,3 +1,5 @@
+import { readApi } from "@/lib/api";
+
 export type ProviderView = {
   id: string;
   label: string;
@@ -9,6 +11,7 @@ export type ProviderView = {
   oauthLabel?: string;
   note?: string;
   configured: boolean;
+  hint?: string;
   source?: "key" | "signin" | "server";
   baseUrl?: string;
   enabled: string[];
@@ -28,10 +31,8 @@ export type LoginState = {
 };
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`/api/providers${path}`, { ...init, headers: { "content-type": "application/json" } });
-  const body = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
-  return body;
+  const res = await fetch(`/api/providers${path}`, { ...init, cache: "no-store", headers: { "content-type": "application/json" } });
+  return readApi<T>(res);
 }
 
 export const providersApi = {

@@ -3,11 +3,16 @@
 import type { OnboardingOptions, Place } from "@shared/onboarding";
 import type { Home } from "@shared/profile";
 import { useEffect, useState } from "react";
+import { readApi } from "@/lib/api";
+import { noteAuthFailure } from "@/lib/authState";
 import { optionsQuery } from "./onboarding";
 
 export async function searchPlaces(q: string, signal?: AbortSignal): Promise<Place[]> {
   const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, { cache: "no-store", signal });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    noteAuthFailure(res.status, ((await res.json().catch(() => ({}))) as { error?: unknown }).error);
+    return [];
+  }
   const body = (await res.json().catch(() => ({}))) as { places?: Place[] };
   return Array.isArray(body.places) ? body.places : [];
 }
@@ -18,7 +23,7 @@ export function useOnboardingOptions(home: Home | undefined): OnboardingOptions 
   useEffect(() => {
     let alive = true;
     fetch(`/api/onboarding/options?${query}`, { cache: "no-store" })
-      .then((r) => (r.ok ? (r.json() as Promise<OnboardingOptions>) : null))
+      .then((r) => readApi<OnboardingOptions>(r))
       .then((options) => {
         if (alive && options?.rows) setResult({ query, options });
       })
@@ -31,20 +36,18 @@ export function useOnboardingOptions(home: Home | undefined): OnboardingOptions 
 }
 
 export const settingsApi = {
-  get: async (): Promise<{ braveSearch: boolean }> => {
-    const res = await fetch("/api/settings", { cache: "no-store" });
-    if (!res.ok) throw new Error(`Couldn't load settings (${res.status})`);
-    return (await res.json()) as { braveSearch: boolean };
-  },
+  get: async (): Promise<{ braveSearch: boolean }> =>
+    readApi<{ braveSearch: boolean }>(await fetch("/api/settings", { cache: "no-store" })),
   saveBrave: async (apiKey: string) => {
-    const res = await fetch("/api/settings/brave-search/key", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ apiKey }),
-    });
-    if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't save the key");
+    await readApi(
+      await fetch("/api/settings/brave-search/key", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ apiKey }),
+      }),
+    );
   },
   removeBrave: async () => {
-    await fetch("/api/settings/brave-search", { method: "DELETE" });
+    await readApi(await fetch("/api/settings/brave-search", { method: "DELETE" }));
   },
 };

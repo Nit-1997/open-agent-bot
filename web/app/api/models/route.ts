@@ -1,11 +1,5 @@
-import { agentHeaders, agentUrl } from "@/lib/agentServer";
+import { forwardToAgent } from "@/lib/agentServer";
 
-export async function GET() {
-  try {
-    const upstream = await fetch(agentUrl("/models"), { headers: agentHeaders(), cache: "no-store" });
-    if (!upstream.ok) return Response.json({ error: "unavailable" }, { status: 502 });
-    return Response.json(await upstream.json());
-  } catch {
-    return Response.json({ error: "unavailable" }, { status: 502 });
-  }
+export function GET(req: Request) {
+  return forwardToAgent(req, "/models");
 }

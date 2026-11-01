@@ -307,6 +307,30 @@ describe("ProfileDrawer", () => {
     expect(onClear).toHaveBeenCalled();
   });
 
+  it("shows recent chats and a sign-out-everywhere form, with unique ids", () => {
+    const { container } = render(
+      <ProfileDrawer
+        profile={profile}
+        models={models}
+        onSave={async () => {}}
+        onClose={() => {}}
+        onRestart={() => {}}
+        onClear={() => {}}
+        recentChats={<p id="recent-chats-slot">chats</p>}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Recent chats" })).toBeInTheDocument();
+    const signOut = screen.getByRole("button", { name: "Sign out everywhere" });
+    expect(signOut).toHaveAttribute("id", "profile-signout-all");
+    const form = signOut.closest("form") as HTMLFormElement;
+    expect(form).toHaveAttribute("action", "/auth/signout");
+    expect(form).toHaveAttribute("method", "post");
+    expect(new FormData(form).get("scope")).toBe("global");
+    const ids = [...container.querySelectorAll("*")].filter((e) => e.namespaceURI === "http://www.w3.org/1999/xhtml").map((e) => e.id);
+    expect(ids.filter((id) => !id)).toEqual([]);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it("closes on Escape", () => {
     const onClose = vi.fn();
     render(

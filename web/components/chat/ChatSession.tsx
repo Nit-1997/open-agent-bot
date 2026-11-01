@@ -4,6 +4,8 @@ import { useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { noteRunFailure } from "@/lib/authState";
+import type { HistoryMessage } from "@/lib/chats";
 import { classifyRunError, type RunErrorKind } from "@/lib/errors";
 import type { WorkflowStepEvent } from "@/lib/steps";
 import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
@@ -16,7 +18,14 @@ import { QUIET_ANSWER, TurnView } from "./TurnView";
 
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-export function ChatSession(props: { agentId: string; threadId: string; locale: string; name?: string; draft?: string }) {
+export function ChatSession(props: {
+  agentId: string;
+  threadId: string;
+  locale: string;
+  name?: string;
+  draft?: string;
+  history?: HistoryMessage[];
+}) {
   const { agent } = useAgent({ agentId: `chat-${props.threadId}`, runtimeAgentId: props.agentId, threadId: props.threadId });
   const { copilotkit } = useCopilotKit();
   const [sending, setSending] = useState(false);
@@ -56,6 +65,11 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
   }, [turns]);
   useAgentContext({ description: "workspace_edits", value: workspaceContextValue(edits) });
 
+  const { history } = props;
+  useEffect(() => {
+    if (history?.length && agent.messages.length === 0) agent.setMessages(history);
+  }, [agent, history]);
+
   useEffect(() => {
     const sub = agent.subscribe({
       onCustomEvent: ({ event }) => {
@@ -66,6 +80,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
       },
       onRunErrorEvent: ({ event }) => {
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
+        noteRunFailure(message);
         setError({ kind: classifyRunError({ error: new Error(message) }), message: event.message });
       },
     });
@@ -100,6 +115,7 @@ export function ChatSession(props: { agentId: string; threadId: string; locale: 
       setEdits({});
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
+      noteRunFailure(e.message);
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
     } finally {
       setSending(false);

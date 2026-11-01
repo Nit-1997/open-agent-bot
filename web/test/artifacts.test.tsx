@@ -1,9 +1,19 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/artifacts/[id]/route";
 import { ArtifactCard, parseArtifactId } from "@/components/artifacts/ArtifactCard";
+import { AUTH, headersOf, SERVICE_SECRET, stubAgentEnv } from "./support/agentEnv";
 
-afterEach(() => vi.unstubAllGlobals());
+vi.mock("@/lib/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth")>()),
+  getAgentAuth: vi.fn(async () => AUTH),
+}));
+
+beforeEach(stubAgentEnv);
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 const call = (id: string, qs = "") => GET(new Request(`http://localhost/api/artifacts/${id}${qs}`), { params: Promise.resolve({ id }) });
 
@@ -14,7 +24,22 @@ describe("artifacts route", () => {
     const res = await call("abcdefghijkl");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-security-policy")).toBe("sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toMatch(/\/artifacts\/abcdefghijkl$/);
+    const sent = headersOf(fetchMock.mock.calls[0] as unknown[]);
+    expect(sent.get("authorization")).toBe(`Bearer ${AUTH.accessToken}`);
+    expect(sent.get("x-agent-secret")).toBe(SERVICE_SECRET);
+  });
+
+  it("passes the agent's 404 through for someone else's artifact", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ error: "not_found" }, { status: 404 })),
+    );
+    const res = await call("abcdefghijkl");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-security-policy")).toBeNull();
   });
 
   it("proxies pdf with attachment disposition", async () => {

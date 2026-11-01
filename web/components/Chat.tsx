@@ -1,13 +1,18 @@
 "use client";
 
 import { useAgentContext } from "@copilotkit/react-core/v2";
-import { Moon, Plus, Sun, User } from "lucide-react";
+import { LogOut, Moon, Plus, Sun, User } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ChatSession } from "@/components/chat/ChatSession";
+import { RecentChats } from "@/components/chat/RecentChats";
+import { AccessDisabled, SignedOutBanner } from "@/components/SessionNotices";
 import { ModelMenu } from "@/components/profile/ModelMenu";
 import { ModelsPanel } from "@/components/profile/ModelsPanel";
 import { Onboarding } from "@/components/profile/onboarding/Onboarding";
 import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
+import { useAuthState } from "@/lib/authState";
+import type { HistoryMessage } from "@/lib/chats";
 import { useModels } from "@/lib/models";
 import { clearedProfile, initials, type Profile, saveProfile, useProfile } from "@/lib/profile";
 import { getUserContext, type UserContext, withChat } from "@/lib/userContext";
@@ -65,7 +70,27 @@ function ProfileLoading({ error, onRetry }: { error?: string; onRetry: () => voi
   );
 }
 
-export function Chat() {
+function SignOutButton() {
+  return (
+    <form id="header-signout-form" method="post" action="/auth/signout">
+      <input id="header-signout-scope" type="hidden" name="scope" value="local" />
+      <button
+        id="header-signout"
+        type="submit"
+        aria-label="Sign out"
+        className="glass-pill inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-text-secondary transition hover:bg-paper hover:text-text-primary sm:px-3"
+      >
+        <LogOut id="header-signout-icon" aria-hidden="true" size={14} />
+        <span id="header-signout-label" className="hidden sm:inline">
+          Sign out
+        </span>
+      </button>
+    </form>
+  );
+}
+
+export function Chat({ email, isAdmin }: { email: string; isAdmin: boolean }) {
+  const authState = useAuthState();
   const { profile, error, reload } = useProfile();
   const { list: models, reload: reloadModels } = useModels();
   const [modelsPanel, setModelsPanel] = useState(false);
@@ -74,6 +99,7 @@ export function Chat() {
   const [chatModel, setChatModel] = useState<string | undefined>(undefined);
   const [drawer, setDrawer] = useState(false);
   const [draft, setDraft] = useState<string | undefined>(undefined);
+  const [history, setHistory] = useState<HistoryMessage[] | undefined>(undefined);
 
   useAgentContext({
     description: "user_context",
@@ -85,6 +111,14 @@ export function Chat() {
     setUserContext(getUserContext());
     setChatModel(undefined);
     setDraft(undefined);
+    setHistory(undefined);
+  }, []);
+
+  const openChat = useCallback((chatId: string, messages: HistoryMessage[]) => {
+    setThreadId(chatId);
+    setHistory(messages);
+    setDraft(undefined);
+    setDrawer(false);
   }, []);
 
   const save = async (p: Profile) => {
@@ -92,92 +126,122 @@ export function Chat() {
     reloadModels();
   };
 
-  if (!profile) return <ProfileLoading error={error} onRetry={reload} />;
+  if (authState === "account_disabled") return <AccessDisabled />;
+  const signedOut = authState === "signed_out" && <SignedOutBanner />;
+  if (!profile) {
+    return (
+      <>
+        {signedOut}
+        <ProfileLoading error={error} onRetry={reload} />
+      </>
+    );
+  }
 
   if (!profile.onboardedAt) {
     return (
-      <Onboarding
-        profile={profile}
-        models={models}
-        onModelsChanged={reloadModels}
-        onDone={async (p, starter) => {
-          await save(p);
-          setDraft(starter ?? undefined);
-        }}
-      />
+      <>
+        {signedOut}
+        <Onboarding
+          profile={profile}
+          models={models}
+          onModelsChanged={reloadModels}
+          onDone={async (p, starter) => {
+            await save(p);
+            setDraft(starter ?? undefined);
+          }}
+        />
+      </>
     );
   }
 
   return (
-    <div id="chat-shell" className="flex h-dvh w-full justify-center p-2 sm:p-4">
-      <div id="chat-frame" className="glass flex w-full max-w-[920px] flex-col rounded-[28px] p-1.5 sm:p-2">
-        <header id="chat-header" className="flex items-center justify-between gap-2 px-3 py-2">
-          <div id="chat-brand" className="flex items-center gap-2.5">
-            <span id="chat-brand-orb" aria-hidden="true" className="orb h-6 w-6 shadow-float" />
-            <h1 id="chat-title" className="hidden font-display text-[24px] leading-none text-text-primary sm:block">
-              Open Agent
-            </h1>
-          </div>
-          <div id="chat-actions" className="flex items-center gap-1.5">
-            <ModelMenu models={models} value={chatModel} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
-            <ThemeToggle />
-            <button
-              id="chat-profile-button"
-              type="button"
-              onClick={() => setDrawer(true)}
-              aria-label="Open profile"
-              className="glass-pill flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-medium text-text-primary transition hover:bg-paper"
-            >
-              {initials(profile.name) || <User id="chat-profile-icon" aria-hidden="true" size={15} />}
-            </button>
-            <button
-              id="chat-new-button"
-              type="button"
-              onClick={startNewChat}
-              className="inline-flex items-center gap-1.5 rounded-full bg-charcoal px-3.5 py-2 text-[13px] font-medium text-on-charcoal shadow-float transition hover:opacity-85"
-            >
-              <Plus id="chat-new-icon" aria-hidden="true" size={14} />
-              <span id="chat-new-label" className="hidden sm:inline">
-                New chat
+    <>
+      {signedOut}
+      <div id="chat-shell" className="flex h-dvh w-full justify-center p-2 sm:p-4">
+        <div id="chat-frame" className="glass flex w-full max-w-[920px] flex-col rounded-[28px] p-1.5 sm:p-2">
+          <header id="chat-header" className="flex items-center justify-between gap-2 px-3 py-2">
+            <div id="chat-brand" className="flex items-center gap-2.5">
+              <span id="chat-brand-orb" aria-hidden="true" className="orb h-6 w-6 shadow-float" />
+              <h1 id="chat-title" className="hidden font-display text-[24px] leading-none text-text-primary sm:block">
+                Open Agent
+              </h1>
+            </div>
+            <div id="chat-actions" className="flex items-center gap-1.5">
+              <span id="header-email" className="hidden max-w-[180px] truncate text-[12px] text-text-muted md:inline" title={email}>
+                {email}
               </span>
-            </button>
-          </div>
-        </header>
-        <main id="chat-main" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-bg">
-          <ChatSession
-            key={threadId}
-            agentId={AGENT_ID}
-            threadId={threadId}
-            locale={userContext.locale}
-            name={profile.name}
-            draft={draft}
+              {isAdmin && (
+                <Link
+                  id="header-admin-link"
+                  href="/admin"
+                  className="glass-pill rounded-full px-3 py-2 text-[12px] font-medium text-text-secondary transition hover:bg-paper hover:text-text-primary"
+                >
+                  Admin
+                </Link>
+              )}
+              <ModelMenu models={models} value={chatModel} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
+              <ThemeToggle />
+              <SignOutButton />
+              <button
+                id="chat-profile-button"
+                type="button"
+                onClick={() => setDrawer(true)}
+                aria-label="Open profile"
+                className="glass-pill flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-medium text-text-primary transition hover:bg-paper"
+              >
+                {initials(profile.name) || <User id="chat-profile-icon" aria-hidden="true" size={15} />}
+              </button>
+              <button
+                id="chat-new-button"
+                type="button"
+                onClick={startNewChat}
+                className="inline-flex items-center gap-1.5 rounded-full bg-charcoal px-3.5 py-2 text-[13px] font-medium text-on-charcoal shadow-float transition hover:opacity-85"
+              >
+                <Plus id="chat-new-icon" aria-hidden="true" size={14} />
+                <span id="chat-new-label" className="hidden sm:inline">
+                  New chat
+                </span>
+              </button>
+            </div>
+          </header>
+          <main id="chat-main" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-bg">
+            <ChatSession
+              key={threadId}
+              agentId={AGENT_ID}
+              threadId={threadId}
+              locale={userContext.locale}
+              name={profile.name}
+              draft={draft}
+              history={history}
+            />
+          </main>
+        </div>
+        {drawer && (
+          <ProfileDrawer
+            profile={profile}
+            models={models}
+            onClose={() => setDrawer(false)}
+            onSave={async (p) => {
+              await save(p);
+              setDrawer(false);
+            }}
+            onRestart={() => {
+              void save({ ...profile, onboardedAt: undefined });
+              setDrawer(false);
+            }}
+            onClear={() => {
+              void save(clearedProfile(profile));
+              setDrawer(false);
+            }}
+            onManageModels={() => {
+              setDrawer(false);
+              setModelsPanel(true);
+            }}
+            recentChats={<RecentChats currentThreadId={threadId} onOpen={openChat} />}
           />
-        </main>
+        )}
+        {modelsPanel && <ModelsPanel onClose={() => setModelsPanel(false)} onChanged={reloadModels} />}
       </div>
-      {drawer && (
-        <ProfileDrawer
-          profile={profile}
-          models={models}
-          onClose={() => setDrawer(false)}
-          onSave={async (p) => {
-            await save(p);
-            setDrawer(false);
-          }}
-          onRestart={() => {
-            void save({ ...profile, onboardedAt: undefined });
-            setDrawer(false);
-          }}
-          onClear={() => {
-            void save(clearedProfile(profile));
-            setDrawer(false);
-          }}
-          onManageModels={() => {
-            setDrawer(false);
-            setModelsPanel(true);
-          }}
-        />
-      )}
-      {modelsPanel && <ModelsPanel onClose={() => setModelsPanel(false)} onChanged={reloadModels} />}
-    </div>
+    </>
   );
 }

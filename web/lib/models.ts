@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { readApi } from "@/lib/api";
 
 export type ModelOption = { id: string; label: string; provider?: string; note?: string };
 export type ModelList = { default: string | null; models: ModelOption[] };
@@ -16,8 +17,8 @@ export function useModels(): { list: ModelList | null; reload: () => void } {
   useEffect(() => {
     let alive = true;
     fetch("/api/models", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((v: ModelList | null) => {
+      .then((r) => readApi<ModelList>(r))
+      .then((v) => {
         if (alive && v && Array.isArray(v.models)) setList(v);
       })
       .catch(() => {});
