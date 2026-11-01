@@ -171,16 +171,25 @@ describe("admin repo against PostgREST", () => {
 describe("user repos against PostgREST", () => {
   it("pages chats by last message, newest first, scoped to the user", async () => {
     const s = stub([
-      { body: [{ id: CHAT_1, title: "T", last_message_at: "2026-11-01T00:00:00Z" }], headers: { "content-range": "5-5/6" } },
+      { body: [{ id: CHAT_1, title: "T", last_message_at: "2026-11-01T00:00:00Z" }], headers: { "content-range": "20-20/21" } },
     ]);
     expect(await forUser(s.db, ALICE.id).chats.page(2)).toEqual({
       items: [{ id: CHAT_1, title: "T", lastMessageAt: "2026-11-01T00:00:00Z" }],
-      total: 6,
+      total: 21,
     });
     const [call] = s.calls;
     expect(one(call, "order")).toBe("last_message_at.desc,id.desc");
     expect(one(call, "user_id")).toBe(`eq.${ALICE.id}`);
-    expect([one(call, "offset"), one(call, "limit")]).toEqual(["5", "5"]);
+    expect([one(call, "offset"), one(call, "limit")]).toEqual(["20", "20"]);
+  });
+
+  it("answers a page past the end with no rows and the real total", async () => {
+    const s = stub([
+      { status: 416, body: { code: "PGRST103", message: "Requested range not satisfiable", details: null, hint: null } },
+      { body: [], headers: { "content-range": "*/21" } },
+    ]);
+    expect(await forUser(s.db, ALICE.id).chats.page(9)).toEqual({ items: [], total: 21 });
+    expect(s.calls[1].method).toBe("HEAD");
   });
 
   it("maps PT409 from workspace_put to a version conflict or a missing chat", async () => {

@@ -8,7 +8,7 @@ import { normalizeId } from "@shared/ids";
 import type { PageResponse } from "@shared/pages";
 import { type RequestAction, SEARCH_MAX, type UserAction } from "@/lib/admin";
 import { getClaimsOrNull } from "@/lib/auth";
-import { parsePage } from "@/lib/pagination";
+import { parsePage } from "@shared/pages";
 
 const REQUEST_ACTIONS: readonly RequestAction[] = ["approve", "reject", "resend"];
 const USER_ACTIONS: readonly UserAction[] = ["deactivate", "reactivate"];

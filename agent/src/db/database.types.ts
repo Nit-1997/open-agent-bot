@@ -345,6 +345,16 @@ export type Database = {
         }
         Returns: string
       }
+      search_user_content: {
+        Args: {
+          p_limit: number
+          p_offset: number
+          p_query: string
+          p_scope: string
+          p_user: string
+        }
+        Returns: Json
+      }
       workspace_put: {
         Args: {
           p_chat: string

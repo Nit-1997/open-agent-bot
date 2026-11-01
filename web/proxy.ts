@@ -18,7 +18,7 @@ function respond(request: NextRequest, decision: RouteDecision, passed: NextResp
     case "login": {
       const origin = appOrigin();
       const url = new URL("/login", origin);
-      url.searchParams.set("next", safeNext(request.nextUrl.pathname, origin));
+      url.searchParams.set("next", safeNext(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin));
       if (decision.error) url.searchParams.set("error", decision.error);
       return NextResponse.redirect(url, 302);
     }

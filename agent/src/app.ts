@@ -12,6 +12,9 @@ import { adminRoutes } from "./http/admin.js";
 import { aguiRoutes } from "./http/agui.js";
 import { artifactRoutes } from "./http/artifacts.js";
 import { chatRoutes } from "./http/chats.js";
+import { planRoutes } from "./http/plans.js";
+import { reportRoutes } from "./http/reports.js";
+import { searchRoutes } from "./http/search.js";
 import { errorResponse } from "./http/handlers.js";
 import { type OnboardingDeps, onboardingRoutes } from "./http/onboarding.js";
 import { type ProfilesFor, profileRoutes } from "./http/profile.js";
@@ -58,6 +61,11 @@ const USER_PATHS = [
   "/providers",
   "/providers/*",
   "/artifacts/*",
+  "/reports",
+  "/reports/*",
+  "/plans",
+  "/plans/*",
+  "/search",
 ];
 
 export function createApp(deps: AppDeps) {
@@ -78,6 +86,9 @@ export function createApp(deps: AppDeps) {
 
   app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, limiter: deps.limiter, gate: deps.gate }));
   app.route("/", chatRoutes({ repos: deps.repos, limiter: deps.limiter }));
+  app.route("/", reportRoutes({ repos: deps.repos, limiter: deps.limiter }));
+  app.route("/", planRoutes({ repos: deps.repos, limiter: deps.limiter }));
+  app.route("/", searchRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", profileRoutes({ profiles: deps.profiles, limiter: deps.limiter, sessions: deps.store }));
   app.route("/", settingsRoutes({ hubs: deps.hubs, limiter: deps.limiter }));
   app.route("/", onboardingRoutes({ ...deps.onboarding, limiter: deps.limiter }));

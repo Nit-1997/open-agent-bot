@@ -5,6 +5,6 @@ export function oneOf<T extends string>(allowed: readonly T[], value: string, co
   throw new Error(`unexpected ${column} value in the database`);
 }
 
-export const pageOffset = (page: number) => (Math.max(1, Math.floor(page)) - 1) * PAGE_SIZE;
+export const pageOffset = (page: number, size: number = PAGE_SIZE) => (Math.max(1, Math.floor(page)) - 1) * size;
 
 export const likePrefix = (q: string) => `${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;

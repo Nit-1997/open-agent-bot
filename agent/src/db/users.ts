@@ -1,28 +1,34 @@
 import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
 import type { MessageRole, MessageStatus } from "../../../shared/chats.js";
 import { isUuid } from "../../../shared/ids.js";
-import { PAGE_SIZE } from "../../../shared/pages.js";
+import { CHATS_PAGE_SIZE, PLANS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_PAGE_SIZE } from "../../../shared/lists.js";
 import { ENTITY_KINDS } from "../../../shared/workspace.js";
+import { Type } from "typebox";
+import { Value } from "typebox/value";
 import type { CredentialKind } from "../crypto/envelope.js";
 import { UserError } from "../lib/errors.js";
 import { VersionConflict } from "../workspace/conflict.js";
 import { fromBytea, toBytea } from "./bytea.js";
 import type { Db } from "./client.js";
 import type { Json, Tables } from "./database.types.js";
-import { dbError, must, read } from "./errors.js";
+import { dbError, must, read, readPage } from "./errors.js";
 import { oneOf, pageOffset } from "./rows.js";
 import {
   ARTIFACTS_BUCKET,
   type ArtifactFile,
+  type ArtifactListRow,
   type ArtifactRepo,
   type ArtifactStorage,
   artifactPath,
   type ChatRepo,
   type CredentialRepo,
+  type ChatEntity,
   type CredentialRow,
   type MessageRepo,
   type ProfileRepo,
   type ProviderSettingsRepo,
+  type SearchRepo,
+  type SearchResult,
   type UserRepos,
   type VersionedEntity,
   type WorkspaceRepo,
@@ -53,6 +59,12 @@ function profiles(db: Db, userId: string): ProfileRepo {
     },
   };
 }
+
+const toChatSummary = (r: { id: string; title: string; last_message_at: string }) => ({
+  id: r.id,
+  title: r.title,
+  lastMessageAt: r.last_message_at,
+});
 
 function chats(db: Db, userId: string): ChatRepo {
   const exists = async (chatId: string) => {
@@ -96,20 +108,33 @@ function chats(db: Db, userId: string): ChatRepo {
       }
     },
     async page(page) {
-      const from = pageOffset(page);
-      const { data, count } = await read("chats.page", () =>
-        db
-          .from("chats")
-          .select("id, title, last_message_at", { count: "exact" })
-          .eq("user_id", userId)
-          .order("last_message_at", { ascending: false })
-          .order("id", { ascending: false })
-          .range(from, from + PAGE_SIZE - 1),
+      const from = pageOffset(page, CHATS_PAGE_SIZE);
+      const { data, total } = await readPage(
+        "chats.page",
+        () =>
+          db
+            .from("chats")
+            .select("id, title, last_message_at", { count: "exact" })
+            .eq("user_id", userId)
+            .order("last_message_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(from, from + CHATS_PAGE_SIZE - 1),
+        () => db.from("chats").select("id", { count: "exact", head: true }).eq("user_id", userId),
       );
-      return {
-        items: (data ?? []).map((r) => ({ id: r.id, title: r.title, lastMessageAt: r.last_message_at })),
-        total: count ?? 0,
-      };
+      return { items: (data ?? []).map(toChatSummary), total };
+    },
+    async get(chatId) {
+      if (!isUuid(chatId)) return undefined;
+      const { data } = await read("chats.get", () =>
+        db.from("chats").select("id, title, last_message_at").eq("id", chatId).eq("user_id", userId).maybeSingle(),
+      );
+      return data ? toChatSummary(data) : undefined;
+    },
+    async titles(chatIds) {
+      const ids = [...new Set(chatIds.filter(isUuid))];
+      if (!ids.length) return new Map();
+      const { data } = await read("chats.titles", () => db.from("chats").select("id, title").in("id", ids).eq("user_id", userId));
+      return new Map((data ?? []).map((r) => [r.id, r.title]));
     },
   };
 }
@@ -203,6 +228,40 @@ function workspace(db: Db, userId: string): WorkspaceRepo {
       );
       return (data?.length ?? 0) > 0;
     },
+    async page(page, kind) {
+      const from = pageOffset(page, PLANS_PAGE_SIZE);
+      const { data, total } = await readPage(
+        "workspace.page",
+        () => {
+          const q = db
+            .from("workspace_entities")
+            .select("chat_id, kind, entity_id, value, version, updated_at", { count: "exact" })
+            .eq("user_id", userId);
+          return (kind ? q.eq("kind", kind) : q)
+            .order("updated_at", { ascending: false })
+            .order("chat_id")
+            .order("kind")
+            .order("entity_id")
+            .range(from, from + PLANS_PAGE_SIZE - 1);
+        },
+        () => {
+          const q = db.from("workspace_entities").select("entity_id", { count: "exact", head: true }).eq("user_id", userId);
+          return kind ? q.eq("kind", kind) : q;
+        },
+      );
+      return { items: (data ?? []).map((r): ChatEntity => ({ ...toEntity(r), chatId: r.chat_id })), total };
+    },
+    async counts() {
+      const counted = await Promise.all(
+        ENTITY_KINDS.map(async (kind) => {
+          const { count } = await read("workspace.counts", () =>
+            db.from("workspace_entities").select("entity_id", { count: "exact", head: true }).eq("user_id", userId).eq("kind", kind),
+          );
+          return [kind, count ?? 0] as const;
+        }),
+      );
+      return Object.fromEntries(counted) as Record<(typeof ENTITY_KINDS)[number], number>;
+    },
   };
 }
 
@@ -210,6 +269,19 @@ const validArtifactId = (id: string) => {
   if (!ARTIFACT_ID_RE.test(id)) throw new UserError("That report doesn't exist.", "not_found");
   return id;
 };
+
+const ARTIFACT_LIST_COLUMNS = "id, chat_id, title, pdf_path, size_bytes, created_at";
+
+const toArtifactListRow = (
+  r: Pick<Tables<"artifacts">, "id" | "chat_id" | "title" | "pdf_path" | "size_bytes" | "created_at">,
+): ArtifactListRow => ({
+  id: r.id,
+  chatId: r.chat_id,
+  title: r.title,
+  pdfReady: !!r.pdf_path,
+  sizeBytes: r.size_bytes,
+  createdAt: r.created_at,
+});
 
 function artifacts(db: Db, userId: string): ArtifactRepo {
   return {
@@ -234,6 +306,29 @@ function artifacts(db: Db, userId: string): ArtifactRepo {
       );
       return data ? { id: data.id, chatId: data.chat_id, title: data.title, pdfReady: !!data.pdf_path } : undefined;
     },
+    async page(page) {
+      const from = pageOffset(page, REPORTS_PAGE_SIZE);
+      const { data, total } = await readPage(
+        "artifacts.page",
+        () =>
+          db
+            .from("artifacts")
+            .select(ARTIFACT_LIST_COLUMNS, { count: "exact" })
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(from, from + REPORTS_PAGE_SIZE - 1),
+        () => db.from("artifacts").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      );
+      return { items: (data ?? []).map(toArtifactListRow), total };
+    },
+    async summary(id) {
+      if (!ARTIFACT_ID_RE.test(id)) return undefined;
+      const { data } = await read("artifacts.summary", () =>
+        db.from("artifacts").select(ARTIFACT_LIST_COLUMNS).eq("id", id).eq("user_id", userId).maybeSingle(),
+      );
+      return data ? toArtifactListRow(data) : undefined;
+    },
     async setPdf(id) {
       await must(
         "artifacts.setPdf",
@@ -243,6 +338,43 @@ function artifacts(db: Db, userId: string): ArtifactRepo {
           .eq("id", id)
           .eq("user_id", userId),
       );
+    },
+  };
+}
+
+const SearchRowSchema = Type.Object({
+  kind: Type.Union([Type.Literal("chat"), Type.Literal("report")]),
+  refId: Type.String(),
+  title: Type.String(),
+  at: Type.String(),
+  chatId: Type.Union([Type.String(), Type.Null()]),
+  match: Type.Union([Type.Literal("title"), Type.Literal("message")]),
+  snippet: Type.Union([Type.String(), Type.Null()]),
+  snippetStart: Type.Union([Type.Integer(), Type.Null()]),
+  contentLength: Type.Union([Type.Integer(), Type.Null()]),
+});
+
+const SearchResultSchema = Type.Object({
+  total: Type.Integer({ minimum: 0 }),
+  chats: Type.Integer({ minimum: 0 }),
+  reports: Type.Integer({ minimum: 0 }),
+  items: Type.Array(SearchRowSchema),
+});
+
+function search(db: Db, userId: string): SearchRepo {
+  return {
+    async search(query, scope, page) {
+      const res = await db.rpc("search_user_content", {
+        p_user: userId,
+        p_query: query,
+        p_scope: scope,
+        p_limit: SEARCH_PAGE_SIZE,
+        p_offset: pageOffset(page, SEARCH_PAGE_SIZE),
+      });
+      if (res.error?.code === "22023") throw new UserError("Search for 2 to 100 characters.", "invalid");
+      if (res.error) throw dbError("search", { ...res.error, status: res.status });
+      if (!Value.Check(SearchResultSchema, res.data)) throw new Error("unexpected search_user_content result");
+      return res.data as SearchResult;
     },
   };
 }
@@ -402,6 +534,7 @@ export function forUser(db: Db, userId: string): UserRepos {
     messages: messages(db, userId),
     workspace: workspace(db, userId),
     artifacts: artifacts(db, userId),
+    search: search(db, userId),
     storage: storage(db, userId),
     providerSettings: providerSettings(db, userId),
     credentials: credentials(db, userId),

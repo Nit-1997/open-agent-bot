@@ -11,7 +11,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  if (await getClaimsOrNull()) redirect("/");
+  if (await getClaimsOrNull()) redirect(safeNext(firstParam(params.next)));
   const error = authErrorCopy(firstParam(params.error));
   return (
     <AuthCard id="login" title="Sign in" subtitle="Open Agent is invite-only.">

@@ -1,6 +1,6 @@
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
-import { EventEntitySchema, ShortlistEntitySchema, TripEntitySchema } from "./widgets.js";
+import { EventEntitySchema, ShortlistEntitySchema, TripEntitySchema } from "./widgets.ts";
 
 export { EventEntitySchema, ShortlistEntitySchema, TripEntitySchema };
 
@@ -133,4 +133,50 @@ export function applyPatch(doc: unknown, ops: PatchOp[]): { ok: true; value: unk
     }
   }
   return { ok: true, value: root };
+}
+
+const B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const KEY_RE = /^[A-Za-z0-9_-]{2,534}$/;
+export const ENTITY_ID_MAX = 100;
+
+export function entityKey(id: string): string {
+  const bytes = new TextEncoder().encode(id);
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const n = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0);
+    const chars = i + 1 >= bytes.length ? 2 : i + 2 >= bytes.length ? 3 : 4;
+    for (let c = 0; c < chars; c++) out += B64URL[(n >> (18 - 6 * c)) & 63];
+  }
+  return out;
+}
+
+export function entityIdFromKey(key: unknown): string | undefined {
+  if (typeof key !== "string" || !KEY_RE.test(key) || key.length % 4 === 1) return undefined;
+  const bits = [...key].map((c) => B64URL.indexOf(c));
+  const bytes: number[] = [];
+  for (let i = 0; i < bits.length; i += 4) {
+    const n = (bits[i] << 18) | (bits[i + 1] << 12) | ((bits[i + 2] ?? 0) << 6) | (bits[i + 3] ?? 0);
+    bytes.push((n >> 16) & 255);
+    if (i + 2 < bits.length) bytes.push((n >> 8) & 255);
+    if (i + 3 < bits.length) bytes.push(n & 255);
+  }
+  let id: string;
+  try {
+    id = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(new Uint8Array(bytes));
+  } catch {
+    return undefined;
+  }
+  const length = Array.from(id).length;
+  if (length < 1 || length > ENTITY_ID_MAX) return undefined;
+  return entityKey(id) === key ? id : undefined;
+}
+
+export function safeHttpUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
 }

@@ -82,6 +82,8 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
         p_note: "",
         p_ip_hash: `\\x${"00".repeat(32)}`,
       });
+      const found = await c.rpc("search_user_content", { p_user: a.id, p_query: "secret", p_scope: "all", p_limit: 10, p_offset: 0 });
+      expect(found.error, `${who} search_user_content`).not.toBeNull();
       expect(put.error, `${who} workspace_put`).not.toBeNull();
       expect(submit.error, `${who} access_request_submit`).not.toBeNull();
     }
@@ -115,5 +117,28 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
       "select count(*)::int as n from pg_proc p join pg_namespace s on s.oid = p.pronamespace cross join (values ('anon'), ('authenticated')) r(role) where s.nspname = 'public' and has_function_privilege(r.role, p.oid, 'execute')",
     );
     expect(fns[0].n).toBe(0);
+  });
+
+  it("keeps search_user_content service-only, invoker-rights with an empty search_path, with its indexes and pg_trgm in extensions", async () => {
+    const fn = await managementQuery<{ acl: string; definer: boolean; config: string[] }>(
+      "select p.proacl::text as acl, p.prosecdef as definer, p.proconfig as config from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'search_user_content'",
+    );
+    expect(fn).toHaveLength(1);
+    expect(fn[0].definer).toBe(false);
+    expect(fn[0].config).toEqual(['search_path=""']);
+    expect(fn[0].acl).toBe("{postgres=X/postgres,service_role=X/postgres}");
+    const ext = await managementQuery<{ schema: string }>(
+      "select n.nspname as schema from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = 'pg_trgm'",
+    );
+    expect(ext).toEqual([{ schema: "extensions" }]);
+    const idx = await managementQuery<{ indexname: string }>(
+      "select indexname from pg_indexes where schemaname = 'public' and indexname in ('chats_title_trgm_idx', 'chat_messages_content_trgm_idx', 'artifacts_title_trgm_idx', 'workspace_entities_user_recent_idx') order by indexname",
+    );
+    expect(idx.map((i) => i.indexname)).toEqual([
+      "artifacts_title_trgm_idx",
+      "chat_messages_content_trgm_idx",
+      "chats_title_trgm_idx",
+      "workspace_entities_user_recent_idx",
+    ]);
   });
 });

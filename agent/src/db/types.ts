@@ -1,4 +1,5 @@
 import type { ChatSummary, StoredMessage } from "../../../shared/chats.js";
+import type { SearchScope } from "../../../shared/lists.js";
 import type { Page } from "../../../shared/pages.js";
 import type { EntityKind } from "../../../shared/workspace.js";
 import type { CredentialKind, Sealed } from "../crypto/envelope.js";
@@ -8,6 +9,9 @@ export type NewMessage = Omit<StoredMessage, "createdAt">;
 export type VersionedEntity = { kind: EntityKind; id: string; value: unknown; version: number; updatedAt: number };
 
 export type ArtifactRow = { id: string; chatId: string | null; title: string; pdfReady: boolean };
+export type ArtifactListRow = ArtifactRow & { sizeBytes: number; createdAt: string };
+export type ChatEntity = VersionedEntity & { chatId: string };
+export type EntityCounts = Record<EntityKind, number>;
 export type ArtifactFile = "html" | "pdf";
 
 export type ProviderSettingsRow = { data: unknown; deviceId: string; stamp: string };
@@ -25,6 +29,8 @@ export interface ChatRepo {
   exists(chatId: string): Promise<boolean>;
   touch(chatId: string, opts: { titleIfEmpty?: string; model?: string }): Promise<void>;
   page(page: number): Promise<Page<ChatSummary>>;
+  get(chatId: string): Promise<ChatSummary | undefined>;
+  titles(chatIds: string[]): Promise<Map<string, string>>;
 }
 
 export interface MessageRepo {
@@ -37,12 +43,34 @@ export interface WorkspaceRepo {
   list(chatId: string, kind?: EntityKind): Promise<VersionedEntity[]>;
   put(chatId: string, kind: EntityKind, id: string, value: unknown, expectedVersion?: number): Promise<number>;
   remove(chatId: string, kind: EntityKind, id: string): Promise<boolean>;
+  page(page: number, kind?: EntityKind): Promise<Page<ChatEntity>>;
+  counts(): Promise<EntityCounts>;
 }
 
 export interface ArtifactRepo {
   insert(row: { id: string; chatId: string | null; title: string; sizeBytes: number }): Promise<void>;
   get(id: string): Promise<ArtifactRow | undefined>;
   setPdf(id: string): Promise<void>;
+  page(page: number): Promise<Page<ArtifactListRow>>;
+  summary(id: string): Promise<ArtifactListRow | undefined>;
+}
+
+export type SearchRow = {
+  kind: "chat" | "report";
+  refId: string;
+  title: string;
+  at: string;
+  chatId: string | null;
+  match: "title" | "message";
+  snippet: string | null;
+  snippetStart: number | null;
+  contentLength: number | null;
+};
+
+export type SearchResult = { total: number; chats: number; reports: number; items: SearchRow[] };
+
+export interface SearchRepo {
+  search(query: string, scope: SearchScope, page: number): Promise<SearchResult>;
 }
 
 export interface ArtifactStorage {
@@ -71,6 +99,7 @@ export type UserRepos = Readonly<{
   messages: MessageRepo;
   workspace: WorkspaceRepo;
   artifacts: ArtifactRepo;
+  search: SearchRepo;
   storage: ArtifactStorage;
   providerSettings: ProviderSettingsRepo;
   credentials: CredentialRepo;

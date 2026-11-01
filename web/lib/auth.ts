@@ -1,4 +1,5 @@
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
+import { hrefFor, parseRoute } from "@shared/routes";
 import { notFound, redirect } from "next/navigation";
 import { appOrigin } from "@/lib/env";
 import { type SessionUser, sessionUserFromClaims } from "@/lib/sessionUser";
@@ -14,7 +15,6 @@ export class AuthUnavailable extends Error {
   override name = "AuthUnavailable";
 }
 
-const NEXT_PATHS = new Set(["/", "/admin"]);
 const MAX_NEXT_LENGTH = 512;
 
 const hasControlChar = (s: string) => [...s].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f);
@@ -22,7 +22,7 @@ const hasControlChar = (s: string) => [...s].some((c) => c.charCodeAt(0) < 0x20 
 export function safeNext(raw: unknown, origin: string = appOrigin()): string {
   if (typeof raw !== "string" || raw.length === 0 || raw.length > MAX_NEXT_LENGTH) return "/";
   if (!raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) return "/";
-  if (/%2f|%5c/i.test(raw)) return "/";
+  if (/%2f|%5c/i.test(raw.split("?")[0])) return "/";
   let decoded: string;
   try {
     decoded = decodeURIComponent(raw);
@@ -37,7 +37,8 @@ export function safeNext(raw: unknown, origin: string = appOrigin()): string {
     return "/";
   }
   if (url.origin !== origin) return "/";
-  return NEXT_PATHS.has(url.pathname) ? url.pathname : "/";
+  const route = parseRoute(url.pathname, url.searchParams);
+  return route ? hrefFor(route) : "/";
 }
 
 export async function getClaimsOrNull(): Promise<SessionUser | null> {

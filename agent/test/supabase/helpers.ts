@@ -53,13 +53,18 @@ export async function sessionFor(email: string): Promise<{ accessToken: string; 
   return { accessToken: data.session.access_token, client };
 }
 
-export async function createTestUser(): Promise<TestUser> {
+export async function createBareUser(): Promise<{ id: string; email: string }> {
   const email = testEmail();
   await adminRepo().invited.add(email, null, null);
   const { data, error } = await service().auth.admin.createUser({ email, email_confirm: true });
   if (error || !data.user) throw error ?? new Error("no user");
   created.push({ id: data.user.id, email });
-  return { id: data.user.id, email, ...(await sessionFor(email)) };
+  return { id: data.user.id, email };
+}
+
+export async function createTestUser(): Promise<TestUser> {
+  const user = await createBareUser();
+  return { ...user, ...(await sessionFor(user.email)) };
 }
 
 export async function deleteUser(id: string, email: string): Promise<void> {

@@ -38,3 +38,19 @@ export async function read<R extends Result>(where: string, q: () => PromiseLike
   if (first.error && isTransportFailure({ ...first.error, status: first.status })) return must(where, q());
   return must(where, Promise.resolve(first));
 }
+
+const RANGE_NOT_SATISFIABLE = "PGRST103";
+
+export async function readPage<R extends Result>(
+  where: string,
+  q: () => PromiseLike<R>,
+  count: () => PromiseLike<Result>,
+): Promise<{ data: R["data"] | null; total: number }> {
+  const res = await q();
+  if (res.error?.code === RANGE_NOT_SATISFIABLE) {
+    const { count: total } = await read(`${where}.count`, count);
+    return { data: null, total: total ?? 0 };
+  }
+  const { data, count: total } = await read(where, () => Promise.resolve(res));
+  return { data, total: total ?? 0 };
+}

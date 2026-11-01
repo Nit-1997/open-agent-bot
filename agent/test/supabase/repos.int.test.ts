@@ -10,6 +10,7 @@ import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js"
 import { VersionConflict } from "../../src/workspace/conflict.js";
 import {
   adminRepo,
+  createBareUser,
   createTestUser,
   deleteCreatedUsers,
   enabled,
@@ -123,22 +124,18 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
     expect(page.items[0].ipHashPrefix).toBe(ip.toString("hex").slice(0, 8));
     await service().from("access_requests").delete().like("email", "oab-test+%@example.test");
   });
-  it("pages a user's chats newest first: page 2 holds the two oldest of seven", async () => {
-    const c = await createTestUser();
+  it("pages a user's chats newest first: page 2 holds the two oldest of 22, and a page past the end is empty", async () => {
+    const c = await createBareUser();
     const at = (i: number) => new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString();
-    const rows = Array.from({ length: 7 }, (_, i) => ({ id: randomUUID(), user_id: c.id, title: `chat ${i}`, last_message_at: at(i) }));
+    const rows = Array.from({ length: 22 }, (_, i) => ({ id: randomUUID(), user_id: c.id, title: `chat ${i}`, last_message_at: at(i) }));
     const { error } = await service().from("chats").insert(rows);
     expect(error).toBeNull();
-    const page = await forUser(service(), c.id).chats.page(2);
-    expect(page.total).toBe(7);
+    const repo = forUser(service(), c.id).chats;
+    const page = await repo.page(2);
+    expect(page.total).toBe(22);
     expect(page.items.map((r) => r.title)).toEqual(["chat 1", "chat 0"]);
-    expect((await forUser(service(), c.id).chats.page(1)).items.map((r) => r.title)).toEqual([
-      "chat 6",
-      "chat 5",
-      "chat 4",
-      "chat 3",
-      "chat 2",
-    ]);
+    expect((await repo.page(1)).items.map((r) => r.title).slice(0, 3)).toEqual(["chat 21", "chat 20", "chat 19"]);
+    expect(await repo.page(9)).toEqual({ items: [], total: 22 });
   });
 
   it("pages access requests newest first: page 2 continues where page 1 stopped", async () => {
@@ -169,5 +166,45 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
           rows.map((r) => r.email),
         );
     }
+  });
+
+  it("reads one chat, chat titles, reports with their chats and plans across chats", async () => {
+    const ra = forUser(service(), (await createBareUser()).id);
+    const rb = forUser(service(), b.id);
+    const c1 = randomUUID();
+    const c2 = randomUUID();
+    await ra.chats.claim(c1, {});
+    await ra.chats.touch(c1, { titleIfEmpty: "Plans one" });
+    await ra.chats.claim(c2, {});
+    expect(await ra.chats.get(c1)).toMatchObject({ id: c1, title: "Plans one" });
+    expect(await rb.chats.get(c1)).toBeUndefined();
+    expect(await ra.chats.titles([c1, c2, randomUUID()])).toEqual(
+      new Map([
+        [c1, "Plans one"],
+        [c2, ""],
+      ]),
+    );
+    expect((await rb.chats.titles([c1])).size).toBe(0);
+
+    await ra.artifacts.insert({ id: "intRepA00001", chatId: c1, title: "First", sizeBytes: 10 });
+    await ra.artifacts.insert({ id: "intRepA00002", chatId: c2, title: "Second", sizeBytes: 20 });
+    const reports = await ra.artifacts.page(1);
+    expect(reports.total).toBe(2);
+    expect(reports.items.map((r) => r.id)).toEqual(["intRepA00002", "intRepA00001"]);
+    expect(await ra.artifacts.page(50)).toEqual({ items: [], total: 2 });
+    expect(await rb.artifacts.summary("intRepA00001")).toBeUndefined();
+    await service().from("chats").delete().eq("id", c2);
+    expect((await ra.artifacts.summary("intRepA00002"))?.chatId).toBeNull();
+
+    await ra.workspace.put(c1, "trip", "t1", { destination: "Big Sur", start: "a", end: "b", travelers: 2, stays: [], days: [] });
+    await ra.workspace.put(c1, "event", "e1", { title: "Party", guests: 3 });
+    const all = await ra.workspace.page(1);
+    expect(all.total).toBe(2);
+    expect(all.items.map((e) => e.kind)).toEqual(["event", "trip"]);
+    expect(all.items[0].chatId).toBe(c1);
+    const trips = await ra.workspace.page(1, "trip");
+    expect(trips.items.map((e) => e.id)).toEqual(["t1"]);
+    expect(await ra.workspace.counts()).toEqual({ cart: 0, trip: 1, event: 1, shortlist: 0 });
+    expect((await rb.workspace.page(1)).total).toBe(0);
   });
 });
