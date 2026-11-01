@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SearchResponse } from "../../../shared/lists.js";
 import { UserError } from "../../src/lib/errors.js";
+import { LIMITS } from "../../src/lib/rateLimit.js";
 import { makeApp } from "../fixtures/app.js";
 import { ALICE, BOB, CHAT_1, CHAT_2 } from "../fixtures/users.js";
 
@@ -54,14 +55,16 @@ describe("GET /search", () => {
     const { call } = await seeded();
     for (const q of [
       "/search?q=a",
+      "/search?q=ab",
       `/search?q=${"a".repeat(101)}`,
       "/search",
-      "/search?q=ab&scope=plans",
-      "/search?q=ab&page=0",
-      "/search?q=ab&page=1002",
+      "/search?q=abc&scope=plans",
+      "/search?q=abc&page=0",
+      "/search?q=abc&page=1002",
     ])
       expect((await call(ALICE, q)).status, q).toBe(400);
-    expect((await call(ALICE, `/search?q=${"%20".repeat(401)}ab`)).status).toBe(400);
+    expect(await (await call(ALICE, "/search?q=ab")).json()).toMatchObject({ message: "Search for 3 to 100 characters." });
+    expect((await call(ALICE, `/search?q=${"%20".repeat(401)}abc`)).status).toBe(400);
     const cleaned = await get(call, "/search?q=ta%00co%E2%80%8B");
     expect(cleaned.query).toBe("taco");
     expect(cleaned.total).toBe(1);
@@ -73,9 +76,47 @@ describe("GET /search", () => {
     const { call } = await makeApp({
       repos: (id) => ({
         ...repos(id),
-        search: { search: vi.fn(async () => Promise.reject(new UserError("Search for 2 to 100 characters.", "invalid"))) },
+        search: { search: vi.fn(async () => Promise.reject(new UserError("Search for 3 to 100 characters.", "invalid"))) },
       }),
     });
     expect((await call(ALICE, "/search?q=abc")).status).toBe(400);
+  });
+
+  it("runs one search per user at a time and answers a second with 429", async () => {
+    const h = await seeded();
+    const repos = h.deps.repos;
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    const search = vi.fn(async () => {
+      await held;
+      return { items: [], total: 0, chats: 0, reports: 0 };
+    });
+    const { call } = await makeApp({ repos: (id) => ({ ...repos(id), search: { search } }) });
+    const first = call(ALICE, "/search?q=tacos");
+    await vi.waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    const second = await call(ALICE, "/search?q=tacos");
+    expect(second.status).toBe(429);
+    expect(await second.json()).toMatchObject({ error: "rate_limited", retryAfter: 1 });
+    const other = call(BOB, "/search?q=tacos");
+    await vi.waitFor(() => expect(search).toHaveBeenCalledTimes(2));
+    release();
+    expect((await first).status).toBe(200);
+    expect((await other).status).toBe(200);
+    expect((await call(ALICE, "/search?q=tacos")).status).toBe(200);
+  });
+
+  it("frees the slot when a search fails", async () => {
+    const h = await seeded();
+    const repos = h.deps.repos;
+    const search = vi.fn().mockRejectedValueOnce(new Error("db down")).mockResolvedValue({ items: [], total: 0, chats: 0, reports: 0 });
+    const { call } = await makeApp({ repos: (id) => ({ ...repos(id), search: { search } }) });
+    expect((await call(ALICE, "/search?q=tacos")).status).toBe(500);
+    expect((await call(ALICE, "/search?q=tacos")).status).toBe(200);
+  });
+
+  it("allows 60 searches per user in ten minutes", () => {
+    expect(LIMITS.search).toEqual({ max: 60, windowMs: 10 * 60_000 });
   });
 });

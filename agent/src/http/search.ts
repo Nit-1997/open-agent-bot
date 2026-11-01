@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import {
   isSearchScope,
   normalizeQuery,
+  SEARCH_MAX,
+  SEARCH_MIN,
   SEARCH_PAGE_SIZE,
   type SearchHit,
   type SearchResponse,
@@ -12,8 +14,8 @@ import {
 import type { AuthEnv } from "../auth/middleware.js";
 import type { SearchRow, UserRepos } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
-import type { RateLimiter } from "../lib/rateLimit.js";
-import { limitBy, pageParam, safe } from "./handlers.js";
+import { ConcurrencyGate, type RateLimiter, rateLimitError, SEARCH_CONCURRENCY } from "../lib/rateLimit.js";
+import { errorResponse, limitBy, pageParam, safe } from "./handlers.js";
 
 const collapse = (s: string) => s.replace(/\s+/gu, " ");
 
@@ -44,13 +46,23 @@ type Repos = (userId: string) => Pick<UserRepos, "search" | "chats">;
 
 export function searchRoutes(deps: { repos: Repos; limiter: RateLimiter }) {
   const app = new Hono<AuthEnv>();
+  const gate = new ConcurrencyGate(SEARCH_CONCURRENCY);
   app.use("/search", limitBy<AuthEnv>(deps.limiter, "search"));
+  app.use("/search", async (c, next) => {
+    const leave = gate.enter(c.get("user").id);
+    if (!leave) return errorResponse(c, rateLimitError(1));
+    try {
+      await next();
+    } finally {
+      leave();
+    }
+  });
 
   app.get(
     "/search",
     safe<AuthEnv>(async (c) => {
       const query = normalizeQuery(c.req.query("q") ?? "");
-      if (!query) throw new UserError("Search for 2 to 100 characters.", "invalid");
+      if (!query) throw new UserError(`Search for ${SEARCH_MIN} to ${SEARCH_MAX} characters.`, "invalid");
       const rawScope = c.req.query("scope") || "all";
       if (!isSearchScope(rawScope)) throw new UserError("scope must be all, chats or reports", "invalid");
       const scope: SearchScope = rawScope;

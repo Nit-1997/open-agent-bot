@@ -8,12 +8,14 @@ describe("normalizeQuery", () => {
     expect(normalizeQuery("ｔａｃｏ")).toBe("taco");
   });
 
-  it("enforces 2 to 100 code points and a raw cap of 400", () => {
+  it("enforces 3 to 100 code points and a raw cap of 400", () => {
     expect(normalizeQuery("a")).toBeNull();
-    expect(normalizeQuery("ab")).toBe("ab");
+    expect(normalizeQuery("ab")).toBeNull();
+    expect(normalizeQuery(" a b ")).toBe("a b");
+    expect(normalizeQuery("abc")).toBe("abc");
     expect(normalizeQuery("a".repeat(100))).toHaveLength(100);
     expect(normalizeQuery("a".repeat(101))).toBeNull();
-    expect(normalizeQuery(`${" ".repeat(399)}ab`)).toBeNull();
+    expect(normalizeQuery(`${" ".repeat(398)}abc`)).toBeNull();
     expect(normalizeQuery(undefined)).toBeNull();
   });
 });

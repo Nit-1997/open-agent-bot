@@ -184,9 +184,9 @@ describe("SearchView and Highlight", () => {
     counts: { chats: 1, reports: 1 },
   });
 
-  it("asks for two characters without a request", () => {
-    renderShell(<SearchView q="a" scope="all" page={1} />);
-    expect(screen.getByText("Type at least 2 characters to search.")).toBeInTheDocument();
+  it("asks for three characters without a request", () => {
+    renderShell(<SearchView q="ab" scope="all" page={1} />);
+    expect(screen.getByText("Type at least 3 characters to search.")).toBeInTheDocument();
     expect(calls.filter((c) => c.startsWith("/api/search"))).toHaveLength(0);
   });
 

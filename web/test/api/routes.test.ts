@@ -40,9 +40,10 @@ describe("shell API routes", () => {
     ["plan key", () => plan(req("/x"), params({ chatId: CHAT, kind: "trip", key: "dDF" })), 404],
     ["plan dots", () => plan(req("/x"), params({ chatId: CHAT, kind: "trip", key: ".." })), 404],
     ["search short", () => search(req("/api/search?q=a")), 400],
+    ["search two characters", () => search(req("/api/search?q=ab")), 400],
     ["search long", () => search(req(`/api/search?q=${"a".repeat(101)}`)), 400],
-    ["search scope", () => search(req("/api/search?q=ab&scope=plans")), 400],
-    ["search far page", () => search(req("/api/search?q=ab&page=1002")), 400],
+    ["search scope", () => search(req("/api/search?q=abc&scope=plans")), 400],
+    ["search far page", () => search(req("/api/search?q=abc&page=1002")), 400],
   ])("answers %s without calling the agent", async (_name, call, status) => {
     expect((await call()).status).toBe(status);
     expect(fetchMock).not.toHaveBeenCalled();

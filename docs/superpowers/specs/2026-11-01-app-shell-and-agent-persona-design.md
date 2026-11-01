@@ -460,7 +460,7 @@ All share `SectionHeader` (`h1` in Instrument Serif, a count line such as "12 re
 
 `Highlight` `{ text; query }` splits text on a case-insensitive literal match (the query is escaped with a `RegExp` escape before it is used, or found with `toLocaleLowerCase().indexOf`, so a query like `(a+)+$` is never a live pattern) and wraps the matches in `<mark>`. It never renders HTML or Markdown from the server: snippets are plain React text.
 
-The search request is debounced 250 ms and each new request aborts the previous one (`AbortController`); a response for a query that is no longer in the URL is ignored. Below the results: `Pager` with "Showing 1–10 of 23". States: fewer than 2 characters → "Type at least 2 characters to search." (no request); loading → skeleton rows; no results → "No chats or reports match “<q>”."; error → "Couldn't search: <message>" with Retry.
+The search request is debounced 250 ms and each new request aborts the previous one (`AbortController`); a response for a query that is no longer in the URL is ignored. Below the results: `Pager` with "Showing 1–10 of 23". States: fewer than 3 characters → "Type at least 3 characters to search." (no request); loading → skeleton rows; no results → "No chats or reports match “<q>”."; error → "Couldn't search: <message>" with Retry.
 
 ### Onboarding: the "Your agent" step
 
@@ -604,7 +604,7 @@ export const CHATS_PAGE_SIZE = 20;
 export const REPORTS_PAGE_SIZE = 12;
 export const PLANS_PAGE_SIZE = 12;
 export const SEARCH_PAGE_SIZE = 10;
-export const SEARCH_MIN = 2;
+export const SEARCH_MIN = 3;
 export const SEARCH_MAX = 100;
 export const SEARCH_SCOPES = ["all", "chats", "reports"] as const;
 export type SearchScope = (typeof SEARCH_SCOPES)[number];
@@ -628,7 +628,7 @@ export type SearchResponse = PageResponse<SearchHit> & { query: string; scope: S
 
 `shared/pages.ts` `PAGE_SIZE = 5` stays for admin lists.
 
-Rate limits (`lib/rateLimit.ts`): add `lists: { max: 240, windowMs: 10 * 60_000 }` for `/reports*` and `/plans*`, and `search: { max: 300, windowMs: 10 * 60_000 }` (a debounced search sends a request every pause while typing, so a few searches use dozens; the RPC is bounded per user, so this is a cost cap, not a correctness one). Chats keep `chats` (120 per 10 minutes); opening a chat costs two (`/chats/:id` and its messages). A `429` shows in each view's error state with the `retry-after` seconds ("Slow down: try again in 12 s.").
+Rate limits (`lib/rateLimit.ts`): add `lists: { max: 240, windowMs: 10 * 60_000 }` for `/reports*` and `/plans*`, and `search: { max: 60, windowMs: 10 * 60_000 }` with one search per user at a time (a `ConcurrencyGate` of 1; a second request while one runs gets `429` with `retryAfter: 1`). Each search is a few trigram scans, so the cap is kept low; the debounce keeps a typed query to a handful of requests. Chats keep `chats` (120 per 10 minutes); opening a chat costs two (`/chats/:id` and its messages). A `429` shows in each view's error state with the `retry-after` seconds ("Slow down: try again in 12 s.").
 
 ### `GET /chats?page=` (changed)
 
@@ -677,7 +677,7 @@ The widget is checked with `validateWidget` before it is returned. If the entity
 
 Validation:
 
-- `q`: the raw parameter is rejected above 400 UTF-16 units before any work; then control and format characters (`\p{Cc}`, `\p{Cf}`) are removed, it is normalised NFKC, whitespace is collapsed and trimmed; it must be `SEARCH_MIN`–`SEARCH_MAX` (2–100) code points, else `400 invalid` ("Search for 2 to 100 characters."). The web route applies the same function (`normalizeQuery` in `shared/lists.ts`), so the URL, the request and the highlight all use one string.
+- `q`: the raw parameter is rejected above 400 UTF-16 units before any work; then control and format characters (`\p{Cc}`, `\p{Cf}`) are removed, it is normalised NFKC, whitespace is collapsed and trimmed; it must be `SEARCH_MIN`–`SEARCH_MAX` (3–100) code points, else `400 invalid` ("Search for 3 to 100 characters."). The web route applies the same function (`normalizeQuery` in `shared/lists.ts`), so the URL, the request and the highlight all use one string.
 - `scope`: one of `all`, `chats`, `reports`; default `all`; else `400 invalid`.
 - `page`: `pageParam`; `(page - 1) * SEARCH_PAGE_SIZE` must be at most 10,000, else `400 invalid` ("That page is too far back.").
 
@@ -828,7 +828,7 @@ Every agent path is built from validated values only (UUIDs, enum members, digit
 | `/reports/[id]` | Header skeleton | n/a | 404: "This report doesn't exist or isn't yours." + All reports; other: "Couldn't load this report: …" + Retry |
 | `/plans` | Skeleton rows | All: "No plans yet. Carts, trips, events and shortlists <name> saves in chats show up here." Filtered: "No <kind>s yet." + Show all plans | "Couldn't load plans: …" + Retry |
 | `/plans/…` | Header + card skeleton | n/a | 404: "This plan doesn't exist or isn't yours."; 422: "This plan was saved in an older shape and can't be shown here. Open its chat to see it."; other: "Couldn't load this plan: …" + Retry |
-| `/search` | Skeleton rows | Under 2 characters: "Type at least 2 characters to search."; none: "No chats or reports match “<q>”." | "Couldn't search: …" + Retry |
+| `/search` | Skeleton rows | Under 3 characters: "Type at least 3 characters to search."; none: "No chats or reports match “<q>”." | "Couldn't search: …" + Retry |
 | Report iframe | The browser's own | n/a | The iframe shows the agent's 404 JSON today; `ReportDetail` fetches the metadata first, so a missing report never reaches the iframe. The frame keeps `sandbox={ARTIFACT_SANDBOX}`, the response keeps `ARTIFACT_CSP` (with its own `sandbox` directive), the app CSP's `frame-src 'self'` allows it, and `next.config.ts` keeps exempting only `/api/artifacts/` from `X-Frame-Options: DENY`; none of that changes. |
 | Signed out / deactivated | Existing `SignedOutBanner` / `AccessDisabled` | | |
 
@@ -892,7 +892,7 @@ Every new component test also asserts that every element has a non-empty, unique
 - `MobileDrawer.test.tsx`: opens with focus on close; Tab and Shift+Tab stay inside; Escape and backdrop close and return focus to the menu button; a link click closes it; Models and keys opens the panel.
 - `ReportsView` / `ReportDetail`: loading, empty, error + Retry, list with "Showing 1–12 of 13" and pager; deleted chat shows "Chat deleted"; the iframe has the sandbox attribute and is not rendered before the metadata; 404 state.
 - `PlansView` / `PlanDetail`: the kind filter replaces the URL and shows counts; filtered empty state; a cart renders `CartCard` and a trip `PlanCard` with no edit controls (no swap, remove or enabled stepper); a `javascript:` URL in a stored pick renders as text, not a link; 422 and 404 states.
-- `SearchView` / `Highlight`: under 2 characters sends no request; debounced `replace` and first-keystroke `push`; a newer query aborts the older request and a late older response is ignored; scope tabs with counts; `Highlight` renders `<b>`-like text literally, treats `(a+)+$` and `.*` as literal text, and marks a case-insensitive match; snippet ellipses; empty, error + Retry, 429 with its seconds.
+- `SearchView` / `Highlight`: under 3 characters sends no request; debounced `replace` and first-keystroke `push`; a newer query aborts the older request and a late older response is ignored; scope tabs with counts; `Highlight` renders `<b>`-like text literally, treats `(a+)+$` and `.*` as literal text, and marks a case-insensitive match; snippet ellipses; empty, error + Retry, 429 with its seconds.
 - `AgentSection.test.tsx`: chips fill the name; the live heading updates; invalid names show the matching message and disable Next/Save; look and tone `aria-pressed`.
 - `onboarding.test.ts` (existing) and `Onboarding` component: `agent` is first in every `slideOrder`; "01 / 06"; Skip for now keeps the defaults and records `skipped: ["agent"]`; Next stores `agent`; the summary line jumps back.
 - `ProfileDrawer`: the "Your agent" group saves through `onSave`; `focus="agent"` focuses the name input; no recent chats group.
@@ -989,7 +989,7 @@ Owner rules apply: a commit after each major step; `npm run build` (and lint, fo
 - The "Next: about you" label on the agent slide only.
 - `ProfileDrawer` and `ModelsPanel` move onto the shared `Overlay` for focus trapping.
 - `axe-core` in the E2E package for contrast checks (jsdom can't compute colours).
-- Search rate limit 300 per 10 minutes.
+- Search rate limit 60 per 10 minutes, one at a time per user.
 - Plan detail URLs use base64url of the entity id.
 - The URL of a new chat changes when its first run starts, not on send.
 - Light value of the new `--sidebar` token (`#f6f4f1`).
@@ -1047,3 +1047,4 @@ What the build changed or settled, and why. The sections above were updated wher
 - **Shell API.** The context value is memoised and `newChat` reads the chat state through a ref, so it is stable. `composerInputId(threadId)` sits next to `paneId` in `lib/shell/chatController.ts`.
 - **Widget ids carry the pane prefix.** `WidgetRenderer` and `ArtifactCard` take an `idPrefix` (the pane's id) and every widget builds its root id with `widgetId(kind, toolCallId, idPrefix)`, e.g. `chat-pane-<thread>-cart-<toolCallId>`, so two mounted panes can't share an id. The plan detail view keeps its own `detail-` tool call ids.
 - **Widget URLs.** Every widget link (cards, stays and their other sources, the sources row) goes through `ExternalLink`, which renders text for anything `safeHttpUrl` rejects, and every widget image (`Picture`, the image block) loads only an `http(s)` URL. The shared `Url` schema now requires `^https?://`, so a widget with any other scheme fails validation.
+- **Search cost.** Search allows 60 requests per user per 10 minutes and one at a time (`SEARCH_CONCURRENCY = 1`, answered with `429`, `retryAfter: 1`), and needs at least 3 characters (`SEARCH_MIN = 3`, shared by the web route, the agent route and the views). The database function still accepts 2 characters as its own floor; the routes are stricter.

@@ -1,6 +1,6 @@
 "use client";
 
-import { normalizeQuery, type SearchResponse, type SearchScope } from "@shared/lists";
+import { normalizeQuery, SEARCH_MIN, type SearchResponse, type SearchScope } from "@shared/lists";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useShell } from "@/components/shell/ShellProvider";
@@ -64,7 +64,7 @@ export function SearchView(props: { q: string; scope: SearchScope; page: number 
         <SearchScopeTabs id={`${id}-scopes`} value={props.scope} counts={data?.counts} onChange={setScope} />
       </div>
       <div id={`${id}-scopes-panel`} role="tabpanel" aria-labelledby={`${id}-scopes-${props.scope}`}>
-        {!query && <ListState id={`${id}-hint`} state={{ kind: "empty", children: "Type at least 2 characters to search." }} />}
+        {!query && <ListState id={`${id}-hint`} state={{ kind: "empty", children: `Type at least ${SEARCH_MIN} characters to search.` }} />}
         {query && !current && <ListState id={`${id}-loading`} state={{ kind: "loading", rows: 4 }} />}
         {query && current?.error && (
           <ListState

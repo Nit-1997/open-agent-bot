@@ -12,13 +12,14 @@ export const LIMITS = {
   options: { max: 120, windowMs: 10 * 60_000 },
   chats: { max: 120, windowMs: 10 * 60_000 },
   lists: { max: 240, windowMs: 10 * 60_000 },
-  search: { max: 300, windowMs: 10 * 60_000 },
+  search: { max: 60, windowMs: 10 * 60_000 },
   admin: { max: 120, windowMs: 10 * 60_000 },
   emailLinkIp: { max: 5, windowMs: 60 * 60_000 },
   emailLinkAddr: { max: 3, windowMs: 60 * 60_000 },
 } as const satisfies Record<string, Limit>;
 
 export const RUN_CONCURRENCY = 2;
+export const SEARCH_CONCURRENCY = 1;
 
 export class RateLimiter {
   private readonly hits = new Map<string, number[]>();

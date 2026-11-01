@@ -1,7 +1,7 @@
 import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
 import type { MessageRole, MessageStatus } from "../../../shared/chats.js";
 import { isUuid } from "../../../shared/ids.js";
-import { CHATS_PAGE_SIZE, PLANS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_PAGE_SIZE } from "../../../shared/lists.js";
+import { CHATS_PAGE_SIZE, PLANS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "../../../shared/lists.js";
 import { ENTITY_KINDS } from "../../../shared/workspace.js";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -371,7 +371,7 @@ function search(db: Db, userId: string): SearchRepo {
         p_limit: SEARCH_PAGE_SIZE,
         p_offset: pageOffset(page, SEARCH_PAGE_SIZE),
       });
-      if (res.error?.code === "22023") throw new UserError("Search for 2 to 100 characters.", "invalid");
+      if (res.error?.code === "22023") throw new UserError(`Search for ${SEARCH_MIN} to ${SEARCH_MAX} characters.`, "invalid");
       if (res.error) throw dbError("search", { ...res.error, status: res.status });
       if (!Value.Check(SearchResultSchema, res.data)) throw new Error("unexpected search_user_content result");
       return res.data as SearchResult;
