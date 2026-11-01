@@ -13,10 +13,10 @@ cd ../web && npm ci
 
 To run the whole stack, follow **Run** in the [README](README.md). To work on one side, run the other in Docker and point at it:
 
-- Agent: `cd agent && npm run build && AGENT_DATA_DIR=./.data/agent AGENT_SHARED_SECRET=dev npm start` (settings in the README's reference table)
-- Web: `cd web && AGENT_URL=http://localhost:8000 AGENT_SHARED_SECRET=dev npm run dev`
+- Agent: `cd agent && npm run build && set -a && . ../deploy-config/.env-agent && set +a && npm start` (settings in the README's reference table)
+- Web: `cd web && set -a && . ../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
-In Docker the agent generates the secret on the `shared` volume and web reads it from there.
+Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see **Run** in the README). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
 
 ## Checks
 
@@ -27,24 +27,34 @@ CI runs these on every pull request. Run them before you push (`npm run format` 
 | `agent` | `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` |
 | `web` | `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` |
 
-Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set.
+Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `test/supabase/` run against the real Supabase project with `npm run test:supabase`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
 
 ## Layout
 
 ```
 agent/src/
-  server.ts            process wiring: config, provider hub, session store, shutdown
-  app.ts               composes the HTTP routes in http/
-  http/                artifacts, providers (model admin), profile, settings, onboarding
-                       (places, chip options), agui (chat stream); handlers.ts holds shared helpers
+  server.ts            process wiring: config, Supabase clients, per-user hubs, session store, shutdown
+  app.ts               composes the HTTP routes in http/ behind the auth guards
+  auth/                service secret, JWT verification (JWKS, ES256), active-user cache, guards,
+                       the ambient provider env refusal
+  db/                  the only Supabase access: forUser(userId) repositories, admin repository,
+                       error mapping; db/client.ts may be imported only here and by entry points
+  crypto/              envelope AES-256-GCM for provider credentials, key wrapper, hints
+  access/              request-access and email-link service (IP pepper, padding, limits)
+  admin/               approve/invite/deactivate/delete, Supabase Auth admin adapter
+  scripts/             operator scripts run inside the container (credential key rotation)
+  http/                artifacts, chats, providers (model admin), profile, settings, onboarding
+                       (places, chip options), access, admin, agui (chat stream); handlers.ts
+                       holds shared helpers
   agui/                run lifecycle (runHandler), input parsing, pi events → AG-UI events,
                        typed event builders (events.ts), run stats
   pi/                  creating and disposing pi agent sessions
-  providers/           model provider catalog, keys, OAuth sign-in flows
-  profile/             ProfileStore (profile.json today, a database later), the prompt lines
-                       built from it, and the tool defaults it implies
+  providers/           model provider catalog, per-user hubs (LRU), the encrypted pi CredentialStore,
+                       OAuth sign-in flows bound to their user
+  profile/             ProfileStore (Supabase), the prompt lines built from it, and the tool
+                       defaults it implies
   onboarding/          Photon address search, Overpass nearby groceries, onboarding chip rows
-  session/             per-thread session store with idle sweep
+  session/             sessions keyed by user and chat, with per-user and global caps and idle sweep
   prompt/              system prompt and region/currency detection
   tools/               one file per agent tool, each owning its full description, plus
                        the helpers budget.ts, result.ts, args.ts and text.ts
@@ -52,17 +62,23 @@ agent/src/
                        browser may not do (policy.ts), live frames (frames.ts)
   shop/                catalog tile extraction, ranking and the per-chat cart
   stays/               hotel and rental search: one file per site in sources/
-  workspace/           per-chat saved plan state (SQLite): store, summary, edits, cart binding
+  workspace/           per-chat saved plan state (Supabase): store, summary, edits, cart binding
   grounding/           checks prices, ratings and links against tool evidence
   render/              tool data shapes (data.ts) → widget payloads
-  artifacts/           report storage, PDF export, and the report kit (reportKit.ts: CSS
+  artifacts/           report storage in Supabase Storage, PDF export, and the report kit (reportKit.ts: CSS
                        components plus the guide the model sees in create_artifact)
   lib/                 small shared helpers with no tool dependencies: net.ts (URL guard,
-                       safe fetch), retry, files, fx, concurrency, secret (first-start secret)
+                       safe fetch), retry, fx, concurrency, rate limits, keyed mutex, log redaction
 shared/                schemas used by both agent and web: widgets, workspace edits, the profile
                        (profile.ts), curated onboarding lists per country (onboarding.ts), flights
+supabase/
+  migrations/          SQL applied in order with the Supabase MCP (file name = recorded version)
+  scripts/             configure-auth (auth config as code), bootstrap-admin, dev-link, cleanup-e2e
+  templates/           invite and magic-link email templates
 web/
-  app/api/             thin proxies to the agent (lib/agentServer.ts holds URL + secret)
+  proxy.ts             session refresh, route rules and the nonce CSP on every request
+  app/                 login, request-access, auth confirm/callback/signout, admin, the chat page
+  app/api/             thin proxies to the agent with the user's token (lib/agentServer.ts)
   components/chat/     chat session, turns, activity steps, sources
   components/widgets/  one component per widget kind
   components/profile/  onboarding slides (onboarding/, sections shared with the drawer),
@@ -115,7 +131,8 @@ Onboarding chips come from `shared/onboarding.ts`: one `CURATED` entry per count
 - TypeScript strict mode everywhere. Prefer small pure functions; keep I/O at the edges.
 - Code explains itself through names. Add a comment only for a non-obvious reason.
 - Every rendered HTML element in `web/` has a unique, stable `id` derived from its parent's id.
-- Keys are added in the app and stored by the agent. Optional settings live in `deploy-config/.env-*` files, which are git-ignored; never commit them.
+- Keys are added in the app and stored encrypted by the agent. Settings live in `deploy-config/.env-*` and `deploy-config/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `deploy-config/env.examples/`.
+- Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).
 
 ## Safety rails

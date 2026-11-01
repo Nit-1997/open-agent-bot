@@ -1,6 +1,6 @@
 # Invite-only accounts on Supabase, with every user's data in Supabase
 
-Status: reviewed, ready to build · 2026-10-31 · branch `feat/supabase-auth`
+Status: built · 2026-11-01 · branch `feat/supabase-auth` (see "Build notes" at the end for what changed while building)
 
 Review pass (2026-10-31) verified every Supabase claim against the live project (Management API and MCP, read-only), the Supabase docs, the installed packages (`next` 16.4.3, `@copilotkit/runtime` 1.81.0, `@ag-ui/client` 1.0.2, `@earendil-works/pi-*` 1.4.0, `hono` 4.13.14, `playwright` 1.64.1) and the agent and web source. The owner's open questions are now decided (see "Decisions made by the owner"). Nothing in this spec is left to the builder except UI copy and styling.
 
@@ -137,11 +137,11 @@ Volumes removed from compose: `agent-data`, `artifacts-data`, `shared`. There ar
 
 ## Data model
 
-All SQL lives in `supabase/migrations/`, named `YYYYMMDDHHMMSS_name.sql`, applied in order with the Supabase MCP `apply_migration` (name = file name without extension). Migrations are written to run once on an empty schema; they are not re-runnable and don't need to be (`apply_migration` records each one). The owner rules out back-compat, so there are no `if not exists` guards to hide drift.
+All SQL lives in `supabase/migrations/`, applied in order with the Supabase MCP `apply_migration` (name = the part after the timestamp). `apply_migration` records its own version, so each file is named `<recorded version>_<name>.sql` to match `list_migrations`. Migrations are written to run once on an empty schema; they are not re-runnable and don't need to be (`apply_migration` records each one). The owner rules out back-compat, so there are no `if not exists` guards to hide drift.
 
 Conventions:
 
-- Every per-user table has `user_id uuid not null references auth.users(id) on delete cascade`, and an index whose first column is `user_id` (cascade deletes and every agent query filter on it).
+- Every per-user table has `user_id uuid not null references auth.users(id) on delete cascade`, and an index whose first column is `user_id` (cascade deletes and every agent query filter on it). Every other foreign key also has a covering index (`access_requests.user_id`/`decided_by`, `invited_emails.request_id`/`invited_by`, `chat_messages (chat_id, user_id, id)`, `workspace_entities (chat_id, user_id)`), so the performance advisor reports no unindexed foreign keys.
 - Child tables reference their parent with a composite FK `(parent_id, user_id) → parent(id, user_id)`, so the database guarantees a row's `user_id` matches its parent's owner.
 - RLS is enabled on every table (the project's `ensure_rls` event trigger also does this; the migrations still say it explicitly). There are **no** policies for `anon` or `authenticated`, and all privileges are revoked from them. The only policy in the schema is the one that lets `supabase_auth_admin` read `invited_emails` for the hook.
 - `service_role` (what a secret key maps to) keeps its default grants and bypasses RLS.
@@ -399,7 +399,7 @@ revoke all on public.chats, public.chat_messages, public.workspace_entities from
 - `kind` mirrors `ENTITY_KINDS` in `shared/workspace.ts` (`cart`, `trip`, `event`, `shortlist`). A unit test reads the migration file and asserts the two lists match.
 - The workspace is per chat today (`thread_id` in the SQLite PK) and stays per chat.
 - `workspace_put` runs the optimistic version check in one statement, so two concurrent turns can't both win. SQLSTATE `PT409` makes PostgREST answer HTTP 409, and supabase-js surfaces `error.code === "PT409"` with `error.details` = the current version. The agent maps it to the existing `VersionConflict` (`workspace/conflict.ts`).
-- A chat id owned by another user fails the composite FK (`23503`), which the agent maps to `not_found`. The `where w.user_id = p_user` on the upsert path is a second guard.
+- A chat id owned by another user fails the composite FK (`23503`), which the agent maps to `not_found`. On the upsert path (`p_expected is null`) an existing row of another user's chat hits the conflict first, the `where w.user_id = p_user` guard updates nothing, and the function raises `PT409` with detail `0`; the agent maps `PT409` without an expected version to `not_found` (integration test).
 
 ### Migration 5: `20261031120400_artifacts.sql`
 
@@ -475,7 +475,8 @@ revoke all on public.provider_settings, public.provider_credentials from anon, a
 After each migration: MCP `list_migrations`, then `get_advisors` for `security` and `performance`. Every finding is fixed except these accepted ones, which are listed in a header comment of migration 6:
 
 - `rls_enabled_no_policy` (INFO) on every `public` table except `invited_emails`: intentional, the agent is the only data path.
-- Nothing else is accepted. The two `rls_auto_enable` warnings must be gone after migration 1.
+- `unused_index` (INFO, performance) on the new indexes: expected on an empty database.
+- Nothing else is accepted. The two `rls_auto_enable` warnings are gone after migration 1 (verified 2026-11-01).
 
 ## Auth flows
 
@@ -586,7 +587,7 @@ All are admin-only agent endpoints with a confirm dialog in the UI.
   2. List `artifacts/{id}/` (100 per page) and remove each page; stop and fail on the first error.
   3. `delete from access_requests where email = :email`; `delete from invited_emails where email = :email`.
   4. `auth.admin.deleteUser(id)`. FKs cascade profiles, chats, messages, workspace, artifacts, settings and credentials.
-  5. On failure, return `500 { error: "delete_failed", step: "storage" | "requests" | "auth_user" }`. Every step is idempotent, so retrying is safe.
+  5. On failure, return `500 { error: "delete_failed", step: "deactivate" | "storage" | "requests" | "auth_user" }`. Every step is idempotent, so retrying is safe.
 
 ### 9. Admin bootstrap (one time)
 
@@ -734,7 +735,7 @@ All responses are JSON. Errors are `{ error: <code>, message?: <safe copy>, retr
 | `POST /agui` | user | AG-UI `RunAgentInput` | SSE | `400`, `401`, `403`, `429`; in-stream `RUN_ERROR` `NOT_FOUND`/`BUSY`/`TIME_LIMIT` |
 | `GET /chats` | user | `page≥1` | `{ items, total, page, pageSize: 5 }` | `400` |
 | `GET /chats/:id/messages` | user | — | `{ items, total }` | `404` |
-| `GET/PUT /profile`, `GET /settings`, `POST /settings/brave-search/key`, `DELETE /settings/brave-search`, `GET /places`, `GET /onboarding/options`, `GET /models`, `GET /providers`, `POST /providers/local`, `POST /providers/test`, `POST /providers/:id/login`, `GET/POST/DELETE /providers/logins/:flow[/answer]`, `POST /providers/:id/key`, `DELETE /providers/:id`, `GET/PUT /providers/:id/models` | user | as today | as today, plus `hint` on providers | as today, plus `401`/`403`/`429` |
+| `GET/PUT /profile`, `GET /settings` (adds `braveSearchHint` when a key is set), `POST /settings/brave-search/key`, `DELETE /settings/brave-search`, `GET /places`, `GET /onboarding/options`, `GET /models`, `GET /providers`, `POST /providers/local`, `POST /providers/test`, `POST /providers/:id/login`, `GET/POST/DELETE /providers/logins/:flow[/answer]`, `POST /providers/:id/key`, `DELETE /providers/:id`, `GET/PUT /providers/:id/models` | user | as today | as today, plus `hint` on providers | as today, plus `401`/`403`/`429` |
 | `GET /artifacts/:file` | user | — | HTML or PDF | `404` |
 | `GET /admin/access-requests` | admin | `status=pending|approved|rejected|all`, `page≥1` | `{ items, total, page, pageSize: 5 }`, `created_at desc, id desc` | `400` |
 | `POST /admin/access-requests/:id/approve` | admin | — | `200 { request }` | `409 already_decided`, `409 already_member`, `502 invite_failed` |
@@ -881,7 +882,7 @@ Magic link: the same structure, heading "Sign in to Open Agent", link `{{ .Redir
 
 **Google Cloud console** (owner, by hand): OAuth client type "Web application", authorized redirect URI `https://dwiuzfvmevdzzabqeaog.supabase.co/auth/v1/callback`, consent screen published (or the owner's and testers' accounts added as test users while in testing mode). The client id and secret are already in `.env-supabase-admin`.
 
-**Secret API keys** (dashboard → Settings → API keys, by hand, because creating them through the API would print the value): `agent` (for `.env-agent`) and `admin_scripts` (for `.env-supabase-admin`). Each can be revoked alone. The `default` secret key is then deleted.
+**Secret API keys**: `agent` (for `.env-agent`) and `admin_scripts` (for `.env-supabase-admin`), created with `POST /v1/projects/{ref}/api-keys?reveal=true` (`{"type":"secret","name":…,"secret_jwt_template":{"role":"service_role"}}`) by a script that writes the returned value straight into the env file without printing it. Each can be revoked alone. The `default` secret key is then deleted (`DELETE …/api-keys/{id}`; still pending, see Build notes).
 
 Migrations are applied with MCP `apply_migration`; the script doesn't run DDL.
 
@@ -944,7 +945,7 @@ Migrations are applied with MCP `apply_migration`; the script doesn't run DDL.
 - Volumes: remove `agent-data`, `artifacts-data`, `shared`; add `caddy-data`, `caddy-config`.
 - `agent/Dockerfile`: remove the `agentsecret` group and the `/data/*` dirs. `web/Dockerfile`: remove the group.
 
-Local: `docker compose --profile local up -d --build`. EC2: `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose up -d --build`.
+Local: `docker compose --env-file deploy-config/.env-nextjs --profile local up -d --build`. The `--env-file` feeds the web image's `NEXT_PUBLIC_SUPABASE_*` build args (`build.args` in compose; `env_file` doesn't reach builds, and Next inlines whatever value is present at build time, even an empty string, so `web/Dockerfile` fails the build when they are empty). EC2: `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose up -d --build`. The web healthcheck fetches `/login` (`/` redirects to `APP_ORIGIN`, which the container can't resolve).
 
 Locally the web container calls the agent at `http://agent:8000` (compose network), while Vercel calls `https://$AGENT_HOST` through Caddy. The Caddy agent path is exercised locally by the E2E `curl` checks.
 
@@ -1100,7 +1101,7 @@ Prerequisites: migrations applied, `configure-auth.mjs --apply` (and `--disable-
 3. Sign out, then on `/login` request an email link for `ntnbhat9@gmail.com`. The email arrives from `onboarding@resend.dev` (proves SMTP); open it, click **Continue**, land on `/` as the admin (same user id: proves Google and email resolve to one user).
 4. In a second Chrome profile, open `/request-access` and submit `Dummy One / ntnbhat9+oab-e2e1@gmail.com / testing`. Thank-you page. Submit again: identical, and `/admin` → Requests → Pending shows "Showing 1–1 of 1".
 5. As admin: **View** shows the details → **Approve**. Expect `invite_status='sent'` if the Resend sandbox accepts the plus-address, else `invite_status='failed'` with a visible error. Record which.
-6. `node supabase/scripts/dev-link.mjs ntnbhat9+oab-e2e1@gmail.com` (dev-only, `.env-supabase-admin` loaded): if `profiles` has the email it calls `generateLink({ type: "magiclink", email, options: { redirectTo: APP_ORIGIN + "/auth/confirm" } })` and prints `…/auth/confirm?token_hash=<hashed_token>&type=email`; otherwise `generateLink({ type: "invite", … })` and prints `…&type=invite`. Open it in the second profile, click **Continue**: signed in as the dummy with an empty profile.
+6. `node supabase/scripts/dev-link.mjs ntnbhat9+oab-e2e1@gmail.com` (dev-only, `.env-supabase-admin` loaded): if `profiles` has the email it calls `generateLink({ type: "magiclink", email, options: { redirectTo: APP_ORIGIN + "/auth/confirm" } })` and prints `…/auth/confirm?token_hash=<hashed_token>&type=email`; otherwise `generateLink({ type: "invite", … })` and prints `…&type=invite`. It never adds to `invited_emails`, so it only works for an approved request (the hook rejects anything else). Open it in the second profile, click **Continue**: signed in as the dummy with an empty profile.
 7. As the dummy: finish onboarding, Models → OpenRouter, paste the OpenRouter key from `E2E_OPENROUTER_KEY`. The row shows `sk-or-…<last4>`. DevTools Network: no response contains the key. MCP `execute_sql`: `select provider, kind, hint, key_version, octet_length(ciphertext) from provider_credentials` shows ciphertext only.
 8. As the dummy: run "price eggs and milk at Trader Joe's" (exercises `shop`, the workspace cart, and `create_artifact` when the model makes one; if not, ask "make that a printable list"). Open the artifact and download the PDF. Reload; the chat appears in Recent chats ("Showing 1–1 of 1") and reopens with its text.
 9. Second dummy (`+oab-e2e2`, repeat 4–6). As dummy 2:
@@ -1139,19 +1140,19 @@ The builder records the run as a checklist in the PR description.
 
 ## Claims to verify during build
 
-Each is checked by a named test, not assumed.
+Each is checked by a named test, not assumed. Outcomes recorded 2026-11-01; "open" ones need the browser E2E run.
 
-1. **Google linking to an invited user with `disable_signup = true`.** Docs say same-email identities link automatically; they don't say so explicitly for disabled sign-ups. Expected yes (no user is created). E2E step 2 (bootstrap admin, confirmed) and a dummy whose address is a Google account trying Google before and after using the invite. If linking is refused, the fix is to keep `disable_signup = true` and rely on email links for that user; the design doesn't change.
-2. **Whether `before-user-created` fires for admin `inviteUserByEmail` / `createUser` / `generateLink`.** The design works either way (emails are allowlisted first). Integration test records it.
-3. **Whether a failed invite email leaves the user created.** Both outcomes are handled (Resend invite and `dev-link.mjs` branch on `profiles`). E2E step 5.
-4. **Resend sandbox and plus-addresses.** E2E step 5 records it; nothing depends on it.
-5. **The Google callback error for a non-invited account** (`signup_disabled` vs the hook's message). Both map to `not_invited`. E2E step 11.
-6. **The hook URI in schema `private`.** `pg-functions://postgres/private/before_user_created` with `USAGE` on `private` granted to `supabase_auth_admin`. The integration hook test proves it fires; if the Management API rejects a non-`public` schema, move only this function to `public` with the same revokes (it's still not callable by `anon`/`authenticated`).
-7. **Storage `allowed_mime_types` with the upload content type.** Integration test uploads `text/html` and `application/pdf`.
-8. **Nonce CSP with `cacheComponents` (enabled in `next.config.ts`).** Next requires dynamic rendering for nonces. E2E checks the Chrome console for CSP violations on `/login`, `/request-access`, `/auth/confirm`, `/`, `/admin`. If static shells drop the nonce, set `cacheComponents: false`: every page is per-user and dynamic anyway.
-9. **`sessions_timebox` / `sessions_inactivity_timeout` on the current plan.** The script reports applied or skipped.
-10. **Read-only agent container.** `pwuser`'s uid/gid in `mcr.microsoft.com/playwright:v1.64.1-noble` (set the `/home/pwuser` tmpfs `uid`/`gid` to `docker compose run --rm agent id -u pwuser` / `id -g`), and that Chromium (both `browser/pool.ts` and the PDF renderer in `artifacts/store.ts`), pi sessions and Node start with `read_only: true`. E2E step 8 exercises both Chromium paths.
-11. **Banned user and `verifyOtp`.** E2E step 10 expects a banned user's `token_hash` to fail verification (mapped to `link_expired`).
+1. **Google linking to an invited user with `disable_signup = true`.** Open: E2E steps 2 and 6. If linking is refused, keep `disable_signup = true` and rely on email links for that user.
+2. **Whether `before-user-created` fires for admin calls.** Settled (`agent/test/supabase/hook.int.test.ts`): it fires for `generateLink({ type: "invite" })` (a non-invited email is rejected with the hook's message) but **not** for `auth.admin.createUser`, which creates any email. Only `bootstrap-admin.mjs` and the integration tests call `createUser`, both with the secret key and after allowlisting; the agent never does. Public OTP sign-up with `shouldCreateUser: true` is refused (`signup_disabled`).
+3. **Whether a failed invite email leaves the user created.** Open: E2E step 5. Both outcomes are handled: after a failed invite the agent looks the email up in `profiles` and stores `user_id` if the user exists.
+4. **Resend sandbox and plus-addresses.** Open: E2E step 5.
+5. **The Google callback error for a non-invited account.** Open: E2E step 11. Both `signup_disabled` and the hook's message map to `not_invited`.
+6. **The hook URI in schema `private`.** Settled: the Management API accepted `pg-functions://postgres/private/before_user_created`, and the hook rejects non-invited `generateLink` calls, so it runs from `private`.
+7. **Storage `allowed_mime_types` with the upload content type.** Settled (`repos.int.test.ts`): `text/html` and `application/pdf` uploads succeed.
+8. **Nonce CSP with `cacheComponents`.** Settled by the docs: Next 16's CSP guide says Partial Prerendering can't carry nonces, so `cacheComponents` (and `partialPrefetching`, which needs it) are off and the root layout reads `x-nonce` from `headers()`. Every page is dynamic. Open: the Chrome console check for CSP violations in E2E.
+9. **`sessions_timebox` / `sessions_inactivity_timeout` on the current plan.** Settled: the PATCH is rejected on this plan; `configure-auth.mjs --apply` skips both with "requires Pro plan" and `--check` reports them as not enforced instead of failing.
+10. **Read-only agent container.** Partly settled: `pwuser` is uid/gid 1001 in `mcr.microsoft.com/playwright:v1.64.1-noble`; the agent starts and serves with `read_only: true` and the tmpfs mounts (`docker compose ps` healthy). Open: both Chromium paths under E2E step 8.
+11. **Banned user and `verifyOtp`.** Open: E2E step 10. The agent side is settled: a deactivated user's still-valid token gets `403 account_disabled` (checked against the running stack).
 
 Resolved during review (no longer open): auth field names and units (`sessions_*` in hours, `jwt_exp` and `security_refresh_token_reuse_interval` in seconds, `smtp_port` a string); CopilotKit per-request agents (`AgentsFactory`) and default header forwarding; pi `CredentialStore` signature and env fallback; `contextNote` can be async (pi's `context` handler accepts a Promise); pi's ChatGPT callback port is fixed at 1455; `@supabase/ssr` honors `cookieOptions.httpOnly`; `supabase_auth_admin` already has `USAGE` on `public`.
 
@@ -1174,3 +1175,19 @@ Resolved during review (no longer open): auth field names and units (`sessions_*
 ## UI copy and styling
 
 Exact copy beyond the strings fixed above, and the admin and recent-chats styling, follow the existing glass style and are the builder's only open choices.
+
+## Build notes (2026-11-01)
+
+What the build changed or learned, beyond the claims above.
+
+- **Ambient env names** are collected at startup by asking every pi built-in provider's `auth.apiKey.resolve()` which variables it reads (a recording `AuthContext`), because pi doesn't export the names as data. The list includes config-like names such as `GOOGLE_CLOUD_PROJECT`; any of them set makes startup fail.
+- **Jev** is resolved per user hub (a `WeakMap` cache) with one shared limiter (`createJudge({ limiter })`) so `JEV_CONCURRENCY` stays global.
+- **Error bodies** are `{ error: <code>, message }` everywhere; `UserError` gained an optional `code` and `details`, and kinds `unprocessable` (422 `invalid`), `unauthorized`, `forbidden`, `too_large`, `rate_limited` and `internal` (500, used by `delete_failed`).
+- **Two runs at once per user**: a third concurrent `POST /agui` gets `429` with `retryAfter: 5`.
+- **Web (CopilotKit)**: the runtime's `InMemoryAgentRunner` keys threads by bare id and exposes `GET /threads` listing every thread, so the route uses a `UserScopedRunner` (`web/lib/copilotRunner.ts`) keyed by `${userId}:${threadId}` with thread listing off. The CopilotKit provider moved from the root layout into `app/page.tsx` so `/login` and `/admin` render without it. Admin list reads are server actions (`app/admin/actions.ts`) rather than `/api/admin/*` routes; both check the claim and the agent checks again.
+- **Web (sign-out)**: when Supabase can't be reached, the sign-out route deletes the `sb-*` cookies itself and redirects to `/login?error=auth_unavailable`. A missing env var throws a named `ConfigError`, never `agent_unreachable`. `x-client-ip` is sent only when the first `x-forwarded-for` entry looks like an IP; the agent uses `unknown` otherwise.
+- **Pending owner actions** (the build's permissions refused these; nothing depends on them yet):
+  - delete the `default` secret API key (`6ec4aaf1-…`);
+  - `node supabase/scripts/configure-auth.mjs --apply --disable-legacy-keys` (disables the legacy anon/service_role keys and revokes the legacy HS256 secret; the Supabase MCP talks to the Management API with the owner's token and doesn't use them);
+  - `docker volume rm open-agent-bot_agent-data open-agent-bot_artifacts-data open-agent-bot_shared` (the old file-store volumes; compose no longer mounts them).
+
