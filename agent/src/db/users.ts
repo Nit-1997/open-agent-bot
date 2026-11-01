@@ -187,7 +187,10 @@ function workspace(db: Db, userId: string): WorkspaceRepo {
           p_expected: expectedVersion ?? null,
         })
         .abortSignal(timeout());
-      if (res.error?.code === "PT409") throw new VersionConflict(kind, id, expectedVersion ?? 0, Number(res.error.details) || 0);
+      if (res.error?.code === "PT409") {
+        if (expectedVersion === undefined) throw new UserError("This chat doesn't exist.", "not_found");
+        throw new VersionConflict(kind, id, expectedVersion, Number(res.error.details) || 0);
+      }
       if (res.error) throw dbError("workspace.put", { ...res.error, status: res.status });
       return res.data as number;
     },
