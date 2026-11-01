@@ -1,6 +1,7 @@
-import { emptyProfile, type Profile, parseProfile } from "../../../shared/profile.js";
+import { emptyProfile, type Profile, parseProfile, withoutInvalidAgent } from "../../../shared/profile.js";
 import type { ProfileRepo } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
+import { log } from "../lib/log.js";
 
 export interface ProfileStore {
   get(): Promise<Profile>;
@@ -9,11 +10,17 @@ export interface ProfileStore {
 
 const invalid = () => new UserError("that profile isn't valid");
 
+export function readStoredProfile(raw: unknown): Profile {
+  const { value, dropped } = withoutInvalidAgent(raw);
+  if (dropped) log.warn("[profile] dropped invalid agent");
+  return parseProfile(value) ?? emptyProfile();
+}
+
 export class SupabaseProfileStore implements ProfileStore {
   constructor(private readonly repo: ProfileRepo) {}
 
   async get(): Promise<Profile> {
-    return parseProfile(await this.repo.get()) ?? emptyProfile();
+    return readStoredProfile(await this.repo.get());
   }
 
   async put(input: unknown): Promise<Profile> {

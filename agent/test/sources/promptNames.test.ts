@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildSystemPrompt, CORE_PROMPT } from "../../src/prompt/systemPrompt.js";
+import { buildSystemPrompt, corePrompt } from "../../src/prompt/systemPrompt.js";
 
 const NAMES = [
   "amazon",
@@ -31,7 +31,7 @@ const skills = readdirSync(skillsDir, { withFileTypes: true })
 
 describe("no store or provider names in the core prompt or skills", () => {
   it("finds none in the v2 core prompt, with or without user context", () => {
-    expect(CORE_PROMPT).not.toMatch(pattern);
+    expect(corePrompt("warm")).not.toMatch(pattern);
     const ctx = { timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T14:00" };
     expect(buildSystemPrompt(ctx)).not.toMatch(pattern);
     expect(buildSystemPrompt(null)).not.toMatch(pattern);

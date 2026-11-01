@@ -44,7 +44,7 @@ export function pickModel(hub: Pick<ProviderHub, "resolve">, ref: string | undef
 
 export function sessionFactory(deps: SessionDeps): CreateSession {
   const { cfg, artifacts, pool } = deps;
-  return async (owner, userContext, history) => {
+  return async (owner, userContext, persona, history) => {
     const { user, chatId } = owner;
     const key = sessionKey(owner);
     const hub = await deps.hubs.get(user);
@@ -60,7 +60,7 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: current,
-      systemPrompt: buildSystemPrompt(userContext, skills),
+      systemPrompt: buildSystemPrompt(userContext, skills, persona),
       tools: buildTools({
         cfg,
         artifacts: artifacts.sink(repos, chatId),

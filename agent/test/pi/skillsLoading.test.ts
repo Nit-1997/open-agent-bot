@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createPiSession } from "../../src/pi/createPiSession.js";
 import { testHub } from "../fixtures/hub.js";
 import { loadSkillCatalog, skillsDir } from "../../src/skills/catalog.js";
-import { CORE_PROMPT, buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
+import { corePrompt, buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 import { loadSkillTool } from "../../src/tools/loadSkill.js";
 
 async function open(skills?: string) {
@@ -26,7 +26,7 @@ describe("pi skill loading", () => {
     const handle = await open(skillsDir());
     try {
       const p = handle.session.systemPrompt;
-      expect(p).toContain(CORE_PROMPT);
+      expect(p).toContain(corePrompt("warm"));
       expect(p).not.toContain("<available_skills>");
       expect(p.match(/trip-planning/g)?.length).toBe(1);
       expect(handle.session.getActiveToolNames()).toEqual(["load_skill"]);

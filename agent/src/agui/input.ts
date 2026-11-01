@@ -15,7 +15,7 @@ const clip = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v
 
 function readProfile(v: unknown): ProfileOverride | undefined {
   if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
-  const raw = { ...(v as Record<string, unknown>) };
+  const { agent: _persona, ...raw } = v as Record<string, unknown>;
   const homeText = clip(raw.home, 200);
   if (homeText) raw.home = { label: homeText, city: homeText };
   const parsed = parseProfile(raw);

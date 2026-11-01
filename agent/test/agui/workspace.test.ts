@@ -26,7 +26,7 @@ function setup(opts: { evidence?: Evidence } = {}) {
   const created: { chatId: string; history?: HistoryMessage[] }[] = [];
   const store = new SessionStore({
     idleMs: 60000,
-    create: async (owner, _ctx, history): Promise<SessionEntry> => {
+    create: async (owner, _ctx, _persona, history): Promise<SessionEntry> => {
       created.push({ chatId: owner.chatId, history });
       return { session, busy: false, lastUsed: 0, dispose: async () => {}, cart: await workspaceCart(workspace), evidence: opts.evidence };
     },

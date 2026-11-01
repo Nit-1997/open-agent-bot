@@ -4,6 +4,8 @@ import type { AuthUser } from "../auth/verify.js";
 import type { ChatRepo, MessageRepo, NewMessage } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
+import { agentPersona, type Profile } from "../../../shared/profile.js";
+import { chatTitleFrom } from "../../../shared/chats.js";
 import type { ProfileStore } from "../profile/store.js";
 import type { UserContext } from "../prompt/userContext.js";
 import {
@@ -24,7 +26,6 @@ export const EMPTY_REPLY_NUDGE =
   "Your reply so far shows me no answer. Answer my previous message now, in full, from what the tools already returned, without searching again.";
 
 export const TIME_LIMIT_MESSAGE = "This run hit the time limit. Ask me to continue.";
-const TITLE_CHARS = 80;
 
 export type RunContext = {
   user: AuthUser;
@@ -71,13 +72,16 @@ function logEvent(threadId: string, e: PiEvent): void {
   }
 }
 
-export async function withStoredProfile(ctx: UserContext | null, profiles: ProfileStore | undefined): Promise<UserContext | null> {
-  if (!ctx || !profiles) return ctx;
-  const stored = await profiles.get().catch((err: unknown) => {
+export async function readStored(profiles: ProfileStore | undefined): Promise<Profile | undefined> {
+  if (!profiles) return undefined;
+  return profiles.get().catch((err: unknown) => {
     log.warn("[run] couldn't read the profile", err);
     return undefined;
   });
-  return stored ? { ...ctx, profile: { ...stored, ...ctx.profile } } : ctx;
+}
+
+export function mergeStored(ctx: UserContext | null, stored: Profile | undefined): UserContext | null {
+  return ctx && stored ? { ...ctx, profile: { ...stored, ...ctx.profile } } : ctx;
 }
 
 class Transcript {
@@ -147,7 +151,9 @@ export async function* handleRun(
     return;
   }
 
-  const userContext = await withStoredProfile(readUserContext(input), ctx.profiles);
+  const stored = await readStored(ctx.profiles);
+  const userContext = mergeStored(readUserContext(input), stored);
+  const persona = agentPersona(stored);
   const denied = await claim(ctx, threadId, userContext?.model);
   if (denied) {
     yield denied;
@@ -160,7 +166,7 @@ export async function* handleRun(
   let made: { entry: SessionEntry; history?: HistoryMessage[] } | { error: unknown };
   try {
     const history = store.get(owner) ? undefined : await seedHistory(ctx, threadId);
-    made = { entry: await store.getOrCreate(owner, userContext, history), history };
+    made = { entry: await store.getOrCreate(owner, userContext, persona, history), history };
   } catch (error) {
     made = { error };
   }
@@ -187,7 +193,7 @@ export async function* handleRun(
     threadId,
     runId,
     [{ role: "user", content: prompt.slice(0, 200_000), status: "complete" }],
-    prompt.trim().slice(0, TITLE_CHARS),
+    chatTitleFrom(prompt),
   );
   if (!savedPrompt) yield custom(NOT_SAVED_EVENT, { message: PROMPT_NOT_SAVED });
   const transcript = new Transcript();
@@ -212,6 +218,7 @@ export async function* handleRun(
     entry.busy = false;
     store.touch(owner);
     if (!saved) await saveReply("interrupted");
+    await store.release(owner, entry);
   }
 }
 

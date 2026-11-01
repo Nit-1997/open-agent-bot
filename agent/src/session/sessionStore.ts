@@ -3,6 +3,7 @@ import type { FrameBus } from "../browser/frames.js";
 import type { Evidence } from "../grounding/evidence.js";
 import { log } from "../lib/log.js";
 import type { PiSession } from "../pi/createPiSession.js";
+import type { AgentPersona } from "../../../shared/profile.js";
 import type { UserContext } from "../prompt/userContext.js";
 import type { ActiveCart } from "../shop/cart.js";
 
@@ -13,6 +14,7 @@ export type SessionOwner = { user: AuthUser; chatId: string };
 export type SessionEntry = {
   session: PiSession;
   busy: boolean;
+  retired?: boolean;
   lastRunId?: string;
   lastUsed: number;
   dispose: () => Promise<void>;
@@ -24,7 +26,12 @@ export type SessionEntry = {
   turnStats?: () => { jevCalls: number; jevCostUsd: number };
 };
 
-export type CreateSession = (owner: SessionOwner, ctx: UserContext | null, history?: HistoryMessage[]) => Promise<SessionEntry>;
+export type CreateSession = (
+  owner: SessionOwner,
+  ctx: UserContext | null,
+  persona: AgentPersona,
+  history?: HistoryMessage[],
+) => Promise<SessionEntry>;
 
 export class SessionCapacityError extends Error {
   constructor() {
@@ -53,7 +60,8 @@ export class SessionStore {
   }
 
   get(owner: SessionOwner): SessionEntry | undefined {
-    return this.entries.get(sessionKey(owner));
+    const e = this.entries.get(sessionKey(owner));
+    return e?.retired ? undefined : e;
   }
 
   private keysOf(userId: string): string[] {
@@ -75,13 +83,14 @@ export class SessionStore {
     return freed;
   }
 
-  getOrCreate(owner: SessionOwner, ctx: UserContext | null, history?: HistoryMessage[]): Promise<SessionEntry> {
+  getOrCreate(owner: SessionOwner, ctx: UserContext | null, persona: AgentPersona, history?: HistoryMessage[]): Promise<SessionEntry> {
     const key = sessionKey(owner);
     const existing = this.entries.get(key);
-    if (existing) {
+    if (existing && !(existing.retired && !existing.busy)) {
       existing.lastUsed = this.now();
       return Promise.resolve(existing);
     }
+    const stale = existing ? this.drop(key) : undefined;
     const waiting = this.pending.get(key);
     if (waiting) return waiting;
     let freed: Promise<void> | undefined;
@@ -91,8 +100,9 @@ export class SessionStore {
       return Promise.reject(err);
     }
     const p = (async () => {
+      await stale;
       await freed;
-      const e = await this.create(owner, ctx, history);
+      const e = await this.create(owner, ctx, persona, history);
       e.lastUsed = this.now();
       this.entries.set(key, e);
       return e;
@@ -120,6 +130,21 @@ export class SessionStore {
   async sweep(): Promise<void> {
     const cutoff = this.now() - this.idleMs;
     for (const [key, e] of [...this.entries]) if (!e.busy && e.lastUsed < cutoff) await this.drop(key);
+  }
+
+  async release(owner: SessionOwner, entry: SessionEntry): Promise<void> {
+    const key = sessionKey(owner);
+    if (entry.retired && !entry.busy && this.entries.get(key) === entry) await this.drop(key);
+  }
+
+  async retireUser(userId: string): Promise<void> {
+    await Promise.allSettled(this.keysOf(userId).flatMap((k) => (this.pending.get(k) ? [this.pending.get(k)!] : [])));
+    for (const key of this.keysOf(userId)) {
+      const e = this.entries.get(key);
+      if (!e) continue;
+      if (e.busy) e.retired = true;
+      else await this.drop(key);
+    }
   }
 
   async disposeUser(userId: string): Promise<void> {

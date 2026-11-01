@@ -78,7 +78,7 @@ export function createApp(deps: AppDeps) {
 
   app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, limiter: deps.limiter, gate: deps.gate }));
   app.route("/", chatRoutes({ repos: deps.repos, limiter: deps.limiter }));
-  app.route("/", profileRoutes({ profiles: deps.profiles, limiter: deps.limiter }));
+  app.route("/", profileRoutes({ profiles: deps.profiles, limiter: deps.limiter, sessions: deps.store }));
   app.route("/", settingsRoutes({ hubs: deps.hubs, limiter: deps.limiter }));
   app.route("/", onboardingRoutes({ ...deps.onboarding, limiter: deps.limiter }));
   app.route("/", providerRoutes({ hubs: deps.hubs, logins: deps.logins, profiles: deps.profiles, limiter: deps.limiter }));

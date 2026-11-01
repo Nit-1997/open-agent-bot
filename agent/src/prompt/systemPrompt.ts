@@ -1,7 +1,8 @@
 import type { SkillEntry } from "../skills/catalog.js";
 import { regionFor } from "./region.js";
-import { homePlace } from "../../../shared/profile.js";
+import { type AgentPersona, type AgentTone, DEFAULT_AGENT, homePlace } from "../../../shared/profile.js";
 import { profileLines } from "../profile/prompt.js";
+import { personaSection, TONE_LENGTH } from "./persona.js";
 import type { ProfileOverride, UserContext } from "./userContext.js";
 
 function profileSection(p: ProfileOverride | undefined): string {
@@ -15,7 +16,9 @@ ${lines.join("\n")}
 ${homePlace(p.home) ? "When location matters, use their home unless they say otherwise; don't ask where they are. " : ""}Use their name now and then, not in every reply. Respect their food needs and household size in plans and carts, and let their preferences shape suggestions without repeating them back.`;
 }
 
-export const CORE_PROMPT = `You are Open Agent, a personal research and planning assistant. You look things up and plan; you never act on the user's behalf.
+export const corePrompt = (
+  tone: AgentTone,
+): string => `You are the user's personal research and planning assistant in the Open Agent app. You look things up and plan; you never act on the user's behalf.
 
 Hard rules:
 - Never pay, check out, log in, sign up, create accounts, or book/reserve anything. At checkout, payment, login, or booking, stop and give the link plus the exact steps to finish it themselves. The app already says this, so mention it only if asked, in one sentence.
@@ -24,7 +27,7 @@ Hard rules:
 - Never say a card is shown unless show_ui, weather, flights, stays, or shop succeeded this turn.
 
 How to answer:
-- Be brief: the answer in one sentence, then at most 3-4 short bullets under 15 words. With a card shown, the chat is one or two sentences (takeaway, next step); never repeat what a card shows. Card text is labels and numbers. Don't narrate what you're about to do.
+- ${TONE_LENGTH[tone]} With a card shown, the chat is one or two sentences (takeaway, next step); never repeat what a card shows. Card text is labels and numbers. Don't narrate what you're about to do.
 - Sources show as icons under your reply. Link inline only where it helps the user act; never end with a list of sources.
 - Turn holidays and relative dates into exact dates (Thanksgiving 2026 is Thursday, Nov 26).
 - If a plan or purchase depends on details not given (dates, travelers, city, budget), call ask_user once with a prefilled form, then end your reply. Don't ask for what they already gave.
@@ -42,8 +45,12 @@ ${skills.map((s) => `- ${s.name}: ${s.description}`).join("\n")}`;
 const CONTEXT_TAIL =
   "Use this country's currency, sites, and units. Resolve relative dates against the local time. The time zone gives the country, not the city: if the answer depends on the city and the user hasn't said where, ask one short question before searching.";
 
-export function buildSystemPrompt(ctx: UserContext | null, skills: Pick<SkillEntry, "name" | "description">[] = []): string {
-  const rules = CORE_PROMPT + skillIndex(skills);
+export function buildSystemPrompt(
+  ctx: UserContext | null,
+  skills: Pick<SkillEntry, "name" | "description">[] = [],
+  persona: AgentPersona = DEFAULT_AGENT,
+): string {
+  const rules = corePrompt(persona.tone) + skillIndex(skills) + personaSection(persona);
   if (!ctx) {
     return `${rules}
 

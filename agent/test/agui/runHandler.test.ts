@@ -8,12 +8,12 @@ import {
   PROMPT_NOT_SAVED,
   REPLY_NOT_SAVED,
   type RunContext,
+  mergeStored,
   TIME_LIMIT_MESSAGE,
-  withStoredProfile,
 } from "../../src/agui/runHandler.js";
 import { UserError } from "../../src/lib/errors.js";
 import { MemoryProfileStore } from "../../src/profile/store.js";
-import { emptyProfile } from "../../../shared/profile.js";
+import { type AgentPersona, DEFAULT_AGENT, emptyProfile } from "../../../shared/profile.js";
 import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import type { PiEvent } from "../../src/agui/translate.js";
@@ -481,16 +481,16 @@ describe("readUserContext", () => {
       defaultModel: "groq/x",
       home: { label: "1 Main St, Austin", city: "Austin", country: "US" },
     });
-    const merged = await withStoredProfile(
+    const merged = mergeStored(
       ctx({ timeZone: "UTC", locale: "en-US", localTime: "t", profile: { home: "Sunnyvale, CA" } }),
-      stored,
+      await stored.get(),
     );
     expect(merged?.profile).toMatchObject({
       name: "Stored",
       defaultModel: "groq/x",
       home: { label: "Sunnyvale, CA", city: "Sunnyvale, CA" },
     });
-    const plain = await withStoredProfile(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t" }), stored);
+    const plain = mergeStored(ctx({ timeZone: "UTC", locale: "en-US", localTime: "t" }), await stored.get());
     expect(plain?.profile?.home?.city).toBe("Austin");
   });
 
@@ -575,7 +575,7 @@ describe("chat ownership and persistence", () => {
     ]);
     const store = new SessionStore({
       idleMs: 60000,
-      create: async (_o, _c, history): Promise<SessionEntry> => {
+      create: async (_o, _c, _p, history): Promise<SessionEntry> => {
         seen.push(history);
         return { session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {} };
       },
@@ -629,5 +629,49 @@ describe("chat ownership and persistence", () => {
     });
     const out = await collect(run(input(), store, new AbortController().signal));
     expect(out.at(-1)).toMatchObject({ type: EventType.RUN_ERROR, code: "BUSY" });
+  });
+});
+
+describe("persona", () => {
+  const personaStore = (personas: AgentPersona[]) =>
+    new SessionStore({
+      idleMs: 60000,
+      create: async (_o, _c, persona): Promise<SessionEntry> => {
+        personas.push(persona);
+        return { session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {} };
+      },
+    });
+
+  it("takes the persona from the stored profile, even for a run with no user_context", async () => {
+    db = new MemoryDb();
+    const personas: AgentPersona[] = [];
+    const profiles = new MemoryProfileStore({ ...emptyProfile(), agent: { name: "Sage", tone: "brief" } });
+    await collect(handleRun(input(), runCtx({ profiles }), personaStore(personas), new AbortController().signal));
+    expect(personas).toEqual([{ name: "Sage", look: "mist", tone: "brief" }]);
+  });
+
+  it("ignores an agent the browser puts into user_context", async () => {
+    db = new MemoryDb();
+    const personas: AgentPersona[] = [];
+    const profiles = new MemoryProfileStore({ ...emptyProfile(), agent: { name: "Sage" } });
+    const value = JSON.stringify({
+      timeZone: "UTC",
+      locale: "en-US",
+      localTime: "t",
+      profile: { agent: { name: "Evil", tone: "thorough" } },
+    });
+    const inp = input({ context: [{ description: "user_context", value }] });
+    expect(readUserContext(inp)?.profile).toBeUndefined();
+    await collect(handleRun(inp, runCtx({ profiles }), personaStore(personas), new AbortController().signal));
+    expect(personas).toEqual([{ name: "Sage", look: "mist", tone: "warm" }]);
+  });
+
+  it("falls back to the default persona when the profile can't be read", async () => {
+    db = new MemoryDb();
+    const personas: AgentPersona[] = [];
+    const profiles = { get: async () => Promise.reject(new Error("down")), put: async () => emptyProfile() };
+    const out = await collect(handleRun(input(), runCtx({ profiles }), personaStore(personas), new AbortController().signal));
+    expect(personas).toEqual([DEFAULT_AGENT]);
+    expect(out.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED });
   });
 });

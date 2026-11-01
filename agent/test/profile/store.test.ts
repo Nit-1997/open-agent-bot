@@ -30,3 +30,18 @@ describe("SupabaseProfileStore", () => {
     expect(await new SupabaseProfileStore(db.forUser(ALICE.id).profiles).get()).toEqual(emptyProfile());
   });
 });
+
+describe("reading a stored agent", () => {
+  it("drops an invalid stored agent and keeps the rest of the profile", async () => {
+    const db = new MemoryDb();
+    await db.forUser(ALICE.id).profiles.putData({ name: "Nitin", onboardedAt: "2026-10-30", agent: { name: "Bad\u202e", tone: "warm" } });
+    const p = await new SupabaseProfileStore(db.forUser(ALICE.id).profiles).get();
+    expect(p).toMatchObject({ name: "Nitin", onboardedAt: "2026-10-30" });
+    expect(p.agent).toBeUndefined();
+  });
+
+  it("refuses to save an invalid agent", async () => {
+    const store = new SupabaseProfileStore(new MemoryDb().forUser(ALICE.id).profiles);
+    await expect(store.put({ agent: { name: "{{x}}" } })).rejects.toThrow(/isn't valid/);
+  });
+});
