@@ -3,7 +3,7 @@ import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import { supabaseEnv } from "@/lib/env";
 import { type SessionUser, sessionUserFromClaims } from "@/lib/sessionUser";
-import { SESSION_COOKIE_OPTIONS } from "./cookies";
+import { SESSION_COOKIE_OPTIONS, sessionCookieOptions } from "./cookies";
 
 export type SessionState = { user: SessionUser | null; unavailable: boolean };
 
@@ -22,7 +22,7 @@ export async function updateSession(
         for (const { name, value } of list) request.cookies.set(name, value);
         forwardHeaders.set("cookie", request.headers.get("cookie") ?? "");
         response = next();
-        for (const { name, value, options } of list) response.cookies.set(name, value, options);
+        for (const { name, value, options } of list) response.cookies.set(name, value, sessionCookieOptions(options));
         for (const [key, value] of Object.entries(headers)) response.headers.set(key, value);
       },
     },

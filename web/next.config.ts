@@ -10,6 +10,7 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  poweredByHeader: false,
   outputFileTracingRoot: path.join(__dirname, ".."),
   async headers() {
     return [
