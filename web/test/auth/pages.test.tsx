@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ConfirmPage from "@/app/auth/confirm/page";
 import LoginPage from "@/app/login/page";
@@ -50,6 +50,19 @@ describe("/login", () => {
     expect(container.querySelector<HTMLInputElement>("#login-google-next")?.value).toBe("/");
     expect(document.getElementById("login-email-input")).toHaveAttribute("type", "email");
     expect(document.getElementById("login-email-submit")).toHaveTextContent("Email me a sign-in link");
+    expect(screen.getByRole("link", { name: "Request access" })).toHaveAttribute("href", "/request-access");
+    expectUniqueIds(container);
+  });
+
+  it("hides the email-link form behind an invited-only toggle and leads newcomers to Request access", async () => {
+    const { container } = render(await LoginPage(params({})));
+    expect(document.getElementById("login-email-input")).toBeNull();
+    const toggle = screen.getByRole("button", { name: /Invited, but no Google account/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(document.getElementById("login-email-input")).toHaveAttribute("type", "email");
+    expect(screen.getByText(/This doesn't request access/)).toBeInTheDocument();
+    expect(screen.getByText("New to Open Agent?")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Request access" })).toHaveAttribute("href", "/request-access");
     expectUniqueIds(container);
   });

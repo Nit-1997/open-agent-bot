@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AuthCard, authPrimary } from "@/components/auth/AuthCard";
+import { AuthCard, authPrimary, authSecondary } from "@/components/auth/AuthCard";
 import { getClaimsOrNull, safeNext } from "@/lib/auth";
 import { authErrorCopy } from "@/lib/authErrors";
 import { firstParam } from "@/lib/authForms";
@@ -26,18 +26,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           Continue with Google
         </button>
       </form>
-      <div id="login-divider" className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-text-faint">
-        <span id="login-divider-left" className="h-px flex-1 bg-border" />
-        or
-        <span id="login-divider-right" className="h-px flex-1 bg-border" />
-      </div>
-      <EmailLinkForm />
-      <p id="login-request" className="text-[13px] text-text-muted">
-        Not invited yet?{" "}
-        <Link id="login-request-link" href="/request-access" className="text-text-primary underline underline-offset-2">
+      <EmailLinkForm startOpen={!!error} />
+      <div id="login-request" className="space-y-2 border-t border-border pt-5">
+        <p id="login-request-text" className="text-center text-[13px] text-text-secondary">
+          New to Open Agent?
+        </p>
+        <Link id="login-request-link" href="/request-access" className={`${authSecondary} block text-center`}>
           Request access
         </Link>
-      </p>
+      </div>
     </AuthCard>
   );
 }

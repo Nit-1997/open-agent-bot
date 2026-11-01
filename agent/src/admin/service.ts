@@ -6,6 +6,7 @@ import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "./authAdmin.js";
 import { deleteAccount } from "./deleteAccount.js";
+import { describeInviteFailure } from "./inviteCopy.js";
 
 export type AccountHooks = { onDisabled(userId: string): Promise<void>; onEnabled(userId: string): void };
 
@@ -13,8 +14,11 @@ const ADMIN_TTL_MS = 30_000;
 
 const missingUser = () => new UserError("That user doesn't exist.", "not_found");
 const selfAction = () => new UserError("You can't do that to your own account.", "conflict", { code: "self_action" });
-const inviteFailed = (code: string) =>
-  new UserError(`Invite email failed: ${code}. Use Resend invite.`, "upstream", { code: "invite_failed" });
+const inviteFailed = (code: string) => new UserError(describeInviteFailure(code), "upstream", { code: "invite_failed" });
+const inviteOutcome = (result: EmailResult) =>
+  result.ok
+    ? { inviteStatus: "sent" as const, inviteError: null }
+    : { inviteStatus: "failed" as const, inviteError: describeInviteFailure(result.code) };
 
 export function createLiveAdminCheck(auth: Pick<AuthAdmin, "getUser">, now: () => number = Date.now) {
   const cache = new Map<string, { ok: boolean; at: number }>();
@@ -55,7 +59,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
     const member = await repo.users.findByEmail(r.email);
     const result = member ? await auth.magicLink(r.email) : await auth.invite(r.email, r.name);
     const userId = member?.id ?? (result.ok ? result.userId : null) ?? (await repo.users.findByEmail(r.email))?.id ?? null;
-    if (!result.ok) log.warn(`[admin] invite email failed request=${r.id} code=${result.code}`);
+    if (!result.ok) log.warn(`[admin] invite email failed request=${r.id} code=${result.code} message=${result.message}`);
     return { result, userId };
   };
 
@@ -75,10 +79,12 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
       if (member) return repo.accessRequests.decide(id, { status: "approved", decidedBy: admin.id, userId: member.id, invite: null });
       await repo.invited.add(r.email, r.id, admin.id);
       const { result, userId } = await sendInvite(r);
-      const invite = result.ok
-        ? { inviteStatus: "sent" as const, inviteError: null }
-        : { inviteStatus: "failed" as const, inviteError: `${result.code}: ${result.message}` };
-      const updated = await repo.accessRequests.decide(id, { status: "approved", decidedBy: admin.id, userId, invite });
+      const updated = await repo.accessRequests.decide(id, {
+        status: "approved",
+        decidedBy: admin.id,
+        userId,
+        invite: inviteOutcome(result),
+      });
       if (!result.ok) throw inviteFailed(result.code);
       return updated;
     },
@@ -95,13 +101,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
         throw new UserError("Only approved requests can get a new invite.", "conflict", { code: "not_approved" });
       await repo.invited.add(r.email, r.id, null);
       const { result, userId } = await sendInvite(r);
-      const updated = await repo.accessRequests.setInvite(
-        id,
-        result.ok
-          ? { inviteStatus: "sent", inviteError: null }
-          : { inviteStatus: "failed", inviteError: `${result.code}: ${result.message}` },
-        userId,
-      );
+      const updated = await repo.accessRequests.setInvite(id, inviteOutcome(result), userId);
       if (!result.ok) throw inviteFailed(result.code);
       return updated;
     },

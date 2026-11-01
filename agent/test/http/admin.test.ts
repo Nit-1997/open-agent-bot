@@ -47,7 +47,7 @@ describe("admin access requests", () => {
     expect(res.status).toBe(502);
     expect(await res.json()).toMatchObject({
       error: "invite_failed",
-      message: "Invite email failed: over_email_send_rate_limit. Use Resend invite.",
+      message: "Too many emails were sent recently. Wait an hour, then use Resend invite. (over_email_send_rate_limit)",
     });
     expect(h.accounts.requests.get(id)).toMatchObject({ status: "approved", inviteStatus: "failed" });
     const resent = await h.call(ADMIN, `/admin/access-requests/${id}/resend`, { method: "POST" });
