@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { AccessService } from "./access/service.js";
 import type { AdminService } from "./admin/service.js";
 import type { RunContext } from "./agui/runHandler.js";
@@ -11,10 +12,12 @@ import { adminRoutes } from "./http/admin.js";
 import { aguiRoutes } from "./http/agui.js";
 import { artifactRoutes } from "./http/artifacts.js";
 import { chatRoutes } from "./http/chats.js";
+import { errorResponse } from "./http/handlers.js";
 import { type OnboardingDeps, onboardingRoutes } from "./http/onboarding.js";
 import { type ProfilesFor, profileRoutes } from "./http/profile.js";
 import { providerRoutes } from "./http/providers.js";
 import { settingsRoutes } from "./http/settings.js";
+import { UserError } from "./lib/errors.js";
 import type { ConcurrencyGate, RateLimiter } from "./lib/rateLimit.js";
 import type { UserHubs } from "./providers/hubs.js";
 import type { LoginFlows } from "./providers/logins.js";
@@ -36,6 +39,12 @@ export type AppDeps = {
   admin: AdminService;
 };
 
+export const BODY_LIMIT_BYTES = 1024 * 1024;
+export const RUN_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
+
+const limitBody = (maxSize: number) =>
+  bodyLimit({ maxSize, onError: (c) => errorResponse(c, new UserError("That request is too large.", "too_large")) });
+
 const USER_PATHS = [
   "/agui",
   "/chats",
@@ -56,8 +65,11 @@ export function createApp(deps: AppDeps) {
   const { guards } = deps;
 
   app.get("/health", (c) => c.json({ ok: true }));
-  app.on("OPTIONS", "*", (c) => c.json({ error: "method_not_allowed" }, 405));
+  app.on("OPTIONS", "*", (c) => c.json({ error: "method_not_allowed", message: "Method not allowed." }, 405));
   app.use("*", guards.requireService);
+  const runBody = limitBody(RUN_BODY_LIMIT_BYTES);
+  const otherBody = limitBody(BODY_LIMIT_BYTES);
+  app.use("*", (c, next) => (c.req.path === "/agui" ? runBody(c, next) : otherBody(c, next)));
 
   app.route("/", accessRoutes({ access: deps.access }));
 

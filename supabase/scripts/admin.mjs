@@ -5,7 +5,7 @@ const required = (name) => {
 };
 
 export function adminEnv() {
-  return { url: required("SUPABASE_URL"), key: required("SUPABASE_ADMIN_SECRET_KEY"), appOrigin: process.env.APP_ORIGIN?.trim() || "https://app.localhost" };
+  return { url: required("SUPABASE_URL"), key: required("SUPABASE_ADMIN_SECRET_KEY"), appOrigin: required("APP_ORIGIN") };
 }
 
 export function createAdmin({ url, key }) {

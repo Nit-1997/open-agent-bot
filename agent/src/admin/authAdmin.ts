@@ -1,6 +1,5 @@
 import type { User } from "@supabase/supabase-js";
 import type { Db } from "../db/client.js";
-import { ARTIFACTS_BUCKET } from "../db/users.js";
 import { UserError } from "../lib/errors.js";
 
 export type AuthAccount = {
@@ -20,11 +19,9 @@ export interface AuthAdmin {
   magicLink(email: string): Promise<EmailResult>;
   setBanned(id: string, banned: boolean): Promise<void>;
   deleteUser(id: string): Promise<void>;
-  removeArtifacts(userId: string): Promise<void>;
 }
 
 const BAN_FOREVER = "876000h";
-const LIST_PAGE = 100;
 
 const toAccount = (u: User): AuthAccount => ({
   id: u.id,
@@ -74,16 +71,6 @@ export function createAuthAdmin(deps: { service: Db; anon: Db; appOrigin: string
     async deleteUser(id) {
       const { error } = await admin.deleteUser(id);
       if (error && error.status !== 404) throw authError("the delete", error);
-    },
-    async removeArtifacts(userId) {
-      const bucket = deps.service.storage.from(ARTIFACTS_BUCKET);
-      for (;;) {
-        const { data, error } = await bucket.list(userId, { limit: LIST_PAGE, offset: 0 });
-        if (error) throw new UserError("Couldn't list the user's files.", "upstream");
-        if (!data.length) return;
-        const { error: removeError } = await bucket.remove(data.map((o) => `${userId}/${o.name}`));
-        if (removeError) throw new UserError("Couldn't remove the user's files.", "upstream");
-      }
     },
   };
 }

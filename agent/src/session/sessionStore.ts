@@ -60,38 +60,48 @@ export class SessionStore {
     return [...this.entries.keys(), ...this.pending.keys()].filter((k) => k.startsWith(`${userId}:`));
   }
 
-  private async makeRoom(userId: string): Promise<void> {
-    const mine = this.keysOf(userId);
+  private makeRoom(userId: string, key: string): Promise<void> | undefined {
+    const mine = this.keysOf(userId).filter((k) => k !== key);
+    let freed: Promise<void> | undefined;
     if (mine.length >= this.limits.perUser) {
       const idle = mine
         .map((k) => [k, this.entries.get(k)] as const)
         .filter((x): x is readonly [string, SessionEntry] => !!x[1] && !x[1].busy)
         .sort((a, b) => a[1].lastUsed - b[1].lastUsed)[0];
       if (!idle) throw new SessionCapacityError();
-      await this.drop(idle[0]);
+      freed = this.drop(idle[0]);
     }
     if (this.entries.size + this.pending.size >= this.limits.total) throw new SessionCapacityError();
+    return freed;
   }
 
-  async getOrCreate(owner: SessionOwner, ctx: UserContext | null, history?: HistoryMessage[]): Promise<SessionEntry> {
+  getOrCreate(owner: SessionOwner, ctx: UserContext | null, history?: HistoryMessage[]): Promise<SessionEntry> {
     const key = sessionKey(owner);
     const existing = this.entries.get(key);
     if (existing) {
       existing.lastUsed = this.now();
-      return existing;
+      return Promise.resolve(existing);
     }
-    let p = this.pending.get(key);
-    if (!p) {
-      await this.makeRoom(owner.user.id);
-      p = this.create(owner, ctx, history).then((e) => {
-        e.lastUsed = this.now();
-        this.entries.set(key, e);
-        this.pending.delete(key);
-        return e;
-      });
-      p.catch(() => this.pending.delete(key));
-      this.pending.set(key, p);
+    const waiting = this.pending.get(key);
+    if (waiting) return waiting;
+    let freed: Promise<void> | undefined;
+    try {
+      freed = this.makeRoom(owner.user.id, key);
+    } catch (err) {
+      return Promise.reject(err);
     }
+    const p = (async () => {
+      await freed;
+      const e = await this.create(owner, ctx, history);
+      e.lastUsed = this.now();
+      this.entries.set(key, e);
+      return e;
+    })();
+    this.pending.set(key, p);
+    void p.then(
+      () => this.pending.delete(key),
+      () => this.pending.delete(key),
+    );
     return p;
   }
 

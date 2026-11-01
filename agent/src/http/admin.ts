@@ -1,24 +1,29 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
+import { isRequestFilter } from "../../../shared/admin.js";
+import { normalizeId } from "../../../shared/ids.js";
+import { PAGE_SIZE } from "../../../shared/pages.js";
 import type { AdminService } from "../admin/service.js";
 import type { AuthEnv } from "../auth/middleware.js";
-import type { RequestFilter } from "../db/admin.js";
-import { PAGE_SIZE } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
-import { limitBy, type RateLimiter } from "../lib/rateLimit.js";
-import { body, pageParam, safe } from "./handlers.js";
+import type { RateLimiter } from "../lib/rateLimit.js";
+import { body, limitBy, pageParam, safe } from "./handlers.js";
 
-const FILTERS: readonly RequestFilter[] = ["pending", "approved", "rejected", "all"];
+const idParam = (c: Context<AuthEnv>, what: string): string => {
+  const id = normalizeId(c.req.param("id"));
+  if (!id) throw new UserError(`That ${what} doesn't exist.`, "not_found");
+  return id;
+};
 
 export function adminRoutes(deps: { admin: AdminService; limiter: RateLimiter }) {
   const app = new Hono<AuthEnv>();
   const { admin } = deps;
-  app.use("*", limitBy<AuthEnv>(deps.limiter, "admin"));
+  app.use("/admin/*", limitBy<AuthEnv>(deps.limiter, "admin"));
 
   app.get(
     "/admin/access-requests",
     safe<AuthEnv>(async (c) => {
-      const status = (c.req.query("status") ?? "pending") as RequestFilter;
-      if (!FILTERS.includes(status)) throw new UserError("status must be pending, approved, rejected or all", "invalid");
+      const status = c.req.query("status") ?? "pending";
+      if (!isRequestFilter(status)) throw new UserError("status must be pending, approved, rejected or all", "invalid");
       const page = pageParam(c);
       return c.json({ ...(await admin.listRequests(status, page)), page, pageSize: PAGE_SIZE });
     }),
@@ -26,7 +31,7 @@ export function adminRoutes(deps: { admin: AdminService; limiter: RateLimiter })
   for (const action of ["approve", "reject", "resend"] as const) {
     app.post(
       `/admin/access-requests/:id/${action}`,
-      safe<AuthEnv>(async (c) => c.json({ request: await admin[action](c.get("user"), c.req.param("id") ?? "") })),
+      safe<AuthEnv>(async (c) => c.json({ request: await admin[action](c.get("user"), idParam(c, "request")) })),
     );
   }
   app.get(
@@ -40,16 +45,16 @@ export function adminRoutes(deps: { admin: AdminService; limiter: RateLimiter })
   );
   app.post(
     "/admin/users/:id/deactivate",
-    safe<AuthEnv>(async (c) => c.json({ user: await admin.deactivate(c.get("user"), c.req.param("id") ?? "") })),
+    safe<AuthEnv>(async (c) => c.json({ user: await admin.deactivate(c.get("user"), idParam(c, "user")) })),
   );
   app.post(
     "/admin/users/:id/reactivate",
-    safe<AuthEnv>(async (c) => c.json({ user: await admin.reactivate(c.get("user"), c.req.param("id") ?? "") })),
+    safe<AuthEnv>(async (c) => c.json({ user: await admin.reactivate(c.get("user"), idParam(c, "user")) })),
   );
   app.delete(
     "/admin/users/:id",
     safe<AuthEnv>(async (c) => {
-      await admin.remove(c.get("user"), c.req.param("id") ?? "", (await body(c)).confirmEmail);
+      await admin.remove(c.get("user"), idParam(c, "user"), (await body(c)).confirmEmail);
       return c.json({ ok: true });
     }),
   );

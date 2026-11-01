@@ -1,22 +1,16 @@
+import type { ChatSummary, StoredMessage } from "../../../shared/chats.js";
+import type { Page } from "../../../shared/pages.js";
 import type { EntityKind } from "../../../shared/workspace.js";
 import type { CredentialKind, Sealed } from "../crypto/envelope.js";
 
-export const PAGE_SIZE = 5;
-
-export type Page<T> = { items: T[]; total: number };
-
-export type ChatSummary = { id: string; title: string; lastMessageAt: string };
-export type MessageStatus = "complete" | "interrupted";
-export type MessageRole = "user" | "assistant";
-export type NewMessage = { role: MessageRole; content: string; status: MessageStatus };
-export type StoredMessage = NewMessage & { createdAt: string };
+export type NewMessage = Omit<StoredMessage, "createdAt">;
 
 export type VersionedEntity = { kind: EntityKind; id: string; value: unknown; version: number; updatedAt: number };
 
 export type ArtifactRow = { id: string; chatId: string | null; title: string; pdfReady: boolean };
 export type ArtifactFile = "html" | "pdf";
 
-export type ProviderSettingsRow = { data: unknown; deviceId: string };
+export type ProviderSettingsRow = { data: unknown; deviceId: string; stamp: string };
 
 export type CredentialRow = Sealed & { provider: string; kind: CredentialKind; hint: string; version: number };
 export type CredentialListing = { provider: string; kind: CredentialKind; hint: string };
@@ -59,7 +53,7 @@ export interface ArtifactStorage {
 
 export interface ProviderSettingsRepo {
   get(): Promise<ProviderSettingsRow>;
-  put(data: object): Promise<void>;
+  put(data: object, stamp: string): Promise<string>;
 }
 
 export interface CredentialRepo {
@@ -81,5 +75,7 @@ export type UserRepos = Readonly<{
   providerSettings: ProviderSettingsRepo;
   credentials: CredentialRepo;
 }>;
+
+export const ARTIFACTS_BUCKET = "artifacts";
 
 export const artifactPath = (userId: string, id: string, file: ArtifactFile) => `${userId}/${id}.${file}`;

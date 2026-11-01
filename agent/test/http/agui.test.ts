@@ -57,6 +57,16 @@ const post = (app: ReturnType<typeof routes>) =>
   });
 
 describe("agui route", () => {
+  it.each([["r\n[auth] forged"], ["x".repeat(101)], [""], ["a b"]])("refuses run id %j before anything is logged", async (runId) => {
+    const res = await routes({ heartbeatMs: 1000 }).request("/agui", {
+      method: "POST",
+      body: JSON.stringify({ ...input, runId }),
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "invalid" });
+  });
+
   it("keeps a quiet stream alive with SSE comments so clients don't time out mid-turn", async () => {
     const res = await post(routes({ heartbeatMs: 10 }));
     const text = await res.text();

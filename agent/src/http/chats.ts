@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import type { AuthEnv } from "../auth/middleware.js";
-import { PAGE_SIZE, type UserRepos } from "../db/types.js";
+import { normalizeId } from "../../../shared/ids.js";
+import { PAGE_SIZE } from "../../../shared/pages.js";
+import type { UserRepos } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
-import { limitBy, type RateLimiter } from "../lib/rateLimit.js";
-import { pageParam, safe } from "./handlers.js";
+import type { RateLimiter } from "../lib/rateLimit.js";
+import { limitBy, pageParam, safe } from "./handlers.js";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const missing = () => new UserError("This chat doesn't exist.", "not_found");
 
 export function chatRoutes(deps: { repos: (userId: string) => Pick<UserRepos, "chats" | "messages">; limiter: RateLimiter }) {
@@ -24,8 +25,8 @@ export function chatRoutes(deps: { repos: (userId: string) => Pick<UserRepos, "c
   app.get(
     "/chats/:id/messages",
     safe<AuthEnv>(async (c) => {
-      const id = (c.req.param("id") ?? "").toLowerCase();
-      if (!UUID_RE.test(id)) throw missing();
+      const id = normalizeId(c.req.param("id"));
+      if (!id) throw missing();
       const repos = deps.repos(c.get("user").id);
       if (!(await repos.chats.exists(id))) throw missing();
       return c.json(await repos.messages.history(id));

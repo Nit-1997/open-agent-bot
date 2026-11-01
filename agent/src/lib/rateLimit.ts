@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from "hono";
+import { UserError } from "./errors.js";
 
 export type Limit = { max: number; windowMs: number };
 export type Verdict = { ok: true } | { ok: false; retryAfter: number };
@@ -64,19 +64,5 @@ export class ConcurrencyGate {
   }
 }
 
-export const rateLimited = (retryAfter: number) =>
-  Response.json(
-    { error: "rate_limited", message: `Slow down: try again in ${retryAfter} s.`, retryAfter },
-    { status: 429, headers: { "retry-after": String(retryAfter) } },
-  );
-
-export function limitBy<E extends { Variables: { user: { id: string } } }>(
-  limiter: RateLimiter,
-  name: keyof typeof LIMITS,
-): MiddlewareHandler<E> {
-  return async (c, next) => {
-    const verdict = limiter.take(`${name}:${c.get("user").id}`, LIMITS[name]);
-    if (!verdict.ok) return rateLimited(verdict.retryAfter);
-    await next();
-  };
-}
+export const rateLimitError = (retryAfter: number) =>
+  new UserError(`Slow down: try again in ${retryAfter} s.`, "rate_limited", { retryAfter });

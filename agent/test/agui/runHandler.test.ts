@@ -1,7 +1,17 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { readUserContext } from "../../src/agui/input.js";
-import { EMPTY_REPLY_NUDGE, handleRun, type RunContext, TIME_LIMIT_MESSAGE, withStoredProfile } from "../../src/agui/runHandler.js";
+import {
+  EMPTY_REPLY_NUDGE,
+  handleRun,
+  NOT_SAVED_EVENT,
+  PROMPT_NOT_SAVED,
+  REPLY_NOT_SAVED,
+  type RunContext,
+  TIME_LIMIT_MESSAGE,
+  withStoredProfile,
+} from "../../src/agui/runHandler.js";
+import { UserError } from "../../src/lib/errors.js";
 import { MemoryProfileStore } from "../../src/profile/store.js";
 import { emptyProfile } from "../../../shared/profile.js";
 import { FrameBus } from "../../src/browser/frames.js";
@@ -510,6 +520,39 @@ describe("chat ownership and persistence", () => {
       { role: "assistant", content: "Eggs are $3.", status: "complete" },
     ]);
     expect((await db.forUser(ALICE.id).chats.page(1)).items[0]).toMatchObject({ id: CHAT_1, title: "price eggs at Trader Joe's" });
+  });
+
+  it("tells the client before the run ends when the reply couldn't be saved", async () => {
+    const { store } = setup(async (emit) => {
+      emit(ev.assistantStart);
+      emit(ev.delta("Eggs are $3."));
+      emit(ev.assistantEnd());
+    });
+    const r = db.forUser(ALICE.id);
+    let calls = 0;
+    const messages = {
+      ...r.messages,
+      append: async (...args: Parameters<typeof r.messages.append>) => {
+        if (calls++ > 0) throw new UserError("The data service isn't reachable.", "unavailable");
+        return r.messages.append(...args);
+      },
+    };
+    const out = await collect(run(input(), store, new AbortController().signal, runCtx({ messages })));
+    const notice = out.findIndex((e) => e.type === EventType.CUSTOM && (e as { name?: string }).name === NOT_SAVED_EVENT);
+    expect(notice).toBeGreaterThan(-1);
+    expect(out[notice]).toMatchObject({ value: { message: REPLY_NOT_SAVED } });
+    expect(out.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED });
+    expect(notice).toBeLessThan(out.length - 1);
+  });
+
+  it("tells the client when its own message couldn't be saved, and still answers", async () => {
+    const { store } = setup();
+    const r = db.forUser(ALICE.id);
+    const messages = { ...r.messages, append: async () => Promise.reject(new UserError("down", "unavailable")) };
+    const out = await collect(run(input(), store, new AbortController().signal, runCtx({ messages })));
+    const notices = out.filter((e) => e.type === EventType.CUSTOM && (e as { name?: string }).name === NOT_SAVED_EVENT);
+    expect(notices.map((e) => (e as { value: { message: string } }).value.message)).toEqual([PROMPT_NOT_SAVED, REPLY_NOT_SAVED]);
+    expect(out.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED });
   });
 
   it("refuses another user's chat id with NOT_FOUND before any work", async () => {

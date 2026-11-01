@@ -6,8 +6,9 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const API = "https://api.supabase.com/v1";
 const SECRET_FIELDS = new Set(["smtp_pass", "external_google_secret"]);
-const PRO_ONLY = ["sessions_timebox", "sessions_inactivity_timeout"];
-const HOOK_FN = "private.before_user_created(jsonb)";
+const PRO_ONLY = ["sessions_timebox", "sessions_inactivity_timeout", "password_hibp_enabled"];
+const EXPECTED_SECRET_KEYS = new Set(["agent", "admin_scripts"]);
+const HOOK_FNS = ["private.before_user_created(jsonb)", "private.custom_access_token(jsonb)"];
 
 const args = new Set(process.argv.slice(2));
 const mode = args.has("--apply") ? "apply" : args.has("--check") ? "check" : undefined;
@@ -70,8 +71,20 @@ function desired() {
     mailer_templates_magic_link_content: template("magic_link.html"),
     hook_before_user_created_enabled: true,
     hook_before_user_created_uri: "pg-functions://postgres/private/before_user_created",
+    hook_custom_access_token_enabled: true,
+    hook_custom_access_token_uri: "pg-functions://postgres/private/custom_access_token",
     security_captcha_enabled: false,
     password_min_length: 12,
+    password_hibp_enabled: true,
+    security_update_password_require_reauthentication: true,
+    security_update_password_require_current_password: true,
+    mailer_notifications_password_changed_enabled: true,
+    mfa_totp_enroll_enabled: false,
+    mfa_totp_verify_enabled: false,
+    mfa_phone_enroll_enabled: false,
+    mfa_phone_verify_enabled: false,
+    mfa_web_authn_enroll_enabled: false,
+    mfa_web_authn_verify_enabled: false,
   };
 }
 
@@ -103,20 +116,32 @@ function diff(current, want, rotate) {
   return changes;
 }
 
-async function hookFunctionExists() {
-  const rows = await api("POST", "/database/query/read-only", {
-    query: `select to_regprocedure('${HOOK_FN}') is not null as ok`,
-  });
-  return rows?.[0]?.ok === true;
+async function missingHookFunctions() {
+  const missing = [];
+  for (const fn of HOOK_FNS) {
+    const rows = await api("POST", "/database/query/read-only", { query: `select to_regprocedure('${fn}') is not null as ok` });
+    if (rows?.[0]?.ok !== true) missing.push(fn);
+  }
+  return missing;
 }
 
-async function checkSigningKeys() {
+async function keyDrift() {
   const res = await api("GET", "/config/auth/signing-keys");
-  const keys = Array.isArray(res) ? res : (res?.keys ?? []);
-  const inUse = keys.filter((k) => k.status === "in_use");
-  if (inUse.length !== 1 || inUse[0].algorithm !== "ES256") fail(`signing keys: expected one in_use ES256 key, found ${JSON.stringify(inUse.map((k) => k.algorithm))}`);
-  console.log(`signing keys: one in_use ES256 key (${inUse[0].id})`);
-  return keys;
+  const signing = Array.isArray(res) ? res : (res?.keys ?? []);
+  const apiKeys = (await api("GET", "/api-keys?reveal=false")) ?? [];
+  const legacy = await api("GET", "/api-keys/legacy");
+  const inUse = signing.filter((k) => k.status === "in_use");
+  const legacySigning = signing.filter((k) => k.algorithm === "HS256" && k.status !== "revoked");
+  const extraSecrets = apiKeys.filter((k) => k.type === "secret" && !EXPECTED_SECRET_KEYS.has(k.name));
+  const missingSecrets = [...EXPECTED_SECRET_KEYS].filter((name) => !apiKeys.some((k) => k.type === "secret" && k.name === name));
+  const problems = [];
+  if (inUse.length !== 1 || inUse[0].algorithm !== "ES256")
+    problems.push(`signing keys: expected one in_use ES256 key, found ${JSON.stringify(inUse.map((k) => k.algorithm))}`);
+  for (const k of legacySigning) problems.push(`signing keys: legacy HS256 key is ${k.status}, not revoked (anyone with the old JWT secret can mint tokens)`);
+  if (legacy?.enabled) problems.push("api keys: legacy anon and service_role keys are enabled");
+  for (const k of extraSecrets) problems.push(`api keys: unexpected secret key "${k.name}" (only ${[...EXPECTED_SECRET_KEYS].join(", ")} should exist)`);
+  for (const name of missingSecrets) problems.push(`api keys: expected secret key "${name}" is missing`);
+  return { signing, legacy, legacySigning, extraSecrets, problems };
 }
 
 async function patch(changes) {
@@ -132,6 +157,15 @@ async function patch(changes) {
   }
 }
 
+async function disableLegacyKeys(keys) {
+  if (keys.legacy?.enabled) await api("PUT", "/api-keys/legacy?enabled=false");
+  for (const k of keys.legacySigning) await api("PATCH", `/config/auth/signing-keys/${k.id}`, { status: "revoked" });
+  for (const k of keys.extraSecrets) await api("DELETE", `/api-keys/${k.id}`);
+  console.log(
+    `legacy api keys: disabled; HS256 keys revoked: ${keys.legacySigning.length}; secret keys deleted: ${keys.extraSecrets.map((k) => k.name).join(", ") || "none"}`,
+  );
+}
+
 async function main() {
   const want = desired();
   const current = await api("GET", "/config/auth");
@@ -140,34 +174,32 @@ async function main() {
   for (const f of fields) console.log(`${f}: ${show(f, current[f])} → ${show(f, changes[f])}`);
   if (!fields.length) console.log("auth config: no drift");
 
-  const keys = await checkSigningKeys();
-  const legacy = await api("GET", "/api-keys/legacy");
-  console.log(`legacy api keys: ${legacy?.enabled ? "enabled" : "disabled"}`);
+  const keys = await keyDrift();
+  for (const p of keys.problems) console.log(`drift: ${p}`);
+  if (!keys.problems.length) console.log("keys: no drift");
 
   if (mode === "check") {
     const hard = fields.filter((f) => !PRO_ONLY.includes(f));
-    for (const f of fields.filter((f) => PRO_ONLY.includes(f))) console.log(`${f}: not enforced (Pro plan only)`);
-    process.exit(hard.length ? 1 : 0);
+    for (const f of fields.filter((f) => PRO_ONLY.includes(f))) console.log(`${f}: not enforced (paid plan only)`);
+    if (keys.problems.length) console.log("fix key drift with: configure-auth.mjs --apply --disable-legacy-keys");
+    process.exit(hard.length || keys.problems.length ? 1 : 0);
   }
 
-  if (changes.hook_before_user_created_enabled && !(await hookFunctionExists())) {
-    fail(`refusing to enable the hook: ${HOOK_FN} does not exist (apply the migrations first)`);
+  if (changes.hook_before_user_created_enabled || changes.hook_custom_access_token_enabled) {
+    const missing = await missingHookFunctions();
+    if (missing.length) fail(`refusing to enable hooks: ${missing.join(", ")} missing (apply the migrations first)`);
   }
   if (fields.length) {
     const skipped = await patch(changes);
-    for (const f of skipped) console.log(`${f}: skipped, requires Pro plan`);
+    for (const f of skipped) console.log(`${f}: skipped, requires a paid plan`);
     const after = await api("GET", "/config/auth");
     const left = Object.keys(diff(after, want, false)).filter((f) => !skipped.includes(f));
     if (left.length) fail(`still drifting after apply: ${left.join(", ")}`);
     console.log("auth config: applied");
   }
 
-  if (args.has("--disable-legacy-keys")) {
-    if (legacy?.enabled) await api("PUT", "/api-keys/legacy?enabled=false");
-    const hs = keys.find((k) => k.algorithm === "HS256" && k.status !== "revoked");
-    if (hs) await api("PATCH", `/config/auth/signing-keys/${hs.id}`, { status: "revoked" });
-    console.log(`legacy api keys: disabled; legacy HS256 key: ${hs ? "revoked" : "already revoked"}`);
-  }
+  if (args.has("--disable-legacy-keys")) await disableLegacyKeys(keys);
+  else if (keys.problems.length) console.log("key drift left alone; rerun with --disable-legacy-keys to fix it");
 }
 
 main().catch((err) => fail(err instanceof Error ? err.message : String(err)));

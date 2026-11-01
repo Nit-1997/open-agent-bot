@@ -1,3 +1,5 @@
+import { BlockedAddressError } from "../../src/lib/net.js";
+import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { describe, expect, it } from "vitest";
 import type { ProviderHub } from "../../src/providers/hub.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";
@@ -209,5 +211,45 @@ describe("ProviderHub", () => {
     expect(ok.configured).toBe(true);
     const later = await testHub({ userId: ALICE.id, isAdmin: false, fetch: f, lookup: async () => ["127.0.0.1"] }, db);
     expect(later.list().find((p) => p.id === "custom")?.configured).toBe(false);
+  });
+
+  it("sends an invited user's model calls through the guarded fetch, never the default one", async () => {
+    const sse = () =>
+      new Response(
+        [
+          `data: ${JSON.stringify({ id: "x", object: "chat.completion.chunk", created: 1, model: "m1", choices: [{ index: 0, delta: { role: "assistant", content: "hi" }, finish_reason: "stop" }] })}`,
+          "data: [DONE]",
+          "",
+        ].join("\n\n"),
+        { headers: { "content-type": "text/event-stream" } },
+      );
+    const f = fakeFetch([
+      [/\/models$/, () => json({ data: [{ id: "m1" }] })],
+      [/\/chat\/completions$/, sse],
+    ]);
+    const user = await testHub({ userId: ALICE.id, isAdmin: false, userFetch: createSafeFetch(f) });
+    await user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" });
+    await user.test("custom/m1");
+    expect(f.calls).toContain("https://models.example.com/v1/chat/completions");
+  });
+
+  it("maps a connect-time refusal to the private-address error", async () => {
+    const blocked = (async () => {
+      throw new TypeError("fetch failed", { cause: new BlockedAddressError("refusing models.example.com") });
+    }) as typeof fetch;
+    const user = await testHub({ userId: ALICE.id, isAdmin: false, userFetch: blocked });
+    await expect(user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" })).rejects.toMatchObject({
+      kind: "unprocessable",
+      message: "That address isn't reachable from the server.",
+    });
+  });
+
+  it("refuses to overwrite settings another tab changed", async () => {
+    const db = new MemoryDb();
+    const f = fakeFetch([[/\/models$/, () => json({ data: [{ id: "m1" }] })]]);
+    const first = await testHub({ fetch: f }, db);
+    const second = await testHub({ fetch: f }, db);
+    await first.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" });
+    await expect(second.setEnabled("custom", [])).rejects.toMatchObject({ kind: "conflict", code: "settings_changed" });
   });
 });

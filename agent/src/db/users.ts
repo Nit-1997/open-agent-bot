@@ -1,12 +1,18 @@
 import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
-import type { EntityKind } from "../../../shared/workspace.js";
+import type { MessageRole, MessageStatus } from "../../../shared/chats.js";
+import { isUuid } from "../../../shared/ids.js";
+import { PAGE_SIZE } from "../../../shared/pages.js";
+import { ENTITY_KINDS } from "../../../shared/workspace.js";
 import type { CredentialKind } from "../crypto/envelope.js";
 import { UserError } from "../lib/errors.js";
 import { VersionConflict } from "../workspace/conflict.js";
 import { fromBytea, toBytea } from "./bytea.js";
 import type { Db } from "./client.js";
-import { dbError, must, read, timeout } from "./errors.js";
+import type { Json, Tables } from "./database.types.js";
+import { dbError, must, read } from "./errors.js";
+import { oneOf, pageOffset } from "./rows.js";
 import {
+  ARTIFACTS_BUCKET,
   type ArtifactFile,
   type ArtifactRepo,
   type ArtifactStorage,
@@ -15,7 +21,6 @@ import {
   type CredentialRepo,
   type CredentialRow,
   type MessageRepo,
-  PAGE_SIZE,
   type ProfileRepo,
   type ProviderSettingsRepo,
   type UserRepos,
@@ -23,45 +28,41 @@ import {
   type WorkspaceRepo,
 } from "./types.js";
 
-export const ARTIFACTS_BUCKET = "artifacts";
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CONTENT_TYPE: Record<ArtifactFile, string> = { html: "text/html", pdf: "application/pdf" };
 const HISTORY_LIMIT = 200;
 
-const offset = (page: number) => (Math.max(1, Math.floor(page)) - 1) * PAGE_SIZE;
+const CREDENTIAL_KINDS: readonly CredentialKind[] = ["api_key", "oauth"];
 
 function profiles(db: Db, userId: string): ProfileRepo {
   return {
     async get() {
-      const { data } = await read("profiles.get", () =>
-        db.from("profiles").select("data").eq("user_id", userId).abortSignal(timeout()).maybeSingle<{ data: unknown }>(),
-      );
+      const { data } = await read("profiles.get", () => db.from("profiles").select("data").eq("user_id", userId).maybeSingle());
       if (!data) throw new UserError("Your account has no profile.", "not_found");
       return data.data;
     },
     async putData(value) {
       const { data } = await must(
         "profiles.put",
-        db.from("profiles").update({ data: value }).eq("user_id", userId).select("user_id").abortSignal(timeout()),
+        db
+          .from("profiles")
+          .update({ data: value as Json })
+          .eq("user_id", userId)
+          .select("user_id"),
       );
       if (!data?.length) throw new UserError("Your account has no profile.", "not_found");
     },
   };
 }
 
-type ChatRowDb = { id: string; title: string; last_message_at: string };
-
 function chats(db: Db, userId: string): ChatRepo {
   const exists = async (chatId: string) => {
-    const { data } = await read("chats.get", () =>
-      db.from("chats").select("id").eq("id", chatId).eq("user_id", userId).abortSignal(timeout()).maybeSingle(),
-    );
+    const { data } = await read("chats.get", () => db.from("chats").select("id").eq("id", chatId).eq("user_id", userId).maybeSingle());
     return !!data;
   };
   return {
     exists,
     async claim(chatId, opts) {
-      if (!UUID_RE.test(chatId)) throw new UserError("This chat doesn't exist.", "not_found");
+      if (!isUuid(chatId)) throw new UserError("This chat doesn't exist.", "not_found");
       await must(
         "chats.claim",
         db
@@ -69,8 +70,7 @@ function chats(db: Db, userId: string): ChatRepo {
           .upsert(
             { id: chatId, user_id: userId, ...(opts.model && { model: opts.model.slice(0, 200) }) },
             { onConflict: "id", ignoreDuplicates: true },
-          )
-          .abortSignal(timeout()),
+          ),
       );
       if (!(await exists(chatId))) throw new UserError("This chat doesn't exist.", "not_found");
     },
@@ -81,8 +81,7 @@ function chats(db: Db, userId: string): ChatRepo {
           .from("chats")
           .update({ last_message_at: new Date().toISOString(), ...(opts.model && { model: opts.model.slice(0, 200) }) })
           .eq("id", chatId)
-          .eq("user_id", userId)
-          .abortSignal(timeout()),
+          .eq("user_id", userId),
       );
       if (opts.titleIfEmpty) {
         await must(
@@ -92,13 +91,12 @@ function chats(db: Db, userId: string): ChatRepo {
             .update({ title: opts.titleIfEmpty.slice(0, 200) })
             .eq("id", chatId)
             .eq("user_id", userId)
-            .eq("title", "")
-            .abortSignal(timeout()),
+            .eq("title", ""),
         );
       }
     },
     async page(page) {
-      const from = offset(page);
+      const from = pageOffset(page);
       const { data, count } = await read("chats.page", () =>
         db
           .from("chats")
@@ -106,18 +104,18 @@ function chats(db: Db, userId: string): ChatRepo {
           .eq("user_id", userId)
           .order("last_message_at", { ascending: false })
           .order("id", { ascending: false })
-          .range(from, from + PAGE_SIZE - 1)
-          .abortSignal(timeout()),
+          .range(from, from + PAGE_SIZE - 1),
       );
       return {
-        items: ((data ?? []) as ChatRowDb[]).map((r) => ({ id: r.id, title: r.title, lastMessageAt: r.last_message_at })),
+        items: (data ?? []).map((r) => ({ id: r.id, title: r.title, lastMessageAt: r.last_message_at })),
         total: count ?? 0,
       };
     },
   };
 }
 
-type MessageRowDb = { role: "user" | "assistant"; content: string; status: "complete" | "interrupted"; created_at: string };
+const MESSAGE_ROLES: readonly MessageRole[] = ["user", "assistant"];
+const MESSAGE_STATUSES: readonly MessageStatus[] = ["complete", "interrupted"];
 
 function messages(db: Db, userId: string): MessageRepo {
   return {
@@ -125,10 +123,7 @@ function messages(db: Db, userId: string): MessageRepo {
       if (!rows.length) return;
       await must(
         "messages.append",
-        db
-          .from("chat_messages")
-          .insert(rows.map((r) => ({ chat_id: chatId, user_id: userId, run_id: runId.slice(0, 100), ...r })))
-          .abortSignal(timeout()),
+        db.from("chat_messages").insert(rows.map((r) => ({ chat_id: chatId, user_id: userId, run_id: runId.slice(0, 100), ...r }))),
       );
     },
     async history(chatId, limit = HISTORY_LIMIT) {
@@ -139,20 +134,24 @@ function messages(db: Db, userId: string): MessageRepo {
           .eq("chat_id", chatId)
           .eq("user_id", userId)
           .order("id", { ascending: false })
-          .limit(limit)
-          .abortSignal(timeout()),
+          .limit(limit),
       );
-      const items = ((data ?? []) as MessageRowDb[])
-        .map((r) => ({ role: r.role, content: r.content, status: r.status, createdAt: r.created_at }))
+      const items = (data ?? [])
+        .map((r) => ({
+          role: oneOf(MESSAGE_ROLES, r.role, "chat_messages.role"),
+          content: r.content,
+          status: oneOf(MESSAGE_STATUSES, r.status, "chat_messages.status"),
+          createdAt: r.created_at,
+        }))
         .reverse();
       return { items, total: count ?? 0 };
     },
   };
 }
 
-type EntityRowDb = { kind: EntityKind; entity_id: string; value: unknown; version: number; updated_at: string };
-const toEntity = (r: EntityRowDb): VersionedEntity => ({
-  kind: r.kind,
+type EntityRow = Pick<Tables<"workspace_entities">, "kind" | "entity_id" | "value" | "version" | "updated_at">;
+const toEntity = (r: EntityRow): VersionedEntity => ({
+  kind: oneOf(ENTITY_KINDS, r.kind, "workspace_entities.kind"),
   id: r.entity_id,
   value: r.value,
   version: r.version,
@@ -164,35 +163,31 @@ function workspace(db: Db, userId: string): WorkspaceRepo {
     db.from("workspace_entities").select("kind, entity_id, value, version, updated_at").eq("chat_id", chatId).eq("user_id", userId);
   return {
     async get(chatId, kind, id) {
-      const { data } = await read("workspace.get", () =>
-        base(chatId).eq("kind", kind).eq("entity_id", id).abortSignal(timeout()).maybeSingle<EntityRowDb>(),
-      );
+      const { data } = await read("workspace.get", () => base(chatId).eq("kind", kind).eq("entity_id", id).maybeSingle());
       return data ? toEntity(data) : undefined;
     },
     async list(chatId, kind) {
       const { data } = await read("workspace.list", () => {
         const q = kind ? base(chatId).eq("kind", kind) : base(chatId);
-        return q.order("updated_at").order("kind").order("entity_id").abortSignal(timeout());
+        return q.order("updated_at").order("kind").order("entity_id");
       });
-      return ((data ?? []) as EntityRowDb[]).map(toEntity);
+      return (data ?? []).map(toEntity);
     },
     async put(chatId, kind, id, value, expectedVersion) {
-      const res = await db
-        .rpc("workspace_put", {
-          p_user: userId,
-          p_chat: chatId,
-          p_kind: kind,
-          p_id: id,
-          p_value: value,
-          p_expected: expectedVersion ?? null,
-        })
-        .abortSignal(timeout());
+      const res = await db.rpc("workspace_put", {
+        p_user: userId,
+        p_chat: chatId,
+        p_kind: kind,
+        p_id: id,
+        p_value: value as Json,
+        p_expected: (expectedVersion ?? null) as number,
+      });
       if (res.error?.code === "PT409") {
         if (expectedVersion === undefined) throw new UserError("This chat doesn't exist.", "not_found");
         throw new VersionConflict(kind, id, expectedVersion, Number(res.error.details) || 0);
       }
       if (res.error) throw dbError("workspace.put", { ...res.error, status: res.status });
-      return res.data as number;
+      return res.data ?? 0;
     },
     async remove(chatId, kind, id) {
       const { data } = await must(
@@ -204,8 +199,7 @@ function workspace(db: Db, userId: string): WorkspaceRepo {
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("entity_id", id)
-          .select("entity_id")
-          .abortSignal(timeout()),
+          .select("entity_id"),
       );
       return (data?.length ?? 0) > 0;
     },
@@ -217,37 +211,26 @@ const validArtifactId = (id: string) => {
   return id;
 };
 
-type ArtifactRowDb = { id: string; chat_id: string | null; title: string; pdf_path: string | null };
-
 function artifacts(db: Db, userId: string): ArtifactRepo {
   return {
     async insert(row) {
       const id = validArtifactId(row.id);
       await must(
         "artifacts.insert",
-        db
-          .from("artifacts")
-          .insert({
-            id,
-            user_id: userId,
-            chat_id: row.chatId,
-            title: row.title.slice(0, 200),
-            html_path: artifactPath(userId, id, "html"),
-            size_bytes: row.sizeBytes,
-          })
-          .abortSignal(timeout()),
+        db.from("artifacts").insert({
+          id,
+          user_id: userId,
+          chat_id: row.chatId,
+          title: row.title.slice(0, 200),
+          html_path: artifactPath(userId, id, "html"),
+          size_bytes: row.sizeBytes,
+        }),
       );
     },
     async get(id) {
       if (!ARTIFACT_ID_RE.test(id)) return undefined;
       const { data } = await read("artifacts.get", () =>
-        db
-          .from("artifacts")
-          .select("id, chat_id, title, pdf_path")
-          .eq("id", id)
-          .eq("user_id", userId)
-          .abortSignal(timeout())
-          .maybeSingle<ArtifactRowDb>(),
+        db.from("artifacts").select("id, chat_id, title, pdf_path").eq("id", id).eq("user_id", userId).maybeSingle(),
       );
       return data ? { id: data.id, chatId: data.chat_id, title: data.title, pdfReady: !!data.pdf_path } : undefined;
     },
@@ -258,8 +241,7 @@ function artifacts(db: Db, userId: string): ArtifactRepo {
           .from("artifacts")
           .update({ pdf_path: artifactPath(userId, validArtifactId(id), "pdf") })
           .eq("id", id)
-          .eq("user_id", userId)
-          .abortSignal(timeout()),
+          .eq("user_id", userId),
       );
     },
   };
@@ -305,48 +287,52 @@ function storage(db: Db, userId: string): ArtifactStorage {
 const DEFAULT_SETTINGS = { custom: {}, enabled: {}, hidden: [] };
 
 function providerSettings(db: Db, userId: string): ProviderSettingsRepo {
+  const load = async () => {
+    const { data } = await read("providerSettings.get", () =>
+      db.from("provider_settings").select("data, device_id, updated_at").eq("user_id", userId).maybeSingle(),
+    );
+    return data ? { data: data.data, deviceId: data.device_id, stamp: data.updated_at } : undefined;
+  };
   return {
     async get() {
+      const found = await load();
+      if (found) return found;
       await must(
         "providerSettings.create",
-        db
-          .from("provider_settings")
-          .upsert({ user_id: userId, data: DEFAULT_SETTINGS }, { onConflict: "user_id", ignoreDuplicates: true })
-          .abortSignal(timeout()),
+        db.from("provider_settings").upsert({ user_id: userId, data: DEFAULT_SETTINGS }, { onConflict: "user_id", ignoreDuplicates: true }),
       );
-      const { data } = await read("providerSettings.get", () =>
-        db
-          .from("provider_settings")
-          .select("data, device_id")
-          .eq("user_id", userId)
-          .abortSignal(timeout())
-          .single<{ data: unknown; device_id: string }>(),
-      );
-      return { data: data!.data, deviceId: data!.device_id };
+      const created = await load();
+      if (!created) throw new UserError("Your account has no model settings.", "not_found");
+      return created;
     },
-    async put(value) {
-      await must("providerSettings.put", db.from("provider_settings").update({ data: value }).eq("user_id", userId).abortSignal(timeout()));
+    async put(value, stamp) {
+      const { data } = await must(
+        "providerSettings.put",
+        db
+          .from("provider_settings")
+          .update({ data: value as Json })
+          .eq("user_id", userId)
+          .eq("updated_at", stamp)
+          .select("updated_at"),
+      );
+      const next = data?.[0]?.updated_at;
+      if (!next)
+        throw new UserError("Your model settings changed somewhere else. Reload and try again.", "conflict", { code: "settings_changed" });
+      return next;
     },
   };
 }
 
-type CredentialRowDb = {
-  provider: string;
-  kind: CredentialKind;
-  ciphertext: string;
-  nonce: string;
-  dek_wrapped: string;
-  dek_nonce: string;
-  key_version: number;
-  hint: string;
-  version: number;
-};
+type CredentialRowDb = Pick<
+  Tables<"provider_credentials">,
+  "provider" | "kind" | "ciphertext" | "nonce" | "dek_wrapped" | "dek_nonce" | "key_version" | "hint" | "version"
+>;
 
 const CREDENTIAL_COLUMNS = "provider, kind, ciphertext, nonce, dek_wrapped, dek_nonce, key_version, hint, version";
 
 export const credentialFromDb = (r: CredentialRowDb): CredentialRow => ({
   provider: r.provider,
-  kind: r.kind,
+  kind: oneOf(CREDENTIAL_KINDS, r.kind, "provider_credentials.kind"),
   ciphertext: fromBytea(r.ciphertext),
   nonce: fromBytea(r.nonce),
   dekWrapped: fromBytea(r.dek_wrapped),
@@ -358,7 +344,7 @@ export const credentialFromDb = (r: CredentialRowDb): CredentialRow => ({
 
 export const credentialToDb = (r: Omit<CredentialRow, "version">) => ({
   provider: r.provider,
-  kind: r.kind,
+  kind: oneOf(CREDENTIAL_KINDS, r.kind, "provider_credentials.kind"),
   ciphertext: toBytea(r.ciphertext),
   nonce: toBytea(r.nonce),
   dek_wrapped: toBytea(r.dekWrapped),
@@ -371,30 +357,22 @@ function credentials(db: Db, userId: string): CredentialRepo {
   return {
     async read(provider) {
       const { data } = await read("credentials.read", () =>
-        db
-          .from("provider_credentials")
-          .select(CREDENTIAL_COLUMNS)
-          .eq("user_id", userId)
-          .eq("provider", provider)
-          .abortSignal(timeout())
-          .maybeSingle<CredentialRowDb>(),
+        db.from("provider_credentials").select(CREDENTIAL_COLUMNS).eq("user_id", userId).eq("provider", provider).maybeSingle(),
       );
       return data ? credentialFromDb(data) : undefined;
     },
     async list() {
       const { data } = await read("credentials.list", () =>
-        db.from("provider_credentials").select("provider, kind, hint").eq("user_id", userId).order("provider").abortSignal(timeout()),
+        db.from("provider_credentials").select("provider, kind, hint").eq("user_id", userId).order("provider"),
       );
-      return (data ?? []) as Array<{ provider: string; kind: CredentialKind; hint: string }>;
+      return (data ?? []).map((r) => ({
+        provider: r.provider,
+        kind: oneOf(CREDENTIAL_KINDS, r.kind, "provider_credentials.kind"),
+        hint: r.hint,
+      }));
     },
     async insert(row) {
-      await must(
-        "credentials.insert",
-        db
-          .from("provider_credentials")
-          .insert({ user_id: userId, ...credentialToDb(row) })
-          .abortSignal(timeout()),
-      );
+      await must("credentials.insert", db.from("provider_credentials").insert({ user_id: userId, ...credentialToDb(row) }));
     },
     async update(row, expectedVersion) {
       const { data } = await must(
@@ -405,22 +383,18 @@ function credentials(db: Db, userId: string): CredentialRepo {
           .eq("user_id", userId)
           .eq("provider", row.provider)
           .eq("version", expectedVersion)
-          .select("version")
-          .abortSignal(timeout()),
+          .select("version"),
       );
       return (data?.length ?? 0) > 0;
     },
     async delete(provider) {
-      await must(
-        "credentials.delete",
-        db.from("provider_credentials").delete().eq("user_id", userId).eq("provider", provider).abortSignal(timeout()),
-      );
+      await must("credentials.delete", db.from("provider_credentials").delete().eq("user_id", userId).eq("provider", provider));
     },
   };
 }
 
 export function forUser(db: Db, userId: string): UserRepos {
-  if (!UUID_RE.test(userId)) throw new Error("forUser needs a verified user id");
+  if (!isUuid(userId) || userId !== userId.toLowerCase()) throw new Error("forUser needs a verified user id");
   return Object.freeze({
     userId,
     profiles: profiles(db, userId),

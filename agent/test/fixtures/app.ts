@@ -8,8 +8,12 @@ import { UserStatusCache } from "../../src/auth/status.js";
 import { AuthError, type AuthUser } from "../../src/auth/verify.js";
 import { parseCredentialKeys } from "../../src/config.js";
 import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
-import type { AccessRequestView, AdminRepo, ProfileView, UserStatus } from "../../src/db/admin.js";
-import { PAGE_SIZE } from "../../src/db/types.js";
+import type { AccessRequestView, ProfileView, UserStatus } from "../../../shared/admin.js";
+import { PAGE_SIZE } from "../../../shared/pages.js";
+import type { AdminRepo } from "../../src/db/admin.js";
+import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
+import { UserError } from "../../src/lib/errors.js";
+import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "../../src/lib/rateLimit.js";
 import { SupabaseProfileStore } from "../../src/profile/store.js";
 import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
@@ -81,7 +85,8 @@ export class FakeAccounts {
         },
         async decide(id, d) {
           const r = self.requests.get(id);
-          if (r?.status !== "pending") throw new Error("already decided");
+          if (!r) throw new UserError("That request doesn't exist.", "not_found");
+          if (r.status !== "pending") throw new UserError("This request was already decided.", "conflict", { code: "already_decided" });
           const next: AccessRequestView = {
             ...r,
             status: d.status,
@@ -92,7 +97,9 @@ export class FakeAccounts {
           return next;
         },
         async setInvite(id, invite) {
-          const next = { ...self.requests.get(id)!, inviteStatus: invite.inviteStatus, inviteError: invite.inviteError };
+          const r = self.requests.get(id);
+          if (!r) throw new UserError("That request doesn't exist.", "not_found");
+          const next = { ...r, inviteStatus: invite.inviteStatus, inviteError: invite.inviteError };
           self.requests.set(id, next);
           return next;
         },
@@ -131,6 +138,11 @@ export class FakeAccounts {
           if (u) u.status = status;
         },
       },
+      storage: {
+        async removeUserFiles(userId) {
+          self.removedArtifacts.push(userId);
+        },
+      },
     };
   }
 
@@ -160,9 +172,6 @@ export class FakeAccounts {
       async deleteUser(id) {
         self.users.delete(id);
       },
-      async removeArtifacts(userId) {
-        self.removedArtifacts.push(userId);
-      },
     };
   }
 }
@@ -190,6 +199,7 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
       settings: r.providerSettings,
       credentials: new SupabaseCredentialStore(user.id, r.credentials, wrapper),
       fetch: over.fetch ?? fakeFetch([]),
+      userFetch: createSafeFetch(over.fetch ?? fakeFetch([])),
       lookup: async () => ["93.184.216.34"],
     });
   });
@@ -209,9 +219,11 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
     auth: accounts.auth(),
     hooks: { onDisabled: async (id) => status.invalidate(id), onEnabled: (id) => status.invalidate(id) },
   });
+  const queue = new BackgroundQueue({ name: "access", max: 50, concurrency: 2 });
   const access = createAccessService({
     pepper: Buffer.alloc(32, 9),
     limiter,
+    queue,
     submit: (i) => accounts.repo().accessRequests.submit(i),
     sendMagicLink: async (email) => {
       accounts.sent.push({ kind: "magic", email });
@@ -262,5 +274,5 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
       },
     });
   };
-  return { app, call, db, accounts, status, hubs, logins, limiter, artifacts, deps };
+  return { app, call, db, accounts, status, hubs, logins, limiter, artifacts, deps, queue };
 }

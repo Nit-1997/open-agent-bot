@@ -97,14 +97,22 @@ class Transcript {
   }
 }
 
-async function persist(ctx: RunContext, chatId: string, runId: string, rows: NewMessage[], titleIfEmpty?: string): Promise<void> {
+export const NOT_SAVED_EVENT = "not_saved";
+export const PROMPT_NOT_SAVED = "Your message wasn't saved, so this chat's history will miss it.";
+export const REPLY_NOT_SAVED = "This reply wasn't saved, so it won't be in this chat's history.";
+
+async function persist(ctx: RunContext, chatId: string, runId: string, rows: NewMessage[], titleIfEmpty?: string): Promise<boolean> {
   try {
     await ctx.messages.append(chatId, runId, rows);
     await ctx.chats.touch(chatId, { ...(titleIfEmpty && { titleIfEmpty }) });
+    return true;
   } catch (err) {
     log.warn(`[run] user=${ctx.user.id} thread=${chatId} couldn't save messages`, err instanceof UserError ? err.kind : err);
+    return false;
   }
 }
+
+const isTerminal = (e: BaseEvent) => e.type === EventType.RUN_FINISHED || e.type === EventType.RUN_ERROR;
 
 async function claim(ctx: RunContext, chatId: string, model: string | undefined): Promise<BaseEvent | undefined> {
   try {
@@ -174,29 +182,36 @@ export async function* handleRun(
   if (signal.aborted) return;
   entry.busy = true;
   entry.lastRunId = runId;
-  await persist(
+  const savedPrompt = await persist(
     ctx,
     threadId,
     runId,
     [{ role: "user", content: prompt.slice(0, 200_000), status: "complete" }],
     prompt.trim().slice(0, TITLE_CHARS),
   );
+  if (!savedPrompt) yield custom(NOT_SAVED_EVENT, { message: PROMPT_NOT_SAVED });
   const transcript = new Transcript();
-  let outcome: "complete" | "interrupted" = "interrupted";
+  let saved = false;
+  const saveReply = async (outcome: "complete" | "interrupted") => {
+    saved = true;
+    const text = transcript.text();
+    return !text || (await persist(ctx, threadId, runId, [{ role: "assistant", content: text.slice(0, 200_000), status: outcome }]));
+  };
   try {
     for await (const e of runTurn({ input, entry, signal, ctx, last, history, userContext, stats: createStatsCollector() })) {
       transcript.see(e);
-      if (e.type === EventType.RUN_FINISHED) outcome = "complete";
+      if (isTerminal(e) && !(await saveReply(e.type === EventType.RUN_FINISHED ? "complete" : "interrupted")))
+        yield custom(NOT_SAVED_EVENT, { message: REPLY_NOT_SAVED });
       yield e;
     }
   } catch (err) {
     log.error(`[run] thread=${threadId} failed`, err);
+    if (!saved && !(await saveReply("interrupted"))) yield custom(NOT_SAVED_EVENT, { message: REPLY_NOT_SAVED });
     yield runError("INTERNAL_ERROR", "Something went wrong on the agent. Try again.");
   } finally {
     entry.busy = false;
     store.touch(owner);
-    const text = transcript.text();
-    if (text) await persist(ctx, threadId, runId, [{ role: "assistant", content: text.slice(0, 200_000), status: outcome }]);
+    if (!saved) await saveReply("interrupted");
   }
 }
 

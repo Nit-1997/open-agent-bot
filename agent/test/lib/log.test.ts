@@ -28,4 +28,13 @@ describe("redact", () => {
     expect(written).not.toContain("sk-or-v1-0123");
     expect(written).not.toContain("secret-token");
   });
+
+  describe("log lines", () => {
+    it("escapes control characters so a value can't forge or split log lines", () => {
+      const out = vi.spyOn(console, "log").mockImplementation(() => {});
+      log.info(`[run] run=${"x\n[auth] verified user=admin\r\u001b[31m\u2028"}`);
+      expect(out.mock.calls[0][0]).toBe("[run] run=x\\u000a[auth] verified user=admin\\u000d\\u001b[31m\\u2028");
+      out.mockRestore();
+    });
+  });
 });

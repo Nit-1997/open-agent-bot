@@ -60,9 +60,12 @@ describe("admin access requests", () => {
     const [id] = ids(h);
     h.accounts.add({ ...BOB, id: "44444444-4444-4444-8444-444444444444", email: "new@example.test" });
     const res = await h.call(ADMIN, `/admin/access-requests/${id}/approve`, { method: "POST" });
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ error: "already_member" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ request: { status: "approved", inviteStatus: null } });
+    expect(h.accounts.requests.get(id)?.status).toBe("approved");
     expect(h.accounts.sent).toEqual([]);
+    const again = await h.call(ADMIN, `/admin/access-requests/${id}/approve`, { method: "POST" });
+    expect(again.status).toBe(409);
   });
 
   it("rejects without email and refuses to resend a rejected request", async () => {
@@ -89,6 +92,17 @@ describe("admin users", () => {
     expect(all.items[0]).toMatchObject({ email: ADMIN.email, isAdmin: true, providers: ["email"] });
     const bob = (await (await h.call(ADMIN, "/admin/users?q=bob")).json()) as { items: Array<{ email: string }> };
     expect(bob.items.map((u) => u.email)).toEqual([BOB.email]);
+  });
+
+  it("treats upper-case ids as the same user, so self-actions stay blocked", async () => {
+    const h = await makeApp();
+    const res = await h.call(ADMIN, `/admin/users/${ADMIN.id.toUpperCase()}/deactivate`, { method: "POST" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: "self_action" });
+    const other = await h.call(ADMIN, `/admin/users/${ALICE.id.toUpperCase()}/deactivate`, { method: "POST" });
+    expect(await other.json()).toMatchObject({ user: { id: ALICE.id, status: "deactivated" } });
+    expect((await h.call(ALICE, "/profile")).status).toBe(403);
+    expect((await h.call(ADMIN, "/admin/users/not-a-uuid/deactivate", { method: "POST" })).status).toBe(404);
   });
 
   it("deactivates a user, which blocks their next request, and reactivates them", async () => {
@@ -136,11 +150,10 @@ describe("admin users", () => {
 
   it("reports the step a delete failed at", async () => {
     const h = await makeApp();
-    const auth = h.accounts.auth();
-    h.accounts.auth = () => ({ ...auth, removeArtifacts: async () => Promise.reject(new Error("storage down")) });
+    const repo = h.accounts.repo();
     const { createAdminService } = await import("../../src/admin/service.js");
     const admin = createAdminService({
-      repo: h.accounts.repo(),
+      repo: { ...repo, storage: { removeUserFiles: async () => Promise.reject(new Error("storage down")) } },
       auth: h.accounts.auth(),
       hooks: { onDisabled: async () => {}, onEnabled: () => {} },
     });

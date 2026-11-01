@@ -1,19 +1,17 @@
 import { Hono } from "hono";
-import { type AccessService, normalizeEmail, padTo, RESPONSE_FLOOR_MS, readRequest } from "../access/service.js";
+import { type AccessService, normalizeEmail, readRequest } from "../access/service.js";
 import { body, safe } from "./handlers.js";
 
 const clientIp = (raw: string | undefined) => (raw ?? "").split(",")[0].trim().slice(0, 64) || "unknown";
 
-export function accessRoutes(deps: { access: AccessService; floorMs?: number }) {
+export function accessRoutes(deps: { access: AccessService }) {
   const app = new Hono();
-  const floor = deps.floorMs ?? RESPONSE_FLOOR_MS;
 
   app.post(
     "/access-requests",
     safe(async (c) => {
       const input = readRequest(await body(c));
-      const ip = clientIp(c.req.header("x-client-ip"));
-      await padTo(floor, () => deps.access.request(input, ip));
+      deps.access.request(input, clientIp(c.req.header("x-client-ip")));
       return c.json({ ok: true }, 202);
     }),
   );
@@ -21,8 +19,7 @@ export function accessRoutes(deps: { access: AccessService; floorMs?: number }) 
     "/auth/email-link",
     safe(async (c) => {
       const email = normalizeEmail((await body(c)).email);
-      const ip = clientIp(c.req.header("x-client-ip"));
-      await padTo(floor, () => deps.access.emailLink(email, ip));
+      deps.access.emailLink(email, clientIp(c.req.header("x-client-ip")));
       return c.json({ ok: true }, 202);
     }),
   );

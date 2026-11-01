@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import type { AuthEnv } from "../auth/middleware.js";
 import { log } from "../lib/log.js";
-import { limitBy, type RateLimiter } from "../lib/rateLimit.js";
+import type { RateLimiter } from "../lib/rateLimit.js";
 import type { ProfileStore } from "../profile/store.js";
-import { body, safe } from "./handlers.js";
+import { body, limitBy, safe } from "./handlers.js";
 
 export type ProfilesFor = (userId: string) => ProfileStore;
 

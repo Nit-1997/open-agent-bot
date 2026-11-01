@@ -8,7 +8,20 @@ describe("artifact routes", () => {
     const { id } = await artifacts.save(db.forUser(ALICE.id), null, "Diwali Plan!", "<html><body><h1>Plan</h1></body></html>");
     const res = await call(ALICE, `/artifacts/${id}`);
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-security-policy")).toBe("sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    const csp = Object.fromEntries(
+      (res.headers.get("content-security-policy") ?? "").split("; ").map((d) => [d.split(" ")[0], d.split(" ").slice(1).join(" ")]),
+    );
+    expect(csp).toMatchObject({
+      "default-src": "'none'",
+      "script-src": "'unsafe-inline'",
+      "style-src": "'unsafe-inline' https://fonts.googleapis.com",
+      "font-src": "https://fonts.gstatic.com",
+      "img-src": "data:",
+      "connect-src": "'none'",
+      "form-action": "'none'",
+      "base-uri": "'none'",
+      sandbox: "allow-scripts allow-popups allow-popups-to-escape-sandbox",
+    });
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(res.headers.get("content-type")).toMatch(/text\/html/);

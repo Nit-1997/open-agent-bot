@@ -95,6 +95,18 @@ describe("createVerifier", () => {
   it("rejects missing session_id, a non-uuid sub and a bad typ", async () => {
     const v = verifier();
     expect(await code(v(await sign({ session_id: undefined })))).toBe("invalid_token");
+    expect(
+      await code(
+        v(
+          await sign({
+            amr: [
+              { method: "otp", timestamp: 1 },
+              { method: "password", timestamp: 2 },
+            ],
+          }),
+        ),
+      ),
+    ).toBe("invalid_token");
     expect(await code(v(await sign({ sub: "not-a-uuid" })))).toBe("invalid_token");
     expect(await code(v(await sign({}, { typ: "at+jwt" })))).toBe("invalid_token");
   });

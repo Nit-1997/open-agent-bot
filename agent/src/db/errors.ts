@@ -24,18 +24,16 @@ export function dbError(where: string, e: DbFailure): UserError {
   }
 }
 
-type Result<T> = { data: T | null; error: DbFailure | null; status?: number; count?: number | null };
+type Result = { data: unknown; error: DbFailure | null; status?: number; count?: number | null };
+type Rows<R extends Result> = { data: R["data"] | null; count: number | null };
 
-export const DB_TIMEOUT_MS = 10_000;
-export const timeout = () => AbortSignal.timeout(DB_TIMEOUT_MS);
-
-export async function must<T>(where: string, q: PromiseLike<Result<T>>): Promise<{ data: T | null; count: number | null }> {
+export async function must<R extends Result>(where: string, q: PromiseLike<R>): Promise<Rows<R>> {
   const res = await q;
   if (res.error) throw dbError(where, { ...res.error, status: res.status });
   return { data: res.data, count: res.count ?? null };
 }
 
-export async function read<T>(where: string, q: () => PromiseLike<Result<T>>): Promise<{ data: T | null; count: number | null }> {
+export async function read<R extends Result>(where: string, q: () => PromiseLike<R>): Promise<Rows<R>> {
   const first = await q();
   if (first.error && isTransportFailure({ ...first.error, status: first.status })) return must(where, q());
   return must(where, Promise.resolve(first));

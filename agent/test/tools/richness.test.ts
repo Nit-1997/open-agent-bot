@@ -51,7 +51,7 @@ describe("music lists become picture cards", () => {
 
 describe("reports lead with a picture", () => {
   const store = { save: async (_t: string, html: string) => ({ id: "a1", html }) };
-  const images = { isSourced: () => true, loads: async () => true };
+  const images = { isSourced: () => true, inline: async () => ({ dataUrl: "data:image/jpeg;base64,bWlhdGE=", bytes: 5 }) };
   const pic = '<img src="https://img.example/miata.jpg" alt="Miata RF">';
   const filler = `<p>${"x".repeat(7000)}</p>`;
 
@@ -76,7 +76,8 @@ describe("reports lead with a picture", () => {
       html: `<header class="hero"><h1>Miata</h1></header>${filler}<article class="option">${pic}</article>`,
     });
     expect(res.isError).toBeUndefined();
-    expect(saved.indexOf("miata.jpg")).toBeLessThan(saved.indexOf("xxxx"));
+    expect(saved.indexOf("bWlhdGE=")).toBeLessThan(saved.indexOf("xxxx"));
+    expect(saved).not.toContain("img.example");
   });
 
   it("saves an educational report without pictures as written, with no error", async () => {

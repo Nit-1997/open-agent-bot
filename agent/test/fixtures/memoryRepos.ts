@@ -1,16 +1,8 @@
 import { emptyProfile } from "../../../shared/profile.js";
+import type { ChatSummary, StoredMessage } from "../../../shared/chats.js";
+import { PAGE_SIZE } from "../../../shared/pages.js";
 import type { EntityKind } from "../../../shared/workspace.js";
-import type {
-  ArtifactFile,
-  ArtifactRow,
-  ChatSummary,
-  CredentialRow,
-  NewMessage,
-  StoredMessage,
-  UserRepos,
-  VersionedEntity,
-} from "../../src/db/types.js";
-import { PAGE_SIZE } from "../../src/db/types.js";
+import type { ArtifactFile, ArtifactRow, CredentialRow, NewMessage, UserRepos, VersionedEntity } from "../../src/db/types.js";
 import { UserError } from "../../src/lib/errors.js";
 import { VersionConflict } from "../../src/workspace/conflict.js";
 
@@ -23,7 +15,7 @@ export class MemoryDb {
   entities = new Map<string, VersionedEntity & { chatId: string; userId: string }>();
   artifacts = new Map<string, ArtifactRow & { userId: string; sizeBytes: number }>();
   objects = new Map<string, Buffer>();
-  settings = new Map<string, { data: unknown; deviceId: string }>();
+  settings = new Map<string, { data: unknown; deviceId: string; stamp: string }>();
   credentials = new Map<string, CredentialRow & { userId: string }>();
   private clock = 0;
 
@@ -150,12 +142,18 @@ export class MemoryDb {
       providerSettings: {
         async get() {
           if (!db.settings.has(userId))
-            db.settings.set(userId, { data: { custom: {}, enabled: {}, hidden: [] }, deviceId: crypto.randomUUID() });
+            db.settings.set(userId, { data: { custom: {}, enabled: {}, hidden: [] }, deviceId: crypto.randomUUID(), stamp: "0" });
           return structuredClone(db.settings.get(userId)!);
         },
-        async put(data: object) {
-          const cur = db.settings.get(userId) ?? { data: {}, deviceId: crypto.randomUUID() };
-          db.settings.set(userId, { ...cur, data: structuredClone(data) });
+        async put(data: object, stamp: string) {
+          const cur = db.settings.get(userId);
+          if (!cur || cur.stamp !== stamp)
+            throw new UserError("Your model settings changed somewhere else. Reload and try again.", "conflict", {
+              code: "settings_changed",
+            });
+          const next = String(Number(cur.stamp) + 1);
+          db.settings.set(userId, { ...cur, data: structuredClone(data), stamp: next });
+          return next;
         },
       },
       credentials: {

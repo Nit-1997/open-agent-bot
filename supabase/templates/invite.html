@@ -1,5 +1,5 @@
 <h2 style="font-family: sans-serif; margin: 0 0 12px">You're invited to Open Agent</h2>
 <p style="font-family: sans-serif">Hi{{ if .Data.name }} {{ .Data.name }}{{ end }}, your request was approved. This link signs you in and expires in one hour.</p>
-<p style="font-family: sans-serif"><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite">Accept the invite</a></p>
+<p style="font-family: sans-serif"><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite&email={{ .Email }}">Accept the invite</a></p>
 <p style="font-family: sans-serif">After this, sign in with Google using this email ({{ .Email }}), or ask for an email link on the sign-in page.</p>
 <p style="font-family: sans-serif; color: #666">If you didn't ask for access, ignore this email.</p>

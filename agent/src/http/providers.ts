@@ -1,11 +1,11 @@
 import { type Context, Hono } from "hono";
 import type { AuthEnv } from "../auth/middleware.js";
 import { UserError } from "../lib/errors.js";
-import { limitBy, type RateLimiter } from "../lib/rateLimit.js";
+import type { RateLimiter } from "../lib/rateLimit.js";
 import type { UserHubs } from "../providers/hubs.js";
 import type { LoginFlows } from "../providers/logins.js";
 import { defaultModelRef } from "../session/createSession.js";
-import { body, safe } from "./handlers.js";
+import { body, limitBy, safe } from "./handlers.js";
 import type { ProfilesFor } from "./profile.js";
 
 type Deps = { hubs: UserHubs; logins: LoginFlows; profiles: ProfilesFor; limiter: RateLimiter };
@@ -17,9 +17,12 @@ const EXPIRED = "This sign-in expired. Start it again.";
 export function providerRoutes(deps: Deps) {
   const app = new Hono<AuthEnv>();
   const hub = (c: C) => deps.hubs.get(c.get("user"));
-  const mutate = async (c: C, fn: (h: Awaited<ReturnType<typeof hub>>) => Promise<unknown>) => {
-    await fn(await hub(c));
-    deps.hubs.invalidate(c.get("user").id);
+  const mutate = async <T>(c: C, fn: (h: Awaited<ReturnType<typeof hub>>) => Promise<T>): Promise<T> => {
+    try {
+      return await fn(await hub(c));
+    } finally {
+      deps.hubs.invalidate(c.get("user").id);
+    }
   };
   const keys = limitBy<AuthEnv>(deps.limiter, "keys");
 
@@ -39,14 +42,14 @@ export function providerRoutes(deps: Deps) {
     keys,
     safe<AuthEnv>(async (c) => {
       const b = await body(c);
-      const h = await hub(c);
-      const provider = await h.addLocal({
-        kind: String(b.kind ?? ""),
-        baseUrl: String(b.baseUrl ?? ""),
-        ...(typeof b.apiKey === "string" && { apiKey: b.apiKey }),
-        ...(typeof b.label === "string" && { label: b.label }),
-      });
-      deps.hubs.invalidate(c.get("user").id);
+      const provider = await mutate(c, (h) =>
+        h.addLocal({
+          kind: String(b.kind ?? ""),
+          baseUrl: String(b.baseUrl ?? ""),
+          ...(typeof b.apiKey === "string" && { apiKey: b.apiKey }),
+          ...(typeof b.label === "string" && { label: b.label }),
+        }),
+      );
       return c.json({ provider });
     }),
   );

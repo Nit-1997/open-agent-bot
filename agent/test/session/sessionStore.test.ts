@@ -23,6 +23,36 @@ describe("SessionStore", () => {
     expect(e.dispose).toHaveBeenCalled();
   });
 
+  it("creates one session when the same chat is opened twice at once, even while making room", async () => {
+    const create = vi.fn(async () => entry());
+    const store = new SessionStore({ idleMs: 1000, create, limits: { perUser: 1 } });
+    const old = await store.getOrCreate(at(ALICE, "old"), null);
+    const [a, b] = await Promise.all([store.getOrCreate(at(ALICE, "new"), null), store.getOrCreate(at(ALICE, "new"), null)]);
+    expect(a).toBe(b);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(old.dispose).toHaveBeenCalledTimes(1);
+    expect(store.get(at(ALICE, "old"))).toBeUndefined();
+  });
+
+  it("never holds more than the per-user limit when different chats open at once", async () => {
+    const made: SessionEntry[] = [];
+    const store = new SessionStore({
+      idleMs: 1000,
+      limits: { perUser: 2 },
+      create: async () => {
+        const e = entry();
+        made.push(e);
+        return e;
+      },
+    });
+    await store.getOrCreate(at(ALICE, "a"), null);
+    await store.getOrCreate(at(ALICE, "b"), null);
+    const opened = await Promise.allSettled(["c", "d", "e"].map((c) => store.getOrCreate(at(ALICE, c), null)));
+    const live = made.filter((e) => !(e.dispose as ReturnType<typeof vi.fn>).mock.calls.length);
+    expect(live.length).toBeLessThanOrEqual(2);
+    expect(opened.some((r) => r.status === "fulfilled")).toBe(true);
+  });
+
   it("getOrCreate twice returns same entry", async () => {
     const create = vi.fn(async () => entry());
     const store = new SessionStore({ idleMs: 1000, create });

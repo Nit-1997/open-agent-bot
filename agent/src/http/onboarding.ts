@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import type { Place } from "../../../shared/onboarding.js";
 import type { AuthEnv } from "../auth/middleware.js";
-import { limitBy, type RateLimiter } from "../lib/rateLimit.js";
+import type { RateLimiter } from "../lib/rateLimit.js";
 import { type OptionsDeps, onboardingOptions } from "../onboarding/options.js";
 import { searchPlaces } from "../onboarding/places.js";
-import { safe } from "./handlers.js";
+import { limitBy, safe } from "./handlers.js";
 
 export type OnboardingDeps = Partial<OptionsDeps> & { places?: (q: string) => Promise<Place[]> };
 

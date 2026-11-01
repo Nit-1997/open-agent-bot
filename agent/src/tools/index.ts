@@ -6,7 +6,7 @@ import type { UserContext } from "../prompt/userContext.js";
 import { browseTool, runBrowse } from "./browse.js";
 import { type Budget, withBudget } from "./budget.js";
 import type { BrowserPool } from "../browser/pool.js";
-import { imageLoads } from "../artifacts/images.js";
+import { inlineImage } from "../artifacts/images.js";
 import { createArtifactTool } from "./createArtifact.js";
 import { fetchPageTool } from "./fetchPage.js";
 import { flightsTool } from "./flights.js";
@@ -38,7 +38,7 @@ type ToolDeps = {
   cfg: AgentConfig;
   artifacts: ArtifactSink;
   pool: BrowserPool;
-  threadId: string;
+  sessionKey: string;
   userContext: UserContext | null;
   budget: Budget;
   evidence?: Evidence;
@@ -103,7 +103,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
   const { country, currency } = regionFor(deps.userContext);
   const search = { searxngUrl: deps.cfg.searxngUrl, braveApiKey: deps.braveApiKey };
   const openTab: OpenTab = async (live) => {
-    const page = await deps.pool.tab(deps.threadId, deps.userContext);
+    const page = await deps.pool.tab(deps.sessionKey, deps.userContext);
     const stop = live && deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
     return {
       page,
@@ -113,7 +113,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
       },
     };
   };
-  const browseDeps = { pool: deps.pool, threadId: deps.threadId, userContext: deps.userContext, frames: deps.frames };
+  const browseDeps = { pool: deps.pool, sessionKey: deps.sessionKey, userContext: deps.userContext, frames: deps.frames };
   const tools: ToolDefinition<any, any, any>[] = [
     withBudget(webSearchTool(search), deps.budget, "search"),
     withBudget(imageSearchTool(search), deps.budget, "images"),
@@ -124,7 +124,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
     withBudget(
       shopTool({
         pool: deps.pool,
-        threadId: deps.threadId,
+        sessionKey: deps.sessionKey,
         userContext: deps.userContext,
         frames: deps.frames,
         cart: deps.cart,
@@ -160,14 +160,14 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         matchingImage(name, await runSearch(search, [name, source].filter(Boolean).join(" "), "images", 10)),
     }),
     askUserTool(),
-    createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() }),
+    createArtifactTool(deps.artifacts, { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, inline: inlineImage() }),
     ...(deps.complete
       ? [
           withBudget(
             researchTool({
               search,
               artifacts: deps.artifacts,
-              images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, loads: imageLoads() },
+              images: { isSourced: (u) => deps.evidence?.hasUrl(u) ?? false, inline: inlineImage() },
               complete: deps.complete,
               judge,
               evidence: deps.evidence,

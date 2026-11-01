@@ -15,6 +15,7 @@ import { createAdminRepo } from "./db/admin.js";
 import { createAnonClient, createServiceClient } from "./db/client.js";
 import { forUser } from "./db/users.js";
 import { createJudgeFrom, type Judge, judgeResolver } from "./judge/index.js";
+import { BackgroundQueue } from "./lib/backgroundQueue.js";
 import { createLimiter } from "./lib/concurrency.js";
 import { log, setLogLevel } from "./lib/log.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "./lib/rateLimit.js";
@@ -110,6 +111,7 @@ const admin = createAdminService({
 const access = createAccessService({
   pepper: cfg.accessRequestPepper,
   limiter,
+  queue: new BackgroundQueue({ name: "access", max: 200, concurrency: 2 }),
   submit: (input) => adminRepo.accessRequests.submit(input),
   sendMagicLink: async (email) => {
     const r = await authAdmin.magicLink(email);

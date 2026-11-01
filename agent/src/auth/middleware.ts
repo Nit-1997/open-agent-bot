@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
+import { errorResponse } from "../http/handlers.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
 import type { UserStatusCache } from "./status.js";
@@ -22,17 +23,17 @@ export function serviceSecretMatches(given: string | undefined, expected: string
 }
 
 const signedOut = (c: Context) =>
-  c.json({ error: "signed_out", message: "You were signed out. Sign in again." }, 401, {
-    "www-authenticate": 'Bearer error="invalid_token"',
-  });
+  errorResponse(c, new UserError("You were signed out. Sign in again.", "unauthorized", { code: "signed_out" }));
 const unavailable = (c: Context) =>
-  c.json({ error: "auth_unavailable", message: "Can't reach the account service. Try again in a minute." }, 503);
-const disabled = (c: Context) => c.json({ error: "account_disabled", message: "Your access has been turned off." }, 403);
-const notFound = (c: Context) => c.json({ error: "not_found", message: "Not found." }, 404);
+  errorResponse(c, new UserError("Can't reach the account service. Try again in a minute.", "unavailable", { code: "auth_unavailable" }));
+const disabled = (c: Context) =>
+  errorResponse(c, new UserError("Your access has been turned off.", "forbidden", { code: "account_disabled" }));
+const notFound = (c: Context) => errorResponse(c, new UserError("Not found.", "not_found"));
 
 export function createGuards(deps: { serviceSecret: string; verify: Verifier; status: UserStatusCache; isLiveAdmin: AdminCheck }): Guards {
   const requireService: MiddlewareHandler = async (c, next) => {
-    if (!serviceSecretMatches(c.req.header("x-agent-secret"), deps.serviceSecret)) return c.json({ error: "unauthorized" }, 401);
+    if (!serviceSecretMatches(c.req.header("x-agent-secret"), deps.serviceSecret))
+      return errorResponse(c, new UserError("Unauthorized.", "unauthorized"));
     await next();
   };
 

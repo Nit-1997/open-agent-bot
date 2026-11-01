@@ -41,7 +41,7 @@ describe("service secret", () => {
     const { call, verify } = app();
     const res = await call("/user", { "x-agent-secret": "nope" });
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "unauthorized" });
+    expect(await res.json()).toMatchObject({ error: "unauthorized" });
     expect(verify).not.toHaveBeenCalled();
   });
 });

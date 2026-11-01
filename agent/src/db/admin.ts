@@ -1,85 +1,75 @@
+import type { AccessRequestView, InviteStatus, ProfileView, RequestFilter, RequestStatus, UserStatus } from "../../../shared/admin.js";
+import { isUuid } from "../../../shared/ids.js";
+import { PAGE_SIZE, type Page } from "../../../shared/pages.js";
 import { UserError } from "../lib/errors.js";
-import type { Db } from "./client.js";
 import { fromBytea, toBytea } from "./bytea.js";
-import { must, read, timeout } from "./errors.js";
-import { PAGE_SIZE, type Page } from "./types.js";
+import type { Db } from "./client.js";
+import type { Tables } from "./database.types.js";
+import { must, read } from "./errors.js";
+import { ARTIFACTS_BUCKET } from "./types.js";
+import { likePrefix, oneOf, pageOffset } from "./rows.js";
 
-export type RequestStatus = "pending" | "approved" | "rejected";
-export type RequestFilter = RequestStatus | "all";
 export type SubmitOutcome = "inserted" | "duplicate" | "already_member" | "rate_limited_ip" | "rate_limited_global";
 
-export type AccessRequestView = {
-  id: string;
-  name: string;
-  email: string;
-  note: string;
-  status: RequestStatus;
-  inviteStatus: "sent" | "failed" | null;
-  inviteError: string | null;
-  ipHashPrefix: string;
-  createdAt: string;
-  decidedAt: string | null;
-};
+const SUBMIT_OUTCOMES: readonly SubmitOutcome[] = ["inserted", "duplicate", "already_member", "rate_limited_ip", "rate_limited_global"];
+const REQUEST_STATUSES: readonly RequestStatus[] = ["pending", "approved", "rejected"];
+const INVITE_STATUSES: readonly InviteStatus[] = ["sent", "failed"];
+const USER_STATUSES: readonly UserStatus[] = ["active", "deactivated"];
 
-export type UserStatus = "active" | "deactivated";
-export type ProfileView = { id: string; email: string; status: UserStatus; createdAt: string };
-
-type RequestRowDb = {
-  id: string;
-  name: string;
-  email: string;
-  note: string;
-  status: RequestStatus;
-  invite_status: "sent" | "failed" | null;
-  invite_error: string | null;
-  ip_hash: string;
-  created_at: string;
-  decided_at: string | null;
-};
+const STORAGE_PAGE = 100;
 
 const REQUEST_COLUMNS = "id, name, email, note, status, invite_status, invite_error, ip_hash, created_at, decided_at";
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PROFILE_COLUMNS = "user_id, email, status, created_at";
 
-const toRequest = (r: RequestRowDb): AccessRequestView => ({
+type RequestRow = Pick<
+  Tables<"access_requests">,
+  "id" | "name" | "email" | "note" | "status" | "invite_status" | "invite_error" | "ip_hash" | "created_at" | "decided_at"
+>;
+type ProfileRow = Pick<Tables<"profiles">, "user_id" | "email" | "status" | "created_at">;
+
+const toRequest = (r: RequestRow): AccessRequestView => ({
   id: r.id,
   name: r.name,
   email: r.email,
   note: r.note,
-  status: r.status,
-  inviteStatus: r.invite_status,
+  status: oneOf(REQUEST_STATUSES, r.status, "access_requests.status"),
+  inviteStatus: r.invite_status === null ? null : oneOf(INVITE_STATUSES, r.invite_status, "access_requests.invite_status"),
   inviteError: r.invite_error,
   ipHashPrefix: fromBytea(r.ip_hash).toString("hex").slice(0, 8),
   createdAt: r.created_at,
   decidedAt: r.decided_at,
 });
 
-type ProfileRowDb = { user_id: string; email: string; status: UserStatus; created_at: string };
-const toProfile = (r: ProfileRowDb): ProfileView => ({ id: r.user_id, email: r.email, status: r.status, createdAt: r.created_at });
+const toProfile = (r: ProfileRow): ProfileView => ({
+  id: r.user_id,
+  email: r.email,
+  status: oneOf(USER_STATUSES, r.status, "profiles.status"),
+  createdAt: r.created_at,
+});
 
-const offset = (page: number) => (Math.max(1, Math.floor(page)) - 1) * PAGE_SIZE;
-const likePrefix = (q: string) => `${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-
-export type InviteOutcome = { inviteStatus: "sent" | "failed"; inviteError: string | null };
+export type InviteOutcome = { inviteStatus: InviteStatus; inviteError: string | null };
 export type Decision =
   | { status: "approved"; decidedBy: string; userId: string | null; invite: InviteOutcome | null }
   | { status: "rejected"; decidedBy: string };
 
+const missingRequest = () => new UserError("That request doesn't exist.", "not_found");
+
 export function createAdminRepo(db: Db) {
   const requestById = async (id: string) => {
-    if (!UUID_RE.test(id)) return undefined;
-    const { data } = await read("accessRequests.get", () =>
-      db.from("access_requests").select(REQUEST_COLUMNS).eq("id", id).abortSignal(timeout()).maybeSingle<RequestRowDb>(),
-    );
+    if (!isUuid(id)) return undefined;
+    const { data } = await read("accessRequests.get", () => db.from("access_requests").select(REQUEST_COLUMNS).eq("id", id).maybeSingle());
     return data ? toRequest(data) : undefined;
   };
 
-  const updateRequest = async (where: string, id: string, patch: Record<string, unknown>, onlyPending: boolean) => {
+  const updateRequest = async (where: string, id: string, patch: Partial<Tables<"access_requests">>, onlyPending: boolean) => {
+    if (!isUuid(id)) throw missingRequest();
     let q = db.from("access_requests").update(patch).eq("id", id);
     if (onlyPending) q = q.eq("status", "pending");
-    const { data } = await must(where, q.select(REQUEST_COLUMNS).abortSignal(timeout()));
-    const row = (data as RequestRowDb[] | null)?.[0];
-    if (!row) throw new UserError("This request was already decided.", "conflict", { code: "already_decided" });
-    return toRequest(row);
+    const { data } = await must(where, q.select(REQUEST_COLUMNS));
+    const row = data?.[0];
+    if (row) return toRequest(row);
+    if (!onlyPending || !(await requestById(id))) throw missingRequest();
+    throw new UserError("This request was already decided.", "conflict", { code: "already_decided" });
   };
 
   const inviteColumns = (o: InviteOutcome | null) => ({
@@ -92,29 +82,26 @@ export function createAdminRepo(db: Db) {
       async submit(input: { name: string; email: string; note: string; ipHash: Buffer }): Promise<SubmitOutcome> {
         const { data } = await must(
           "accessRequests.submit",
-          db
-            .rpc("access_request_submit", {
-              p_name: input.name,
-              p_email: input.email,
-              p_note: input.note,
-              p_ip_hash: toBytea(input.ipHash),
-            })
-            .abortSignal(timeout()),
+          db.rpc("access_request_submit", {
+            p_name: input.name,
+            p_email: input.email,
+            p_note: input.note,
+            p_ip_hash: toBytea(input.ipHash),
+          }),
         );
-        return data as SubmitOutcome;
+        return oneOf(SUBMIT_OUTCOMES, data ?? "", "access_request_submit result");
       },
       async page(filter: RequestFilter, page: number): Promise<Page<AccessRequestView>> {
-        const from = offset(page);
+        const from = pageOffset(page);
         const { data, count } = await read("accessRequests.page", () => {
           let q = db.from("access_requests").select(REQUEST_COLUMNS, { count: "exact" });
           if (filter !== "all") q = q.eq("status", filter);
           return q
             .order("created_at", { ascending: false })
             .order("id", { ascending: false })
-            .range(from, from + PAGE_SIZE - 1)
-            .abortSignal(timeout());
+            .range(from, from + PAGE_SIZE - 1);
         });
-        return { items: ((data ?? []) as RequestRowDb[]).map(toRequest), total: count ?? 0 };
+        return { items: (data ?? []).map(toRequest), total: count ?? 0 };
       },
       get: requestById,
       decide(id: string, d: Decision): Promise<AccessRequestView> {
@@ -126,7 +113,7 @@ export function createAdminRepo(db: Db) {
         return updateRequest("accessRequests.setInvite", id, { ...inviteColumns(invite), ...(userId && { user_id: userId }) }, false);
       },
       async deleteByEmail(email: string): Promise<void> {
-        await must("accessRequests.deleteByEmail", db.from("access_requests").delete().eq("email", email).abortSignal(timeout()));
+        await must("accessRequests.deleteByEmail", db.from("access_requests").delete().eq("email", email));
       },
     },
     invited: {
@@ -135,59 +122,56 @@ export function createAdminRepo(db: Db) {
           "invited.add",
           db
             .from("invited_emails")
-            .upsert({ email, request_id: requestId, invited_by: invitedBy }, { onConflict: "email", ignoreDuplicates: true })
-            .abortSignal(timeout()),
+            .upsert({ email, request_id: requestId, invited_by: invitedBy }, { onConflict: "email", ignoreDuplicates: true }),
         );
       },
       async remove(email: string): Promise<void> {
-        await must("invited.remove", db.from("invited_emails").delete().eq("email", email).abortSignal(timeout()));
+        await must("invited.remove", db.from("invited_emails").delete().eq("email", email));
       },
     },
     users: {
       async page(page: number, q?: string): Promise<Page<ProfileView>> {
-        const from = offset(page);
+        const from = pageOffset(page);
         const { data, count } = await read("users.page", () => {
-          let query = db.from("profiles").select("user_id, email, status, created_at", { count: "exact" });
+          let query = db.from("profiles").select(PROFILE_COLUMNS, { count: "exact" });
           if (q) query = query.like("email", likePrefix(q.toLowerCase()));
           return query
             .order("created_at", { ascending: false })
             .order("user_id", { ascending: false })
-            .range(from, from + PAGE_SIZE - 1)
-            .abortSignal(timeout());
+            .range(from, from + PAGE_SIZE - 1);
         });
-        return { items: ((data ?? []) as ProfileRowDb[]).map(toProfile), total: count ?? 0 };
+        return { items: (data ?? []).map(toProfile), total: count ?? 0 };
       },
       async get(id: string): Promise<ProfileView | undefined> {
-        if (!UUID_RE.test(id)) return undefined;
-        const { data } = await read("users.get", () =>
-          db
-            .from("profiles")
-            .select("user_id, email, status, created_at")
-            .eq("user_id", id)
-            .abortSignal(timeout())
-            .maybeSingle<ProfileRowDb>(),
-        );
+        if (!isUuid(id)) return undefined;
+        const { data } = await read("users.get", () => db.from("profiles").select(PROFILE_COLUMNS).eq("user_id", id).maybeSingle());
         return data ? toProfile(data) : undefined;
       },
       async findByEmail(email: string): Promise<ProfileView | undefined> {
         const { data } = await read("users.findByEmail", () =>
-          db
-            .from("profiles")
-            .select("user_id, email, status, created_at")
-            .eq("email", email)
-            .abortSignal(timeout())
-            .maybeSingle<ProfileRowDb>(),
+          db.from("profiles").select(PROFILE_COLUMNS).eq("email", email).maybeSingle(),
         );
         return data ? toProfile(data) : undefined;
       },
       async status(id: string): Promise<UserStatus | undefined> {
-        const { data } = await read("users.status", () =>
-          db.from("profiles").select("status").eq("user_id", id).abortSignal(timeout()).maybeSingle<{ status: UserStatus }>(),
-        );
-        return data?.status;
+        const { data } = await read("users.status", () => db.from("profiles").select("status").eq("user_id", id).maybeSingle());
+        return data ? oneOf(USER_STATUSES, data.status, "profiles.status") : undefined;
       },
       async setStatus(id: string, status: UserStatus): Promise<void> {
-        await must("users.setStatus", db.from("profiles").update({ status }).eq("user_id", id).abortSignal(timeout()));
+        await must("users.setStatus", db.from("profiles").update({ status }).eq("user_id", id));
+      },
+    },
+    storage: {
+      async removeUserFiles(userId: string): Promise<void> {
+        if (!isUuid(userId)) throw new Error("removeUserFiles needs a user id");
+        const bucket = db.storage.from(ARTIFACTS_BUCKET);
+        for (;;) {
+          const { data, error } = await bucket.list(userId, { limit: STORAGE_PAGE, offset: 0 });
+          if (error) throw new UserError("Couldn't list the user's files.", "upstream");
+          if (!data.length) return;
+          const { error: removeError } = await bucket.remove(data.map((o) => `${userId}/${o.name}`));
+          if (removeError) throw new UserError("Couldn't remove the user's files.", "upstream");
+        }
       },
     },
   };

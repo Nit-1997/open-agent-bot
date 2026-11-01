@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readEnvFile } from "../../evals/auth.js";
 import { createAuthAdmin } from "../../src/admin/authAdmin.js";
+import { deleteAccount } from "../../src/admin/deleteAccount.js";
 import { createAdminRepo } from "../../src/db/admin.js";
 import { createAnonClient, createServiceClient } from "../../src/db/client.js";
 
@@ -26,7 +27,12 @@ export const cfg = () => ({
 export const service = () => createServiceClient(cfg());
 export const anon = () => createAnonClient(cfg());
 export const adminRepo = () => createAdminRepo(service());
-export const authAdmin = () => createAuthAdmin({ service: service(), anon: anon(), appOrigin: env.APP_ORIGIN ?? "https://app.localhost" });
+export function appOrigin(): string {
+  if (!env.APP_ORIGIN) throw new Error("APP_ORIGIN is missing from deploy-config/.env-agent");
+  return env.APP_ORIGIN;
+}
+
+export const authAdmin = () => createAuthAdmin({ service: service(), anon: anon(), appOrigin: appOrigin() });
 
 export const testEmail = () => `oab-test+${randomUUID()}@example.test`;
 
@@ -57,12 +63,7 @@ export async function createTestUser(): Promise<TestUser> {
 }
 
 export async function deleteUser(id: string, email: string): Promise<void> {
-  const auth = authAdmin();
-  const repo = adminRepo();
-  await auth.removeArtifacts(id);
-  await repo.accessRequests.deleteByEmail(email);
-  await repo.invited.remove(email);
-  await auth.deleteUser(id);
+  await deleteAccount({ repo: adminRepo(), auth: authAdmin() }, { id, email });
 }
 
 export function track(id: string, email: string): void {

@@ -1,11 +1,13 @@
 import type { AssistantMessage, Context, CredentialStore, Model } from "@earendil-works/pi-ai";
+import { streamSimple as openAiCompletions } from "@earendil-works/pi-ai/api/openai-completions";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { keyHint } from "../crypto/hint.js";
 import type { CredentialListing, ProviderSettingsRepo } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
-import { type Lookup, publicHttpUrlError, resolvesInternal } from "../lib/net.js";
+import { isBlockedError, type Lookup, publicHttpUrlError, resolvesInternal } from "../lib/net.js";
+import { createSafeFetch } from "../lib/safeFetch.js";
 import { type CatalogEntry, catalogEntry, CLOUD, LOCAL, LOCAL_KINDS, type LocalKind } from "./catalog.js";
 
 type AnyModel = Model<any>;
@@ -111,6 +113,7 @@ export type HubOptions = {
   credentials: HubCredentials;
   litellm?: { baseUrl: string; apiKey: string; models: SeedModel[] };
   fetch?: typeof fetch;
+  userFetch?: typeof fetch;
   complete?: Complete;
   lookup?: Lookup;
 };
@@ -136,9 +139,10 @@ export class ProviderHub {
     private keys: Record<string, string>,
     private readonly hints: Map<string, string>,
     private readonly devId: string,
-    private readonly f: typeof fetch,
+    private readonly userFetch: typeof fetch,
     private readonly completeFn: Complete,
     private readonly signedIn: Map<string, "key" | "signin">,
+    private stamp: string,
   ) {}
 
   static async create(opts: HubOptions): Promise<ProviderHub> {
@@ -169,9 +173,10 @@ export class ProviderHub {
       keys,
       hints,
       stored.deviceId,
-      opts.fetch ?? fetch,
+      opts.isAdmin ? (opts.fetch ?? fetch) : (opts.userFetch ?? createSafeFetch()),
       opts.complete ?? ((m, c, o) => rt.completeSimple(m, c, o)),
       signedIn,
+      stored.stamp,
     );
     if (opts.isAdmin && opts.litellm && !settings.hidden.includes("litellm")) {
       const models = await withGatewayLimits(opts.fetch ?? fetch, opts.litellm);
@@ -202,11 +207,16 @@ export class ProviderHub {
 
   private registerCustom(id: string): void {
     const c = this.settings.custom[id];
+    const userFetch = this.userFetch;
     this.rt.registerProvider(id, {
       name: c.label,
       baseUrl: c.baseUrl,
       apiKey: this.keys[id] || "none",
       api: "openai-completions",
+      ...(!this.opts.isAdmin && {
+        streamSimple: (model, context, options) =>
+          openAiCompletions(model as Model<"openai-completions">, context, { ...options, fetch: userFetch }),
+      }),
       models: c.models.map((m) => ({
         id: m.id,
         name: m.label,
@@ -315,13 +325,14 @@ export class ProviderHub {
     if (!(await this.targetAllowed(baseUrl))) throw new UserError(PRIVATE_TARGET, "unprocessable");
     let ids: string[];
     try {
-      const res = await this.f(`${baseUrl}/models`, {
+      const res = await this.userFetch(`${baseUrl}/models`, {
         headers: input.apiKey ? { authorization: `Bearer ${input.apiKey}` } : {},
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       ids = (((await res.json()) as { data?: Array<{ id?: string }> }).data ?? []).map((m) => m.id).filter((m): m is string => !!m);
     } catch (err) {
+      if (isBlockedError(err)) throw new UserError(PRIVATE_TARGET, "unprocessable");
       throw new UserError(`couldn't list models at ${baseUrl}/models (${err instanceof Error ? err.message : String(err)})`, "upstream");
     }
     if (!ids.length) throw new UserError(`the server at ${baseUrl} has no models`, "upstream");
@@ -441,7 +452,7 @@ export class ProviderHub {
 
   private async save(): Promise<void> {
     const { litellm: _gateway, ...custom } = this.settings.custom;
-    await this.opts.settings.put({ ...this.settings, custom });
+    this.stamp = await this.opts.settings.put({ ...this.settings, custom }, this.stamp);
   }
 }
 

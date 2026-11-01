@@ -65,7 +65,7 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
         cfg,
         artifacts: artifacts.sink(repos, chatId),
         pool,
-        threadId: key,
+        sessionKey: key,
         userContext,
         budget,
         evidence,

@@ -33,7 +33,7 @@ export type JobResult = { store: Store; item: Item; tiles: Tile[]; blocked?: str
 
 type Deps = {
   pool: BrowserPool;
-  threadId: string;
+  sessionKey: string;
   userContext: UserContext | null;
   allowPrivateHosts?: boolean;
   storeFor?: (name: string) => Store | undefined;
@@ -75,7 +75,7 @@ async function runAll(deps: Deps, jobs: Job[]): Promise<JobResult[]> {
   const results: JobResult[] = new Array(jobs.length);
   let next = 0;
   const worker = async (n: number) => {
-    const page = await deps.pool.tab(deps.threadId, deps.userContext);
+    const page = await deps.pool.tab(deps.sessionKey, deps.userContext);
     const stop = n === 0 && deps.frames ? await watch(page, deps.frames).catch(() => undefined) : undefined;
     try {
       while (next < jobs.length) {

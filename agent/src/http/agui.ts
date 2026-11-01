@@ -1,17 +1,20 @@
 import type { RunAgentInput } from "@ag-ui/core";
 import { EventEncoder } from "@ag-ui/encoder";
 import { Hono } from "hono";
+import { isUuid } from "../../../shared/ids.js";
 import { handleRun, type RunContext } from "../agui/runHandler.js";
 import type { AuthEnv } from "../auth/middleware.js";
 import type { AuthUser } from "../auth/verify.js";
-import { type ConcurrencyGate, LIMITS, type RateLimiter, rateLimited } from "../lib/rateLimit.js";
+import { type ConcurrencyGate, LIMITS, type RateLimiter, rateLimitError } from "../lib/rateLimit.js";
+import { UserError } from "../lib/errors.js";
+import { errorResponse } from "./handlers.js";
 import type { SessionStore } from "../session/sessionStore.js";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RUN_ID_RE = /^[\w-]{1,100}$/;
 
 function isRunInput(x: unknown): x is RunAgentInput {
   const v = x as Partial<RunAgentInput> | null;
-  return !!v && typeof v.threadId === "string" && typeof v.runId === "string" && Array.isArray(v.messages);
+  return !!v && isUuid(v.threadId) && typeof v.runId === "string" && RUN_ID_RE.test(v.runId) && Array.isArray(v.messages);
 }
 
 const HEARTBEAT_MS = 15_000;
@@ -30,12 +33,12 @@ export function aguiRoutes(deps: {
 
   app.post("/agui", async (c) => {
     const body = await c.req.json().catch(() => null);
-    if (!isRunInput(body) || !UUID_RE.test(body.threadId)) return c.json({ error: "invalid", message: "invalid RunAgentInput" }, 400);
+    if (!isRunInput(body)) return errorResponse(c, new UserError("invalid RunAgentInput", "invalid"));
     const user = c.get("user");
     const verdict = deps.limiter.take(`run:${user.id}`, LIMITS.run);
-    if (!verdict.ok) return rateLimited(verdict.retryAfter);
+    if (!verdict.ok) return errorResponse(c, rateLimitError(verdict.retryAfter));
     const leave = deps.gate.enter(user.id);
-    if (!leave) return rateLimited(5);
+    if (!leave) return errorResponse(c, rateLimitError(5));
     const input: RunAgentInput = { ...body, threadId: body.threadId.toLowerCase() };
     const ctx = deps.context(user, input.threadId);
 

@@ -28,8 +28,8 @@ export class BrowserPool {
     return this.browser;
   }
 
-  page(threadId: string, ctx: UserContext | null): Promise<Page> {
-    let t = this.threads.get(threadId);
+  page(sessionKey: string, ctx: UserContext | null): Promise<Page> {
+    let t = this.threads.get(sessionKey);
     if (!t) {
       t = (async () => {
         const context = await (await this.launch()).newContext({
@@ -44,8 +44,8 @@ export class BrowserPool {
         await page.setViewportSize(browseViewport(ctx));
         return { context, page };
       })();
-      t.catch(() => this.threads.delete(threadId));
-      this.threads.set(threadId, t);
+      t.catch(() => this.threads.delete(sessionKey));
+      this.threads.set(sessionKey, t);
     }
     return t.then(async (x) => {
       if (x.page.isClosed()) {
@@ -56,15 +56,15 @@ export class BrowserPool {
     });
   }
 
-  async tab(threadId: string, ctx: UserContext | null): Promise<Page> {
-    await this.page(threadId, ctx);
-    const { context } = await this.threads.get(threadId)!;
+  async tab(sessionKey: string, ctx: UserContext | null): Promise<Page> {
+    await this.page(sessionKey, ctx);
+    const { context } = await this.threads.get(sessionKey)!;
     return context.newPage();
   }
 
-  async close(threadId: string): Promise<void> {
-    const t = this.threads.get(threadId);
-    this.threads.delete(threadId);
+  async close(sessionKey: string): Promise<void> {
+    const t = this.threads.get(sessionKey);
+    this.threads.delete(sessionKey);
     if (t) await (await t).context.close().catch(() => {});
   }
 

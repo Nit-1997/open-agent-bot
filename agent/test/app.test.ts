@@ -1,3 +1,4 @@
+import { BODY_LIMIT_BYTES } from "../src/app.js";
 import { describe, expect, it, vi } from "vitest";
 import { LoginFlows } from "../src/providers/logins.js";
 import { createRegistry } from "../src/sources/index.js";
@@ -35,9 +36,26 @@ describe("createApp guards", () => {
       for (const secret of [null, "b".repeat(64)]) {
         const res = await call(ALICE, path, { method, secret });
         expect(res.status, `${method} ${path}`).toBe(401);
-        expect(await res.json()).toEqual({ error: "unauthorized" });
+        expect(await res.json()).toMatchObject({ error: "unauthorized" });
       }
     }
+  });
+
+  it("answers 404 not_found for unknown paths, signed in or not, and never runs the admin limiter there", async () => {
+    const { call } = await makeApp();
+    for (const user of [null, ALICE, ADMIN]) {
+      const res = await call(user, "/no-such-route");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "not_found", message: "Not found." });
+    }
+  });
+
+  it("refuses bodies over the limit with 413 too_large", async () => {
+    const { call } = await makeApp();
+    const big = JSON.stringify({ defaultModel: "x".repeat(BODY_LIMIT_BYTES) });
+    const res = await call(ALICE, "/profile", { method: "PUT", body: big });
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ error: "too_large" });
   });
 
   it("answers signed_out with a bearer challenge when the token is missing or wrong", async () => {

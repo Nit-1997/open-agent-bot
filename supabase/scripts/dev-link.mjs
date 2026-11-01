@@ -10,5 +10,5 @@ run(async () => {
   const link = await admin.generateLink({ type, email, redirect_to: `${env.appOrigin}/auth/confirm` });
   const hashed = link.hashed_token ?? link.properties?.hashed_token;
   if (!hashed) throw new Error("generateLink returned no hashed_token");
-  console.log(`${env.appOrigin}/auth/confirm?token_hash=${hashed}&type=${member ? "email" : "invite"}`);
+  console.log(`${env.appOrigin}/auth/confirm?token_hash=${hashed}&type=${member ? "email" : "invite"}&email=${encodeURIComponent(email)}`);
 });

@@ -1,11 +1,11 @@
+import type { AccessRequestView, AdminUser, ProfileView, RequestFilter } from "../../../shared/admin.js";
+import type { Page } from "../../../shared/pages.js";
 import type { AuthUser } from "../auth/verify.js";
-import type { AccessRequestView, AdminRepo, ProfileView, RequestFilter } from "../db/admin.js";
-import type { Page } from "../db/types.js";
+import type { AdminRepo } from "../db/admin.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "./authAdmin.js";
-
-export type UserView = ProfileView & { lastSignInAt: string | null; providers: string[]; isAdmin: boolean };
+import { deleteAccount } from "./deleteAccount.js";
 
 export type AccountHooks = { onDisabled(userId: string): Promise<void>; onEnabled(userId: string): void };
 
@@ -37,7 +37,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
     return r;
   };
 
-  const userView = (p: ProfileView, a: AuthAccount | undefined): UserView => ({
+  const userView = (p: ProfileView, a: AuthAccount | undefined): AdminUser => ({
     ...p,
     lastSignInAt: a?.lastSignInAt ?? null,
     providers: a?.providers ?? [],
@@ -72,10 +72,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
       const r = await request(id);
       if (r.status !== "pending") throw new UserError("This request was already decided.", "conflict", { code: "already_decided" });
       const member = await repo.users.findByEmail(r.email);
-      if (member) {
-        await repo.accessRequests.decide(id, { status: "approved", decidedBy: admin.id, userId: member.id, invite: null });
-        throw new UserError("This email already has an account.", "conflict", { code: "already_member" });
-      }
+      if (member) return repo.accessRequests.decide(id, { status: "approved", decidedBy: admin.id, userId: member.id, invite: null });
       await repo.invited.add(r.email, r.id, admin.id);
       const { result, userId } = await sendInvite(r);
       const invite = result.ok
@@ -109,19 +106,19 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
       return updated;
     },
 
-    async listUsers(page: number, q?: string): Promise<Page<UserView>> {
+    async listUsers(page: number, q?: string): Promise<Page<AdminUser>> {
       const profiles = await repo.users.page(page, q);
       const accounts = await Promise.all(profiles.items.map((p) => auth.getUser(p.id)));
       return { items: profiles.items.map((p, i) => userView(p, accounts[i])), total: profiles.total };
     },
 
-    async deactivate(admin: AuthUser, id: string): Promise<UserView> {
+    async deactivate(admin: AuthUser, id: string): Promise<AdminUser> {
       await target(admin, id);
       await disable(id);
       return userView((await repo.users.get(id))!, await auth.getUser(id));
     },
 
-    async reactivate(admin: AuthUser, id: string): Promise<UserView> {
+    async reactivate(admin: AuthUser, id: string): Promise<AdminUser> {
       await target(admin, id);
       await auth.setBanned(id, false);
       await repo.users.setStatus(id, "active");
@@ -133,7 +130,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
       const profile = await target(admin, id);
       if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== profile.email)
         throw new UserError("Type the user's email to confirm.", "unprocessable");
-      const step = async (name: "deactivate" | "storage" | "requests" | "auth_user", fn: () => Promise<void>) => {
+      const step = async (name: string, fn: () => Promise<void>) => {
         try {
           await fn();
         } catch (err) {
@@ -145,12 +142,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
         }
       };
       await step("deactivate", () => disable(id));
-      await step("storage", () => auth.removeArtifacts(id));
-      await step("requests", async () => {
-        await repo.accessRequests.deleteByEmail(profile.email);
-        await repo.invited.remove(profile.email);
-      });
-      await step("auth_user", () => auth.deleteUser(id));
+      await deleteAccount({ repo, auth }, profile, step);
       log.info(`[admin] deleted user=${id} by=${admin.id}`);
     },
   };

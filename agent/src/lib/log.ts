@@ -42,15 +42,28 @@ export function redact(value: unknown): unknown {
   return value;
 }
 
+const isControl = (code: number) => code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+
+export function escapeControl(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    out += isControl(code) ? `\\u${code.toString(16).padStart(4, "0")}` : ch;
+  }
+  return out;
+}
+
+const oneLine = (value: unknown): unknown => (typeof value === "string" ? escapeControl(value) : value);
+
 const at =
   (level: LogLevel, write: (...args: unknown[]) => void) =>
   (...args: unknown[]): void => {
-    if (LOG_LEVELS.indexOf(level) >= threshold) write(...args);
+    if (LOG_LEVELS.indexOf(level) >= threshold) write(...args.map(oneLine));
   };
 
 export const log = {
   debug: at("debug", (...args) => console.log(...args)),
   info: at("info", (...args) => console.log(...args)),
-  warn: at("warn", (...args) => console.warn(...args.map(redact))),
-  error: at("error", (...args) => console.error(...args.map(redact))),
+  warn: at("warn", (...args) => console.warn(...args.map(redact).map(oneLine))),
+  error: at("error", (...args) => console.error(...args.map(redact).map(oneLine))),
 };

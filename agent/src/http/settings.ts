@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import type { AuthEnv } from "../auth/middleware.js";
-import { limitBy, type RateLimiter } from "../lib/rateLimit.js";
+import type { RateLimiter } from "../lib/rateLimit.js";
 import type { UserHubs } from "../providers/hubs.js";
-import { body, safe } from "./handlers.js";
+import { body, limitBy, safe } from "./handlers.js";
 
 export function settingsRoutes(deps: { hubs: UserHubs; limiter: RateLimiter }) {
   const app = new Hono<AuthEnv>();

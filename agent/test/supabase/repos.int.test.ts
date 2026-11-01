@@ -123,4 +123,51 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
     expect(page.items[0].ipHashPrefix).toBe(ip.toString("hex").slice(0, 8));
     await service().from("access_requests").delete().like("email", "oab-test+%@example.test");
   });
+  it("pages a user's chats newest first: page 2 holds the two oldest of seven", async () => {
+    const c = await createTestUser();
+    const at = (i: number) => new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString();
+    const rows = Array.from({ length: 7 }, (_, i) => ({ id: randomUUID(), user_id: c.id, title: `chat ${i}`, last_message_at: at(i) }));
+    const { error } = await service().from("chats").insert(rows);
+    expect(error).toBeNull();
+    const page = await forUser(service(), c.id).chats.page(2);
+    expect(page.total).toBe(7);
+    expect(page.items.map((r) => r.title)).toEqual(["chat 1", "chat 0"]);
+    expect((await forUser(service(), c.id).chats.page(1)).items.map((r) => r.title)).toEqual([
+      "chat 6",
+      "chat 5",
+      "chat 4",
+      "chat 3",
+      "chat 2",
+    ]);
+  });
+
+  it("pages access requests newest first: page 2 continues where page 1 stopped", async () => {
+    const db = service();
+    const at = (i: number) => new Date(Date.UTC(2100, 0, 1, 0, i)).toISOString();
+    const rows = Array.from({ length: 7 }, (_, i) => ({
+      name: `order ${i}`,
+      email: testEmail(),
+      note: "",
+      ip_hash: `\\x${randomBytes(32).toString("hex")}`,
+      created_at: at(i),
+    }));
+    try {
+      const { error } = await db.from("access_requests").insert(rows);
+      expect(error).toBeNull();
+      const repo = adminRepo();
+      const first = await repo.accessRequests.page("pending", 1);
+      const second = await repo.accessRequests.page("pending", 2);
+      expect(first.items.map((r) => r.name)).toEqual(["order 6", "order 5", "order 4", "order 3", "order 2"]);
+      expect(second.items.slice(0, 2).map((r) => r.name)).toEqual(["order 1", "order 0"]);
+      expect(second.total).toBe(first.total);
+    } finally {
+      await db
+        .from("access_requests")
+        .delete()
+        .in(
+          "email",
+          rows.map((r) => r.email),
+        );
+    }
+  });
 });

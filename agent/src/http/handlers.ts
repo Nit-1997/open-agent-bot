@@ -1,7 +1,8 @@
-import type { Context, Env, Handler } from "hono";
+import type { Context, Env, Handler, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { UserError, type UserErrorKind } from "../lib/errors.js";
 import { log } from "../lib/log.js";
+import { LIMITS, type RateLimiter, rateLimitError } from "../lib/rateLimit.js";
 
 const STATUS: Record<UserErrorKind, ContentfulStatusCode> = {
   invalid: 400,
@@ -19,11 +20,27 @@ const STATUS: Record<UserErrorKind, ContentfulStatusCode> = {
 
 export function errorResponse(c: Context, err: UserError): Response {
   const { retryAfter, details } = err.opts;
+  const headers: Record<string, string> = {};
+  if (retryAfter !== undefined) headers["retry-after"] = String(retryAfter);
+  if (err.kind === "unauthorized") headers["www-authenticate"] = 'Bearer error="invalid_token"';
   return c.json(
     { error: err.code, message: err.message, ...(retryAfter !== undefined && { retryAfter }), ...details },
     STATUS[err.kind],
-    retryAfter !== undefined ? { "retry-after": String(retryAfter) } : undefined,
+    headers,
   );
+}
+
+export function limitBy<E extends { Variables: { user: { id: string } } }>(
+  limiter: RateLimiter,
+  name: keyof typeof LIMITS,
+): MiddlewareHandler<E> {
+  return async (c, next) => {
+    const user = c.get("user") as { id: string } | undefined;
+    if (!user) return errorResponse(c, new UserError("You were signed out. Sign in again.", "unauthorized", { code: "signed_out" }));
+    const verdict = limiter.take(`${name}:${user.id}`, LIMITS[name]);
+    if (!verdict.ok) return errorResponse(c, rateLimitError(verdict.retryAfter));
+    await next();
+  };
 }
 
 export const safe =

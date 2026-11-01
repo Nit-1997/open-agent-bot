@@ -1,4 +1,4 @@
-import type { UserStatus } from "../db/admin.js";
+import type { UserStatus } from "../../../shared/admin.js";
 
 type Lookup = (userId: string) => Promise<UserStatus | undefined>;
 type Entry = { active: boolean; at: number };
