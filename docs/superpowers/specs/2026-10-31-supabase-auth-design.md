@@ -61,7 +61,7 @@ The 2026-10-30 onboarding design put the profile behind a `ProfileStore` interfa
 | Origins | Never hardcoded. `APP_ORIGIN` (web) and `AGENT_HOST` (agent) come from env; locally `https://app.localhost` and `https://agent.localhost` (owner decision 3). |
 | Long runs | CopilotKit route `maxDuration = 300` (valid on Hobby and Pro); the agent ends a run cleanly at `RUN_TIME_LIMIT_SECONDS` (default 280) before Vercel cuts the stream (owner decision 4). |
 | Bot protection | Honeypot, signed minimum-fill time, DB rate limits (owner decision 5). |
-| Email | Supabase custom SMTP via Resend (`smtp.resend.com:465`, user `resend`), sender `onboarding@resend.dev` (sandbox: delivers only to `ntnbhat9@gmail.com`). |
+| Email | Supabase custom SMTP via Resend (`smtp.resend.com:465`, user `resend`), sender `noreply@mail.worksimulation.ai` (domain verified in Resend on 2026-11-01). |
 | Hosting | Web on Vercel. Agent, SearXNG and Caddy on EC2. Locally the same compose file adds the web service and a local Caddyfile. |
 
 ## Project state today (read 2026-10-31 via Management API and MCP)
@@ -856,7 +856,7 @@ Desired auth config (field names and types checked against the live GET and the 
 | `smtp_port` | `"465"` | String in the API |
 | `smtp_user` | `resend` | |
 | `smtp_pass` | `$RESEND_API_KEY` | Secret, sending-only key |
-| `smtp_admin_email` | `$SMTP_SENDER_EMAIL` | `onboarding@resend.dev` |
+| `smtp_admin_email` | `$SMTP_SENDER_EMAIL` | `noreply@mail.worksimulation.ai` |
 | `smtp_sender_name` | `Open Agent` | |
 | `smtp_max_frequency` | `60` | Seconds between emails to one address; already 60 |
 | `mailer_subjects_invite` | `You're invited to Open Agent` | |
@@ -1015,7 +1015,7 @@ Today the file holds `SUPABASE_ACCESS_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT
 | `GOOGLE_CLIENT_ID` | | (exists) |
 | `GOOGLE_CLIENT_SECRET` | S | (exists) |
 | `RESEND_API_KEY` | S | (exists), sending-only |
-| `SMTP_SENDER_EMAIL` | | `onboarding@resend.dev` (add) |
+| `SMTP_SENDER_EMAIL` | | `noreply@mail.worksimulation.ai` |
 | `SITE_URL` | | `https://app.localhost` until production exists (add) |
 | `PROD_ORIGIN` | | empty until production exists; the script omits it (add) |
 | `APP_ORIGIN` | | `https://app.localhost` (add; used by `dev-link.mjs` and printed by bootstrap) |
