@@ -7,9 +7,6 @@ COPY agent/tsconfig.json ./
 COPY agent/src ./src
 COPY agent/skills ./skills
 RUN npm run build && npm prune --omit=dev
-RUN groupadd -g 1500 agentsecret && usermod -aG agentsecret pwuser \
-  && mkdir -p /data/agent /data/artifacts /data/shared \
-  && chown -R pwuser:pwuser /data && chown pwuser:agentsecret /data/shared && chmod 2750 /data/shared
 USER pwuser
 ENV NODE_ENV=production
 EXPOSE 8000

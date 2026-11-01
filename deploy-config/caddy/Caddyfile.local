@@ -1,0 +1,39 @@
+{
+	admin off
+	local_certs
+}
+
+(agent_common) {
+	request_body {
+		max_size 4MB
+	}
+	@public_health {
+		path /health
+		not remote_ip private_ranges
+	}
+	respond @public_health 404
+	header {
+		Strict-Transport-Security "max-age=63072000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy agent:8000 {
+		flush_interval -1
+		transport http {
+			read_timeout 20m
+			write_timeout 20m
+		}
+	}
+}
+
+app.localhost {
+	encode zstd gzip
+	reverse_proxy web:3000 {
+		flush_interval -1
+	}
+}
+
+agent.localhost {
+	import agent_common
+}
