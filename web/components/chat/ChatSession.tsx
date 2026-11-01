@@ -4,9 +4,9 @@ import { useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { noteRunFailure } from "@/lib/authState";
+import { errorCodeIn, noteRunFailure } from "@/lib/authState";
 import type { HistoryMessage } from "@/lib/chats";
-import { classifyRunError, type RunErrorKind } from "@/lib/errors";
+import { classifyRunError, NOT_SAVED_EVENT, notSavedMessage, type RunErrorKind } from "@/lib/errors";
 import type { WorkflowStepEvent } from "@/lib/steps";
 import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
 import { Composer } from "./Composer";
@@ -30,6 +30,7 @@ export function ChatSession(props: {
   const { copilotkit } = useCopilotKit();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ kind: RunErrorKind; message?: string } | null>(null);
+  const [unsaved, setUnsaved] = useState<string | null>(null);
   const [timing, setTiming] = useState<Record<string, { start: number; end?: number }>>({});
   const [now, setNow] = useState(() => Date.now());
   const scroller = useRef<HTMLDivElement>(null);
@@ -77,10 +78,11 @@ export function ChatSession(props: {
         if (event.name === "browser_frame" && id) setFrames((f) => ({ ...f, [id]: event.value as BrowserFrame }));
         if (event.name === "workflow_step" && id)
           setWorkflow((w) => ({ ...w, [id]: [...(w[id] ?? []), event.value as WorkflowStepEvent] }));
+        if (event.name === NOT_SAVED_EVENT) setUnsaved(notSavedMessage(event.value));
       },
       onRunErrorEvent: ({ event }) => {
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
-        noteRunFailure(message);
+        noteRunFailure(event.code);
         setError({ kind: classifyRunError({ error: new Error(message) }), message: event.message });
       },
     });
@@ -115,7 +117,7 @@ export function ChatSession(props: {
       setEdits({});
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
-      noteRunFailure(e.message);
+      noteRunFailure(errorCodeIn(e.message));
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
     } finally {
       setSending(false);
@@ -127,6 +129,7 @@ export function ChatSession(props: {
   const send = useCallback(
     (text: string, quiet = false) => {
       setError(null);
+      setUnsaved(null);
       const id = `${quiet ? QUIET_ANSWER : ""}${crypto.randomUUID()}`;
       if (!quiet) reveal.current = id;
       setTiming((t) => ({ ...t, [id]: { start: Date.now() } }));
@@ -182,6 +185,18 @@ export function ChatSession(props: {
             <ArrowDown id="chat-jump-bottom-icon" aria-hidden="true" size={14} />
             <span id="chat-jump-bottom-text">{running ? "Reply loading below" : "Latest below"}</span>
           </button>
+        )}
+        {unsaved && (
+          <p
+            id="chat-not-saved"
+            role="status"
+            className="mb-2 flex items-center justify-between gap-2 rounded-xl bg-warn-bg px-3 py-2 text-xs text-warn-fg"
+          >
+            <span id="chat-not-saved-text">{unsaved}</span>
+            <button id="chat-not-saved-dismiss" type="button" onClick={() => setUnsaved(null)} className="underline underline-offset-2">
+              Dismiss
+            </button>
+          </p>
         )}
         {error && (
           <ErrorBanner

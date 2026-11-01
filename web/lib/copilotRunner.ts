@@ -7,17 +7,22 @@ import {
   type AgentRunnerStopRequest,
   InMemoryAgentRunner,
 } from "@copilotkit/runtime/v2";
+import type { AgentAuth } from "@/lib/auth";
 
-const requestUser = new AsyncLocalStorage<string>();
+const requestAuth = new AsyncLocalStorage<AgentAuth>();
 
-export function withRunnerUser<T>(userId: string, fn: () => T): T {
-  return requestUser.run(userId, fn);
+export function withRequestAuth<T>(auth: AgentAuth, fn: () => T): T {
+  return requestAuth.run(auth, fn);
+}
+
+export function requestAgentAuth(): AgentAuth {
+  const auth = requestAuth.getStore();
+  if (!auth) throw new Error("The chat runner was used outside a signed-in request.");
+  return auth;
 }
 
 export function scopedThreadId(threadId: string): string {
-  const userId = requestUser.getStore();
-  if (!userId) throw new Error("The chat runner was used outside a signed-in request.");
-  return `${userId}:${threadId}`;
+  return `${requestAgentAuth().userId}:${threadId}`;
 }
 
 // InMemoryAgentRunner keys its process-wide store by bare thread id and advertises local thread

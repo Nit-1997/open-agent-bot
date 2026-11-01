@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { agentHeaders, forwardToAgent } from "@/lib/agentServer";
+import { agentHeaders, forwardToAgent, MAX_FORWARD_BODY_BYTES } from "@/lib/agentServer";
 import { getAgentAuth, SignedOut } from "@/lib/auth";
 import { ConfigError } from "@/lib/env";
 import { AGENT_URL, APP_ORIGIN, AUTH, headersOf, SERVICE_SECRET, stubAgentEnv } from "../support/agentEnv";
@@ -46,6 +46,14 @@ describe("forwardToAgent", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("refuses bodies over the forward cap without calling the agent", async () => {
+    vi.mocked(getAgentAuth).mockResolvedValue({ userId: "u", accessToken: "t" });
+    const res = await forwardToAgent(browserRequest("PUT", APP_ORIGIN, "x".repeat(MAX_FORWARD_BODY_BYTES + 1)), "/profile");
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ error: "too_large" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a write with no Origin header", async () => {
     expect((await forwardToAgent(browserRequest("POST", null, "{}"), "/profile")).status).toBe(403);
   });
@@ -74,7 +82,7 @@ describe("forwardToAgent", () => {
     vi.mocked(getAgentAuth).mockRejectedValue(new SignedOut("signed_out"));
     const res = await forwardToAgent(browserRequest("GET", null), "/profile");
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "signed_out" });
+    expect(await res.json()).toEqual({ error: "signed_out", message: "You were signed out. Sign in again." });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

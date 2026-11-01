@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutForm } from "@/components/auth/SignOutForm";
 import { useAgentContext } from "@copilotkit/react-core/v2";
 import { LogOut, Moon, Plus, Sun, User } from "lucide-react";
 import Link from "next/link";
@@ -72,20 +73,17 @@ function ProfileLoading({ error, onRetry }: { error?: string; onRetry: () => voi
 
 function SignOutButton() {
   return (
-    <form id="header-signout-form" method="post" action="/auth/signout">
-      <input id="header-signout-scope" type="hidden" name="scope" value="local" />
-      <button
-        id="header-signout"
-        type="submit"
-        aria-label="Sign out"
-        className="glass-pill inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-text-secondary transition hover:bg-paper hover:text-text-primary sm:px-3"
-      >
-        <LogOut id="header-signout-icon" aria-hidden="true" size={14} />
-        <span id="header-signout-label" className="hidden sm:inline">
-          Sign out
-        </span>
-      </button>
-    </form>
+    <SignOutForm
+      id="header-signout"
+      scope="local"
+      label="Sign out"
+      className="glass-pill inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-text-secondary transition hover:bg-paper hover:text-text-primary sm:px-3"
+    >
+      <LogOut id="header-signout-icon" aria-hidden="true" size={14} />
+      <span id="header-signout-label" className="hidden sm:inline">
+        Sign out
+      </span>
+    </SignOutForm>
   );
 }
 

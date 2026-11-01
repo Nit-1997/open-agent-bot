@@ -13,7 +13,6 @@ export function ConfirmDialog(props: {
   confirmLabel: string;
   requireText?: string;
   busy: boolean;
-  error?: string;
   onConfirm: (typed: string) => void;
   onCancel: () => void;
 }) {
@@ -69,11 +68,6 @@ export function ConfirmDialog(props: {
               className={input}
             />
           </div>
-        )}
-        {props.error && (
-          <p id={`${id}-error`} role="alert" className="text-xs text-danger-fg">
-            {props.error}
-          </p>
         )}
         <div id={`${id}-actions`} className="flex justify-end gap-2">
           <button id={`${id}-cancel`} type="button" autoFocus={!requireText} disabled={busy} onClick={onCancel} className={ghost}>

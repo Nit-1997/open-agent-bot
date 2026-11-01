@@ -1,19 +1,22 @@
 "use client";
 
+import type { ChatSummary } from "@shared/chats";
+import type { PageResponse } from "@shared/pages";
 import { useEffect, useState } from "react";
 import { ghost, solid } from "@/components/profile/models/styles";
+import { DetailList } from "@/components/ui/DetailList";
 import { Pager } from "@/components/ui/Pager";
-import { type ChatSummary, chatsApi, formatWhen, type HistoryMessage, toHistory } from "@/lib/chats";
-import type { Page } from "@/lib/pagination";
+import { chatsApi, formatWhen, type HistoryMessage, toHistory } from "@/lib/chats";
+import { errorMessage } from "@/lib/errors";
 
-type Loaded = { key: string; data?: Page<ChatSummary>; error?: string };
+type Loaded = { key: string; data?: PageResponse<ChatSummary>; error?: string };
 
 export function RecentChats(props: { currentThreadId: string; onOpen: (chatId: string, history: HistoryMessage[]) => void }) {
   const id = "recent-chats";
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [shown, setShown] = useState<Page<ChatSummary> | null>(null);
+  const [shown, setShown] = useState<PageResponse<ChatSummary> | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{ chatId: string; message: string } | null>(null);
@@ -26,10 +29,14 @@ export function RecentChats(props: { currentThreadId: string; onOpen: (chatId: s
       .page(page)
       .then((data) => {
         if (!alive) return;
+        if (data.items.length === 0 && page > 1) {
+          setPage(Math.max(1, Math.ceil(data.total / data.pageSize)));
+          return;
+        }
         setLoaded({ key, data });
         setShown(data);
       })
-      .catch((e: Error) => alive && setLoaded({ key, error: e.message }));
+      .catch((e: unknown) => alive && setLoaded({ key, error: errorMessage(e) }));
     return () => {
       alive = false;
     };
@@ -42,7 +49,7 @@ export function RecentChats(props: { currentThreadId: string; onOpen: (chatId: s
       const { items } = await chatsApi.messages(chat.id);
       props.onOpen(chat.id, toHistory(chat.id, items));
     } catch (e) {
-      setRowError({ chatId: chat.id, message: (e as Error).message });
+      setRowError({ chatId: chat.id, message: errorMessage(e) });
     } finally {
       setOpening(null);
     }
@@ -112,20 +119,13 @@ export function RecentChats(props: { currentThreadId: string; onOpen: (chatId: s
                     </button>
                   </div>
                   {isOpen && (
-                    <dl id={`${id}-details-${chat.id}`} className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
-                      <dt id={`${id}-details-${chat.id}-title-label`} className="text-text-muted">
-                        Title
-                      </dt>
-                      <dd id={`${id}-details-${chat.id}-title`} className="break-words text-text-secondary">
-                        {chat.title.trim() || "Untitled chat"}
-                      </dd>
-                      <dt id={`${id}-details-${chat.id}-date-label`} className="text-text-muted">
-                        Last message
-                      </dt>
-                      <dd id={`${id}-details-${chat.id}-date`} className="text-text-secondary">
-                        {formatWhen(chat.lastMessageAt)}
-                      </dd>
-                    </dl>
+                    <DetailList
+                      id={`${id}-details-${chat.id}`}
+                      items={[
+                        ["title", "Title", chat.title.trim() || "Untitled chat"],
+                        ["date", "Last message", formatWhen(chat.lastMessageAt)],
+                      ]}
+                    />
                   )}
                   {rowError?.chatId === chat.id && (
                     <p id={`${id}-row-error-${chat.id}`} role="alert" className="mt-1.5 text-xs text-danger-fg">

@@ -1,26 +1,17 @@
 "use client";
 
+import { type AccessRequestView, REQUEST_FILTERS, type RequestFilter } from "@shared/admin";
+import type { PageResponse } from "@shared/pages";
 import { useState } from "react";
 import { decideRequest, listRequests } from "@/app/admin/actions";
 import { ghost, solid } from "@/components/profile/models/styles";
+import { DetailList } from "@/components/ui/DetailList";
 import { Pager } from "@/components/ui/Pager";
-import { type ActionResult, runAction } from "@/lib/actionResult";
-import {
-  type AccessRequestView,
-  EMPTY_REQUESTS,
-  FILTER_LABELS,
-  REQUEST_FILTERS,
-  type RequestAction,
-  type RequestFilter,
-  requestNotice,
-} from "@/lib/admin";
+import type { ActionResult } from "@/lib/actionResult";
+import { EMPTY_REQUESTS, FILTER_LABELS, type RequestAction, requestNotice } from "@/lib/admin";
 import { formatWhen } from "@/lib/chats";
-import type { Page } from "@/lib/pagination";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { DetailList } from "./DetailList";
-import { without } from "./without";
-
-type RowError = { email: string; message: string };
+import { usePagedAdminList } from "./usePagedAdminList";
 
 const ID = "admin-requests";
 
@@ -29,45 +20,24 @@ function statusText(r: AccessRequestView): string {
   return r.inviteStatus === "sent" ? "approved · invite sent" : "approved · invite failed";
 }
 
-export function RequestsList({ initial }: { initial: ActionResult<Page<AccessRequestView>> }) {
-  const [filter, setFilter] = useState<RequestFilter>("pending");
-  const [page, setPage] = useState(1);
-  const [result, setResult] = useState(initial);
-  const [loading, setLoading] = useState(false);
+export function RequestsList({ initial }: { initial: ActionResult<PageResponse<AccessRequestView>> }) {
+  const list = usePagedAdminList<AccessRequestView, RequestFilter>({
+    initial,
+    initialQuery: "pending",
+    fetchPage: (filter, page) => listRequests(filter, page),
+  });
+  const { query: filter, page, result, loading, busyRow, rowErrors, hiddenErrors, notice, load } = list;
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [busyRow, setBusyRow] = useState<string | null>(null);
-  const [rowErrors, setRowErrors] = useState<Record<string, RowError>>({});
-  const [notice, setNotice] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<AccessRequestView | null>(null);
 
-  const load = async (nextFilter: RequestFilter, nextPage: number) => {
-    setLoading(true);
-    let target = nextPage;
-    let next = await runAction(() => listRequests(nextFilter, target));
-    if (next.ok && next.data.items.length === 0 && target > 1) {
-      target -= 1;
-      next = await runAction(() => listRequests(nextFilter, target));
-    }
-    setFilter(nextFilter);
-    setPage(target);
-    setResult(next);
-    setLoading(false);
-  };
-
   const act = async (request: AccessRequestView, action: RequestAction) => {
-    setBusyRow(request.id);
-    setNotice(null);
-    setRowErrors((errors) => without(errors, request.id));
-    const outcome = await runAction(() => decideRequest(request.id, action));
-    setBusyRow(null);
+    await list.act(
+      request,
+      () => decideRequest(request.id, action),
+      (data) => requestNotice(action, data.request),
+    );
     setRejecting(null);
-    if (outcome.ok) setNotice(requestNotice(action, outcome.data.request));
-    else setRowErrors((errors) => ({ ...errors, [request.id]: { email: request.email, message: outcome.message } }));
-    if (outcome.ok || outcome.status === 502) await load(filter, page);
   };
-
-  const visible = result.ok ? new Set(result.data.items.map((r) => r.id)) : new Set<string>();
-  const hiddenErrors = Object.entries(rowErrors).filter(([rid]) => !visible.has(rid));
 
   return (
     <section id={ID} aria-label="Access requests" className="space-y-3">

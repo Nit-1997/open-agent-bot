@@ -1,3 +1,4 @@
+import { SignOutForm } from "@/components/auth/SignOutForm";
 import Link from "next/link";
 import { AUTH_ERROR_COPY } from "@/lib/authErrors";
 
@@ -26,16 +27,13 @@ export function AccessDisabled() {
       <p id="session-disabled-text" className="max-w-sm text-sm text-text-muted">
         Ask the person who invited you if you think this is a mistake.
       </p>
-      <form id="session-disabled-signout-form" method="post" action="/auth/signout">
-        <input id="session-disabled-signout-scope" type="hidden" name="scope" value="local" />
-        <button
-          id="session-disabled-signout"
-          type="submit"
-          className="rounded-full border border-border px-4 py-1.5 text-sm text-text-secondary transition hover:border-border-strong"
-        >
-          Sign out
-        </button>
-      </form>
+      <SignOutForm
+        id="session-disabled-signout"
+        scope="local"
+        className="rounded-full border border-border px-4 py-1.5 text-sm text-text-secondary transition hover:border-border-strong"
+      >
+        Sign out
+      </SignOutForm>
     </main>
   );
 }

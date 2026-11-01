@@ -1,7 +1,4 @@
-export const PAGE_SIZE = 5;
 const MAX_PAGE = 100_000;
-
-export type Page<T> = { items: T[]; total: number; page: number; pageSize: number };
 
 export function parsePage(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === "") return 1;

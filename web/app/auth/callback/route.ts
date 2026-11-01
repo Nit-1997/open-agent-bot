@@ -1,11 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { safeNext } from "@/lib/auth";
+import { NEXT_COOKIE } from "@/lib/authCookies";
 import { callbackErrorCode } from "@/lib/authErrors";
 import { appOrigin } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-
-const NEXT_COOKIE = "oab_next";
 
 export async function GET(req: Request) {
   const origin = appOrigin();

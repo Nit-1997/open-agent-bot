@@ -1,16 +1,15 @@
+import type { ChatSummary, StoredMessage } from "@shared/chats";
+import type { Page, PageResponse } from "@shared/pages";
 import { readApi } from "@/lib/api";
-import type { Page } from "@/lib/pagination";
 
-export type ChatSummary = { id: string; title: string; lastMessageAt: string };
-export type StoredMessage = { role: "user" | "assistant"; content: string; status: "complete" | "interrupted"; createdAt: string };
 export type HistoryMessage = { id: string; role: "user" | "assistant"; content: string };
 
 export const STOPPED_MARK = "(stopped)";
 
 export const chatsApi = {
-  page: async (page: number) => readApi<Page<ChatSummary>>(await fetch(`/api/chats?page=${page}`, { cache: "no-store" })),
+  page: async (page: number) => readApi<PageResponse<ChatSummary>>(await fetch(`/api/chats?page=${page}`, { cache: "no-store" })),
   messages: async (id: string) =>
-    readApi<{ items: StoredMessage[]; total: number }>(await fetch(`/api/chats/${encodeURIComponent(id)}/messages`, { cache: "no-store" })),
+    readApi<Page<StoredMessage>>(await fetch(`/api/chats/${encodeURIComponent(id)}/messages`, { cache: "no-store" })),
 };
 
 export function toHistory(chatId: string, items: StoredMessage[]): HistoryMessage[] {

@@ -35,7 +35,7 @@ export function agentBaseUrl(): string {
 }
 
 export function serviceSecret(): string {
-  return required("AGENT_SERVICE_SECRET", process.env.AGENT_SERVICE_SECRET, (v) => /^[0-9a-f]{64}$/i.test(v));
+  return required("AGENT_SERVICE_SECRET", process.env.AGENT_SERVICE_SECRET, (v) => /^[0-9a-f]{64}$/.test(v));
 }
 
 export function supabaseEnv(): { url: string; publishableKey: string } {

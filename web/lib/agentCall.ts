@@ -1,17 +1,16 @@
-import { type AgentRequest, agentFetch } from "@/lib/agentServer";
-import { type ApiErrorBody, apiErrorMessage } from "@/lib/apiErrors";
-import { type AgentAuth, AuthUnavailable, getAgentAuth, SignedOut } from "@/lib/auth";
 import { type ActionResult, failure } from "@/lib/actionResult";
-import { AUTH_ERROR_COPY } from "@/lib/authErrors";
-import { ConfigError } from "@/lib/env";
+import { type AgentFailure, type AgentRequest, agentFetch, authFailureOf, unreachableOf } from "@/lib/agentServer";
+import { type ApiErrorBody, apiErrorMessage } from "@/lib/apiErrors";
+import { type AgentAuth, getAgentAuth } from "@/lib/auth";
+
+const asFailure = (f: AgentFailure) => failure(f.status, f.error, f.message);
 
 export async function callAgent<T>(path: string, auth: AgentAuth | null, init: AgentRequest = {}): Promise<ActionResult<T>> {
   let res: Response;
   try {
     res = await agentFetch(path, auth, init);
   } catch (e) {
-    if (e instanceof ConfigError) throw e;
-    return failure(502, "agent_unreachable", "The agent isn't reachable.");
+    return asFailure(unreachableOf(e));
   }
   const body = (await res.json().catch(() => ({}))) as T & ApiErrorBody;
   if (!res.ok) return failure(res.status, typeof body.error === "string" ? body.error : "upstream", apiErrorMessage(res.status, body));
@@ -23,9 +22,7 @@ export async function withAgentAuth<T>(fn: (auth: AgentAuth) => Promise<ActionRe
   try {
     auth = await getAgentAuth();
   } catch (e) {
-    if (e instanceof SignedOut) return failure(401, "signed_out", AUTH_ERROR_COPY.signed_out);
-    if (e instanceof AuthUnavailable) return failure(503, "auth_unavailable", AUTH_ERROR_COPY.auth_unavailable);
-    throw e;
+    return asFailure(authFailureOf(e));
   }
   return fn(auth);
 }

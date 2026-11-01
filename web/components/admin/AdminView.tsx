@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { AccessRequestView, AdminUser } from "@shared/admin";
+import type { PageResponse } from "@shared/pages";
 import type { ActionResult } from "@/lib/actionResult";
-import type { AccessRequestView, AdminUser } from "@/lib/admin";
-import type { Page } from "@/lib/pagination";
 import { RequestsList } from "./RequestsList";
 import { UsersList } from "./UsersList";
 
@@ -17,8 +17,8 @@ const TABS: Array<[Tab, string]> = [
 export function AdminView(props: {
   email: string;
   selfId: string;
-  requests: ActionResult<Page<AccessRequestView>>;
-  users: ActionResult<Page<AdminUser>>;
+  requests: ActionResult<PageResponse<AccessRequestView>>;
+  users: ActionResult<PageResponse<AdminUser>>;
 }) {
   const [tab, setTab] = useState<Tab>("requests");
   return (

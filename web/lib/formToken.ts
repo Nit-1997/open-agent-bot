@@ -12,6 +12,8 @@ export function signFormTs(now: number = Date.now(), secret: string = serviceSec
   return `${ts}.${mac(ts, secret)}`;
 }
 
+export const freshFormTs = (now: number = Date.now()): string => signFormTs(now - MIN_AGE_MS);
+
 export function checkFormTs(token: unknown, now: number = Date.now(), secret: string = serviceSecret()): boolean {
   if (typeof token !== "string" || token.length > 200) return false;
   const match = /^(\d{1,16})\.([A-Za-z0-9_-]{43})$/.exec(token);

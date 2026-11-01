@@ -1,6 +1,7 @@
 export const AUTH_ERROR_COPY = {
   not_invited: "This Google account isn't invited. Use the email you were invited with, or request access.",
   link_expired: "That link has expired or was already used. Sign in with Google, or ask for a new link below.",
+  link_mismatch: "That link was for a different account, so you weren't signed in. Ask for a new link below.",
   auth_failed: "Sign-in didn't work. Try again.",
   signed_out: "You were signed out. Sign in again.",
   account_disabled: "Your access has been turned off.",

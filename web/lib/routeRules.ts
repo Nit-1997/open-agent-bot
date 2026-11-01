@@ -11,7 +11,6 @@ const PUBLIC_PATHS = new Set(["/login", "/request-access", "/auth/callback", "/a
 export const isPublicPath = (pathname: string) => PUBLIC_PATHS.has(pathname) || pathname.startsWith("/_next/");
 
 const isAdminPage = (pathname: string) => pathname === "/admin" || pathname.startsWith("/admin/");
-const isAdminApi = (pathname: string) => pathname === "/api/admin" || pathname.startsWith("/api/admin/");
 
 export function decideRoute(pathname: string, session: SessionState): RouteDecision {
   if (isPublicPath(pathname)) return { kind: "pass" };
@@ -22,9 +21,6 @@ export function decideRoute(pathname: string, session: SessionState): RouteDecis
     }
     return api ? { kind: "json", status: 401, error: "signed_out" } : { kind: "login" };
   }
-  if (!session.user.isAdmin) {
-    if (isAdminApi(pathname)) return { kind: "json", status: 404, error: "not_found" };
-    if (isAdminPage(pathname)) return { kind: "not_found_page" };
-  }
+  if (!session.user.isAdmin && isAdminPage(pathname)) return { kind: "not_found_page" };
   return { kind: "pass" };
 }

@@ -3,7 +3,7 @@ import { CopilotRuntime, createCopilotEndpoint } from "@copilotkit/runtime/v2";
 import { handle } from "hono/vercel";
 import { agentHeaders, agentUrl, authFailure, isSafeMethod, isSameOrigin, jsonError } from "@/lib/agentServer";
 import { type AgentAuth, getAgentAuth } from "@/lib/auth";
-import { UserScopedRunner, withRunnerUser } from "@/lib/copilotRunner";
+import { requestAgentAuth, UserScopedRunner, withRequestAuth } from "@/lib/copilotRunner";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -15,10 +15,7 @@ let handler: ReturnType<typeof handle> | undefined;
 function endpoint(): ReturnType<typeof handle> {
   if (handler) return handler;
   const runtime = new CopilotRuntime({
-    agents: async () => {
-      const auth = await getAgentAuth();
-      return { openagent: new HttpAgent({ url: agentUrl("/agui"), headers: agentHeaders(auth) }) };
-    },
+    agents: async () => ({ openagent: new HttpAgent({ url: agentUrl("/agui"), headers: agentHeaders(requestAgentAuth()) }) }),
     runner: new UserScopedRunner(),
     forwardHeaders: { useDefaultDenylist: true, denyPrefixes: ["x-"], deny: ["authorization", "cookie"] },
   });
@@ -50,7 +47,7 @@ async function route(req: Request): Promise<Response> {
   } catch (e) {
     return authFailure(e);
   }
-  return withRunnerUser(auth.userId, () => endpoint()(withoutBrowserHeaders(req)));
+  return withRequestAuth(auth, () => endpoint()(withoutBrowserHeaders(req)));
 }
 
 export { route as DELETE, route as GET, route as PATCH, route as POST };

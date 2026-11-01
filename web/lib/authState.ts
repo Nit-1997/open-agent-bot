@@ -18,9 +18,20 @@ export function noteAuthFailure(status: number, code: unknown): void {
   else if (status === 401 && code === "signed_out") set("signed_out");
 }
 
-export function noteRunFailure(text: string): void {
-  if (/account_disabled/.test(text)) set("account_disabled");
-  else if (/signed_out/.test(text)) set("signed_out");
+export function errorCodeIn(text: string): string | undefined {
+  const start = text.indexOf("{");
+  if (start < 0) return undefined;
+  try {
+    const body = JSON.parse(text.slice(start)) as { error?: unknown };
+    return typeof body.error === "string" ? body.error : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function noteRunFailure(code: string | undefined): void {
+  if (code === "account_disabled") set("account_disabled");
+  else if (code === "signed_out") set("signed_out");
 }
 
 export function resetAuthState(): void {

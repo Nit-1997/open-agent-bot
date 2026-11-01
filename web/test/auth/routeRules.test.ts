@@ -25,7 +25,6 @@ describe("decideRoute", () => {
 
   it("hides admin routes from non-admins", () => {
     expect(decideRoute("/admin", user)).toEqual({ kind: "not_found_page" });
-    expect(decideRoute("/api/admin/users", user)).toEqual({ kind: "json", status: 404, error: "not_found" });
     expect(decideRoute("/admin", admin)).toEqual({ kind: "pass" });
     expect(decideRoute("/administrator", user)).toEqual({ kind: "pass" });
   });

@@ -1,67 +1,37 @@
 "use client";
 
+import type { AdminUser } from "@shared/admin";
+import type { PageResponse } from "@shared/pages";
 import { useState } from "react";
 import { deleteUser, listUsers, setUserStatus } from "@/app/admin/actions";
 import { ghost, input } from "@/components/profile/models/styles";
+import { DetailList } from "@/components/ui/DetailList";
 import { Pager } from "@/components/ui/Pager";
-import { type ActionResult, runAction } from "@/lib/actionResult";
-import { type AdminUser, SEARCH_MAX, type UserAction, userNotice } from "@/lib/admin";
+import type { ActionResult } from "@/lib/actionResult";
+import { SEARCH_MAX, type UserAction, userNotice } from "@/lib/admin";
 import { formatWhen } from "@/lib/chats";
-import type { Page } from "@/lib/pagination";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { DetailList } from "./DetailList";
-import { without } from "./without";
+import { usePagedAdminList } from "./usePagedAdminList";
 
 type Pending = { user: AdminUser; kind: "deactivate" | "delete" };
-type RowError = { email: string; message: string };
 
 const ID = "admin-users";
 
-export function UsersList({ initial, selfId }: { initial: ActionResult<Page<AdminUser>>; selfId: string }) {
-  const [query, setQuery] = useState("");
+export function UsersList({ initial, selfId }: { initial: ActionResult<PageResponse<AdminUser>>; selfId: string }) {
+  const list = usePagedAdminList<AdminUser, string>({ initial, initialQuery: "", fetchPage: (q, page) => listUsers(page, q) });
+  const { query, page, result, loading, busyRow, rowErrors, hiddenErrors, notice, load } = list;
   const [draft, setDraft] = useState("");
-  const [page, setPage] = useState(1);
-  const [result, setResult] = useState(initial);
-  const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [busyRow, setBusyRow] = useState<string | null>(null);
-  const [rowErrors, setRowErrors] = useState<Record<string, RowError>>({});
-  const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
 
-  const load = async (nextQuery: string, nextPage: number) => {
-    setLoading(true);
-    let target = nextPage;
-    let next = await runAction(() => listUsers(target, nextQuery));
-    if (next.ok && next.data.items.length === 0 && target > 1) {
-      target -= 1;
-      next = await runAction(() => listUsers(target, nextQuery));
-    }
-    setQuery(nextQuery);
-    setPage(target);
-    setResult(next);
-    setLoading(false);
-  };
-
   const act = async (user: AdminUser, action: UserAction | "delete", confirmEmail = "") => {
-    setBusyRow(user.id);
-    setNotice(null);
-    setRowErrors((errors) => without(errors, user.id));
-    const outcome = await runAction<unknown>(() =>
-      action === "delete" ? deleteUser(user.id, confirmEmail) : setUserStatus(user.id, action),
+    await list.act<unknown>(
+      user,
+      () => (action === "delete" ? deleteUser(user.id, confirmEmail) : setUserStatus(user.id, action)),
+      () => userNotice(action, user.email),
     );
-    setBusyRow(null);
     setPending(null);
-    if (outcome.ok) {
-      setNotice(userNotice(action, user.email));
-      await load(query, page);
-    } else {
-      setRowErrors((errors) => ({ ...errors, [user.id]: { email: user.email, message: outcome.message } }));
-    }
   };
-
-  const visible = result.ok ? new Set(result.data.items.map((u) => u.id)) : new Set<string>();
-  const hiddenErrors = Object.entries(rowErrors).filter(([uid]) => !visible.has(uid));
 
   return (
     <section id={ID} aria-label="Users" className="space-y-3">

@@ -88,7 +88,7 @@ describe("CopilotKit route", () => {
     vi.mocked(getAgentAuth).mockRejectedValue(new SignedOut("signed_out"));
     const res = await POST(runRequest());
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "signed_out" });
+    expect(await res.json()).toEqual({ error: "signed_out", message: "You were signed out. Sign in again." });
     expect(agentCalls).toEqual([]);
   });
 

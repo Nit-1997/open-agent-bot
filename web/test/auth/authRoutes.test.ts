@@ -32,6 +32,7 @@ const auth = {
   exchangeCodeForSession: vi.fn(),
   verifyOtp: vi.fn(),
   signOut: vi.fn(),
+  getClaims: vi.fn(),
 };
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ auth })) }));
 
@@ -43,6 +44,7 @@ beforeEach(() => {
   auth.exchangeCodeForSession.mockResolvedValue({ error: null });
   auth.verifyOtp.mockResolvedValue({ error: null });
   auth.signOut.mockResolvedValue({ error: null });
+  auth.getClaims.mockResolvedValue({ data: { claims: { email: "Dummy+tag@Example.com" } }, error: null });
 });
 
 afterEach(() => {
@@ -95,10 +97,22 @@ describe("confirmEmailLink", () => {
     return f;
   };
 
-  it("verifies a valid invite or email link and goes home", async () => {
-    expect(await redirectOf(confirmEmailLink(form({ type: "invite", token_hash: "pkce_abcdef123456" })))).toBe("/");
+  const email = "dummy+tag@example.com";
+
+  it("verifies a valid invite or email link for the shown account and goes home", async () => {
+    expect(await redirectOf(confirmEmailLink(form({ type: "invite", token_hash: "pkce_abcdef123456", email })))).toBe("/");
     expect(auth.verifyOtp).toHaveBeenCalledWith({ type: "invite", token_hash: "pkce_abcdef123456" });
-    expect(await redirectOf(confirmEmailLink(form({ type: "email", token_hash: "abcdefghijk" })))).toBe("/");
+    expect(await redirectOf(confirmEmailLink(form({ type: "email", token_hash: "abcdefghijk", email })))).toBe("/");
+    expect(auth.signOut).not.toHaveBeenCalled();
+    expect(cookieStore.delete).toHaveBeenCalledWith({ name: "oab_link", path: "/auth/confirm" });
+  });
+
+  it("signs straight back out when the link belongs to a different account than the one shown", async () => {
+    auth.getClaims.mockResolvedValue({ data: { claims: { email: "attacker@example.com" } }, error: null });
+    expect(await redirectOf(confirmEmailLink(form({ type: "email", token_hash: "abcdefghijk", email })))).toBe(
+      "/login?error=link_mismatch",
+    );
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
   it.each([
@@ -108,6 +122,8 @@ describe("confirmEmailLink", () => {
     [{ type: "email", token_hash: "abc/def?ghijk" }],
     [{ type: "email", token_hash: "a".repeat(201) }],
     [{ type: "email" }],
+    [{ type: "email", token_hash: "abcdefghijk" }],
+    [{ type: "email", token_hash: "abcdefghijk", email: "not-an-email" }],
   ])("rejects %j without calling Supabase", async (fields) => {
     expect(await redirectOf(confirmEmailLink(form(fields as Record<string, string>)))).toBe("/login?error=link_expired");
     expect(auth.verifyOtp).not.toHaveBeenCalled();
@@ -115,7 +131,9 @@ describe("confirmEmailLink", () => {
 
   it("sends a used or expired link to link_expired", async () => {
     auth.verifyOtp.mockResolvedValue({ error: { name: "AuthApiError", message: "Token has expired or is invalid", status: 403 } });
-    expect(await redirectOf(confirmEmailLink(form({ type: "email", token_hash: "abcdefghijk" })))).toBe("/login?error=link_expired");
+    expect(await redirectOf(confirmEmailLink(form({ type: "email", token_hash: "abcdefghijk", email: "a@example.com" })))).toBe(
+      "/login?error=link_expired",
+    );
   });
 });
 
@@ -181,7 +199,9 @@ describe("submitAccessRequest", () => {
     expect(headers.get("x-agent-secret")).toBe(SERVICE_SECRET);
     expect(headers.get("x-client-ip")).toBe("203.0.113.9");
     expect(headers.get("authorization")).toBeNull();
-    expect(JSON.parse(String(init.body))).toEqual({ name: "Dummy One", email: "dummy@example.com", note: "testing" });
+    const sent = JSON.parse(String(init.body));
+    expect(sent).toMatchObject({ name: "Dummy One", email: "dummy@example.com", note: "testing" });
+    expect(typeof sent.formToken).toBe("string");
   });
 
   it("drops bots silently: honeypot, forged token, too fast", async () => {

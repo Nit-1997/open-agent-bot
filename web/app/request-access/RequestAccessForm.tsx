@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { authInput, authPrimary } from "@/components/auth/AuthCard";
-import { type AccessRequestState, EMAIL_MAX, NAME_MAX, NOTE_MAX } from "@/lib/authForms";
+import { EMAIL_MAX } from "@shared/email";
+import { type AccessRequestState, NAME_MAX, NOTE_MAX } from "@/lib/authForms";
 import { submitAccessRequest } from "./actions";
 
 const INITIAL: AccessRequestState = { status: "idle" };
@@ -82,7 +83,7 @@ export function RequestAccessForm({ formTs }: { formTs: string }) {
         </label>
         <input id="request-access-company-website" name="company_website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
-      <input id="request-access-form-ts" type="hidden" name="form_ts" value={formTs} />
+      <input id="request-access-form-ts" type="hidden" name="form_ts" value={state.formTs ?? formTs} />
       {state.message && (
         <p id="request-access-error" role="alert" className="text-xs text-danger-fg">
           {state.message}

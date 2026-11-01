@@ -1,14 +1,16 @@
 "use server";
 
+import { normalizeEmail } from "@shared/email";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { agentFetch } from "@/lib/agentServer";
 import { safeNext } from "@/lib/auth";
-import { clientIp, type EmailLinkState, normalizeEmail } from "@/lib/authForms";
+import { LINK_COOKIE, LINK_COOKIE_MAX_AGE, linkBinding, NEXT_COOKIE } from "@/lib/authCookies";
+import { clientIp, type EmailLinkState } from "@/lib/authForms";
 import { appOrigin, ConfigError } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
-const NEXT_COOKIE = "oab_next";
+const UNAVAILABLE = "Can't send links right now. Try again in a minute.";
 
 export async function signInWithGoogle(form: FormData): Promise<void> {
   const origin = appOrigin();
@@ -38,10 +40,17 @@ export async function requestEmailLink(_prev: EmailLinkState, form: FormData): P
       headers: { "content-type": "application/json", ...(ip && { "x-client-ip": ip }) },
       body: JSON.stringify({ email }),
     });
-    if (res.status >= 500) return { status: "error", message: "Can't send links right now. Try again in a minute." };
+    if (res.status >= 500) return { status: "error", message: UNAVAILABLE };
   } catch (e) {
     if (e instanceof ConfigError) throw e;
-    return { status: "error", message: "Can't send links right now. Try again in a minute." };
+    return { status: "error", message: UNAVAILABLE };
   }
+  (await cookies()).set(LINK_COOKIE, linkBinding(email), {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/auth/confirm",
+    maxAge: LINK_COOKIE_MAX_AGE,
+  });
   return { status: "sent" };
 }

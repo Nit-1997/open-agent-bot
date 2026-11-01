@@ -6,8 +6,8 @@ import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { RequestsList } from "@/components/admin/RequestsList";
 import { UsersList } from "@/components/admin/UsersList";
 import type { ActionResult } from "@/lib/actionResult";
-import type { AccessRequestView, AdminUser } from "@/lib/admin";
-import type { Page } from "@/lib/pagination";
+import type { AccessRequestView, AdminUser } from "@shared/admin";
+import type { PageResponse } from "@shared/pages";
 
 vi.mock("@/app/admin/actions", () => ({
   listRequests: vi.fn(),
@@ -44,7 +44,7 @@ const user = (n: number, over: Partial<AdminUser> = {}): AdminUser => ({
   ...over,
 });
 
-const pageOf = <T,>(items: T[], page: number, total: number): ActionResult<Page<T>> => ({
+const pageOf = <T,>(items: T[], page: number, total: number): ActionResult<PageResponse<T>> => ({
   ok: true,
   data: { items, total, page, pageSize: 5 },
 });
@@ -128,13 +128,22 @@ describe("RequestsList", () => {
     expectUniqueIds(container);
   });
 
-  it("shows a conflict inline on the row without reloading", async () => {
-    vi.mocked(decideRequest).mockResolvedValue(fail(409, "already_member", "This email already has an account."));
+  it("shows a conflict on the row and reloads so the list shows the request's real state", async () => {
+    vi.mocked(decideRequest).mockResolvedValue(fail(409, "already_decided", "This request was already decided."));
+    vi.mocked(listRequests).mockResolvedValue(first);
     render(<RequestsList initial={first} />);
     fireEvent.click(byId(`admin-requests-approve-${uuid(2)}`));
     expect(await screen.findByRole("alert")).toHaveAttribute("id", `admin-requests-row-error-${uuid(2)}`);
-    expect(byId(`admin-requests-row-error-${uuid(2)}`)).toHaveTextContent("This email already has an account.");
-    expect(listRequests).not.toHaveBeenCalled();
+    expect(byId(`admin-requests-row-error-${uuid(2)}`)).toHaveTextContent("This request was already decided.");
+    await waitFor(() => expect(listRequests).toHaveBeenCalledWith("pending", 1));
+  });
+
+  it("explains an approval for someone who already has an account", async () => {
+    vi.mocked(decideRequest).mockResolvedValue({ ok: true, data: { request: request(2, { status: "approved", inviteStatus: null }) } });
+    vi.mocked(listRequests).mockResolvedValue(first);
+    render(<RequestsList initial={first} />);
+    fireEvent.click(byId(`admin-requests-approve-${uuid(2)}`));
+    expect(await screen.findByRole("status")).toHaveTextContent("They already have an account, so no invite was sent.");
   });
 
   it("asks before rejecting", async () => {
@@ -207,6 +216,7 @@ describe("UsersList", () => {
 
   it("deletes only after the email is typed, and shows a failed step on the row", async () => {
     vi.mocked(deleteUser).mockResolvedValue(fail(500, "delete_failed", "Couldn't delete the account. (step: storage)"));
+    vi.mocked(listUsers).mockResolvedValue(first);
     const { container } = render(<UsersList initial={first} selfId={uuid(100)} />);
     fireEvent.click(byId(`admin-users-delete-${uuid(102)}`));
     const confirm = byId("admin-users-confirm-confirm");
@@ -218,7 +228,7 @@ describe("UsersList", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't delete the account. (step: storage)");
     expect(deleteUser).toHaveBeenCalledWith(uuid(102), "user2@example.test");
     expect(screen.queryByRole("status")).toBeNull();
-    expect(listUsers).not.toHaveBeenCalled();
+    await waitFor(() => expect(listUsers).toHaveBeenCalledWith(1, ""));
   });
 
   it("explains a failed load", () => {

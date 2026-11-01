@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutForm } from "@/components/auth/SignOutForm";
 import type { Profile } from "@shared/profile";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -164,16 +165,13 @@ export function ProfileDrawer(props: {
             >
               Run setup again
             </button>
-            <form id="profile-signout-all-form" method="post" action="/auth/signout">
-              <input id="profile-signout-all-scope" type="hidden" name="scope" value="global" />
-              <button
-                id="profile-signout-all"
-                type="submit"
-                className="block text-sm text-text-secondary underline-offset-4 hover:underline"
-              >
-                Sign out everywhere
-              </button>
-            </form>
+            <SignOutForm
+              id="profile-signout-all"
+              scope="global"
+              className="block text-sm text-text-secondary underline-offset-4 hover:underline"
+            >
+              Sign out everywhere
+            </SignOutForm>
             {confirming ? (
               <div id="profile-clear-confirm" className="flex items-center gap-2 text-sm">
                 <span id="profile-clear-question" className="text-text-secondary">

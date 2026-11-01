@@ -4,6 +4,7 @@ import ConfirmPage from "@/app/auth/confirm/page";
 import LoginPage from "@/app/login/page";
 import RequestAccessPage from "@/app/request-access/page";
 import { getClaimsOrNull } from "@/lib/auth";
+import { linkBinding } from "@/lib/authCookies";
 import { AUTH_ERROR_COPY } from "@/lib/authErrors";
 import { checkFormTs } from "@/lib/formToken";
 import { stubAgentEnv } from "../support/agentEnv";
@@ -16,6 +17,12 @@ vi.mock("@/app/login/actions", () => ({ signInWithGoogle: vi.fn(), requestEmailL
 vi.mock("@/app/request-access/actions", () => ({ submitAccessRequest: vi.fn() }));
 vi.mock("@/app/auth/confirm/actions", () => ({ confirmEmailLink: vi.fn() }));
 vi.mock("next/server", () => ({ connection: async () => {} }));
+const jar = new Map<string, string>();
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined) }),
+}));
+
+const byIdIn = (root: HTMLElement, id: string) => root.querySelector(`#${id}`);
 
 class Redirect extends Error {}
 vi.mock("next/navigation", () => ({
@@ -78,12 +85,29 @@ describe("/request-access", () => {
 });
 
 describe("/auth/confirm", () => {
-  it("asks for a click before using the token", async () => {
-    const { container } = render(await ConfirmPage(params({ token_hash: "pkce_abcdef123456", type: "invite" })));
+  it("shows the account and asks for a click before using the token", async () => {
+    const { container } = render(
+      await ConfirmPage(params({ token_hash: "pkce_abcdef123456", type: "invite", email: "new person@example.test" })),
+    );
     expect(screen.getByRole("button", { name: "Continue to Open Agent" })).toHaveAttribute("id", "auth-confirm-continue");
+    expect(byIdIn(container, "auth-confirm-account")).toHaveTextContent("Accept the invite for new+person@example.test");
     expect(container.querySelector<HTMLInputElement>("input[name=token_hash]")?.value).toBe("pkce_abcdef123456");
     expect(container.querySelector<HTMLInputElement>("input[name=type]")?.value).toBe("invite");
+    expect(container.querySelector<HTMLInputElement>("input[name=email]")?.value).toBe("new+person@example.test");
+    expect(screen.queryByRole("note")).toBeNull();
     expectUniqueIds(container);
+  });
+
+  it("warns when an email link wasn't requested from this browser, and not when it was", async () => {
+    const link = { token_hash: "abcdefghijk", type: "email", email: "me@example.test" };
+    const { container, unmount } = render(await ConfirmPage(params(link)));
+    expect(byIdIn(container, "auth-confirm-account")).toHaveTextContent("Sign in as me@example.test");
+    expect(screen.getByRole("note")).toHaveTextContent("wasn't requested from this browser");
+    expectUniqueIds(container);
+    unmount();
+    jar.set("oab_link", linkBinding("me@example.test"));
+    render(await ConfirmPage(params(link)));
+    expect(screen.queryByRole("note")).toBeNull();
   });
 
   it("explains an incomplete link instead of offering the button", async () => {

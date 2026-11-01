@@ -1,3 +1,4 @@
+import { ARTIFACT_CSP } from "@shared/artifacts";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/artifacts/[id]/route";
@@ -23,7 +24,11 @@ describe("artifacts route", () => {
     vi.stubGlobal("fetch", fetchMock);
     const res = await call("abcdefghijkl");
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-security-policy")).toBe("sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    const csp = res.headers.get("content-security-policy") ?? "";
+    expect(csp).toBe(ARTIFACT_CSP);
+    for (const directive of ["default-src 'none'", "img-src data:", "connect-src 'none'", "form-action 'none'", "base-uri 'none'"])
+      expect(csp).toContain(directive);
+    expect(csp).toContain("sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox");
     expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toMatch(/\/artifacts\/abcdefghijkl$/);
