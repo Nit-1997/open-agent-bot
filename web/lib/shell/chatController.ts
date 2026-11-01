@@ -44,9 +44,12 @@ export function initialChatState(draftId: string, starter?: string): ChatState {
   return { draftId, activeId: draftId, threads: { [draftId]: draft(draftId, starter) }, running: [] };
 }
 
+export const paneId = (threadId: string) => `chat-pane-${threadId}`;
+export const composerInputId = (threadId: string) => `${paneId(threadId)}-composer-input`;
+
 export function mountedIds(s: ChatState): string[] {
-  const running = s.running.filter((id) => id !== s.activeId).slice(-(MAX_PANES - 1));
-  return [s.activeId, ...running].filter((id) => s.threads[id]);
+  const keep = new Set([s.activeId, ...s.running.filter((id) => id !== s.activeId).slice(-(MAX_PANES - 1))]);
+  return Object.keys(s.threads).filter((id) => keep.has(id));
 }
 
 function prune(s: ChatState): ChatState {

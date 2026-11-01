@@ -75,8 +75,16 @@ describe("ChatHost", () => {
     }
     await go(`/chats/${C}`);
     await screen.findByText("hello c");
-    expect(panes().map((p) => p.id)).toEqual([`chat-pane-${C}`, `chat-pane-${A}`, `chat-pane-${B}`]);
+    expect(panes().map((p) => p.id)).toEqual([`chat-pane-${A}`, `chat-pane-${B}`, `chat-pane-${C}`]);
     expect(document.getElementById(`chat-pane-${A}`)).toHaveAttribute("hidden");
+    const nodes = panes();
+    await go(`/chats/${A}`);
+    expect(panes()).toEqual(nodes.slice(0, 2));
+    expect(document.getElementById(`chat-pane-${A}`)).not.toHaveAttribute("hidden");
+    expect(document.getElementById(`chat-pane-${B}`)).toHaveAttribute("hidden");
+    await go(`/chats/${C}`);
+    await screen.findByText("hello c");
+    expect(panes().slice(0, 2)).toEqual(nodes.slice(0, 2));
     expectUniqueIds(container);
     for (const id of [A, B, C]) {
       const label = document.getElementById(`chat-pane-${id}-composer-label`)!;
@@ -84,7 +92,7 @@ describe("ChatHost", () => {
     }
     await act(async () => copilot.runs.find((r) => r.agent === agentOf(A))!.finish());
     await flush();
-    expect(panes().map((p) => p.id)).toEqual([`chat-pane-${C}`, `chat-pane-${B}`]);
+    expect(panes().map((p) => p.id)).toEqual([`chat-pane-${B}`, `chat-pane-${C}`]);
   });
 
   it("moves a new chat's URL to /chats/<id> on the first non-error run event, not on send", async () => {

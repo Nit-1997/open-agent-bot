@@ -11,3 +11,6 @@ export function searchHref(raw: string, scope: SearchScope = "all", page = 1): s
 }
 
 export const SEARCH_DEBOUNCE_MS = 250;
+
+export const SEARCH_FIELD_ID = "search-field";
+export const SEARCH_INPUT_ID = `${SEARCH_FIELD_ID}-input`;

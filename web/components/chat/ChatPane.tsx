@@ -11,6 +11,7 @@ import { chatsApi, toHistory } from "@/lib/chats";
 import { errorMessage } from "@/lib/errors";
 import { isolate, rememberLine } from "@/lib/persona";
 import { useBreakpoint } from "@/lib/shell/breakpoints";
+import { composerInputId, paneId } from "@/lib/shell/chatController";
 import { threadAgentId, useThreadContext } from "@/lib/useThreadContext";
 import { getUserContext, withChat } from "@/lib/userContext";
 import { ChatHeader } from "./ChatHeader";
@@ -18,8 +19,6 @@ import { ChatMissing } from "./ChatMissing";
 import { ChatSession } from "./ChatSession";
 
 export const RUNTIME_AGENT_ID = "openagent";
-
-export const paneId = (threadId: string) => `chat-pane-${threadId}`;
 
 function useHistoryLoader(threadId: string, status: string, attempt: number) {
   const { dispatch } = useShell();
@@ -39,8 +38,8 @@ function useHistoryLoader(threadId: string, status: string, attempt: number) {
   }, [threadId, status, attempt, dispatch]);
 }
 
-export function ChatPane(props: { threadId: string; active: boolean }) {
-  const { threadId, active } = props;
+export function ChatPane(props: { threadId: string; active: boolean; visible: boolean }) {
+  const { threadId, active, visible } = props;
   const shell = useShell();
   const { dispatch, persona, profile, models, open, newChat, running, takeFocusRequest } = shell;
   const thread = shell.chats.threads[threadId];
@@ -58,8 +57,10 @@ export function ChatPane(props: { threadId: string; active: boolean }) {
   }, [thread?.status]);
   useEffect(() => {
     activeRef.current = active;
-    if (active && takeFocusRequest("composer")) document.getElementById(`${id}-composer-input`)?.focus();
-  }, [active, id, takeFocusRequest]);
+  }, [active]);
+  useEffect(() => {
+    if (active && visible && takeFocusRequest("composer")) document.getElementById(composerInputId(threadId))?.focus();
+  }, [active, visible, threadId, takeFocusRequest]);
 
   const onRunningChange = useCallback((r: boolean) => dispatch({ type: "running", id: threadId, running: r }), [dispatch, threadId]);
   const onClaimed = useCallback(

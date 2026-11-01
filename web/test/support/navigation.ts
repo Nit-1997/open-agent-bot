@@ -23,6 +23,7 @@ export const nav = {
 };
 
 export const navigationMock = () => {
+  const router = { push: nav.push, replace: nav.replace, back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() };
   const subscribe = (cb: () => void) => {
     nav.listeners.add(cb);
     return () => nav.listeners.delete(cb);
@@ -33,7 +34,7 @@ export const navigationMock = () => {
       const search = useSyncExternalStore(subscribe, () => nav.search);
       return new URLSearchParams(search);
     },
-    useRouter: () => ({ push: nav.push, replace: nav.replace, back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+    useRouter: () => router,
     notFound: () => {
       throw new Error("notFound");
     },

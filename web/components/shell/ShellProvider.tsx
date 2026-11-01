@@ -2,15 +2,26 @@
 
 import type { AgentPersona, Profile } from "@shared/profile";
 import { agentPersona } from "@shared/profile";
-import { useRouter } from "next/navigation";
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useReducer, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ModelList } from "@/lib/models";
-import { type ChatAction, type ChatState, chatReducer, initialChatState, isUntouchedDraft } from "@/lib/shell/chatController";
+import { useBreakpoint } from "@/lib/shell/breakpoints";
+import {
+  type ChatAction,
+  type ChatState,
+  chatReducer,
+  composerInputId,
+  initialChatState,
+  isUntouchedDraft,
+} from "@/lib/shell/chatController";
 import { readSidebarOpen, writeSidebarOpen } from "@/lib/shell/sidebarPref";
 
 export type Overlay = "none" | "sidebar" | "drawer" | "account" | "profile" | "models";
 export type FocusTarget = "search" | "composer";
 export type ShellUser = { email: string; name: string; isAdmin: boolean };
+
+const FOCUS_PATH: Record<FocusTarget, string> = { search: "/search", composer: "/" };
+const BREAKPOINT_OVERLAYS: ReadonlySet<Overlay> = new Set(["sidebar", "drawer"]);
 
 export type ShellApi = {
   user: ShellUser;
@@ -50,17 +61,38 @@ export function ShellProvider(props: {
   children: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const breakpoint = useBreakpoint();
   const [chats, dispatch] = useReducer(chatReducer, props.starter, (starter) => initialChatState(crypto.randomUUID(), starter));
+  const chatsRef = useRef(chats);
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen);
   const [overlay, setOverlay] = useState<Overlay>("none");
   const [profileFocus, setProfileFocus] = useState<"agent" | undefined>(undefined);
+  const [seenBreakpoint, setSeenBreakpoint] = useState(breakpoint);
   const opener = useRef<HTMLElement | null>(null);
-  const focusRequests = useRef(new Set<FocusTarget>());
+  const focusRequest = useRef<FocusTarget | null>(null);
+
+  if (breakpoint !== seenBreakpoint) {
+    setSeenBreakpoint(breakpoint);
+    if (BREAKPOINT_OVERLAYS.has(overlay)) setOverlay("none");
+  }
+
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+
+  useEffect(() => {
+    if (focusRequest.current && FOCUS_PATH[focusRequest.current] !== pathname) focusRequest.current = null;
+  }, [pathname]);
 
   const requestFocus = useCallback((target: FocusTarget) => {
-    focusRequests.current.add(target);
+    focusRequest.current = target;
   }, []);
-  const takeFocusRequest = useCallback((target: FocusTarget) => focusRequests.current.delete(target), []);
+  const takeFocusRequest = useCallback((target: FocusTarget) => {
+    if (focusRequest.current !== target) return false;
+    focusRequest.current = null;
+    return true;
+  }, []);
 
   const open = useCallback(
     (o: Exclude<Overlay, "none">, opts?: { focus?: "agent" }) => {
@@ -89,39 +121,60 @@ export function ShellProvider(props: {
   }, []);
 
   const newChat = useCallback(() => {
-    const onChat = window.location.pathname === "/";
-    if (onChat && isUntouchedDraft(chats.threads[chats.activeId])) {
-      focusRequests.current.add("composer");
-      document.getElementById(`chat-pane-${chats.activeId}-composer-input`)?.focus();
+    const current = chatsRef.current;
+    if (window.location.pathname === "/" && isUntouchedDraft(current.threads[current.activeId])) {
+      document.getElementById(composerInputId(current.activeId))?.focus();
       return;
     }
     dispatch({ type: "newDraft", id: crypto.randomUUID() });
-    focusRequests.current.add("composer");
+    focusRequest.current = "composer";
     router.push("/");
-  }, [chats, router]);
+  }, [router]);
 
   const running = useMemo(() => new Set(chats.running), [chats.running]);
   const persona = useMemo(() => agentPersona(props.profile), [props.profile]);
+  const { user, profile, saveProfile, models, reloadModels } = props;
 
-  const api: ShellApi = {
-    user: props.user,
-    persona,
-    profile: props.profile,
-    saveProfile: props.saveProfile,
-    models: props.models,
-    reloadModels: props.reloadModels,
-    chats,
-    dispatch,
-    newChat,
-    sidebar: { open: sidebarOpen, toggle },
-    overlay,
-    profileFocus,
-    open,
-    close,
-    running,
-    requestFocus,
-    takeFocusRequest,
-  };
+  const api = useMemo<ShellApi>(
+    () => ({
+      user,
+      persona,
+      profile,
+      saveProfile,
+      models,
+      reloadModels,
+      chats,
+      dispatch,
+      newChat,
+      sidebar: { open: sidebarOpen, toggle },
+      overlay,
+      profileFocus,
+      open,
+      close,
+      running,
+      requestFocus,
+      takeFocusRequest,
+    }),
+    [
+      user,
+      persona,
+      profile,
+      saveProfile,
+      models,
+      reloadModels,
+      chats,
+      newChat,
+      sidebarOpen,
+      toggle,
+      overlay,
+      profileFocus,
+      open,
+      close,
+      running,
+      requestFocus,
+      takeFocusRequest,
+    ],
+  );
 
   return <ShellContext.Provider value={api}>{props.children}</ShellContext.Provider>;
 }

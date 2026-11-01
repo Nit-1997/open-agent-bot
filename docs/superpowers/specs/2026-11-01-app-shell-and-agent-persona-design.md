@@ -1031,8 +1031,17 @@ What the build changed or settled, and why. The sections above were updated wher
 - **Mockup sizes.** The empty-state orb is 72 px (44 px on phones) and the onboarding orb 112 px, as in "Collapsed" and "MeetAgent"; the memory line sits under the greeting, as in "Collapsed".
 - **Sign-in redirect.** `safeNext` checks `%2f`/`%5c` only in the path, so an encoded `/` in a search query survives. The login page now forwards an already signed-in visitor to `next`. Email-link sign-in still lands on `/` (the link can be opened in another browser); Google sign-in keeps `next`. E2E step 8 checks the redirect to `/login?next=%2Fsearch%3Fq%3Dtacos`.
 - **Unknown shell paths.** `app/(app)/[...missing]/page.tsx` calls `notFound()`, so `/plans/<chat>/trip/..` (which browsers normalise to `/plans/<chat>/`) is a 404 inside the shell.
-- **Search focus.** Only the rail's Search moves focus into the view's field. Typing in the sidebar or drawer field keeps focus there; both fields follow `?q=`.
+- **Search focus.** Only the rail's Search moves focus into the view's field. Typing in the sidebar or drawer field keeps focus there; both fields follow `?q=`. The scope tabs use a roving `tabindex`: Left and Right wrap, Home and End jump, and moving selects the scope.
 - **Draft text.** A chat pane keeps its composer text while it is mounted (including when hidden and across breakpoints). An idle chat that is left for another chat unmounts and its unsent text is not kept.
 - **Account sheet.** The theme row is `role="switch"` in the sheet (a list of buttons) and `menuitemcheckbox` in the menu.
 - **E2E needs the model key.** Onboarding cannot finish without a model, so `E2E_OPENROUTER_KEY` is required; the live reply in step 3 always runs. The suite has three tests (one per project) with numbered `test.step`s. Test users come from `bootstrap-admin.mjs --user`, are signed in with `dev-link.mjs`, and are removed by `cleanup-e2e.mjs` before and after the run.
 - **Integration users.** `test/supabase` gained `createBareUser` (no session) for tests that only need rows, to stay under the auth rate limit.
+
+### Review fixes (2026-11-01)
+
+- **Focus requests are one-shot.** The shell holds at most one pending request (`search` or `composer`), and a route change to any path other than the request's own (`/search` or `/`) drops it. New chat on an untouched draft and the rail's Search on `/search` focus the field directly instead of leaving a request behind. A chat pane takes a composer request only while it is active and the chat is visible. The Search view focuses its heading on mount only when focus is not already in a search field.
+- **Onboarding.** Leaving the agent step resets its validity, so a bad name that was skipped doesn't keep Next disabled when the step is revisited (the name field starts again from the stored, valid name).
+- **Breakpoint overlays.** Crossing a breakpoint closes the tablet sidebar overlay and the phone drawer without restoring focus, so they don't come back on the way back and the next opener is recorded.
+- **Chat index.** `more()` is generation-checked (a `reset()` or a newer `load()` drops its result), and `load()` refetches as many pages as the list holds when it finishes, so a page added by `more()` during a refresh is kept.
+- **Pane order.** Mounted panes keep the order they were opened in; switching chats only flips `hidden`/`inert`, so React never moves a pane's DOM node. Eviction is unchanged: the active chat plus the two most recent running ones.
+- **Shell API.** The context value is memoised and `newChat` reads the chat state through a ref, so it is stable. `composerInputId(threadId)` sits next to `paneId` in `lib/shell/chatController.ts`.

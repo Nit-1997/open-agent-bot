@@ -114,6 +114,7 @@ export function Onboarding(props: {
 
   const go = (to: SlideId) => {
     setError(null);
+    if (to !== current) setAgentValid(true);
     setSlide(to);
   };
   const next = () => go(slides[Math.min(index + 1, slides.length - 1)]);

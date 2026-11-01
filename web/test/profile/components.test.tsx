@@ -208,6 +208,17 @@ describe("Onboarding", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
+  it("enables Next again after a bad agent name is skipped and the step is revisited", async () => {
+    setup();
+    fireEvent.change(await screen.findByLabelText("Agent Name"), { target: { value: "!!" } });
+    expect(screen.getByRole("button", { name: "Next: about you" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+    expect(title()).toBe("Let's start with you");
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Hi, I'm Juno.");
+    expect(screen.getByRole("button", { name: "Next: about you" })).toBeEnabled();
+  });
+
   it("puts the model step first when no provider is set up, and it can't be skipped", async () => {
     setup({ models: { default: null, models: [] } });
     fireEvent.click(await screen.findByRole("button", { name: "Next" }));

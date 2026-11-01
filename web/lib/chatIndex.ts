@@ -2,6 +2,7 @@
 
 import { type ChatSummary, chatTitleFrom } from "@shared/chats";
 import { CHATS_PAGE_SIZE } from "@shared/lists";
+import type { PageResponse } from "@shared/pages";
 import { useEffect, useSyncExternalStore } from "react";
 import { chatsApi } from "@/lib/chats";
 import { errorMessage } from "@/lib/errors";
@@ -53,9 +54,20 @@ export const chatIndex = {
     const mine = ++generation;
     set({ ...state, status: state.items.length ? state.status : "loading", error: undefined });
     try {
-      const { items, total } = await loadPages(state.pages || 1);
+      let fetched = state.pages || 1;
+      let page = await loadPages(fetched);
+      while (mine === generation && state.pages > fetched) {
+        fetched = state.pages;
+        page = await loadPages(fetched);
+      }
       if (mine === generation)
-        set({ ...state, status: "ready", items, total, pages: Math.max(1, Math.ceil(items.length / CHATS_PAGE_SIZE)) });
+        set({
+          ...state,
+          status: "ready",
+          items: page.items,
+          total: page.total,
+          pages: Math.max(1, Math.ceil(page.items.length / CHATS_PAGE_SIZE)),
+        });
     } catch (e) {
       if (mine === generation) set({ ...state, status: state.items.length ? "ready" : "error", error: errorMessage(e) });
     }
@@ -65,13 +77,22 @@ export const chatIndex = {
   },
   async more(): Promise<void> {
     if (state.loadingMore || state.items.length >= state.total) return;
+    const mine = generation;
+    const next = state.pages + 1;
     set({ ...state, loadingMore: true, moreError: undefined });
+    let res: PageResponse<ChatSummary> | undefined;
+    let failure: string | undefined;
     try {
-      const res = await chatsApi.page(state.pages + 1);
-      set({ ...state, loadingMore: false, items: dedupe([...state.items, ...res.items]), total: res.total, pages: state.pages + 1 });
+      res = await chatsApi.page(next);
     } catch (e) {
-      set({ ...state, loadingMore: false, moreError: errorMessage(e) });
+      failure = errorMessage(e);
     }
+    if (mine !== generation) {
+      if (state.loadingMore) set({ ...state, loadingMore: false });
+      return;
+    }
+    if (res) set({ ...state, loadingMore: false, items: dedupe([...state.items, ...res.items]), total: res.total, pages: next });
+    else set({ ...state, loadingMore: false, moreError: failure });
   },
   addOptimistic(id: string, prompt: string): void {
     if (state.items.some((c) => c.id === id)) return;

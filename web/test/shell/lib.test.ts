@@ -109,10 +109,27 @@ describe("chatController", () => {
     }
     s = chatReducer(s, { type: "open", id: "e" });
     expect(mountedIds(s)).toHaveLength(MAX_PANES);
-    expect(mountedIds(s)).toEqual(["e", "b", "c"]);
+    expect(mountedIds(s)).toEqual(["b", "c", "e"]);
     s = chatReducer(s, { type: "running", id: "b", running: false });
-    expect(mountedIds(s)).toEqual(["e", "c"]);
+    expect(mountedIds(s)).toEqual(["c", "e"]);
     expect(s.threads.b).toBeUndefined();
+  });
+
+  it("keeps mounted panes in the order they were opened when the active one changes", () => {
+    let s = initialChatState("d0");
+    for (const id of ["a", "b"]) {
+      s = chatReducer(s, { type: "open", id });
+      s = chatReducer(s, { type: "running", id, running: true });
+    }
+    s = chatReducer(s, { type: "open", id: "c" });
+    expect(mountedIds(s)).toEqual(["a", "b", "c"]);
+    s = chatReducer(s, { type: "open", id: "a" });
+    expect(s.activeId).toBe("a");
+    expect(mountedIds(s)).toEqual(["a", "b"]);
+    s = chatReducer(s, { type: "open", id: "b" });
+    expect(mountedIds(s)).toEqual(["a", "b"]);
+    s = chatReducer(s, { type: "running", id: "b", running: false });
+    expect(mountedIds(s)).toEqual(["a", "b"]);
   });
 
   it("keeps the draft until it is claimed, then makes a fresh one for /", () => {

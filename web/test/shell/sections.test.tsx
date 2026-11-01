@@ -250,6 +250,58 @@ describe("SearchView and Highlight", () => {
     }
   });
 
+  it("keeps focus and every character when typing one key at a time in the search field", async () => {
+    routes["/api/search?"] = (url) => Response.json(response(new URL(url, "https://x").searchParams.get("q") ?? ""));
+    nav.reset("/search");
+    const { rerender } = renderShell(<SearchView q="" scope="all" page={1} />);
+    const box = document.getElementById("search-field-input") as HTMLInputElement;
+    box.focus();
+    const pause = (ms: number) => act(async () => new Promise((r) => setTimeout(r, ms)));
+    let typed = "";
+    for (const ch of "mcway") {
+      typed += ch;
+      fireEvent.keyDown(box, { key: ch });
+      fireEvent.change(box, { target: { value: typed } });
+      fireEvent.keyUp(box, { key: ch });
+      await pause(typed.length === 3 ? 300 : 20);
+      const last = nav.replace.mock.calls.at(-1)?.[0] as string | undefined;
+      if (last) rerender(<SearchView q={new URL(last, "https://x").searchParams.get("q") ?? ""} scope="all" page={1} />);
+      expect(box).toHaveFocus();
+      expect(box.value).toBe(typed);
+    }
+    expect(nav.replace).toHaveBeenCalledTimes(1);
+    await pause(300);
+    expect(nav.replace).toHaveBeenCalledTimes(2);
+    expect(nav.replace).toHaveBeenLastCalledWith("/search?q=mcway");
+    expect(nav.push).not.toHaveBeenCalled();
+    expect(box).toHaveFocus();
+  });
+
+  it("moves between scope tabs with the arrow keys, Home and End", () => {
+    nav.reset("/search?q=mcway");
+    const { rerender } = renderShell(<SearchView q="mcway" scope="all" page={1} />);
+    const tab = (name: string) => document.getElementById(`search-scopes-${name}`) as HTMLButtonElement;
+    expect(tab("all")).toHaveAttribute("tabindex", "0");
+    expect(tab("chats")).toHaveAttribute("tabindex", "-1");
+    tab("all").focus();
+    fireEvent.keyDown(tab("all"), { key: "ArrowRight" });
+    expect(tab("chats")).toHaveFocus();
+    expect(nav.replace).toHaveBeenLastCalledWith("/search?q=mcway&scope=chats");
+    rerender(<SearchView q="mcway" scope="chats" page={1} />);
+    expect(tab("chats")).toHaveAttribute("aria-selected", "true");
+    expect(tab("chats")).toHaveAttribute("tabindex", "0");
+    fireEvent.keyDown(tab("chats"), { key: "End" });
+    expect(tab("reports")).toHaveFocus();
+    expect(nav.replace).toHaveBeenLastCalledWith("/search?q=mcway&scope=reports");
+    fireEvent.keyDown(tab("reports"), { key: "ArrowRight" });
+    expect(tab("all")).toHaveFocus();
+    expect(nav.replace).toHaveBeenLastCalledWith("/search?q=mcway");
+    fireEvent.keyDown(tab("all"), { key: "ArrowLeft" });
+    expect(tab("reports")).toHaveFocus();
+    fireEvent.keyDown(tab("reports"), { key: "Home" });
+    expect(tab("all")).toHaveFocus();
+  });
+
   it("treats the query as literal text and never as a pattern or markup", () => {
     expect(highlightParts("A (a+)+$ b", "(a+)+$")).toEqual([
       { text: "A ", match: false },

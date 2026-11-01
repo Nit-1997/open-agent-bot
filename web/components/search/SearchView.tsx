@@ -11,26 +11,29 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { SectionPage } from "@/components/ui/SectionPage";
 import { errorMessage } from "@/lib/errors";
 import { searchApi } from "@/lib/search";
-import { searchHref } from "@/lib/shell/searchNav";
+import { SEARCH_FIELD_ID, searchHref } from "@/lib/shell/searchNav";
 import { hitKey, SearchHitRow } from "./SearchHitRow";
 import { SearchScopeTabs } from "./SearchScopeTabs";
 
 type Result = { key: string; data?: SearchResponse; error?: string };
+type MountFocus = "input" | "header" | "keep";
+
+const typingInSearch = () => typeof document !== "undefined" && !!document.activeElement?.closest("form[role=search]");
 
 export function SearchView(props: { q: string; scope: SearchScope; page: number }) {
   const id = "search";
   const router = useRouter();
   const { takeFocusRequest } = useShell();
   const input = useRef<HTMLInputElement>(null);
-  const [focusInput] = useState(() => takeFocusRequest("search"));
+  const [mountFocus] = useState<MountFocus>(() => (takeFocusRequest("search") ? "input" : typingInSearch() ? "keep" : "header"));
   const query = normalizeQuery(props.q);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
   const key = `${query}|${props.scope}|${props.page}|${attempt}`;
 
   useEffect(() => {
-    if (focusInput) input.current?.focus();
-  }, [focusInput]);
+    if (mountFocus === "input") input.current?.focus();
+  }, [mountFocus]);
 
   useEffect(() => {
     if (!query) return;
@@ -55,9 +58,9 @@ export function SearchView(props: { q: string; scope: SearchScope; page: number 
 
   return (
     <SectionPage id={id}>
-      <SectionHeader id={`${id}-header`} title="Search" focusOnMount={!focusInput} />
+      <SectionHeader id={`${id}-header`} title="Search" focusOnMount={mountFocus === "header"} />
       <div id={`${id}-controls`} className="flex flex-col gap-4 pb-4">
-        <SidebarSearch id={`${id}-field`} placeholder="Search chats and reports" large inputRef={input} />
+        <SidebarSearch id={SEARCH_FIELD_ID} placeholder="Search chats and reports" large inputRef={input} />
         <SearchScopeTabs id={`${id}-scopes`} value={props.scope} counts={data?.counts} onChange={setScope} />
       </div>
       <div id={`${id}-scopes-panel`} role="tabpanel" aria-labelledby={`${id}-scopes-${props.scope}`}>
