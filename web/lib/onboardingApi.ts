@@ -35,9 +35,10 @@ export function useOnboardingOptions(home: Home | undefined): OnboardingOptions 
   return result?.options ?? null;
 }
 
+export type SearchSettingsView = { braveSearch: boolean; braveSearchHint?: string };
+
 export const settingsApi = {
-  get: async (): Promise<{ braveSearch: boolean }> =>
-    readApi<{ braveSearch: boolean }>(await fetch("/api/settings", { cache: "no-store" })),
+  get: async (): Promise<SearchSettingsView> => readApi<SearchSettingsView>(await fetch("/api/settings", { cache: "no-store" })),
   saveBrave: async (apiKey: string) => {
     await readApi(
       await fetch("/api/settings/brave-search/key", {

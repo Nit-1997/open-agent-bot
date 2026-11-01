@@ -6,6 +6,7 @@ import { ghost, input, solid } from "./styles";
 
 export function SearchSettings() {
   const [braveSet, setBraveSet] = useState<boolean | null>(null);
+  const [hint, setHint] = useState<string | undefined>(undefined);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +14,10 @@ export function SearchSettings() {
   useEffect(() => {
     settingsApi
       .get()
-      .then((s) => setBraveSet(s.braveSearch))
+      .then((s) => {
+        setBraveSet(s.braveSearch);
+        setHint(s.braveSearchHint);
+      })
       .catch((e: Error) => setError(e.message));
   }, []);
 
@@ -23,6 +27,7 @@ export function SearchSettings() {
     try {
       await action();
       setBraveSet(next);
+      setHint(next ? (await settingsApi.get()).braveSearchHint : undefined);
       setKey("");
     } catch (e) {
       setError((e as Error).message);
@@ -41,7 +46,9 @@ export function SearchSettings() {
           Brave Search
         </p>
         <p id="models-search-brave-status" className={`text-[11px] ${braveSet ? "text-success-fg" : "text-text-muted"}`}>
-          {braveSet ? "Connected · used when SearXNG returns nothing" : "Optional fallback when SearXNG returns nothing"}
+          {braveSet
+            ? `Connected${hint ? ` · ${hint}` : ""} · used when SearXNG returns nothing`
+            : "Optional fallback when SearXNG returns nothing"}
         </p>
         {braveSet === false && (
           <form

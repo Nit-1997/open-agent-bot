@@ -18,8 +18,10 @@ const base = (over: Partial<ProviderView>): ProviderView => ({
 let providers: ProviderView[];
 let calls: Array<{ url: string; method: string; body?: unknown }>;
 let loginState: Record<string, unknown>;
+let braveSaved = false;
 
 beforeEach(() => {
+  braveSaved = false;
   providers = [
     base({
       id: "openai",
@@ -55,8 +57,11 @@ beforeEach(() => {
       calls.push({ url, method, body });
       const ok = (v: unknown) => new Response(JSON.stringify(v), { status: 200 });
       if (url === "/api/providers" && method === "GET") return ok({ providers });
-      if (url === "/api/settings") return ok({ braveSearch: false });
-      if (url === "/api/settings/brave-search/key") return ok({ ok: true });
+      if (url === "/api/settings") return ok(braveSaved ? { braveSearch: true, braveSearchHint: "…ve77" } : { braveSearch: false });
+      if (url === "/api/settings/brave-search/key") {
+        braveSaved = true;
+        return ok({ ok: true });
+      }
       if (url === "/api/providers/openai/key") {
         if (!body.apiKey.trim()) return new Response(JSON.stringify({ error: "the key is empty" }), { status: 400 });
         providers[0] = { ...providers[0], configured: true, source: "key", enabled: ["gpt-5.5"] };
@@ -228,13 +233,13 @@ describe("ModelsPanel", () => {
 });
 
 describe("ModelsPanel search settings", () => {
-  it("saves a Brave Search key without showing it again", async () => {
+  it("saves a Brave Search key without showing it again, only its hint", async () => {
     render(<ModelsPanel onClose={() => {}} onChanged={() => {}} />);
     const field = await screen.findByLabelText("Brave Search API key");
     expect(field).toHaveAttribute("type", "password");
     fireEvent.change(field, { target: { value: "brv-1" } });
     fireEvent.click(within(document.getElementById("models-search-brave") as HTMLElement).getByRole("button", { name: "Save key" }));
-    expect(await screen.findByText(/Connected · used when SearXNG returns nothing/)).toBeInTheDocument();
+    expect(await screen.findByText("Connected · …ve77 · used when SearXNG returns nothing")).toBeInTheDocument();
     expect(calls.find((c) => c.url === "/api/settings/brave-search/key")?.body).toEqual({ apiKey: "brv-1" });
     expect(screen.queryByDisplayValue("brv-1")).toBeNull();
   });
