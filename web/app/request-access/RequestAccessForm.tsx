@@ -78,10 +78,20 @@ export function RequestAccessForm({ formTs }: { formTs: string }) {
         <FieldError id="request-access-note-error" message={errors.note} />
       </div>
       <div id="request-access-trap" aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
-        <label id="request-access-trap-label" htmlFor="request-access-company-website">
-          Company website
+        <label id="request-access-trap-label" htmlFor="request-access-trap-input">
+          Leave this empty
         </label>
-        <input id="request-access-company-website" name="company_website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+        <input
+          id="request-access-trap-input"
+          name="oab_trap"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          data-1p-ignore=""
+          data-lpignore="true"
+          data-form-type="other"
+          defaultValue=""
+        />
       </div>
       <input id="request-access-form-ts" type="hidden" name="form_ts" value={state.formTs ?? formTs} />
       {state.message && (

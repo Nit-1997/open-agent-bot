@@ -14,14 +14,20 @@ export function signFormTs(now: number = Date.now(), secret: string = serviceSec
 
 export const freshFormTs = (now: number = Date.now()): string => signFormTs(now - MIN_AGE_MS);
 
-export function checkFormTs(token: unknown, now: number = Date.now(), secret: string = serviceSecret()): boolean {
-  if (typeof token !== "string" || token.length > 200) return false;
+export type FormTsProblem = "malformed" | "bad_signature" | "too_fast" | "expired";
+
+export function formTsProblem(token: unknown, now: number = Date.now(), secret: string = serviceSecret()): FormTsProblem | null {
+  if (typeof token !== "string" || token.length > 200) return "malformed";
   const match = /^(\d{1,16})\.([A-Za-z0-9_-]{43})$/.exec(token);
-  if (!match) return false;
+  if (!match) return "malformed";
   const [, ts, sig] = match;
   const expected = Buffer.from(mac(ts, secret));
   const given = Buffer.from(sig);
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return false;
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return "bad_signature";
   const age = now - Number(ts);
-  return age >= MIN_AGE_MS && age <= MAX_AGE_MS;
+  if (age < MIN_AGE_MS) return "too_fast";
+  return age > MAX_AGE_MS ? "expired" : null;
 }
+
+export const checkFormTs = (token: unknown, now: number = Date.now(), secret: string = serviceSecret()): boolean =>
+  formTsProblem(token, now, secret) === null;

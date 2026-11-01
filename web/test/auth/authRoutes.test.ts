@@ -183,7 +183,7 @@ describe("submitAccessRequest", () => {
       name: "Dummy One",
       email: " Dummy@Example.com ",
       note: "testing",
-      company_website: "",
+      oab_trap: "",
       form_ts: signFormTs(Date.now() - 10_000),
       ...over,
     };
@@ -206,7 +206,7 @@ describe("submitAccessRequest", () => {
 
   it("drops bots silently: honeypot, forged token, too fast", async () => {
     const bots: Array<Record<string, string>> = [
-      { company_website: "https://spam.test" },
+      { oab_trap: "https://spam.test" },
       { form_ts: "123.forged" },
       { form_ts: signFormTs(Date.now()) },
     ];

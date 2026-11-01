@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { agentFetch } from "@/lib/agentServer";
 import { type AccessRequestState, clientIp, parseAccessRequest } from "@/lib/authForms";
 import { ConfigError } from "@/lib/env";
-import { checkFormTs, freshFormTs } from "@/lib/formToken";
+import { formTsProblem, freshFormTs } from "@/lib/formToken";
 
 const SENT: AccessRequestState = { status: "sent" };
 const UNAVAILABLE = "Can't send your request right now. Try again in a minute.";
@@ -12,9 +12,13 @@ const UNAVAILABLE = "Can't send your request right now. Try again in a minute.";
 export async function submitAccessRequest(_prev: AccessRequestState, form: FormData): Promise<AccessRequestState> {
   const parsed = parseAccessRequest(form);
   if (!parsed.ok) return { status: "invalid", values: parsed.values, fieldErrors: parsed.fieldErrors };
-  const honeypot = form.get("company_website");
+  const honeypot = form.get("oab_trap");
   const formToken = form.get("form_ts");
-  if ((typeof honeypot === "string" && honeypot !== "") || !checkFormTs(formToken)) return SENT;
+  const dropped = typeof honeypot === "string" && honeypot !== "" ? "honeypot" : formTsProblem(formToken);
+  if (dropped) {
+    console.warn(`[access] request dropped reason=${dropped}`);
+    return SENT;
+  }
 
   const ip = clientIp(await headers());
   try {

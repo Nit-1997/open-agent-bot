@@ -73,8 +73,12 @@ describe("/login", () => {
 describe("/request-access", () => {
   it("renders the form with a hidden honeypot and a signed form time", async () => {
     const { container } = render(await RequestAccessPage());
-    const trap = container.querySelector<HTMLInputElement>("input[name=company_website]");
+    const trap = container.querySelector<HTMLInputElement>("input[name=oab_trap]");
     expect(trap).toHaveAttribute("tabindex", "-1");
+    const autofillHints = /company|organi[sz]ation|website|url|address|phone|name|email|city|zip/i;
+    expect(trap?.name).not.toMatch(autofillHints);
+    expect(trap?.id).not.toMatch(autofillHints);
+    expect(container.querySelector(`label[for="${trap?.id}"]`)?.textContent).not.toMatch(autofillHints);
     expect(trap).toHaveAttribute("autocomplete", "off");
     expect(trap?.closest("[aria-hidden=true]")).not.toBeNull();
     const ts = container.querySelector<HTMLInputElement>("input[name=form_ts]")?.value;
