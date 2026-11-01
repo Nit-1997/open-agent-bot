@@ -69,21 +69,31 @@ agent/src/
                        components plus the guide the model sees in create_artifact)
   lib/                 small shared helpers with no tool dependencies: net.ts (URL guard,
                        safe fetch), retry, fx, concurrency, rate limits, keyed mutex, log redaction
-shared/                schemas used by both agent and web: widgets, workspace edits, the profile
-                       (profile.ts), curated onboarding lists per country (onboarding.ts), flights
+shared/                schemas used by both agent and web: widgets, workspace edits, the profile and
+                       the agent persona (profile.ts), curated onboarding lists per country (onboarding.ts),
+                       flights, list and search types (lists.ts), shell URL parsing (routes.ts);
+                       relative imports use the .ts extension (the agent build rewrites them)
 supabase/
   migrations/          SQL applied in order with the Supabase MCP (file name = recorded version)
   scripts/             configure-auth (auth config as code), bootstrap-admin, dev-link, cleanup-e2e
   templates/           invite and magic-link email templates
 web/
   proxy.ts             session refresh, route rules and the nonce CSP on every request
-  app/                 login, request-access, auth confirm/callback/signout, admin, the chat page
+  app/                 login, request-access, auth confirm/callback/signout, admin
+  app/(app)/           the shell routes: /, /chats, /chats/[id], /reports, /reports/[id], /plans,
+                       /plans/[chatId]/[kind]/[key], /search; one layout keeps the shell and chats mounted
   app/api/             thin proxies to the agent with the user's token (lib/agentServer.ts)
-  components/chat/     chat session, turns, activity steps, sources
+  components/shell/    app shell: rail, sidebar, phone top bar, tabs and drawer, account menu and sheet,
+                       overlays (focus trap, Escape, inert background), ShellProvider (chat controller)
+  components/agent/    the agent's orb, name, look and tone pickers
+  components/chat/     chat host and panes (one per running thread), session, turns, chat list
+  components/reports/, components/plans/, components/search/   the section views
   components/widgets/  one component per widget kind
   components/profile/  onboarding slides (onboarding/, sections shared with the drawer),
                        profile drawer, model management
-  lib/                 pure helpers (turn building, sources, onboarding), profile client
+  lib/                 pure helpers (turn building, sources, onboarding, persona), profile client,
+                       API clients, lib/shell/ (breakpoints, chat controller, sidebar preference)
+e2e/                   Playwright demo against the local stack (see README "End-to-end demo")
 ```
 
 ## Adding a tool
@@ -130,7 +140,8 @@ Onboarding chips come from `shared/onboarding.ts`: one `CURATED` entry per count
 
 - TypeScript strict mode everywhere. Prefer small pure functions; keep I/O at the edges.
 - Code explains itself through names. Add a comment only for a non-obvious reason.
-- Every rendered HTML element in `web/` has a unique, stable `id` derived from its parent's id.
+- Every rendered HTML element in `web/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
+- Context for an agent run goes through `useThreadContext` (scoped to one chat's agent). `useAgentContext` is blocked by lint because it reaches every mounted chat.
 - Keys are added in the app and stored encrypted by the agent. Settings live in `deploy-config/.env-*` and `deploy-config/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `deploy-config/env.examples/`.
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).

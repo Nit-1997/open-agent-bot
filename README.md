@@ -76,9 +76,20 @@ Agent settings live in `deploy-config/.env-agent` (git-ignored).
 - **Skills** live in `agent/skills/<name>/SKILL.md` (frontmatter `name`, `description`, then a playbook). The core prompt lists them and the agent loads one with `load_skill`. A new use case is a new folder; no code change.
 - **Jev** (TypeSafe's calibrated classifier) judges product matches in `shop`, hotel brand/area/vibe wishes in `stays`, music cover art, which search hits to read, and research claims. It uses whichever key you added in the app: TypeSafe first, then OpenRouter (`JEV_MODEL` pins one). If Jev is unreachable, every feature falls back to its non-Jev behavior.
 - **Codemode**: Claude Sonnet models (from any provider), or models tagged `codemode` in `AGENT_MODEL_CAPS`, can write one script that runs many lookups and does the maths in code. A failed script turns codemode off for the rest of that chat.
-- **Workspace and chats**: carts, trips, events and shortlists are saved per chat in Supabase, so "make it 16 kids" patches the plan. Chats and their messages are saved too; Recent chats in the profile drawer reopens them, and a chat continues after an agent restart.
+- **Workspace and chats**: carts, trips, events and shortlists are saved per chat in Supabase, so "make it 16 kids" patches the plan. Chats and their messages are saved too and a chat continues after an agent restart. The app shell has a sidebar of chats (Today, This week, Earlier), and its own views for **Reports** (every report, with PDF download), **Plans** (carts, trips, events and shortlists across chats, read-only, each with Open chat) and **Search** (chat titles, message text and report titles). Every view has a URL.
+- **Your agent**: users name their agent, pick its look and how it talks (brief, warm or thorough) in the first onboarding step or the profile drawer. The name and tone go into the system prompt as a quoted name under the hard rules.
 
 Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`, `docs/findings.md`.
+
+## End-to-end demo
+
+`e2e/` drives the local stack (`docker compose … --profile local up -d --build`, https://app.localhost) with Playwright on desktop, tablet and phone sizes. It creates `oab-e2e+shell@example.test` and `oab-e2e+other@example.test`, seeds chats, reports and plans, and removes them afterwards with `supabase/scripts/cleanup-e2e.mjs`. It reads `deploy-config/env-files/.env-supabase-admin` and needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e` (saved through the app's API, never typed or logged; the run uses DeepSeek V4 Flash).
+
+```bash
+cd e2e && npm ci && npx playwright test && node scripts/make-demo.mjs
+```
+
+`make-demo.mjs` needs `ffmpeg` and joins the recordings into `~/Downloads/app-shell-demo.mp4`.
 
 ## Evals
 

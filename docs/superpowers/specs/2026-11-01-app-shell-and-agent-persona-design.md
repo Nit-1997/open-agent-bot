@@ -1,6 +1,6 @@
 # App shell (rail, sidebar, sections) and a personal agent
 
-Status: draft for review · 2026-11-01 · branch `feat/supabase-auth`
+Status: built · 2026-11-01 · branch `feat/supabase-auth` (see "Build notes" at the end for what changed during the build)
 
 Review basis: the five mockups the owner approved (Design canvas "Open Agent Layout Mockups": `Main`, `Collapsed`, `MobileChat`, `MobileDrawer`, `MeetAgent`), the web and agent source at `c102903`, the installed `@copilotkit/react-core`, `@copilotkit/core` and `@copilotkit/runtime` 1.83.0 and `typebox` 1.4.3 in `web/node_modules`, and the live Supabase project read with the MCP (read-only, 2026-11-01). Decisions marked **builder's call** are mine, made where the brief left room; everything else comes from the owner's brief.
 
@@ -270,7 +270,7 @@ New (agent): `src/http/reports.ts`, `src/http/plans.ts`, `src/http/search.ts`, `
 
 New (shared): additions to `shared/profile.ts`; `entityKey`/`entityIdFromKey` and `safeHttpUrl` in `shared/workspace.ts`; `TITLE_CHARS` moves to `shared/chats.ts` (the agent's title length and the optimistic row use one value); new `shared/routes.ts` (`parseRoute`, `hrefFor`; used by the shell, `safeNext` and the API routes; `parsePage` moves from `web/lib/pagination.ts` to `shared/pages.ts` so the parser can use it); new `shared/lists.ts` (list item types and page sizes, below).
 
-New (database): `supabase/migrations/<version>_app_shell_search.sql`.
+New (database): `supabase/migrations/20261101214044_app_shell_search.sql`.
 
 New (E2E): `e2e/` package (see "Testing").
 
@@ -532,7 +532,7 @@ export function checkAgentName(raw: unknown): NameCheck
 2. Normalise with `normalize("NFKC")`, turn every run of Unicode whitespace (`\s` with the `u` flag) into one space, and trim.
 3. Empty → "Give your agent a name."
 4. More than 40 code points (`Array.from(name).length`) → "Keep it to 40 characters."
-5. Must match `/^[\p{L}\p{N}][\p{L}\p{M}\p{N} '’.\-]*$/u`; otherwise → "Use letters, numbers, spaces, apostrophes, hyphens or periods." This rejects control and format characters (zero-width joiners, bidi overrides and isolates, `\p{Cf}` in general), quotes, brackets, `<`, `{`, backticks, `#`, `:`, emoji and newlines.
+5. Must match `/^[\p{L}\p{N}][\p{L}\p{M}\p{N} '’.\-]*$/u` (control characters, `\p{Cc}`, are rejected before step 2, so a newline or tab is an error rather than a space); otherwise → "Use letters, numbers, spaces, apostrophes, hyphens or periods." This rejects control and format characters (zero-width joiners, bidi overrides and isolates, `\p{Cf}` in general), quotes, brackets, `<`, `{`, backticks, `#`, `:`, emoji and newlines.
 6. No more than two combining marks in a row (`/\p{M}{3}/u` → "Use letters, numbers, spaces, apostrophes, hyphens or periods."), so a name can't stack marks into a glyph that spills over the layout.
 
 Names in right-to-left scripts and look-alike letters from other scripts are allowed: the name is only ever shown to its owner, and it never acts as an identifier. To keep an RTL name from reordering the text around it, the UI renders it inside `<bdi>` in text, and wraps it in U+2068/U+2069 (first-strong isolate, pop isolate) inside attribute strings (`placeholder`, `aria-label`, `title`), through one helper `isolate(name)` in `lib/persona.ts`.
@@ -1007,3 +1007,32 @@ Settled by the second review (see "Verified facts"): per-pane CopilotKit context
 ## Open questions for the owner
 
 None. Every choice the brief left open is decided above and marked as a builder's call.
+
+## Build notes (2026-11-01)
+
+What the build changed or settled, and why. The sections above were updated where they name a file or a rule; the rest is recorded here.
+
+### Claims to verify: outcomes
+
+1. **`history.replaceState` keeps the layout mounted.** Verified. E2E step 3 marks the draft pane's DOM node, sends, waits for the URL to become `/chats/<id>`, and finds the same marked node. `ChatHost.test.tsx` checks the replace happens on the first non-error event, not on send and not after `RUN_ERROR`.
+2. **Routes and resizes keep a running chat.** Verified. E2E step 3 marks the Big Sur pane, starts a live reply (DeepSeek V4 Flash), goes to Reports and back, finds the same node and the finished reply. `ShellFrame` test and E2E step 11 cross 1024 and 768 px and keep the pane instance and its typed text (step 11 runs while idle, not mid-reply).
+3. **`addContext({ agentIds })` reaches the request body.** Verified against the real `@copilotkit/core` 1.83.0 (`test/shell/threadContext.test.tsx`): `getContextForAgent` returns only each pane's two entries, unmount removes them, and two `HttpAgent` runs through `core.runAgent` POST bodies that carry only their own `user_context` and `workspace_edits`.
+4. **Migration.** Applied with the MCP as `20261101214044_app_shell_search`. Security advisors: nothing new (the existing INFO `rls_enabled_no_policy` rows and the two auth WARNs are unchanged). Performance advisors: only INFO `unused_index` for the four new indexes, which were created minutes earlier. `rls.int.test.ts` checks the function ACL (`postgres` and `service_role` only), `prosecdef = false`, `search_path=""`, the four indexes and `pg_trgm` in `extensions`.
+5. **Index use.** `search.int.test.ts` seeds 500 messages and asserts no sequential scan of `chat_messages`. The plan recorded with the same query (in a rolled-back transaction) was `Index Scan using chat_messages_user_idx … Filter: (content ~~* '%kay%')`, 0.8 ms. At this size the planner prefers the user btree over the trigram index; both count as index-assisted.
+
+### Deviations
+
+- **Redundant index dropped.** The migration also drops `workspace_entities_user_idx`: the new `(user_id, updated_at desc, …)` index has `user_id` as its leading column and serves the foreign key.
+- **Pages past the end.** PostgREST answers a range past the end with 416 (`PGRST103`), not an empty page. `readPage` in `db/errors.ts` catches it and returns `items: []` with a `head` count, for chats, reports and plans.
+- **Shared imports use `.ts`.** Turbopack does not map `./x.js` to `./x.ts` for files outside `web/`, so shared modules import each other as `./x.ts`; the agent sets `rewriteRelativeImportExtensions` and the web sets `allowImportingTsExtensions`.
+- **Core prompt budget.** The test cap on the core prompt moved from 2,000 to 2,100 characters: the new first line and the tone lines are longer.
+- **Contrast.** axe in the E2E run failed the light `--text-faint` (#8a8a8a, 3.0:1 on `surface`). Light `--text-muted` is now #5c5c5c and `--text-faint` #666666; dark `--text-faint` is #9a9b9f (was #8f9094, 4.2:1 on `paper`). Every view passes `color-contrast` in both themes. The component tests do not run axe (jsdom cannot compute colour and axe-core is not a web dependency); structure is covered by role and name queries and the id checks.
+- **Solid shell surfaces.** The rail, sidebar and main pane use the solid `bg`, `--sidebar` and `surface` tokens, as in the mockups, rather than glass; overlays keep the blurred backdrop.
+- **Mockup sizes.** The empty-state orb is 72 px (44 px on phones) and the onboarding orb 112 px, as in "Collapsed" and "MeetAgent"; the memory line sits under the greeting, as in "Collapsed".
+- **Sign-in redirect.** `safeNext` checks `%2f`/`%5c` only in the path, so an encoded `/` in a search query survives. The login page now forwards an already signed-in visitor to `next`. Email-link sign-in still lands on `/` (the link can be opened in another browser); Google sign-in keeps `next`. E2E step 8 checks the redirect to `/login?next=%2Fsearch%3Fq%3Dtacos`.
+- **Unknown shell paths.** `app/(app)/[...missing]/page.tsx` calls `notFound()`, so `/plans/<chat>/trip/..` (which browsers normalise to `/plans/<chat>/`) is a 404 inside the shell.
+- **Search focus.** Only the rail's Search moves focus into the view's field. Typing in the sidebar or drawer field keeps focus there; both fields follow `?q=`.
+- **Draft text.** A chat pane keeps its composer text while it is mounted (including when hidden and across breakpoints). An idle chat that is left for another chat unmounts and its unsent text is not kept.
+- **Account sheet.** The theme row is `role="switch"` in the sheet (a list of buttons) and `menuitemcheckbox` in the menu.
+- **E2E needs the model key.** Onboarding cannot finish without a model, so `E2E_OPENROUTER_KEY` is required; the live reply in step 3 always runs. The suite has three tests (one per project) with numbered `test.step`s. Test users come from `bootstrap-admin.mjs --user`, are signed in with `dev-link.mjs`, and are removed by `cleanup-e2e.mjs` before and after the run.
+- **Integration users.** `test/supabase` gained `createBareUser` (no session) for tests that only need rows, to stay under the auth rate limit.
