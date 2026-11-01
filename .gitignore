@@ -13,3 +13,6 @@ artifacts-data/
 
 # Local eval runs (baselines live in agent/evals/baseline/)
 agent/evals/results/
+
+# secrets in nested env folders
+deploy-config/**/.env*
