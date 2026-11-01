@@ -1,10 +1,12 @@
 # Invite-only accounts on Supabase, with every user's data in Supabase
 
-Status: draft for review · 2026-10-31 · branch `feat/supabase-auth`
+Status: reviewed, ready to build · 2026-10-31 · branch `feat/supabase-auth`
+
+Review pass (2026-10-31) verified every Supabase claim against the live project (Management API and MCP, read-only), the Supabase docs, the installed packages (`next` 16.4.3, `@copilotkit/runtime` 1.81.0, `@ag-ui/client` 1.0.2, `@earendil-works/pi-*` 1.4.0, `hono` 4.13.14, `playwright` 1.64.1) and the agent and web source. The owner's open questions are now decided (see "Decisions made by the owner"). Nothing in this spec is left to the builder except UI copy and styling.
 
 ## Why
 
-Open Agent is single-user today. There is no login, so anyone who reaches port 3000 can read the profile and change keys, and the README tells people to keep it on localhost. Everything a user owns sits on Docker volumes: `profile.json`, `auth.json` (provider OAuth tokens), `local-keys.json` (plaintext API keys), `providers.json`, `workspace.sqlite`, and the artifact HTML/PDF files.
+Open Agent is single-user today. There is no login, so anyone who reaches port 3000 can read the profile and change keys, and the README tells people to keep it on localhost. Worse, the agent itself is open by default: `app.ts` authorizes every request when no shared secret is configured (`!cfg.sharedSecret || secret === cfg.sharedSecret`, a plain `===`), and `GET /artifacts/:file` has no check at all. Everything a user owns sits on Docker volumes: `profile.json`, `auth.json` (provider OAuth tokens), `local-keys.json` (plaintext API keys), `providers.json`, `workspace.sqlite`, and the artifact HTML/PDF files.
 
 We want to run it for a small invited group: the web app on Vercel and the agent (with SearXNG and Chromium) on an EC2 instance behind Caddy. That needs three things. Only invited people get in. Each person's data is isolated from everyone else's. The EC2 box keeps no user data on disk, so losing or rebuilding the instance loses nothing and a disk snapshot exposes nothing.
 
@@ -13,9 +15,10 @@ The 2026-10-30 onboarding design put the profile behind a `ProfileStore` interfa
 ## Goals
 
 - Invite-only access. A visitor asks for access, the admin approves, the invitee gets an email link, clicks it and is signed in. After that they sign in with Google, or with an emailed link if their address has no Google account.
-- Supabase refuses sign-ups from anyone who wasn't invited. A second check runs inside the database, so a dashboard mistake (re-enabling sign-ups) still doesn't let strangers in.
+- Supabase refuses sign-ups from anyone who wasn't invited. A second check runs inside the database (a `before-user-created` hook), so a dashboard mistake (re-enabling sign-ups) still doesn't let strangers in.
 - Every request to the agent carries the user's Supabase access token. The agent checks it against the project's public keys (ES256 via JWKS) and takes the user id only from the token.
-- Every piece of per-user state lives in Supabase (Postgres plus Storage), scoped by `user_id`, with RLS on every table. The agent container runs read-only with a tmpfs and no volumes.
+- Every piece of per-user state lives in Supabase (Postgres plus Storage), keyed by `user_id`. **The agent is the only reader and writer of user data.** RLS is enabled on every table with no policies for `anon` or `authenticated`, so a leaked publishable key plus a user's access token reads nothing through PostgREST. The web app uses Supabase only for sign-in and session cookies.
+- The agent container runs read-only with tmpfs mounts and no volumes.
 - Provider keys and OAuth tokens are encrypted by the agent (AES-256-GCM, envelope encryption) before they reach the database. The browser can write a key but never read one back; it only sees a hint like `sk-ant-…a91f`.
 - Supabase auth settings and SQL are code: one idempotent configuration script and committed migrations.
 - Local development mirrors EC2: everything runs in docker compose behind Caddy with TLS.
@@ -24,46 +27,55 @@ The 2026-10-30 onboarding design put the profile behind a `ProfileStore` interfa
 
 - Teams, sharing chats or artifacts between users, or roles other than admin and user.
 - Billing, usage quotas per user (beyond abuse rate limits), or usage dashboards.
-- MFA. Supabase supports TOTP and it can be switched on later without schema changes.
+- MFA. Supabase supports TOTP (already enabled in the project config) and it can be switched on in the UI later without schema changes.
 - Self-service account deletion. The admin deletes accounts (see "Delete a user").
 - Moving SearXNG or Chromium off EC2.
 - A memory system. Mem0-style memory is still out of scope.
+- Cloudflare Turnstile on request-access, a second Supabase project for development, and a verified Resend domain. Each is a documented later step (see "Later steps"), not built now.
 
 ## Anti-goals (failures even if it works)
 
 - A key, refresh token, or access token appears in a log line, an error message, a URL, or a browser-readable response.
-- The agent trusts a user id from anywhere other than a verified token (a body field, `threadId`, a header the web sets).
+- The agent trusts a user id from anywhere other than a verified token (a body field, `threadId`, a header the web sets, a header the browser sets that CopilotKit forwards).
 - One user can open, continue, or read another user's chat, cart, artifact or provider login by guessing or reusing an id.
-- The request-access form tells a visitor whether an email is already a user or already asked.
-- Some code path silently falls back to "no auth" when Supabase is unreachable. Every auth failure fails closed, with a clear message.
+- The request-access or email-link form tells a visitor whether an email is already a user or already asked.
+- Some code path silently falls back to "no auth" when Supabase is unreachable or a variable is missing. Every auth failure fails closed, with a clear message.
 - Data stays on the EC2 disk "temporarily" (a cache file, a SQLite file, a PDF cache).
 
 ## Decisions at a glance
 
 | Topic | Decision |
 | --- | --- |
-| Identity | Supabase Auth on project `dwiuzfvmevdzzabqeaog`. Google OAuth plus email links (invite, magic link). No passwords. |
-| Sign-up | `disable_signup = true`. Plus a `before-user-created` Postgres hook that only allows emails in `public.invited_emails`. |
-| Admin | `app_metadata.role = "admin"` (users can't edit `app_metadata`). The first admin is set up by a one-off bootstrap script. |
-| Session in browser | `@supabase/ssr`, PKCE, HttpOnly + Secure + SameSite=Lax cookies. No Supabase client runs in the browser. |
-| Web → agent | Server-to-server only. `Authorization: Bearer <user access token>` plus `x-agent-secret: <service secret>`. The browser never calls the agent. |
-| Token verification | `jose` with remote JWKS from `https://dwiuzfvmevdzzabqeaog.supabase.co/auth/v1/.well-known/jwks.json`. Only `ES256` is accepted; `iss`, `aud=authenticated`, `exp`, `role=authenticated` and `is_anonymous=false` are checked. |
-| Shared secret | The generated file on a shared volume goes away. It is replaced by `AGENT_SERVICE_SECRET`, a static secret in `.env-agent`, `.env-nextjs` and Vercel. It is required on every agent route except `/health`, as defense in depth (the agent is now on the public internet). It never identifies a user. |
-| Agent DB access | `supabase-js` with the secret key (`sb_secret_…`), wrapped in a user-scoped repository layer. Raw clients are never exported from `agent/src/db/`. |
-| Browser reads | Go through Next.js server code using the user's token, so RLS applies. Writes that need validation go through the agent. |
-| Key storage | `provider_credentials`, with RLS on and no policies. A random data key per row encrypts the value (AES-256-GCM). The data key is wrapped by a master key from `CREDENTIAL_KEYS` (AES-256-GCM). The AAD binds user, provider, kind and key version. A `KeyWrapper` interface makes AWS KMS a drop-in later. |
-| Artifacts | Private Storage bucket `artifacts`, path `{user_id}/{artifact_id}.html|.pdf`. Metadata lives in `public.artifacts`. They are served only through agent → web, which adds the sandbox CSP. |
-| Chats | `public.chats` and `public.chat_messages`. The thread id is a client-made UUID, but ownership is claimed in the database on the first run. |
-| Email | Supabase custom SMTP via Resend (`smtp.resend.com:465`, user `resend`). Sender `onboarding@resend.dev` for now. |
-| Hosting | Web on Vercel. Agent, SearXNG and Caddy on EC2. Locally, the same compose file adds the web service and a local Caddyfile. |
+| Supabase project | One project, `dwiuzfvmevdzzabqeaog`, for local and production (owner decision 1). Local test users are real users and are deleted after each E2E run. |
+| Identity | Supabase Auth: Google OAuth plus email links (invite, magic link). No passwords. |
+| Sign-up | `disable_signup = true`, plus a `before-user-created` Postgres hook that only allows emails in `public.invited_emails`. |
+| Admin | `app_metadata.role = "admin"` (users can't edit `app_metadata`). Set by `supabase/scripts/bootstrap-admin.mjs`. Admin = `ntnbhat9@gmail.com`. |
+| Session in browser | `@supabase/ssr` server clients only, PKCE, cookies `HttpOnly; Secure; SameSite=Lax; Path=/`, host-only. No Supabase client in the browser. |
+| Web → agent | Server-to-server only. `Authorization: Bearer <user access token>` plus `x-agent-secret: <AGENT_SERVICE_SECRET>`. The browser never calls the agent. |
+| Token verification | `jose` with remote JWKS. Only `ES256`; `iss`, `aud=authenticated`, `exp`, `role=authenticated`, `is_anonymous=false` checked. |
+| Data access | Only the agent, with a dedicated secret key (`sb_secret_…`), through `forUser(userId)` repositories. RLS on, no user-role policies, no user-role grants. |
+| Key storage | `provider_credentials`, AES-256-GCM per row with a random data key; data key wrapped by a master key from `CREDENTIAL_KEYS`. AAD binds user, provider and kind; the wrap AAD also binds the key version. `KeyWrapper` interface for a later KMS swap. |
+| Artifacts | Private Storage bucket `artifacts`, path `{user_id}/{artifact_id}.html|.pdf`, metadata in `public.artifacts`, served only agent → web with the sandbox CSP. |
+| Chats | `public.chats` and `public.chat_messages`. The thread id is a client-made UUID; ownership is claimed in the database on the first run. History comes from the database, never from the client. |
+| Operator gateway and private-network providers | Admin-only (owner decision 2). |
+| Origins | Never hardcoded. `APP_ORIGIN` (web) and `AGENT_HOST` (agent) come from env; locally `https://app.localhost` and `https://agent.localhost` (owner decision 3). |
+| Long runs | CopilotKit route `maxDuration = 300` (valid on Hobby and Pro); the agent ends a run cleanly at `RUN_TIME_LIMIT_SECONDS` (default 280) before Vercel cuts the stream (owner decision 4). |
+| Bot protection | Honeypot, signed minimum-fill time, DB rate limits (owner decision 5). |
+| Email | Supabase custom SMTP via Resend (`smtp.resend.com:465`, user `resend`), sender `onboarding@resend.dev` (sandbox: delivers only to `ntnbhat9@gmail.com`). |
+| Hosting | Web on Vercel. Agent, SearXNG and Caddy on EC2. Locally the same compose file adds the web service and a local Caddyfile. |
 
 ## Project state today (read 2026-10-31 via Management API and MCP)
 
-- Postgres 17. Extensions: `pgcrypto`, `uuid-ossp`, `supabase_vault`, `pg_stat_statements`. The `public` schema is empty, there are no migrations, no Storage buckets, and 0 users.
-- Signing keys: ES256 key `in_use` and the JWKS publishes one EC/ES256 key. The legacy HS256 secret is `previously_used`, not revoked. Legacy `anon` and `service_role` API keys are still enabled, next to a `publishable` and a `secret` key.
-- Auth config: `disable_signup=false`, Google off, no custom SMTP, `site_url=http://localhost:3000`, empty `uri_allow_list`, `jwt_exp=3600`, `refresh_token_rotation_enabled=true` (reuse interval 10 s), `mailer_otp_exp=3600`, `rate_limit_email_sent=2`, every hook off, `security_manual_linking_enabled=false`, default templates.
+- Postgres 17.11, region `us-east-1`. Installed extensions: `pgcrypto`, `uuid-ossp` (schema `extensions`), `supabase_vault`, `pg_stat_statements`, `plpgsql`. `pg_graphql` is **not** installed, so there is no GraphQL surface.
+- No tables in `public`, no migrations, no Storage buckets, 0 users.
+- `public` already has one function: `public.rls_auto_enable()`, a `SECURITY DEFINER` event-trigger function behind the event trigger `ensure_rls` (`ddl_command_end`). It enables RLS on every new `public` table automatically. Its ACL grants `EXECUTE` to `PUBLIC`, `anon` and `authenticated`, and the security advisor reports it twice (lints 0028 and 0029). Calling an event-trigger function over RPC errors out, but migration 1 revokes it anyway so the advisors are clean.
+- Default privileges in `public` (for objects created by `postgres` and `supabase_admin`) grant all table privileges and `EXECUTE` on functions to `anon` and `authenticated`. Every migration must therefore revoke explicitly; migration 1 also changes the `postgres` default privileges.
+- `supabase_auth_admin` has `USAGE` on `public`, no `BYPASSRLS`, and no `USAGE` on `storage`.
+- Signing keys: ES256 `18b8d44a-322e-4aca-bbbb-064f3f4542b9` is `in_use`; legacy HS256 `4f3b737b-a3ea-468c-ad4f-e10bbe330cfd` is `previously_used`. Legacy `anon` / `service_role` API keys are enabled (`GET …/api-keys/legacy` → `{"enabled":true}`). New-style keys: one `default` publishable and one `default` secret key.
+- Auth config: `disable_signup=false`, `external_email_enabled=true`, Google off, no custom SMTP, `site_url=http://localhost:3000`, empty `uri_allow_list`, `jwt_exp=3600`, `refresh_token_rotation_enabled=true`, `security_refresh_token_reuse_interval=10`, `mailer_otp_exp=3600`, `mailer_otp_length=8`, `rate_limit_email_sent=2`, `smtp_max_frequency=60`, `sessions_timebox=0`, `sessions_inactivity_timeout=0`, every hook off, `security_manual_linking_enabled=false`, `mailer_notifications_identity_linked_enabled=false`, TOTP MFA enroll/verify on, default templates.
+- The organization's plan can't be read with the owner's token (`GET /v1/organizations/{id}` → 403), so the plan is treated as unknown. Session time-box and inactivity timeout are Pro-only features (Supabase "User sessions" docs).
 
-All of this changes through the script and migrations below, never by hand in the dashboard.
+All of this changes through the script and migrations below, never by hand in the dashboard (exceptions: creating the two secret API keys and the Google Cloud OAuth client).
 
 ## Architecture
 
@@ -72,98 +84,95 @@ All of this changes through the script and migrations below, never by hand in th
                              │  HTTPS, cookies only for the web origin
                              ▼
    ┌──────────────────────────────────────────────────────────┐
-   │ web: Next.js 16 (Vercel; locally web container behind     │
+   │ web: Next.js 16 (Vercel; locally the web container behind │
    │      Caddy at https://app.localhost)                     │
    │  proxy.ts ── @supabase/ssr: refresh session (getClaims)  │
-   │  /login /request-access /auth/callback /auth/confirm     │
-   │  /admin (admin claim) · /api/* thin proxies · CopilotKit │
-   │  server-side Supabase client (publishable key + user JWT)│──┐ RLS reads
-   └───────────────┬──────────────────────────────────────────┘  │ (chats list,
-                   │ HTTPS  Authorization: Bearer <access token>  │  admin lists)
-                   │        x-agent-secret: <AGENT_SERVICE_SECRET>│
-                   ▼                                              │
-   ┌─────────────── EC2 (docker compose) ────────────────┐        │
-   │ caddy :443 ── TLS (Let's Encrypt) ── agent:8000      │        │
-   │ agent (read-only fs, tmpfs /tmp, no volumes)         │        │
-   │  auth/: service secret → JWT (JWKS, ES256) → status  │        │
-   │  db/:   user-scoped repos (secret key)               │───────►├──► Supabase
-   │  crypto/: envelope AES-256-GCM (CREDENTIAL_KEYS)     │  HTTPS │    Auth (GoTrue, JWKS,
-   │  per-user ProviderHub + pi ModelRuntime (in memory)  │        │     SMTP → Resend)
-   │  sessions keyed by user+chat, Chromium pool          │        │    Postgres (RLS)
-   │ search (SearXNG, internal only)                      │        │    Storage (artifacts)
-   └──────────────────────────────────────────────────────┘        │
-                                                                   ▼
-                                               Google OAuth ◄── Supabase redirects
+   │  /login /request-access /auth/callback /auth/confirm     │──► Supabase Auth only
+   │  /admin (admin claim) · /api/* thin proxies · CopilotKit │    (sign-in, refresh,
+   │  No database reads: every data call goes to the agent    │     sign-out)
+   └───────────────┬──────────────────────────────────────────┘
+                   │ HTTPS  Authorization: Bearer <access token>
+                   │        x-agent-secret: <AGENT_SERVICE_SECRET>
+                   ▼
+   ┌─────────────── EC2 (docker compose) ────────────────┐
+   │ caddy :443 ── TLS (Let's Encrypt) ── agent:8000      │
+   │ agent (read-only fs, tmpfs /tmp and /home/pwuser)    │
+   │  auth/: service secret → JWT (JWKS, ES256) → status  │
+   │  db/:   user-scoped repos (secret key)               │──────► Supabase
+   │  crypto/: envelope AES-256-GCM (CREDENTIAL_KEYS)     │  HTTPS   Auth (JWKS, admin API,
+   │  per-user ProviderHub + pi ModelRuntime (in memory)  │           SMTP → Resend)
+   │  sessions keyed by user+chat, Chromium pool          │          Postgres (RLS deny-all)
+   │ search (SearXNG, internal only)                      │          Storage (artifacts)
+   └──────────────────────────────────────────────────────┘
+                                                Google OAuth ◄── Supabase redirects
 ```
 
 Trust boundaries:
 
-1. **Browser ↔ web.** Cookies are scoped to the web origin and HttpOnly. The browser holds no tokens it can read from JS. Server actions and POST routes check the Origin header.
-2. **Web ↔ agent.** Server to server over TLS. The service secret proves the caller is our web app. The bearer token proves the user. Both are required.
-3. **Agent ↔ Supabase.** The secret key bypasses RLS. That is why the agent only touches data through `forUser(userId)` repositories that put `user_id` into every query and every insert.
-4. **Browser data ↔ Supabase.** Only through the Next.js server with the user's JWT, so RLS is the backstop if web code has a bug.
+1. **Browser ↔ web.** Cookies are scoped to the web origin and HttpOnly. The browser holds no token it can read from JS. Server actions get Next's built-in Origin/Host check; every non-GET route handler checks `Origin === APP_ORIGIN`.
+2. **Web ↔ agent.** Server to server over TLS. The service secret proves the caller is our web app. The bearer token proves the user. Both are required. Browser headers are never forwarded (CopilotKit's default header forwarding is turned off, see flow 6).
+3. **Agent ↔ Supabase.** The secret key bypasses RLS. That is why the agent only touches data through `forUser(userId)` repositories that put `user_id` into every query, every insert and every Storage path.
+4. **Supabase ↔ anyone else.** PostgREST exposes no rows to `anon` or `authenticated` (no grants, no policies). Storage has no policies on `artifacts`. The publishable key is public by design and is only useful for the Auth endpoints.
 
 ## Inventory: per-user state today and its new home
 
 | Today | File / place | New home | Browser access |
 | --- | --- | --- | --- |
-| Profile (home, household, food, travel, shopping, `defaultModel`, notes, skipped, `onboardedAt`) | `/data/agent/profile.json` (`agent/src/profile/store.ts`) | `public.profiles.data` (jsonb), one row per user | Read own row via RLS. Writes go through the agent (`PUT /profile`, typebox-validated). |
-| Cloud provider API keys and OAuth logins (ChatGPT) | `/data/agent/auth.json` (pi `ModelRuntime` file store) | `public.provider_credentials` (encrypted), behind a `CredentialStore` implementation | None. The hint comes back through the agent's `/providers`. |
-| Local/custom provider API keys, Brave Search key | `/data/agent/local-keys.json` (plaintext) | `public.provider_credentials` (`provider` = `ollama`, `custom`, …, or `secret:brave-search`) | None |
-| Provider settings (custom base URLs and models, enabled models, hidden) | `/data/agent/providers.json` | `public.provider_settings.data` (jsonb) | Read own via RLS (not needed by the UI today; reads go through the agent's `/providers`) |
-| OpenAI device id | `/data/agent/device-id` | `public.provider_settings.device_id` (uuid, per user) | Read own |
-| Workspace (carts, trips, events, shortlists) | `/data/agent/workspace.sqlite` | `public.workspace_entities` | Read own |
-| Chats | Not persisted. Threads exist in agent memory, and history is re-sent by the client and rebuilt in `restoreHistory` | `public.chats` and `public.chat_messages` | Read own (recent chats list) |
-| Artifacts (HTML, metadata, PDF cache) | `/data/artifacts/{id}.html|.json|.pdf` | Storage `artifacts/{user_id}/{id}.html|.pdf` plus `public.artifacts` | Through agent → web only (sandbox CSP) |
-| In-flight provider sign-in flows | `LoginFlows` map (memory) | Still memory, but each flow is bound to `userId` | — |
-| Live pi sessions, browser contexts, evidence, frames | `SessionStore` (memory) | Still memory, keyed by `userId:chatId` | — |
-| pi session scratch dir | `mkdtemp` in `/tmp` | tmpfs `/tmp` (deleted on dispose, as now) | — |
-| Web↔agent secret | `/data/shared/agent-secret` (generated) | `AGENT_SERVICE_SECRET` env (not user data) | — |
+| Profile (home, household, food, travel, shopping, `defaultModel`, notes, skipped, `onboardedAt`) | `/data/agent/profile.json` (`agent/src/profile/store.ts`, `FileProfileStore`) | `public.profiles.data` (jsonb), one row per user | Via agent `GET/PUT /profile` |
+| Cloud provider API keys and OAuth logins (ChatGPT) | `/data/agent/auth.json` (pi `ModelRuntime` file store, `authPath`) | `public.provider_credentials` (encrypted), behind a pi `CredentialStore` implementation | None. Hint only, via agent `GET /providers` |
+| Local/custom provider API keys, Brave Search key | `/data/agent/local-keys.json` (plaintext, `keys[id]`, `keys["secret:brave-search"]`) | `public.provider_credentials` (`provider` = local provider id, or `secret:brave-search`) | None |
+| Provider settings (custom base URLs and models, enabled models, hidden) | `/data/agent/providers.json` | `public.provider_settings.data` (jsonb) | Via agent `GET /providers` |
+| OpenAI device id | `/data/agent/device-id` | `public.provider_settings.device_id` | None |
+| Workspace (carts, trips, events, shortlists), keyed by thread | `/data/agent/workspace.sqlite` (`node:sqlite`, PK `(thread_id, kind, id)`) | `public.workspace_entities`, PK `(chat_id, kind, entity_id)` | Via agent (AG-UI state, as today) |
+| Chats | Not persisted. Threads live in agent memory; history is re-sent by the client and rebuilt with `restoreHistory` (`agui/input.ts`) | `public.chats` and `public.chat_messages` | Via agent `GET /chats`, `GET /chats/:id/messages` |
+| Artifacts (HTML, metadata, PDF cache) | `/data/artifacts/{id}.html|.json|.pdf` | Storage `artifacts/{user_id}/{id}.html|.pdf` plus `public.artifacts` | Via agent → web `/api/artifacts/:id` only (sandbox CSP) |
+| In-flight provider sign-in flows | `LoginFlows` map (memory, `providers/logins.ts`) | Still memory, each flow bound to `userId` | — |
+| Live pi sessions, browser contexts | `SessionStore` (memory, keyed by `threadId`) | Still memory, keyed by `${userId}:${chatId}` | — |
+| pi session scratch dir | `mkdtemp(tmpdir(), "pi-session-")` | tmpfs `/tmp` (deleted on dispose, as now) | — |
+| Web↔agent secret | `/data/shared/agent-secret` (generated by `lib/secret.ts`) | `AGENT_SERVICE_SECRET` env (not user data) | — |
 | SearXNG secret | `searxng-data` volume | Unchanged (not user data) | — |
 | Theme | `localStorage.theme` | Unchanged (per device, not sensitive) | — |
 
-Volumes removed from compose: `agent-data`, `artifacts-data`, `shared`. Since there are no users yet, nothing is migrated (owner's rule); the old files are deleted.
+Volumes removed from compose: `agent-data`, `artifacts-data`, `shared`. There are no users, so nothing is migrated (owner rule); the old volumes are deleted with `docker volume rm`.
 
 ## Data model
 
-All SQL lives in `supabase/migrations/`, named `YYYYMMDDHHMMSS_name.sql`, and is applied in order with the Supabase MCP `apply_migration` (or `supabase db push`). Every migration is idempotent where Postgres allows it (`if not exists`, `create or replace`, `drop policy if exists`). The public schema is empty today, and `list_migrations` returns none.
+All SQL lives in `supabase/migrations/`, named `YYYYMMDDHHMMSS_name.sql`, applied in order with the Supabase MCP `apply_migration` (name = file name without extension). Migrations are written to run once on an empty schema; they are not re-runnable and don't need to be (`apply_migration` records each one). The owner rules out back-compat, so there are no `if not exists` guards to hide drift.
 
 Conventions:
 
-- Every per-user table has `user_id uuid not null references auth.users(id) on delete cascade`.
-- Child tables reference their parent with a composite FK `(parent_id, user_id) → parent(id, user_id)`. The database itself then guarantees that a row's `user_id` matches its parent's owner.
-- RLS is enabled on every table. Policies name a role (`to authenticated`) and wrap auth calls in `(select …)` so they are evaluated once per statement.
-- Grants are explicit. `anon` gets nothing on any table. `authenticated` gets `select` only where a read policy exists. `service_role` (what the secret key maps to) keeps its default grants.
-- Helper functions live in schema `private`, which PostgREST does not expose.
+- Every per-user table has `user_id uuid not null references auth.users(id) on delete cascade`, and an index whose first column is `user_id` (cascade deletes and every agent query filter on it).
+- Child tables reference their parent with a composite FK `(parent_id, user_id) → parent(id, user_id)`, so the database guarantees a row's `user_id` matches its parent's owner.
+- RLS is enabled on every table (the project's `ensure_rls` event trigger also does this; the migrations still say it explicitly). There are **no** policies for `anon` or `authenticated`, and all privileges are revoked from them. The only policy in the schema is the one that lets `supabase_auth_admin` read `invited_emails` for the hook.
+- `service_role` (what a secret key maps to) keeps its default grants and bypasses RLS.
+- Functions that only the agent calls live in `public` (PostgREST must see them), are `security invoker`, have `set search_path = ''`, and are granted `EXECUTE` to `service_role` only. Trigger and hook functions live in schema `private`, which PostgREST doesn't expose.
 
-### Migration 1: `20261031120000_private_schema.sql`
+### Migration 1: `20261031120000_foundation.sql`
 
 ```sql
-create schema if not exists private;
-revoke all on schema private from public, anon, authenticated;
-grant usage on schema private to authenticated, service_role, supabase_auth_admin;
+alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated;
+alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated;
+alter default privileges for role postgres in schema public revoke execute on functions from public, anon, authenticated;
 
-create or replace function private.touch_updated_at()
+revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+
+create schema private;
+revoke all on schema private from public, anon, authenticated;
+grant usage on schema private to supabase_auth_admin;
+
+create function private.touch_updated_at()
 returns trigger language plpgsql set search_path = '' as $$
 begin
   new.updated_at := now();
   return new;
 end $$;
-
-create or replace function private.is_admin()
-returns boolean language sql stable set search_path = '' as $$
-  select coalesce((select auth.jwt()) -> 'app_metadata' ->> 'role' = 'admin', false)
-$$;
-
-revoke all on function private.touch_updated_at() from public, anon, authenticated;
-revoke all on function private.is_admin() from public, anon;
-grant execute on function private.is_admin() to authenticated;
+revoke execute on function private.touch_updated_at() from public;
 ```
 
 ### Migration 2: `20261031120100_profiles.sql`
 
 ```sql
-create table if not exists public.profiles (
+create table public.profiles (
   user_id    uuid primary key references auth.users(id) on delete cascade,
   email      text not null check (email = lower(email) and char_length(email) <= 254),
   data       jsonb not null default '{}'::jsonb
@@ -172,22 +181,13 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index if not exists profiles_created_at_idx on public.profiles (created_at desc, user_id desc);
+create unique index profiles_email_idx on public.profiles (email);
+create index profiles_created_idx on public.profiles (created_at desc, user_id desc);
 
 create trigger profiles_touch before update on public.profiles
   for each row execute function private.touch_updated_at();
 
-create or replace function private.is_active()
-returns boolean language sql stable security definer set search_path = '' as $$
-  select exists (
-    select 1 from public.profiles
-    where user_id = (select auth.uid()) and status = 'active'
-  )
-$$;
-revoke all on function private.is_active() from public, anon;
-grant execute on function private.is_active() to authenticated;
-
-create or replace function private.handle_new_user()
+create function private.handle_new_user()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (user_id, email) values (new.id, lower(new.email))
@@ -195,15 +195,15 @@ begin
   return new;
 end $$;
 
-create or replace function private.handle_user_email_change()
+create function private.handle_user_email_change()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   update public.profiles set email = lower(new.email) where user_id = new.id;
   return new;
 end $$;
 
-revoke all on function private.handle_new_user() from public, anon, authenticated;
-revoke all on function private.handle_user_email_change() from public, anon, authenticated;
+revoke execute on function private.handle_new_user() from public;
+revoke execute on function private.handle_user_email_change() from public;
 
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function private.handle_new_user();
@@ -213,20 +213,14 @@ create trigger on_auth_user_email_changed after update of email on auth.users
 
 alter table public.profiles enable row level security;
 revoke all on public.profiles from anon, authenticated;
-grant select on public.profiles to authenticated;
-
-create policy profiles_select_own on public.profiles for select to authenticated
-  using (user_id = (select auth.uid()) and (select private.is_active()));
-create policy profiles_select_admin on public.profiles for select to authenticated
-  using ((select private.is_admin()));
 ```
 
-There are no insert, update or delete policies. Profile writes go through the agent, which validates `data` with the shared typebox `ProfileSchema`, and status changes go through admin endpoints. `email` is a copy kept in sync by the trigger, so the admin user list is one RLS query.
+`email` is a copy kept in sync by the triggers, so the agent can find a user by email (`profiles_email_idx`, unique) without paging `auth.admin.listUsers`. Every user has an email here because phone sign-in is off and Google requires an email (`external_google_email_optional = false`).
 
 ### Migration 3: `20261031120200_access.sql`
 
 ```sql
-create table if not exists public.access_requests (
+create table public.access_requests (
   id            uuid primary key default gen_random_uuid(),
   name          text not null check (char_length(btrim(name)) between 1 and 100),
   email         text not null check (
@@ -244,22 +238,16 @@ create table if not exists public.access_requests (
   check ((status = 'pending') = (decided_at is null)),
   check (invite_status is null or status = 'approved')
 );
-create unique index if not exists access_requests_one_pending
-  on public.access_requests (email) where status = 'pending';
-create index if not exists access_requests_status_created_idx
-  on public.access_requests (status, created_at desc, id desc);
-create index if not exists access_requests_created_idx
-  on public.access_requests (created_at desc, id desc);
-create index if not exists access_requests_ip_created_idx
-  on public.access_requests (ip_hash, created_at desc);
+create unique index access_requests_one_pending on public.access_requests (email) where status = 'pending';
+create index access_requests_status_created_idx on public.access_requests (status, created_at desc, id desc);
+create index access_requests_created_idx on public.access_requests (created_at desc, id desc);
+create index access_requests_ip_created_idx on public.access_requests (ip_hash, created_at desc);
+create index access_requests_email_idx on public.access_requests (email);
 
 alter table public.access_requests enable row level security;
 revoke all on public.access_requests from anon, authenticated;
-grant select on public.access_requests to authenticated;
-create policy access_requests_select_admin on public.access_requests for select to authenticated
-  using ((select private.is_admin()));
 
-create table if not exists public.invited_emails (
+create table public.invited_emails (
   email      text primary key check (email = lower(email) and char_length(email) <= 254),
   request_id uuid references public.access_requests(id) on delete set null,
   invited_by uuid references auth.users(id) on delete set null,
@@ -268,10 +256,10 @@ create table if not exists public.invited_emails (
 alter table public.invited_emails enable row level security;
 revoke all on public.invited_emails from anon, authenticated;
 grant select on public.invited_emails to supabase_auth_admin;
-create policy invited_emails_auth_admin_read on public.invited_emails for select
-  to supabase_auth_admin using (true);
+create policy invited_emails_auth_admin_read on public.invited_emails
+  for select to supabase_auth_admin using (true);
 
-create or replace function private.before_user_created(event jsonb)
+create function private.before_user_created(event jsonb)
 returns jsonb language plpgsql stable set search_path = '' as $$
 declare
   v_email text := lower(coalesce(event -> 'user' ->> 'email', ''));
@@ -283,18 +271,49 @@ begin
   end if;
   return '{}'::jsonb;
 end $$;
-revoke all on function private.before_user_created(jsonb) from public, anon, authenticated;
+revoke execute on function private.before_user_created(jsonb) from public;
 grant execute on function private.before_user_created(jsonb) to supabase_auth_admin;
+
+create function public.access_request_submit(
+  p_name text, p_email text, p_note text, p_ip_hash bytea
+) returns text language plpgsql set search_path = '' as $$
+declare
+  v_email text := lower(btrim(p_email));
+begin
+  perform pg_advisory_xact_lock(hashtext('access_request_submit'));
+  if (select count(*) from public.access_requests
+       where ip_hash = p_ip_hash and created_at > now() - interval '1 hour') >= 3
+     or (select count(*) from public.access_requests
+       where ip_hash = p_ip_hash and created_at > now() - interval '1 day') >= 10 then
+    return 'rate_limited_ip';
+  end if;
+  if (select count(*) from public.access_requests
+       where created_at > now() - interval '1 day') >= 200 then
+    return 'rate_limited_global';
+  end if;
+  if exists (select 1 from public.profiles where email = v_email) then
+    return 'already_member';
+  end if;
+  if exists (select 1 from public.access_requests where email = v_email and status = 'pending') then
+    return 'duplicate';
+  end if;
+  insert into public.access_requests (name, email, note, ip_hash)
+  values (btrim(p_name), v_email, p_note, p_ip_hash);
+  return 'inserted';
+end $$;
+revoke execute on function public.access_request_submit(text, text, text, bytea) from public, anon, authenticated;
+grant execute on function public.access_request_submit(text, text, text, bytea) to service_role;
 ```
 
 - `ip_hash` is `HMAC-SHA256(ACCESS_REQUEST_PEPPER, client_ip)`. Raw IPs are never stored.
-- The one-pending-per-email unique index makes a duplicate submission a no-op (`on conflict do nothing`), and the visitor sees the same response either way.
-- The hook allows a user only if the email is in `invited_emails`. The agent inserts that row before calling the invite API, and the bootstrap script does the same for the first admin. Deleting a user also deletes their `invited_emails` row.
+- `access_request_submit` does the rate checks and the insert under one transaction-scoped advisory lock, so concurrent submissions can't overshoot the caps. (A PostgREST upsert can't target the partial unique index, which is why this is a function rather than `.upsert({ onConflict })`.) Rate-limited and duplicate outcomes count toward nothing: only inserted rows are counted, which is enough because each insert is one row.
+- The hook allows a user only if the email is in `invited_emails`. The agent inserts that row before calling any invite API, and the bootstrap script does the same for the admin. Deleting a user deletes their `invited_emails` row and their `access_requests` rows.
+- The hook is `security invoker`, as the Supabase docs recommend; it reads `invited_emails` as `supabase_auth_admin` through the grant and policy above.
 
 ### Migration 4: `20261031120300_chats_workspace.sql`
 
 ```sql
-create table if not exists public.chats (
+create table public.chats (
   id              uuid primary key,
   user_id         uuid not null references auth.users(id) on delete cascade,
   title           text not null default '' check (char_length(title) <= 200),
@@ -304,24 +323,25 @@ create table if not exists public.chats (
   last_message_at timestamptz not null default now(),
   unique (id, user_id)
 );
-create index if not exists chats_user_recent_idx on public.chats (user_id, last_message_at desc, id desc);
+create index chats_user_recent_idx on public.chats (user_id, last_message_at desc, id desc);
 create trigger chats_touch before update on public.chats
   for each row execute function private.touch_updated_at();
 
-create table if not exists public.chat_messages (
+create table public.chat_messages (
   id         bigint generated always as identity primary key,
   chat_id    uuid not null,
   user_id    uuid not null references auth.users(id) on delete cascade,
-  run_id     text not null check (char_length(run_id) <= 100),
+  run_id     text not null check (char_length(run_id) between 1 and 100),
   role       text not null check (role in ('user', 'assistant')),
   content    text not null check (char_length(content) <= 200000),
+  status     text not null default 'complete' check (status in ('complete', 'interrupted')),
   created_at timestamptz not null default now(),
   foreign key (chat_id, user_id) references public.chats(id, user_id) on delete cascade
 );
-create index if not exists chat_messages_chat_idx on public.chat_messages (chat_id, id);
-create index if not exists chat_messages_user_idx on public.chat_messages (user_id);
+create index chat_messages_chat_idx on public.chat_messages (chat_id, id);
+create index chat_messages_user_idx on public.chat_messages (user_id);
 
-create table if not exists public.workspace_entities (
+create table public.workspace_entities (
   chat_id    uuid not null,
   user_id    uuid not null references auth.users(id) on delete cascade,
   kind       text not null check (kind in ('cart', 'trip', 'event', 'shortlist')),
@@ -332,9 +352,9 @@ create table if not exists public.workspace_entities (
   primary key (chat_id, kind, entity_id),
   foreign key (chat_id, user_id) references public.chats(id, user_id) on delete cascade
 );
-create index if not exists workspace_entities_user_idx on public.workspace_entities (user_id);
+create index workspace_entities_user_idx on public.workspace_entities (user_id);
 
-create or replace function public.workspace_put(
+create function public.workspace_put(
   p_user uuid, p_chat uuid, p_kind text, p_id text, p_value jsonb, p_expected integer
 ) returns integer language plpgsql set search_path = '' as $$
 declare
@@ -362,36 +382,29 @@ begin
   if v_version is null then
     select version into v_version from public.workspace_entities
      where chat_id = p_chat and user_id = p_user and kind = p_kind and entity_id = p_id;
-    raise exception using errcode = 'P0409', message = 'version_conflict',
+    raise exception using errcode = 'PT409', message = 'version_conflict',
       detail = coalesce(v_version, 0)::text;
   end if;
   return v_version;
 end $$;
-revoke all on function public.workspace_put(uuid, uuid, text, text, jsonb, integer) from public, anon, authenticated;
+revoke execute on function public.workspace_put(uuid, uuid, text, text, jsonb, integer) from public, anon, authenticated;
 grant execute on function public.workspace_put(uuid, uuid, text, text, jsonb, integer) to service_role;
 
 alter table public.chats enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.workspace_entities enable row level security;
 revoke all on public.chats, public.chat_messages, public.workspace_entities from anon, authenticated;
-grant select on public.chats, public.chat_messages, public.workspace_entities to authenticated;
-
-create policy chats_select_own on public.chats for select to authenticated
-  using (user_id = (select auth.uid()) and (select private.is_active()));
-create policy chat_messages_select_own on public.chat_messages for select to authenticated
-  using (user_id = (select auth.uid()) and (select private.is_active()));
-create policy workspace_select_own on public.workspace_entities for select to authenticated
-  using (user_id = (select auth.uid()) and (select private.is_active()));
 ```
 
-- `kind` mirrors `ENTITY_KINDS` in `shared/workspace.ts`. A unit test asserts the two lists match.
-- `workspace_put` runs the optimistic version check in one statement, so two concurrent turns can't both win. The agent maps SQLSTATE `P0409` to the existing `VersionConflict` (expected vs `detail`).
-- The `where w.user_id = p_user` on the upsert path, plus the composite FK, means a different user's row can never be overwritten, even when the ids collide.
+- `kind` mirrors `ENTITY_KINDS` in `shared/workspace.ts` (`cart`, `trip`, `event`, `shortlist`). A unit test reads the migration file and asserts the two lists match.
+- The workspace is per chat today (`thread_id` in the SQLite PK) and stays per chat.
+- `workspace_put` runs the optimistic version check in one statement, so two concurrent turns can't both win. SQLSTATE `PT409` makes PostgREST answer HTTP 409, and supabase-js surfaces `error.code === "PT409"` with `error.details` = the current version. The agent maps it to the existing `VersionConflict` (`workspace/conflict.ts`).
+- A chat id owned by another user fails the composite FK (`23503`), which the agent maps to `not_found`. The `where w.user_id = p_user` on the upsert path is a second guard.
 
 ### Migration 5: `20261031120400_artifacts.sql`
 
 ```sql
-create table if not exists public.artifacts (
+create table public.artifacts (
   id           text primary key check (id ~ '^[A-Za-z0-9_-]{12}$'),
   user_id      uuid not null references auth.users(id) on delete cascade,
   chat_id      uuid,
@@ -404,29 +417,24 @@ create table if not exists public.artifacts (
   check (html_path = user_id::text || '/' || id || '.html'),
   check (pdf_path is null or pdf_path = user_id::text || '/' || id || '.pdf')
 );
-create index if not exists artifacts_user_created_idx on public.artifacts (user_id, created_at desc, id desc);
+create index artifacts_user_created_idx on public.artifacts (user_id, created_at desc, id desc);
+create index artifacts_chat_idx on public.artifacts (chat_id, user_id);
 
 alter table public.artifacts enable row level security;
 revoke all on public.artifacts from anon, authenticated;
-grant select on public.artifacts to authenticated;
-create policy artifacts_select_own on public.artifacts for select to authenticated
-  using (user_id = (select auth.uid()) and (select private.is_active()));
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('artifacts', 'artifacts', false, 10485760, array['text/html', 'application/pdf'])
-on conflict (id) do update
-  set public = false, file_size_limit = excluded.file_size_limit,
-      allowed_mime_types = excluded.allowed_mime_types;
+values ('artifacts', 'artifacts', false, 10485760, array['text/html', 'application/pdf']);
 ```
 
-There are no `storage.objects` policies for the `artifacts` bucket. Storage denies by default, so only the agent's secret key reads and writes it. This is deliberate. Artifact HTML must always be served with `Content-Security-Policy: sandbox …` and `nosniff`, which only our own route adds. A browser-readable signed URL or RLS read would bypass that. Path ownership is enforced three times: the agent always builds the path from the verified user id, the table check constraints, and the metadata lookup by `(id, user_id)`.
+The id regex matches `ARTIFACT_ID_RE` in `shared/artifacts.ts` (`randomBytes(9).toString("base64url")`). There are no `storage.objects` policies for `artifacts`, so only the agent's secret key reads and writes it. This is deliberate: artifact HTML must always be served with `Content-Security-Policy: sandbox …` (`ARTIFACT_CSP`) and `nosniff`, which only our route adds; a signed URL or an RLS read would bypass that. Path ownership is enforced three times: the agent builds the path from the verified user id, the table check constraints, and the metadata lookup by `(id, user_id)`.
 
-On user deletion, `public.artifacts` rows cascade but Storage objects don't. The delete-user flow removes `artifacts/{user_id}/` first (see flows).
+On user deletion, `public.artifacts` rows cascade but Storage objects don't. The delete-user flow removes `artifacts/{user_id}/` first.
 
 ### Migration 6: `20261031120500_providers.sql`
 
 ```sql
-create table if not exists public.provider_settings (
+create table public.provider_settings (
   user_id    uuid primary key references auth.users(id) on delete cascade,
   data       jsonb not null default '{"custom":{},"enabled":{},"hidden":[]}'::jsonb
              check (jsonb_typeof(data) = 'object' and pg_column_size(data) <= 131072),
@@ -436,193 +444,214 @@ create table if not exists public.provider_settings (
 create trigger provider_settings_touch before update on public.provider_settings
   for each row execute function private.touch_updated_at();
 
-create table if not exists public.provider_credentials (
+create table public.provider_credentials (
   user_id     uuid not null references auth.users(id) on delete cascade,
-  provider    text not null check (provider ~ '^[a-z0-9][a-z0-9:_-]{0,63}$'),
+  provider    text not null check (provider ~ '^[a-z0-9][a-z0-9:_.-]{0,63}$'),
   kind        text not null check (kind in ('api_key', 'oauth')),
   ciphertext  bytea not null check (octet_length(ciphertext) between 17 and 65536),
   nonce       bytea not null check (octet_length(nonce) = 12),
   dek_wrapped bytea not null check (octet_length(dek_wrapped) = 48),
   dek_nonce   bytea not null check (octet_length(dek_nonce) = 12),
   key_version integer not null check (key_version > 0),
-  hint        text not null check (char_length(hint) <= 40),
+  hint        text not null check (char_length(hint) <= 80),
   version     integer not null default 1 check (version > 0),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   primary key (user_id, provider)
 );
-create index if not exists provider_credentials_key_version_idx on public.provider_credentials (key_version);
+create index provider_credentials_key_version_idx on public.provider_credentials (key_version);
 create trigger provider_credentials_touch before update on public.provider_credentials
   for each row execute function private.touch_updated_at();
 
 alter table public.provider_settings enable row level security;
 alter table public.provider_credentials enable row level security;
 revoke all on public.provider_settings, public.provider_credentials from anon, authenticated;
-grant select on public.provider_settings to authenticated;
-create policy provider_settings_select_own on public.provider_settings for select to authenticated
-  using (user_id = (select auth.uid()) and (select private.is_active()));
 ```
 
-`provider_credentials` has RLS on and no policies, and grants are revoked from `anon` and `authenticated`. Only `service_role` (the agent's secret key) can touch it. `dek_wrapped` is 32 bytes of data key plus a 16-byte GCM tag. `ciphertext` is the encrypted value with its 16-byte tag appended. `version` gives `modify` optimistic concurrency.
+`dek_wrapped` is the 32-byte data key plus a 16-byte GCM tag. `ciphertext` is the encrypted value with its 16-byte tag appended. `version` gives `modify` optimistic concurrency. `bytea` travels through PostgREST as `\x…` hex; the repository encodes and decodes it, and an integration test round-trips it.
 
 ### Post-migration checks
 
-After applying, run MCP `get_advisors` (security and performance) and fix every finding before moving on. Expected and accepted: "RLS enabled, no policy" on `provider_credentials` and `invited_emails` (intentional). Record the accepted ones in the migration's header comment.
+After each migration: MCP `list_migrations`, then `get_advisors` for `security` and `performance`. Every finding is fixed except these accepted ones, which are listed in a header comment of migration 6:
+
+- `rls_enabled_no_policy` (INFO) on every `public` table except `invited_emails`: intentional, the agent is the only data path.
+- Nothing else is accepted. The two `rls_auto_enable` warnings must be gone after migration 1.
 
 ## Auth flows
 
-The URLs below use the local origin `https://app.localhost`. In production the origin is the Vercel domain, called `APP_ORIGIN` everywhere.
+URLs below use the local origin `https://app.localhost`. In production the origin is the Vercel domain. Code always uses `APP_ORIGIN`, never the `Host` header.
+
+Error copy and codes used by the web, in one place (`web/lib/authErrors.ts`):
+
+| Code (`/login?error=`) | Copy |
+| --- | --- |
+| `not_invited` | "This Google account isn't invited. Use the email you were invited with, or request access." |
+| `link_expired` | "That link has expired or was already used. Sign in with Google, or ask for a new link below." |
+| `auth_failed` | "Sign-in didn't work. Try again." |
+| `signed_out` | "You were signed out. Sign in again." |
+| `account_disabled` | "Your access has been turned off." |
+| `auth_unavailable` | "Can't reach the account service. Try again in a minute." |
+
+Unknown values show nothing. The raw `error_description` from Supabase is never rendered.
 
 ### 1. Request access (visitor)
 
-1. `/request-access` (public) shows name, email, note (optional, up to 1000 characters), and a hidden honeypot field `company_website`. The server action also gets a signed render timestamp (HMAC with `AGENT_SERVICE_SECRET` as key is fine; builder's call).
-2. The server action validates lengths and email shape. It drops the request silently (same success response) if the honeypot is filled or the form was submitted less than 3 seconds after render.
-3. Web → agent `POST /access-requests` with the service secret, `{ name, email, note }`, and `x-client-ip` taken from Vercel's `x-forwarded-for` first hop (locally, Caddy's `X-Forwarded-For`). The agent trusts `x-client-ip` only because the service secret authenticated the caller.
-4. The agent lowercases and trims the email and computes `ip_hash`. It enforces, from the DB:
-   - at most 3 requests per `ip_hash` per hour, and 10 per day;
-   - at most 200 requests in total per day (a flood circuit-breaker);
-   - then `insert … on conflict do nothing`. A pending duplicate inserts nothing.
-5. The response is always `202 { ok: true }` with the same body and roughly the same latency (the agent pads to a 300 ms floor), whether the row was inserted, deduplicated, rate-limited, or the email already belongs to a user. The page shows: "Thanks. If you're approved, you'll get an email from Open Agent." Rate limiting is logged at `warn` with the ip_hash prefix, never the email.
+1. `/request-access` (public, server component) renders name, email, note (optional, up to 1000 characters), a hidden honeypot `company_website` (visually hidden, `tabindex="-1"`, `autocomplete="off"`, `aria-hidden="true"`), and a hidden `form_ts`. `form_ts` is `<unix ms>.<base64url(HMAC-SHA256(key, "<unix ms>"))>` with `key = SHA-256("oab/form-ts/v1\0" + AGENT_SERVICE_SECRET)`, built in `web/lib/formToken.ts` (`signFormTs()` / `checkFormTs(token, now)`).
+2. The server action (`web/app/request-access/actions.ts`, `submitAccessRequest`) validates lengths and email shape (400-style inline errors for a malformed field are fine: they reveal nothing about other people). It drops the request silently (same success state, no agent call) if the honeypot is filled, `form_ts` fails the HMAC, or the form is younger than 3 s or older than 1 h.
+3. Otherwise web → agent `POST /access-requests` with the service secret (no bearer), body `{ name, email, note }`, header `x-client-ip`. The client IP is the first entry of `x-forwarded-for`, which Vercel overwrites with the real client IP (and which Caddy sets from the TCP peer locally, because Caddy ignores incoming `X-Forwarded-For` from untrusted peers). The agent reads `x-client-ip` on this route and on `POST /auth/email-link` only, and only after the service secret passed.
+4. The agent computes `ip_hash` and calls `rpc("access_request_submit", …)`.
+5. The response is always `202 { ok: true }`, padded to a 300 ms floor, whatever the outcome. The page shows: "Thanks. If you're approved, you'll get an email from Open Agent." Outcomes other than `inserted` are logged at `info` (`rate_limited_*` at `warn`) with the first 8 hex chars of `ip_hash`, never the email.
 6. There is no read-back. The visitor can't see or edit their request.
 
 ### 2. Approve and invite (admin)
 
-1. The admin opens `/admin`. The page checks the claim `app_metadata.role === "admin"` from `getClaims()` and returns 404 to everyone else. The Requests tab reads `access_requests` with the user's JWT (RLS policy `access_requests_select_admin`).
-2. **Approve** (a server action) → web → agent `POST /admin/access-requests/:id/approve`. The agent does `requireAdmin`: the claim check plus a live `auth.admin.getUserById(sub)` confirming `app_metadata.role === "admin"` and not banned. Then:
-   1. Load the request. If it isn't `pending`, return `409` "Already decided".
-   2. `insert into invited_emails (email, request_id, invited_by) … on conflict do nothing`.
-   3. Call `auth.admin.inviteUserByEmail(email, { redirectTo: APP_ORIGIN + "/auth/confirm", data: { name } })`.
-   4. On success, set `status='approved'`, `invite_status='sent'`, `user_id`, `decided_by`, `decided_at`.
-   5. On failure, set `status='approved'`, `invite_status='failed'`, and a scrubbed `invite_error` (provider message only, cut to 500 characters, never the full response). Return `502` with "Invite email failed: <reason>. Use Resend invite."
-   6. **Resend invite** (`POST …/resend`) works in two ways. If no auth user has that email yet, it repeats step 3. If one does (an earlier invite created the user but the email failed or expired), it calls `auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: APP_ORIGIN + "/auth/confirm" } })`, which sends the magic-link template. Either way, it updates `invite_status` and `invite_error`.
-3. **Reject**: set `status='rejected'`, `decided_by`, `decided_at`. No email is sent. A later request from the same email is allowed (new row).
-4. Supabase sends the invite email through Resend using the customized template (below).
+1. `/admin` (server component) calls `requireAdmin()` (claim check; `notFound()` otherwise) and loads lists from the agent (`GET /admin/access-requests`, `GET /admin/users`). Admin data is never read from Supabase by the web.
+2. **Approve** (server action) → agent `POST /admin/access-requests/:id/approve`. The agent runs `requireAdmin` (below), then:
+   1. Load the request. Not `pending` → `409 already_decided`.
+   2. If `profiles` has that email → set `status='approved'`, `decided_by`, `decided_at`, `user_id`, leave `invite_status` null, and return `409 already_member` ("This email already has an account."). No email.
+   3. Upsert `invited_emails (email, request_id, invited_by)` with `ignoreDuplicates`.
+   4. `auth.admin.inviteUserByEmail(email, { redirectTo: APP_ORIGIN + "/auth/confirm", data: { name } })`.
+   5. Success → `status='approved'`, `invite_status='sent'`, `user_id`, `decided_by`, `decided_at`; `200 { request }`.
+   6. Failure → `status='approved'`, `invite_status='failed'`, `invite_error` = the Supabase error `code` plus message, cut to 500 characters; `502 invite_failed` with message "Invite email failed: <code>. Use Resend invite." The row is updated either way.
+3. **Resend invite** (`POST …/:id/resend`, request must be `approved`, else `409 not_approved`): if `profiles` has the email, call `signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: APP_ORIGIN + "/auth/confirm" } })` on a fresh anon-key client (magic-link template); otherwise repeat `inviteUserByEmail`. Update `invite_status` / `invite_error` the same way. Supabase's `smtp_max_frequency = 60` means a second resend within a minute fails with `over_email_send_rate_limit`; the UI shows that code.
+4. **Reject**: `status='rejected'`, `decided_by`, `decided_at`. No email. A later request from the same email is allowed (new row).
 
-The Resend sandbox sender (`onboarding@resend.dev`) only delivers to the Resend account owner (`ntnbhat9@gmail.com`). Until a domain is verified, approving anyone else will most likely take the `invite_status='failed'` path. That is expected and visible in the UI. The end-to-end test uses `generateLink` instead (see Testing).
+The Resend sandbox sender only delivers to `ntnbhat9@gmail.com`. Approving anyone else will most likely take the `invite_status='failed'` path until a domain is verified. That is expected and visible in the UI; the E2E test uses `generateLink` instead.
 
 ### 3. First sign-in from the invite link
 
-1. Invite template link: `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite`. `RedirectTo` is `APP_ORIGIN/auth/confirm`, which must be in the redirect allowlist; otherwise Supabase falls back to the Site URL.
-2. `GET /auth/confirm` doesn't verify anything. It renders a page with one button, "Continue to Open Agent" (`id="auth-confirm-continue"`). Email scanners that pre-fetch links therefore can't burn the single-use token (Supabase's production checklist warns about this).
-3. The button submits a server action that checks `type ∈ {"invite", "email"}` and `token_hash` matches `^[A-Za-z0-9_-]{10,200}$`, then calls `supabase.auth.verifyOtp({ type, token_hash })` on the server client. On success the session cookies are set. Then `redirect("/")`; there is no `next` parameter on this route.
+1. Invite template link: `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite`. `RedirectTo` is `APP_ORIGIN/auth/confirm`, exactly as in `uri_allow_list`.
+2. `GET /auth/confirm` verifies nothing. It renders one button, "Continue to Open Agent" (`id="auth-confirm-continue"`), inside a form posting to a server action, with `token_hash` and `type` as hidden fields. Email scanners that pre-fetch links therefore can't burn the single-use token.
+3. The server action (`web/app/auth/confirm/actions.ts`, `confirmEmailLink`) checks `type ∈ {"invite", "email"}` and `token_hash` matches `^[A-Za-z0-9_-]{10,200}$`, then `supabase.auth.verifyOtp({ type, token_hash })` on the server client. Success sets the session cookies and `redirect("/")`. There is no `next` on this route.
 4. The profile row already exists: `private.handle_new_user` created it when the invite created the user. `/` sees an empty profile and starts onboarding, as today.
-5. On error (expired or used), redirect to `/login?error=link_expired`, which says: "That link has expired or was already used. Sign in with Google, or ask for a new link below." The email-link form is right there.
+5. Error → `redirect("/login?error=link_expired")`. The email-link form is on that page.
 
-### 4. Google sign-in (returning users)
+### 4. Google sign-in
 
-1. `/login` → **Continue with Google** (`id="login-google"`) submits a server action. It calls `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: APP_ORIGIN + "/auth/callback?next=" + safeNext, queryParams: { prompt: "select_account" } } })` on the server client (PKCE: the code verifier goes in an HttpOnly cookie), then `redirect(data.url)`.
-2. Google → Supabase (`https://dwiuzfvmevdzzabqeaog.supabase.co/auth/v1/callback`) → `APP_ORIGIN/auth/callback?code=…&next=…`.
-3. `/auth/callback` (route handler):
-   - If the query has `error` / `error_code` / `error_description`, map them: `signup_disabled` or a 403 hook rejection → `/login?error=not_invited` ("This Google account isn't invited. Use the email you were invited with, or request access."); anything else → `/login?error=auth_failed`. The raw description is never echoed into the page.
-   - `exchangeCodeForSession(code)`. On error → `/login?error=auth_failed`.
-   - `next` is sanitized with `safeNext()` (see the threat table). Then redirect to `APP_ORIGIN + next`.
-4. **Uninvited Google accounts:** with `disable_signup = true`, Supabase won't create a user. If sign-ups were ever re-enabled by mistake, the `before-user-created` hook still rejects any email not in `invited_emails`.
-5. **Invited user with a Google account on the same email:** Supabase links identities with the same email automatically ("Supabase Auth automatically links identities with the same email address to a single user", Identity Linking docs). The invite user's email is confirmed once they've used the invite link, so the Google identity is linked to the existing user and no new user is created. If they try Google before using the invite link, the email is unconfirmed. Supabase docs say that when linking, unconfirmed identities on the existing user are removed. That is acceptable here, since there is no password identity to lose. The E2E plan covers both orders (see "Claims to verify during build").
-6. `mailer_notifications_identity_linked_enabled = true`, so the user gets an email when Google is linked, which is a security signal.
+1. `/login` → **Continue with Google** (`id="login-google"`) submits the server action `signInWithGoogle`. It sets a host-only cookie `oab_next` (`HttpOnly; Secure; SameSite=Lax; Path=/auth/callback; Max-Age=600`) to `safeNext(formData.next)`, then calls `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: APP_ORIGIN + "/auth/callback", queryParams: { prompt: "select_account" } } })` on the server client (PKCE: the code verifier is written to a cookie by `setAll`), then `redirect(data.url)`.
+   - `next` travels in a cookie, not the `redirectTo` query string, so `uri_allow_list` can hold exact URLs (Supabase matches the allow list as globs against the whole URL, query included).
+2. Google → `https://dwiuzfvmevdzzabqeaog.supabase.co/auth/v1/callback` → `APP_ORIGIN/auth/callback?code=…`.
+3. `GET /auth/callback` (route handler, `web/app/auth/callback/route.ts`):
+   - `error` / `error_code` present: `signup_disabled`, or `error_description` containing "invite-only" (the hook's message) → `/login?error=not_invited`; anything else → `/login?error=auth_failed`.
+   - No `code` → `/login?error=auth_failed`.
+   - `exchangeCodeForSession(code)`; error → `/login?error=auth_failed`.
+   - Read and delete `oab_next`, run it through `safeNext()` again, redirect to `APP_ORIGIN + next`.
+4. **Uninvited Google accounts:** with `disable_signup = true`, Supabase won't create a user. If sign-ups were ever re-enabled by mistake, the hook still rejects any email not in `invited_emails`.
+5. **Invited user with a Google account on the same email:** Supabase links identities with the same email automatically (Identity Linking docs). Once the invite or magic link has been used, the email is confirmed and Google links to the existing user. If the user tries Google before using the invite, the existing user is unconfirmed; the docs say unconfirmed identities on the existing user are removed on linking, which is harmless here (no password identity). Both orders are in the E2E run (claim 1).
+6. `mailer_notifications_identity_linked_enabled = true`, so the user gets an email when Google is linked.
 
 ### 5. Email sign-in link (users without Google)
 
-1. On `/login`, "Email me a sign-in link" (`id="login-email"`) → server action → `supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: APP_ORIGIN + "/auth/confirm" } })`.
-2. The response is always "If that email has access, a link is on its way." Errors (including "signups not allowed") are logged at `info` without the email and never shown. This avoids enumeration.
-3. Magic-link template: `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`, then the same `/auth/confirm` flow as above. A `token_hash` link works in a different browser from the one that asked, unlike a PKCE `code` link.
+1. `/login` → "Email me a sign-in link" (`id="login-email-submit"`, input `id="login-email-input"`) → server action `requestEmailLink` → agent `POST /auth/email-link` (service secret, no bearer, `x-client-ip`).
+2. The agent rate-limits in memory (`email-link-ip:<ip_hash>` 5 per hour, `email-link-addr:<sha256(email)>` 3 per hour). Within limits, it calls `signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: APP_ORIGIN + "/auth/confirm" } })` on an anon-key client. It always answers `202 { ok: true }`, padded to 300 ms. Errors (including "Signups not allowed for otp") are logged at `info` with the Supabase error code only.
+   - Going through the agent keeps a per-IP limit that works on Vercel (where in-memory state doesn't persist between invocations) and keeps Vercel's shared egress IPs from tripping Supabase's per-IP OTP limit for everyone.
+3. The page always says "If that email has access, a link is on its way."
+4. Magic-link template: `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`, then the same `/auth/confirm` flow. A `token_hash` link works in a different browser from the one that asked, unlike a PKCE `code` link.
 
 ### 6. Every request: session refresh and token forwarding
 
-1. `web/proxy.ts` (Next 16 "proxy", formerly middleware) runs on every non-static path. It creates the server client with the request and response cookie adapters and calls `supabase.auth.getClaims()`. That verifies the access token locally against the cached JWKS and refreshes it with the refresh token if it has expired, writing the new cookies to both the request (so later server code sees them) and the response. There must be no code between `createServerClient` and `getClaims()`.
-2. Route protection in `proxy.ts`:
-   - Public paths: `/login`, `/request-access`, `/auth/callback`, `/auth/confirm`, `/auth/error`, `/_next/*`, `/favicon.ico`.
-   - No valid claims on a page → `302 /login?next=<path>`. No valid claims on `/api/*` → `401 { error: "signed_out" }` (the client shows "You were signed out. Sign in again." with a link).
-   - `/admin` and `/api/admin/*` without the admin claim → 404 (page) or 404 (API).
-3. Server code that calls the agent uses `getAgentAuth()` (`web/lib/auth.ts`). It calls `getClaims()` (verified), then `getSession()` only to read `access_token`, returning `{ userId: claims.sub, accessToken }`. If either is missing, it throws `SignedOut`, which maps to 401.
-4. `agentFetch(path, init)` (`web/lib/agentServer.ts`) sets `authorization: Bearer <accessToken>`, `x-agent-secret`, `cache: "no-store"`, and a timeout. It never forwards browser cookies or headers to the agent.
-5. **CopilotKit / AG-UI:** `app/api/copilotkit/[[...slug]]/route.ts` stops caching one global handler. For each request it calls `getAgentAuth()`, then builds a `CopilotRuntime` with `new HttpAgent({ url: agentUrl("/agui"), headers: { authorization, "x-agent-secret" } })` and handles the request. If the CopilotKit runtime supports per-request headers natively (a header resolver or `properties`), use that instead of rebuilding the runtime; builder's call after checking the installed `@copilotkit/runtime` version. The agent checks the token once at run start. A run that outlives the token's `exp` keeps streaming, which is acceptable because the run started authorized.
-6. **Vercel duration:** set `export const maxDuration = 300` (or the plan maximum) on the CopilotKit route. Long agent runs are cut off at that limit. See open questions.
+1. `web/proxy.ts` (Next 16 "proxy", which replaces `middleware.ts`; neither exists today) runs on every path except static assets. It calls `updateSession(request)` from `web/lib/supabase/proxy.ts`: create the server client with request/response cookie adapters, then immediately `supabase.auth.getClaims()`. `getClaims()` verifies the access token against the cached JWKS (ES256 via WebCrypto) and refreshes it with the refresh token when expired, writing new cookies to the request and the response.
+2. Route rules in `proxy.ts`:
+   - Public: `/login`, `/request-access`, `/auth/callback`, `/auth/confirm`, `/auth/signout`, `/_next/*`, `/favicon.ico`.
+   - No valid claims on a page → `302 /login?next=<path>` (the `next` value is passed through `safeNext`). No valid claims on `/api/*` → `401 { error: "signed_out" }`.
+   - `/admin` without the admin claim → rewrite to the 404 page. `/api/admin/*` without it → `404 { error: "not_found" }`.
+   - Sets the CSP header (below).
+3. `getAgentAuth()` (`web/lib/auth.ts`) calls `getClaims()` (verified), then `getSession()` only to read `access_token`; returns `{ userId: claims.sub, accessToken }` or throws `SignedOut` (→ 401).
+4. `agentFetch(path, auth, init)` (`web/lib/agentServer.ts`) sets `authorization: Bearer <accessToken>`, `x-agent-secret`, `cache: "no-store"`, `signal: AbortSignal.timeout(30_000)`. It never forwards browser cookies or headers. `forwardToAgent(req, path)` (exists today, rewritten) calls `getAgentAuth()`, rejects non-GET requests whose `Origin` isn't `APP_ORIGIN` with `403 { error: "bad_origin" }`, forwards only `content-type` and the body, and maps an unreachable agent to `502 { error: "agent_unreachable" }`.
+5. **CopilotKit / AG-UI** (`web/app/api/copilotkit/[[...slug]]/route.ts`). Today it caches one `CopilotRuntime` with fixed headers, and the installed runtime (1.81.0) forwards browser `authorization` and `x-*` headers to the agent by default (`forwardHeaders` default policy; server headers only win on equal names). The new route:
+   - Rejects non-GET requests whose `Origin` isn't `APP_ORIGIN` (403) and requests without a session (`getAgentAuth()` → 401) before touching the runtime.
+   - Builds the runtime once, with `agents: async () => { const auth = await getAgentAuth(); return { openagent: new HttpAgent({ url: agentUrl("/agui"), headers: agentHeaders(auth) }) }; }` (the `AgentsFactory` form, `runtime.d.mts` L71–86; the runtime calls it per request and clones the agent) and `forwardHeaders: { useDefaultDenylist: true, denyPrefixes: ["x-"], deny: ["authorization", "cookie"] }`.
+   - Passes the runtime a new `Request` built from the original's method, URL and body with only `content-type` and `accept` headers, so nothing the browser sets can reach the agent even if the forwarding policy changes in a CopilotKit update.
+   - `export const maxDuration = 300;` and `export const dynamic = "force-dynamic";`.
+   - The agent checks the token once at run start. A run that outlives the token's `exp` keeps streaming; it started authorized.
+6. **Long runs on Vercel.** With Fluid compute (the default for new projects), Hobby allows `maxDuration` up to 300 s and Pro up to 800 s; a streaming response doesn't extend the limit. `maxDuration = 300` is valid on both. The agent ends every run at `RUN_TIME_LIMIT_SECONDS` (default 280, in `.env-agent`) with `RUN_ERROR` code `TIME_LIMIT` ("This run hit the time limit. Ask me to continue."), after persisting the partial assistant text with `status='interrupted'`. If the client disconnects first (`c.req.raw.signal` aborts), the agent aborts the pi run and persists the same way. On Pro, the owner may raise both (`maxDuration = 800`, `RUN_TIME_LIMIT_SECONDS=780`); the deploy section says how.
 
 ### 7. Sign-out
 
-`POST /auth/signout` (form button `id="header-signout"`, Origin checked) → `supabase.auth.signOut({ scope: "local" })` → clears the cookies → `303 /login`. Using `scope: "global"` instead signs out every device; builder's call. Default to local, and offer "Sign out everywhere" in the profile drawer (`id="profile-signout-all"`).
+`POST /auth/signout` (`web/app/auth/signout/route.ts`, POST only, `Origin === APP_ORIGIN` or 403) reads form field `scope` (`local` default, or `global`), calls `supabase.auth.signOut({ scope })`, and returns `303 /login`. The header button `id="header-signout"` sends `local`; the profile drawer's "Sign out everywhere" (`id="profile-signout-all"`) sends `global`.
 
 ### 8. Deactivate, reactivate, delete
 
-All of these are admin-only agent endpoints, with confirmation in the UI.
+All are admin-only agent endpoints with a confirm dialog in the UI.
 
 - **Deactivate** (`POST /admin/users/:id/deactivate`):
-  1. `auth.admin.updateUserById(id, { ban_duration: "876000h" })`. Refresh fails from then on, so the session dies within `jwt_exp`.
-  2. `update profiles set status='deactivated'`. RLS (`private.is_active()`) immediately hides all their rows from browser reads.
-  3. The agent drops its status cache entry, disposes that user's live sessions, Chromium contexts and login flows, and evicts their `ProviderHub`.
-  4. The agent checks status on every request (cache TTL 30 s), so any still-valid access token gets `403 { error: "account_disabled" }` within 30 s.
-  An admin can't deactivate themselves (`409`).
-- **Reactivate:** `ban_duration: "none"` and `status='active'`.
-- **Delete** (`DELETE /admin/users/:id`, the UI requires typing the email):
-  1. Deactivate first.
-  2. List and remove all Storage objects under `artifacts/{id}/` (paged, 100 at a time; fail and stop if any removal errors).
-  3. `delete from invited_emails where email = …`.
+  1. `auth.admin.updateUserById(id, { ban_duration: "876000h" })`. Refresh and new sign-ins fail from then on.
+  2. `update profiles set status='deactivated' where user_id = :id`.
+  3. Invalidate the agent's status cache entry; dispose the user's live sessions, Chromium contexts and login flows; evict their `ProviderHub`.
+  4. Any still-valid access token gets `403 { error: "account_disabled" }` on its next request (status cache TTL 30 s, invalidated immediately on this agent instance; another agent instance, e.g. a local one on the shared project, sees it within 30 s).
+  Self → `409 self_action`.
+- **Reactivate:** `ban_duration: "none"`, `status='active'`, invalidate cache.
+- **Delete** (`DELETE /admin/users/:id`, body `{ confirmEmail }` must equal the user's email, else `422 invalid`). Self → `409 self_action`.
+  1. Deactivate (idempotent).
+  2. List `artifacts/{id}/` (100 per page) and remove each page; stop and fail on the first error.
+  3. `delete from access_requests where email = :email`; `delete from invited_emails where email = :email`.
   4. `auth.admin.deleteUser(id)`. FKs cascade profiles, chats, messages, workspace, artifacts, settings and credentials.
-  5. If any step fails, return an explicit error naming the step. Every step is idempotent, so retrying is safe.
+  5. On failure, return `500 { error: "delete_failed", step: "storage" | "requests" | "auth_user" }`. Every step is idempotent, so retrying is safe.
 
 ### 9. Admin bootstrap (one time)
 
-`supabase/scripts/bootstrap-admin.mjs` runs on the owner's machine with `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (from `deploy-config/.env-agent`) and `ADMIN_EMAIL=ntnbhat9@gmail.com`:
+`supabase/scripts/bootstrap-admin.mjs <email> [--user]` runs on the owner's machine with `deploy-config/env-files/.env-supabase-admin` loaded (`SUPABASE_URL`, `SUPABASE_ADMIN_SECRET_KEY`):
 
-1. `insert into invited_emails (email) values ($ADMIN_EMAIL) on conflict do nothing` (via PostgREST with the secret key).
-2. If no user has that email, `auth.admin.createUser({ email, email_confirm: true, app_metadata: { role: "admin" } })`. If the user exists, `updateUserById(id, { app_metadata: { ...existing, role: "admin" } })`.
-3. Print the user id and "Sign in with Google at APP_ORIGIN/login". No email is sent.
+1. Upsert `invited_emails (email)` (PostgREST, secret key).
+2. Look up `profiles` by email. Missing → `auth.admin.createUser({ email, email_confirm: true, app_metadata: { role: "admin" } })` (`--user`: no `app_metadata.role`). Present → `updateUserById(id, { app_metadata: { ...user.app_metadata, role: "admin" } })` (`--user`: no change).
+3. Print the user id and "Sign in with Google at <APP_ORIGIN>/login". No email is sent.
 
-Because the email is created confirmed, the owner's first Google sign-in links automatically to this user. A second admin is made by rerunning the script with another email. There is no UI for granting admin, so promotion is deliberately out-of-band.
+Because the email is created confirmed, the owner's first Google sign-in links to this user. There is no UI to grant admin.
 
 ## Agent changes (module by module)
 
-New dependencies: `@supabase/supabase-js` (latest 2.x), `jose` (latest 6.x). There is no separate Postgres driver.
+New dependencies: `@supabase/supabase-js` (2.x, pin the exact current version), `jose` (6.x; already in the web tree as a transitive dependency at 6.2.13, not in the agent). No Postgres driver.
 
 ### Config: `agent/src/config.ts`
 
-Add these fields and remove `sharedSecret`, `sharedSecretFile`, `dataDir` and `artifactsDir`:
+Remove `sharedSecret`, `sharedSecretFile`, `dataDir`, `artifactsDir` (`AGENT_SHARED_SECRET`, `AGENT_SECRET_FILE`, `AGENT_DATA_DIR`, `ARTIFACTS_DIR`). Add:
 
 ```
-supabaseUrl: string                // SUPABASE_URL, required, must be https://<ref>.supabase.co
-supabaseSecretKey: string          // SUPABASE_SECRET_KEY, required, must start with "sb_secret_"
-serviceSecret: string              // AGENT_SERVICE_SECRET, required, ≥ 32 bytes of entropy (64 hex chars)
+supabaseUrl: string             // SUPABASE_URL, required, must match ^https://[a-z]{20}\.supabase\.co$
+supabasePublishableKey: string  // SUPABASE_PUBLISHABLE_KEY, required, starts with "sb_publishable_" (anon client for signInWithOtp)
+supabaseSecretKey: string       // SUPABASE_SECRET_KEY, required, starts with "sb_secret_"
+serviceSecret: string           // AGENT_SERVICE_SECRET, required, exactly 64 hex chars
 credentialKeys: { current: number; keys: Map<number, Buffer> }  // CREDENTIAL_KEYS
-appOrigin: string                  // APP_ORIGIN, required, https origin, no path
-accessRequestPepper: Buffer        // ACCESS_REQUEST_PEPPER, required, 32 bytes base64
+appOrigin: string               // APP_ORIGIN, required, https origin, no path or trailing slash
+accessRequestPepper: Buffer     // ACCESS_REQUEST_PEPPER, required, base64 of exactly 32 bytes
+runTimeLimitSeconds: number     // RUN_TIME_LIMIT_SECONDS, optional, default 280, 30..3600
 ```
 
-`loadConfig` throws a single error listing every missing or invalid variable, by name only. The process exits non-zero, and compose shows the message. Startup also refuses to run if any known provider credential variable is set in the agent's environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `TOGETHER_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `TYPESAFE_API_KEY`, and whatever else pi's provider definitions read; the builder generates the list from pi's catalog in a test). pi's api-key auth falls back to ambient env vars (`credential.key ?? env(...)`), so a stray server key would silently serve every user.
+`loadConfig` throws one error listing every missing or invalid variable by name only; the process exits non-zero. Startup also refuses to run if any provider credential variable that pi would read is set in the agent's environment. pi-ai's `resolve.js` falls back to ambient env (`process.env[name]`) whenever a provider has no stored credential, so a stray `OPENAI_API_KEY` would silently serve every user who hasn't added a key. The list is generated from pi's provider catalog (every `provider.auth.apiKey` env name) by `agent/src/auth/ambientEnv.ts` and covered by a test. `LLM_API_KEY` isn't a pi variable (the hub reads it), so it's allowed.
 
 ### Auth: `agent/src/auth/`
 
 - `verify.ts`
   ```ts
   export type AuthUser = { id: string; email: string; sessionId: string; isAdmin: boolean };
-  export function createVerifier(cfg): (token: string) => Promise<AuthUser>;
+  export function createVerifier(cfg: Config, opts?: { fetch?: typeof fetch }): (token: string) => Promise<AuthUser>;
   ```
   - `createRemoteJWKSet(new URL(cfg.supabaseUrl + "/auth/v1/.well-known/jwks.json"), { cacheMaxAge: 600_000, cooldownDuration: 30_000, timeoutDuration: 5_000 })`.
-  - `jwtVerify(token, jwks, { algorithms: ["ES256"], issuer: cfg.supabaseUrl + "/auth/v1", audience: "authenticated", requiredClaims: ["sub", "exp", "iat", "session_id", "role"], clockTolerance: 30 })`.
-  - It then requires `role === "authenticated"`, `is_anonymous !== true`, `sub` a UUID, a token length of 8 KB or less, and `typ` absent or `JWT`. `isAdmin` comes from `app_metadata.role === "admin"`.
-  - An unknown `kid` makes jose refetch the JWKS (cooldown-limited). `alg` is pinned, so `none`, `HS256` (key confusion) and `RS256` are rejected before any key lookup.
-  - Errors become `AuthError("invalid_token" | "expired_token")`. The token is never logged; only its `kid`, plus `sub` once verified, at debug.
-- `middleware.ts`
-  - `requireService`: constant-time compare (`timingSafeEqual` on SHA-256 digests) of `x-agent-secret` with `cfg.serviceSecret`. Applied app-wide except `GET /health`. Failure → `401 { error: "unauthorized" }`.
-  - `requireUser`: parses `Authorization: Bearer …`, verifies it, then checks `status.isActive(user.id)`. Sets `c.set("user", user)`. Missing or invalid → `401 { error: "signed_out" }` with `www-authenticate: Bearer error="invalid_token"`. Deactivated → `403 { error: "account_disabled" }`.
-  - `requireAdmin`: `requireUser`, then `user.isAdmin`, then a live `auth.admin.getUserById` confirming the role and no ban (cached 30 s per admin). Otherwise `404 { error: "not_found" }` (hides that the endpoints exist).
-- `status.ts`: `UserStatusCache` with `isActive(userId)` reading `profiles.status` (TTL 30 s; negative results cached 30 s too). `invalidate(userId)`. If the DB can't be reached → `503 { error: "auth_unavailable" }` (fail closed, never assume active).
+  - `jwtVerify(token, jwks, { algorithms: ["ES256"], issuer: cfg.supabaseUrl + "/auth/v1", audience: "authenticated", requiredClaims: ["sub", "exp", "iat", "session_id", "role", "email"], clockTolerance: 30 })`.
+  - Then: `role === "authenticated"`, `is_anonymous !== true`, `sub` a UUID, token ≤ 8 KB (checked before parsing), header `typ` absent or `JWT`. `isAdmin` = `app_metadata.role === "admin"`.
+  - Errors become `AuthError("invalid_token" | "expired_token")`. Tokens are never logged; at debug, only `kid` and (after verification) `sub`.
+- `middleware.ts` (Hono middlewares; handlers read `c.get("user")`, typed through `Hono<{ Variables: { user: AuthUser } }>`):
+  - `requireService`: `timingSafeEqual` of SHA-256 digests of `x-agent-secret` and `cfg.serviceSecret`. Applied to every route except `GET /health`. Failure → `401 { error: "unauthorized" }`. There is no "no secret configured" bypass; config validation guarantees the secret exists.
+  - `requireUser`: `Authorization: Bearer …`, verify, then `status.isActive(user.id)`. Missing/invalid → `401 { error: "signed_out" }` with `www-authenticate: Bearer error="invalid_token"`. Deactivated or missing profile → `403 { error: "account_disabled" }`.
+  - `requireAdmin`: `requireUser`, then `user.isAdmin`, then live `auth.admin.getUserById(user.id)` confirming `app_metadata.role === "admin"` and `banned_until` null or past (cached 30 s per admin). Otherwise `404 { error: "not_found" }`.
+- `status.ts`: `UserStatusCache.isActive(userId)` reads `profiles.status` (TTL 30 s for both results); `invalidate(userId)`. DB unreachable → `503 { error: "auth_unavailable" }`. Never assumes active.
 
-The `x-agent-secret` header and the `Authorized` type in `http/handlers.ts` are replaced by Hono context variables (`c.get("user")`). `lib/secret.ts` and `ensureSharedSecret` are deleted.
+`Authorized` (`http/handlers.ts`), `requireSecret`, the inline secret check in `POST /agui`, `lib/secret.ts` and `ensureSharedSecret` are deleted.
 
 ### Database access: `agent/src/db/`
 
-- `client.ts`: `createServiceClient(cfg)` → `createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, global: { headers: { "x-client-info": "open-agent-agent" } } })`. Only `db/*` may import this. A test greps `agent/src` and fails if `db/client` is imported anywhere else.
-- `users.ts`: `forUser(db, userId)` returns a frozen object of repositories, each with `userId` built in:
-  - `profiles.get()` / `profiles.putData(data)`: `select data … eq user_id`, `update … eq user_id`. If the row is missing (it shouldn't be, given the trigger), `insert` it with the email from the token.
-  - `chats.claim(chatId, { model })`: `insert … on conflict (id) do nothing`, then `select … eq id, eq user_id`. If no row comes back, the id belongs to someone else → throw `UserError("not_found")`. The caller returns `404 "This chat doesn't exist."` without saying whose it is.
-  - `chats.touch(chatId, { title?, model? })`, `messages.append(chatId, runId, [{ role, content }])`, `messages.history(chatId, limit = 200)` (oldest first).
-  - `workspace.get/list/put/remove/summary`: async versions of today's API, `rpc("workspace_put", …)` for `put`.
-  - `artifacts.insert/get/setPdf`, `storage.upload/download` under `artifacts/${userId}/…` only. Paths are built here from `userId` and a validated artifact id, never passed in.
-  - `providerSettings.get/put`, `credentials.read/list/modify/delete` (encrypted rows, see crypto).
-- `admin.ts`: `accessRequests.insertPublic/listForIpWindow/decide`, `invited.add/remove`, `users.deactivate/reactivate/delete`. These are used only by `http/admin.ts` and `http/accessRequests.ts`.
-- `errors.ts`: maps PostgREST and Storage errors to `UserError` (`P0409` → `VersionConflict`; `23505` → conflict; network or timeout → `unavailable`; anything else → logged with code, rethrown as `upstream`). Error messages from Supabase are never sent to the client verbatim.
+- `client.ts`: `createServiceClient(cfg)` → `createClient(cfg.supabaseUrl, cfg.supabaseSecretKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, global: { headers: { "x-client-info": "open-agent-agent" } } })`, and `createAnonClient(cfg)` with the publishable key and the same auth options (used only for `signInWithOtp`). `agent/test/dbImports.test.ts` greps `agent/src` and fails if `db/client` is imported outside `agent/src/db/`.
+- `users.ts`: `forUser(db, userId)` returns a frozen object of repositories with `userId` built in:
+  - `profiles.get()` → `data`; `profiles.putData(data)` → `update … eq user_id`; 0 rows → `UserError("not_found")` (the trigger always creates the row).
+  - `chats.claim(chatId, { model })`: `upsert({ id, user_id, model }, { onConflict: "id", ignoreDuplicates: true })`, then `select id … eq id eq user_id`. No row → `UserError("not_found")` → "This chat doesn't exist."
+  - `chats.touch(chatId, { title?, model? })` (also sets `last_message_at = now()`), `chats.page(page)` → `{ items, total }` (5 per page, `last_message_at desc, id desc`, `count: "exact"`), `messages.append(chatId, runId, rows)`, `messages.history(chatId, limit = 200)` (newest 200, returned oldest first, plus `total`).
+  - `workspace.get/list/put/remove/summary` (async versions of today's `WorkspaceStore`, `rpc("workspace_put")` for `put`).
+  - `artifacts.insert/get/setPdf`, `storage.upload/download/removeAll`. Paths are built here from `userId` and a validated id, never passed in.
+  - `providerSettings.get/put` (row created on first `get` with `upsert … ignoreDuplicates`), `credentials.read/list/insert/update/delete`.
+- `admin.ts`: `accessRequests.submit/page/get/decide/setInvite/deleteByEmail`, `invited.add/remove`, `users.page/findByEmail/setStatus`. Used only by `http/admin.ts`, `http/accessRequests.ts` and `http/emailLink.ts`.
+- `errors.ts`: maps PostgREST/Storage errors to `UserError`: `PT409` → `VersionConflict` (expected vs `details`); `23505` → `conflict`; `23503` → `not_found`; `23514` → `invalid`; network or timeout → `unavailable`; anything else → logged with code only, rethrown as `upstream`. Supabase messages never reach clients.
 
-Every repository call has a 10 s timeout through `AbortSignal.timeout`, and retries once on network errors for idempotent reads only.
+Every repository call passes `AbortSignal.timeout(10_000)` (`.abortSignal()` on PostgREST builders) and retries once on network errors for reads only.
 
 ### Crypto: `agent/src/crypto/`
 
@@ -634,163 +663,180 @@ export interface KeyWrapper {
 }
 export class LocalKeyWrapper implements KeyWrapper { /* AES-256-GCM with CREDENTIAL_KEYS */ }
 
+export type CredentialContext = { userId: string; provider: string; kind: "api_key" | "oauth" };
 export type Sealed = { ciphertext: Buffer; nonce: Buffer; dekWrapped: Buffer; dekNonce: Buffer; keyVersion: number };
-export async function seal(w: KeyWrapper, plaintext: Buffer, ctx: { userId: string; provider: string; kind: string }): Promise<Sealed>;
-export async function open(w: KeyWrapper, s: Sealed, ctx: { userId: string; provider: string; kind: string }): Promise<Buffer>;
+export async function seal(w: KeyWrapper, plaintext: Buffer, ctx: CredentialContext): Promise<Sealed>;
+export async function open(w: KeyWrapper, s: Sealed, ctx: CredentialContext): Promise<Buffer>;
+export async function rewrap(w: KeyWrapper, s: Sealed, ctx: CredentialContext): Promise<Sealed>;
 ```
 
-- **`seal`:** `dek = randomBytes(32)`, `nonce = randomBytes(12)`, then AES-256-GCM encrypt the plaintext with the AAD below and append the 16-byte tag. Then `w.wrap(dek, aad)`, which uses a fresh random 12-byte nonce under master key `current`. Finally `dek.fill(0)`.
-- **AAD:** `utf8("oab/credential/v1\0" + userId + "\0" + provider + "\0" + kind + "\0" + keyVersion)`. The same AAD is used for the value and for the wrapped DEK. Moving a row's bytes to another user, provider, kind or key version makes decryption fail. That failure is a hard error: log `[crypto] credential failed integrity check user=<id> provider=<p>` and treat the provider as not configured.
-- **`CREDENTIAL_KEYS` format:** `v2:<base64 32 bytes>,v1:<base64 32 bytes>`. The first entry is current. Each key must decode to exactly 32 bytes, and versions must be unique positive integers. Generate with `openssl rand -base64 32`.
-- **Plaintext lifetime:** decrypted values exist only inside `SupabaseCredentialStore.read/modify` calls and the pi runtime's in-memory auth for the duration of a call. Buffers are zeroed after use where we own them. Values are never logged; `log.ts` gains a `redact()` that masks anything matching `sk-…`, `sb_secret_…`, `Bearer …`, or JSON keys `apiKey|key|access|refresh|token|secret`, applied to every error object before it's logged.
-- **Hint** (`hint.ts`): `hint(value)`. If the value is 20 characters or longer: the prefix up to and including the last `-` or `_` within the first 8 characters, plus `…`, plus the last 4 characters (`sk-ant-…a91f`, `sk-or-…77c2`). If it's shorter: `…` plus the last 2. OAuth credentials get `"Signed in"`, plus ` · <account email>` if the provider's token response includes one. The hint is computed before sealing and stored in clear.
-- **Master-key rotation** (`agent/scripts/rotate-credentials.ts`, run via `docker compose exec agent node dist/agent/scripts/rotate-credentials.js`):
-  1. Add `v(n+1)` as the first entry of `CREDENTIAL_KEYS` and keep the old ones. Restart the agent; new writes use the new key, and old rows still open.
-  2. Run the script. It pages through `provider_credentials where key_version < current` (100 at a time) and, for each row, unwraps the DEK with the old version and rewraps it with the current one (new `dek_nonce`, new `key_version`, AAD recomputed). The value ciphertext is untouched because the DEK doesn't change. Each update is guarded by `eq version` (optimistic); a conflict is retried once.
-  3. When the script reports `0 rows below current`, remove the old key from `CREDENTIAL_KEYS` and restart.
-- **KMS later:** `KmsKeyWrapper` implements `wrap` / `unwrap` with AWS KMS `Encrypt` / `Decrypt` (EncryptionContext = the same AAD fields). `key_version` maps to a KMS key ARN alias version. Nothing else changes.
+- **AAD.** `valueAad = utf8("oab/credential/v1\0" + userId + "\0" + provider + "\0" + kind)`. `wrapAad(version) = valueAad + utf8("\0dek\0" + version)`. The value AAD deliberately excludes the key version, so rotation (which rewraps only the DEK) never invalidates the value ciphertext; the wrap AAD includes it, so a `key_version` swapped in the row fails the unwrap. Moving a row's bytes to another user, provider or kind fails both.
+- **`seal`:** `dek = randomBytes(32)`, `nonce = randomBytes(12)`, AES-256-GCM over the plaintext with `valueAad`, tag appended. `w.wrap(dek, wrapAad(w.currentVersion))` with a fresh random 12-byte nonce. `dek.fill(0)`.
+- **`open`:** unwrap with `wrapAad(s.keyVersion)`, decrypt with `valueAad`, zero the DEK. Any failure is `CredentialIntegrityError`: logged once as `[crypto] credential failed integrity check user=<id> provider=<p>` and the provider is treated as not configured (the UI shows "Key unreadable, enter it again").
+- **Nonces.** Random 96-bit nonces under a per-row random DEK: each DEK encrypts exactly one value (a new DEK per `seal`), and each master key wraps far fewer than 2^32 DEKs, so the random-nonce collision bound is not a concern.
+- **`CREDENTIAL_KEYS` format:** `v2:<base64 32 bytes>,v1:<base64 32 bytes>`. The first entry is current. Each key decodes to exactly 32 bytes; versions are unique positive integers. Generate with `openssl rand -base64 32`.
+- **Plaintext lifetime:** decrypted values exist only inside `SupabaseCredentialStore.read/modify` and pi's in-memory auth during a call. Buffers we own are zeroed. `lib/log.ts` gains `redact(value)` that masks `sk-[A-Za-z0-9_-]{8,}`, `sb_secret_\S+`, `sb_publishable_\S+`, `Bearer \S+`, `eyJ[\w-]+\.[\w-]+\.[\w-]+`, and the values of JSON keys `apiKey|key|access|refresh|token|secret|password|authorization`; `log.error/warn` apply it to every argument.
+- **Hint** (`crypto/hint.ts`, `hint(value)`): values of 20+ characters → the prefix up to and including the last `-` or `_` within the first 8 characters, then `…`, then the last 4 (`sk-ant-…a91f`, `sk-or-…77c2`); shorter values → `…` plus the last 2. OAuth → `Signed in`, plus ` · <email>` when the credential carries an `email` field. Computed before sealing, stored in clear.
+- **Master-key rotation** (`agent/src/scripts/rotateCredentials.ts`, run as `docker compose exec agent node dist/agent/src/scripts/rotateCredentials.js`):
+  1. Prepend `v(n+1)` to `CREDENTIAL_KEYS` on every agent (local and EC2 share the project), keep the old keys, restart. New writes use the new key; old rows still open.
+  2. Run the script. It pages `provider_credentials where key_version < current` (100 at a time) and `rewrap`s each row (new `dek_wrapped`, `dek_nonce`, `key_version`; value ciphertext untouched), updating with `eq version` and `version = version + 1`. A conflict is re-read and retried once, then reported.
+  3. When it reports `0 rows below current`, remove the old key everywhere and restart.
+- **KMS later:** `KmsKeyWrapper` maps each `key_version` to a KMS key ARN from config (`KMS_KEYS=v3:arn:aws:kms:…`), wraps with KMS `Encrypt` / `Decrypt` using `EncryptionContext` = the wrap-AAD fields. Nothing else changes.
 
 ### Provider credentials and the per-user hub: `agent/src/providers/`
 
-- `credentialStore.ts`: `SupabaseCredentialStore implements CredentialStore` (pi-ai). It is per user and per hub.
-  - `read(id)`: select the row, `open`, then `JSON.parse` into pi's `Credential` (`{ type: "api_key", key } | { type: "oauth", refresh, access, expires, … }`).
-  - `list()`: `select provider, kind` only, with no decryption.
-  - `modify(id, fn)`: serialized per `(userId, provider)` with an in-process async mutex. Read current (decrypted), `next = await fn(current)`. If `next` is undefined, return current. Otherwise seal it and upsert with `version = version + 1 where version = <read version>`. On a version conflict, re-read and rerun `fn` once, then fail with `conflict`. pi runs OAuth refresh inside `modify`, so a refreshed ChatGPT token is written back encrypted.
-  - `delete(id)`: delete the row (same mutex).
-- `hub.ts`: `ProviderHub` stays mostly as it is, but `create()` takes `{ userId, settings repo, credentials: SupabaseCredentialStore, deviceId, gateway?: … }`. It calls `ModelRuntime.create({ credentials, modelsPath: null, refreshOnCreate: false, allowModelNetwork: false })` instead of `authPath`. `providers.json` becomes `provider_settings.data`, and `local-keys.json` becomes credential rows (`api_key` kind; provider id = the local provider id or `secret:brave-search`). `deviceId()` reads `provider_settings.device_id`. `lockAuthFile()` and file I/O are deleted. `list()` adds `hint?: string` per configured provider; the UI never receives anything else about the key.
-- `hubs.ts`: `UserHubs`, an LRU of `ProviderHub` per user (max 200 entries, idle TTL 15 min). `get(userId)` builds lazily, with concurrent callers sharing the pending build. Any key or provider mutation calls `invalidate(userId)` *after* the write commits, and live sessions keep their own runtime until disposed.
-- **LiteLLM operator gateway** (`LLM_API_KEY`): shown only to admin users. A hub built for a non-admin never registers it. This stops the operator's paid gateway from serving every invitee by default. (Open question 2 asks whether invitees should share it.)
-- **Local or custom providers** (Ollama, llama.cpp, LM Studio, custom, OpenAI-compatible): on EC2 these are SSRF vectors. `addLocal` now calls `publicHttpUrlError(baseUrl)` and `resolvesInternal(host)` from `lib/net.ts`. Private, loopback, link-local and `host.docker.internal` targets are allowed only for admin users (so local development with Ollama still works for the owner). The check runs again each time a hub is built, because DNS can change. EC2 also gets IMDSv2 with hop limit 1 (see rollout), so a container can't reach instance metadata even if a check is bypassed.
-- `logins.ts`: `LoginFlows.start(userId, providerId)`. Flows store `userId`; `get/answer/cancel(userId, flowId)` return "This sign-in expired" (404) when the flow belongs to a different user. Each user may have one running flow; globally, only one ChatGPT OAuth flow runs at a time (pi binds a fixed callback port 1455). A second user gets `409 "Another sign-in is in progress. Try again in a minute."` On EC2 the browser can't reach the container's `localhost:1455` callback, so the user pastes the final redirect URL into the existing `manual_code` prompt (`SignIn.tsx` already supports this). On success the credential is persisted by pi through `credentials.modify`, so it goes through the encrypted store.
+- `credentialStore.ts`: `SupabaseCredentialStore implements CredentialStore` (pi-ai `auth/types.d.ts`: `read(providerId, options?)`, `list(options?)`, `modify(providerId, fn, options?)`, `delete(providerId, options?)`). One instance per user hub.
+  - `read`: select the row, `open`, `JSON.parse` into pi's `Credential` (`{ type: "api_key", key } | { type: "oauth", refresh, access, expires, … }`). No row → `undefined`.
+  - `list`: `select provider, kind` → `CredentialInfo[]` (`{ providerId, type }`), no decryption.
+  - `modify`: serialized per `(userId, provider)` with an in-process async mutex. Read current (row + version), `next = await fn(current)`. `next === undefined` → return current unchanged. Otherwise seal; no row → insert (`23505` = someone else inserted → re-read and rerun `fn` once); row → `update … eq version` setting `version = version + 1` (0 rows → re-read and rerun once). A second failure throws `UserError("conflict")`. pi persists logins and runs OAuth refresh inside `modify` ("the only write path"), so refreshed ChatGPT tokens are written back encrypted.
+  - `delete`: delete the row (same mutex).
+- `hub.ts`: `ProviderHub.create({ userId, isAdmin, settings, credentials, litellm?, fetch?, complete? })` calls `ModelRuntime.create({ credentials, modelsPath: null, refreshOnCreate: false, allowModelNetwork: false })` instead of `authPath`. `providers.json` → `provider_settings.data`; `local-keys.json` entries → credential rows (`api_key`; provider = local provider id, or `secret:brave-search` for `secret("brave-search")`). `deviceId()` reads `provider_settings.device_id`. `lockAuthFile()`, `save()`'s file writes and all file I/O are deleted. `list()` adds `hint?: string` per configured provider.
+- `hubs.ts`: `UserHubs`, an LRU of `ProviderHub` per user (max 200, idle TTL 15 min). `get(user)` builds lazily, sharing the pending build between concurrent callers. Every key, provider or settings mutation calls `invalidate(userId)` after the write commits; live sessions keep their runtime until disposed.
+- **LiteLLM operator gateway** (`LLM_API_KEY`, `LLM_BASE_URL`): registered only in hubs where `isAdmin` is true. Invitees bring their own keys (owner decision 2).
+- **Local or custom providers** (Ollama, llama.cpp, LM Studio, custom OpenAI-compatible): for non-admins, `addLocal` and every hub build require `publicHttpUrlError(baseUrl) === undefined` and `!(await resolvesInternal(host))` (both exist in `lib/net.ts`); failure → `422 { error: "invalid", message: "That address isn't reachable from the server." }` (and a stored one is skipped at hub build with a warning). Admins may use private, loopback and `host.docker.internal` targets (owner decision 2). EC2 also requires IMDSv2 with hop limit 1.
+- `logins.ts`: `LoginFlows.start(userId, providerId)`; `get/answer/cancel(userId, flowId)` return `404 not_found` ("This sign-in expired") for another user's flow. One running flow per user. pi's ChatGPT callback port is hardcoded (`CALLBACK_PORT = 1455` in pi-ai `openai-chatgpt.js`; only the host is configurable via `PI_OAUTH_CALLBACK_HOST`), so only one ChatGPT OAuth flow can run per agent process: a second gets `409 login_busy` ("Another sign-in is in progress. Try again in a minute."). Port 1455 is no longer published, so the browser's redirect to `http://localhost:1455/auth/callback?…` fails on the user's machine; the user copies that URL from the address bar and pastes it into the prompt pi raises (`SignIn.tsx` already renders any `state.prompt` with its message and placeholder). The SignIn copy explains this.
 
 ### Profiles: `agent/src/profile/store.ts`
 
-`ProfileStore` becomes per user: `interface ProfileStore { get(): Promise<Profile>; put(input: unknown): Promise<Profile> }`, obtained via `profiles(userId)`. `SupabaseProfileStore` uses `forUser(db, userId).profiles`: `parseProfile(row.data) || emptyProfile()` on read; `parseProfile(input)` then `putData` on write, with `UserError("that profile isn't valid")` as today. `FileProfileStore` is deleted. `MemoryProfileStore` stays for tests. `withStoredProfile` takes the per-user store.
+`interface ProfileStore { get(): Promise<Profile>; put(input: unknown): Promise<Profile> }`, obtained with `profiles(userId)`. `SupabaseProfileStore` uses `forUser(db, userId).profiles`: `parseProfile(row.data) ?? emptyProfile()` on read; `parseProfile(input)` then `putData` on write, `UserError("invalid", "that profile isn't valid")` as today. `FileProfileStore` is deleted; `MemoryProfileStore` stays for tests. `withStoredProfile` (`agui/runHandler.ts`) takes the per-user store.
 
-### Chats and sessions: `agent/src/session/`, `agent/src/agui/`, `agent/src/chats/`
+### Chats and sessions: `agent/src/session/`, `agent/src/agui/`, `agent/src/http/chats.ts`
 
-- `http/agui.ts`: `POST /agui` gets `requireUser`. `threadId` must be a UUID (otherwise 400). Before any work: `chats.claim(threadId, { model })`. If it's owned by someone else, the stream emits `RUN_ERROR NOT_FOUND "This chat doesn't exist."`
-- `SessionStore` keys entries by `${userId}:${threadId}`. `getOrCreate(user, threadId, …)`. A user can have at most 3 live sessions; the least recently used idle one is disposed when a fourth starts. A global cap of 50 live sessions returns `RUN_ERROR BUSY "The agent is at capacity. Try again shortly."` past that.
-- **History:** when a session is created for an existing chat, `messages.history(chatId)` is the source of truth. `restoreHistory(input.messages)` is no longer used for seeding, because client-supplied history could be forged. The client's messages still drive the UI.
-- **Persistence:** at run start, append the user message. At `RUN_FINISHED`, append the final assistant text (the same text the translator emitted, without the `<followups>` line) and `chats.touch(threadId, { title: first 80 chars of the first user message if title is empty })`. Tool payloads and widgets are not persisted in this version; reopening a chat shows text only. Builder's call: persist widget payloads in a `parts jsonb` column later.
-- `createSession.ts`: `sessionFactory` takes `user` and gets `hub = await hubs.get(user.id)`. Judge resolution becomes per hub: `judgeResolver` is cached per user hub, and the global `JEV_CONCURRENCY` limiter stays shared. `braveApiKey` comes from that hub's `secret("brave-search")`. `BrowserPool` contexts are keyed by `${userId}:${threadId}`.
+- `POST /agui` gets `requireUser`. `threadId` must be a UUID, else `400 { error: "invalid" }`. Before any work: `chats.claim(threadId, { model })`. Owned by someone else → `RUN_ERROR` code `NOT_FOUND` "This chat doesn't exist."
+- `SessionStore` keys by `${userId}:${threadId}` (`getOrCreate(user, threadId, ctx)`). At most 3 live sessions per user (the least recently used idle one is disposed for a fourth) and 50 globally (`RUN_ERROR` code `BUSY`, "The agent is at capacity. Try again shortly.").
+- **History:** a new session for an existing chat is seeded from `messages.history(chatId)`. `restoreHistory(input.messages)` is no longer used for seeding; client-sent history is ignored by the model (it still drives the UI).
+- **Persistence:** at run start, append the user message (`status='complete'`). At `RUN_FINISHED`, append the final assistant text (without the `<followups>` line) and `chats.touch(threadId, { title: first 80 chars of the first user message when the title is empty })`. On time limit or client abort, append the partial text with `status='interrupted'`. Tool payloads and widgets are not persisted; a reopened chat shows text only.
+- `createSession.ts`: `sessionFactory` takes `user` and gets `hub = await hubs.get(user)`. `judgeResolver` is cached per user hub; the global `JEV_CONCURRENCY` limiter stays shared. `braveApiKey` comes from that hub's `secret("brave-search")`. `BrowserPool` contexts are keyed by `${userId}:${threadId}`.
+- `contextNote` is this repo's option (`pi/createPiSession.ts`), wired to pi's `context` event, whose handler type allows a Promise (`ExtensionHandler` returns `Promise<R | void> | R | void`). It becomes `contextNote?: () => Promise<string | undefined>` and the handler awaits it.
+- `http/chats.ts`: `GET /chats?page=N` → `{ items: [{ id, title, lastMessageAt }], total, page, pageSize: 5 }`; `GET /chats/:id/messages` → `{ items: [{ role, content, status, createdAt }], total }` (newest 200, oldest first). Another user's id → 404.
 
 ### Workspace: `agent/src/workspace/`
 
-`WorkspaceStore` becomes an interface with async methods and a `forChat(userId, chatId)` binding: `get(kind, id)`, `list(kind?)`, `put(kind, id, value, expectedVersion?)`, `remove(kind, id)`, `summary()`. `SupabaseWorkspaceStore` implements it through the repositories, and `MemoryWorkspaceStore` serves tests. Every caller becomes async: `workspace/cart.ts`, `workspace/edits.ts`, `tools/plan.ts`, `tools/index.ts`, `agui/runHandler.ts`, `session/createSession.ts` (`contextNote` becomes async; if pi's `contextNote` hook is sync, precompute the note at run start and after each workspace write, and return the cached string). `node:sqlite` usage is deleted.
+`WorkspaceStore` becomes an async interface bound to a chat: `forChat(userId, chatId)` → `get(kind, id)`, `list(kind?)`, `put(kind, id, value, expectedVersion?)`, `remove(kind, id)`, `summary()`. `SupabaseWorkspaceStore` implements it through the repositories; `MemoryWorkspaceStore` serves tests. Callers become async: `workspace/cart.ts` (`workspaceCart`, `workspaceNote`), `workspace/edits.ts` (`applyEntityEdits`), `tools/plan.ts`, `tools/index.ts` (`planTool`), `agui/runHandler.ts`, `session/createSession.ts`. `node:sqlite` is removed.
 
 ### Artifacts: `agent/src/artifacts/store.ts`, `agent/src/http/artifacts.ts`
 
-- `save(userId, chatId, title, html)`: reject HTML over 5 MB. `id = randomBytes(9).toString("base64url")`. Upload to `artifacts/${userId}/${id}.html` with `contentType: "text/html; charset=utf-8"` and `upsert: false`, then insert the row. If the insert fails, delete the uploaded object.
-- `get(userId, id)`: validate `ARTIFACT_ID_RE`, select the row `eq user_id`, then download `html_path`. A missing row → 404, the same for "someone else's" and "doesn't exist".
-- `renderPdf(userId, id)`: if `pdf_path` is set, download it. Otherwise render (as now, with `blockInternalRequests`), upload `…/${id}.pdf`, and set `pdf_path`. Concurrency stays limited to 2.
-- The `create_artifact` tool gets `userId` and `chatId` from the session.
-- `GET /artifacts/:file` gets `requireUser` and serves with `content-security-policy: ARTIFACT_CSP`, `x-content-type-options: nosniff`, `cache-control: private, no-store`.
+- `save(userId, chatId, title, html)`: reject HTML over 5 MB (`413 too_large`). `id = randomBytes(9).toString("base64url")`. Upload to `artifacts/${userId}/${id}.html` with `contentType: "text/html"` (no charset parameter, so it matches `allowed_mime_types` exactly) and `upsert: false`, then insert the row; if the insert fails, remove the object.
+- `get(userId, id)`: validate `ARTIFACT_ID_RE`, select `eq id eq user_id`, download `html_path`. Missing → 404, the same for "someone else's".
+- `renderPdf(userId, id)`: `pdf_path` set → download. Otherwise render as now (`blockInternalRequests`, `createLimiter(2)`, in-flight `Map` keyed `${userId}:${id}`), upload `…/${id}.pdf` (`contentType: "application/pdf"`), set `pdf_path`.
+- `create_artifact` gets `userId` and `chatId` from the session.
+- `GET /artifacts/:file` (unauthenticated today) gets `requireService` + `requireUser` and serves with `content-type: text/html; charset=utf-8`, `content-security-policy: ARTIFACT_CSP`, `x-content-type-options: nosniff`, `cache-control: private, no-store`.
 
-### Admin and access-request endpoints: `agent/src/http/admin.ts`, `agent/src/http/accessRequests.ts`
+### Endpoints
 
-| Method & path | Guard | Body / query | Response |
-| --- | --- | --- | --- |
-| `POST /access-requests` | service | `{ name, email, note }`, header `x-client-ip` | `202 { ok: true }` always (unless the body is malformed → 400) |
-| `GET /admin/access-requests` | admin | `status=pending|approved|rejected|all`, `page≥1` | `{ items: [...5], total, page, pageSize: 5 }`, newest first (`created_at desc, id desc`) |
-| `POST /admin/access-requests/:id/approve` | admin | — | `200 { request }`, `409` if already decided, `502` if the invite email failed (row still updated) |
-| `POST /admin/access-requests/:id/reject` | admin | — | `200 { request }`, `409` |
-| `POST /admin/access-requests/:id/resend` | admin | — | `200`, `409` if not approved |
-| `GET /admin/users` | admin | `page≥1`, `q` (email prefix, optional) | `{ items: [...5], total, page, pageSize: 5 }` from `profiles`, joined with `auth.admin` for `last_sign_in_at` and the providers list |
-| `POST /admin/users/:id/deactivate` / `reactivate` | admin | — | `200`; `409` for self |
-| `DELETE /admin/users/:id` | admin | `{ confirmEmail }` must equal the user's email | `200`; a `5xx` names the failed step |
+All responses are JSON. Errors are `{ error: <code>, message?: <safe copy>, retryAfter?: <s> }`.
 
-The web admin page can read lists directly via RLS (below). The agent list endpoints exist for the users list, which needs `auth.admin` fields, and for tests. Builder's call: use RLS for the requests list and the agent for the users list.
+| Method & path | Guard | Body / query | Success | Errors |
+| --- | --- | --- | --- | --- |
+| `GET /health` | none | — | `200 { ok: true }` | — |
+| `POST /access-requests` | service | `{ name, email, note }`, `x-client-ip` | `202 { ok: true }` | `400 invalid` (malformed body) |
+| `POST /auth/email-link` | service | `{ email }`, `x-client-ip` | `202 { ok: true }` | `400 invalid` |
+| `POST /agui` | user | AG-UI `RunAgentInput` | SSE | `400`, `401`, `403`, `429`; in-stream `RUN_ERROR` `NOT_FOUND`/`BUSY`/`TIME_LIMIT` |
+| `GET /chats` | user | `page≥1` | `{ items, total, page, pageSize: 5 }` | `400` |
+| `GET /chats/:id/messages` | user | — | `{ items, total }` | `404` |
+| `GET/PUT /profile`, `GET /settings`, `POST /settings/brave-search/key`, `DELETE /settings/brave-search`, `GET /places`, `GET /onboarding/options`, `GET /models`, `GET /providers`, `POST /providers/local`, `POST /providers/test`, `POST /providers/:id/login`, `GET/POST/DELETE /providers/logins/:flow[/answer]`, `POST /providers/:id/key`, `DELETE /providers/:id`, `GET/PUT /providers/:id/models` | user | as today | as today, plus `hint` on providers | as today, plus `401`/`403`/`429` |
+| `GET /artifacts/:file` | user | — | HTML or PDF | `404` |
+| `GET /admin/access-requests` | admin | `status=pending|approved|rejected|all`, `page≥1` | `{ items, total, page, pageSize: 5 }`, `created_at desc, id desc` | `400` |
+| `POST /admin/access-requests/:id/approve` | admin | — | `200 { request }` | `409 already_decided`, `409 already_member`, `502 invite_failed` |
+| `POST /admin/access-requests/:id/reject` | admin | — | `200 { request }` | `409 already_decided` |
+| `POST /admin/access-requests/:id/resend` | admin | — | `200 { request }` | `409 not_approved`, `502 invite_failed` |
+| `GET /admin/users` | admin | `page≥1`, `q` (email prefix, optional, ≤ 254 chars) | `{ items: [{ id, email, status, createdAt, lastSignInAt, providers, isAdmin }], total, page, pageSize: 5 }`, `created_at desc` | `400` |
+| `POST /admin/users/:id/deactivate`, `/reactivate` | admin | — | `200 { user }` | `409 self_action`, `404` |
+| `DELETE /admin/users/:id` | admin | `{ confirmEmail }` | `200 { ok: true }` | `409 self_action`, `422 invalid`, `500 delete_failed` + `step` |
+
+Status codes: `401 unauthorized` (service secret), `401 signed_out`, `403 account_disabled`, `404 not_found`, `409` as listed and `version_conflict`/`login_busy`/`conflict`, `413 too_large`, `422 invalid`, `429 rate_limited`, `502 invite_failed`/`upstream`, `503 auth_unavailable`/`unavailable`. The agent sends no CORS headers and answers `OPTIONS` with 405.
+
+The users list reads one page of `profiles` (5 rows) and calls `auth.admin.getUserById` for those 5 ids to add `lastSignInAt`, `providers` and `isAdmin`.
 
 ### Rate limits: `agent/src/lib/rateLimit.ts`
 
-An in-memory sliding window keyed by string. That is acceptable because there is one agent instance; the shared DB-backed limit is only needed for access requests, which already use the DB. Limits (builder may tune):
+An in-memory sliding window keyed by string (one agent process per environment; access requests use the DB).
 
 | Key | Limit |
 | --- | --- |
-| `run:<user>` | 30 runs / 10 min, 2 concurrent |
-| `keys:<user>` (key set/delete, local provider add, provider test) | 20 / hour |
-| `login:<user>` | 5 / 10 min |
-| `profile:<user>` (PUT) | 60 / hour |
-| `places:<user>`, `options:<user>` | 120 / 10 min |
-| `admin:<user>` | 120 / 10 min |
-| Access requests | in DB: 3/hour and 10/day per ip_hash, 200/day global |
+| `run:<user>` | 30 runs per 10 min, 2 concurrent |
+| `keys:<user>` (key set/delete, local provider add, provider test) | 20 per hour |
+| `login:<user>` | 5 per 10 min |
+| `profile:<user>` (PUT) | 60 per hour |
+| `places:<user>`, `options:<user>` | 120 per 10 min |
+| `chats:<user>` | 120 per 10 min |
+| `admin:<user>` | 120 per 10 min |
+| `email-link-ip:<ip_hash>` / `email-link-addr:<sha256(email)>` | 5 / 3 per hour (silent: still `202`) |
+| Access requests | in DB: 3 per hour and 10 per day per `ip_hash`, 200 per day globally (silent) |
 
-Exceeding a limit → `429 { error: "rate_limited", retryAfter }` with a `Retry-After` header. The web shows "Slow down: try again in N s." and never retries automatically.
-
-### Other agent routes
-
-`/models`, `/providers/*`, `/settings/*`, `/profile`, `/places`, `/onboarding/options` all get `requireUser` and operate on `hubs.get(user.id)` and `profiles(user.id)`. The response shapes stay the same apart from the new `hint` on providers.
+Exceeding a user limit → `429 { error: "rate_limited", retryAfter }` plus `Retry-After`. The web shows "Slow down: try again in N s." and never retries automatically.
 
 ### Errors and logging
 
-- `safe()` keeps mapping `UserError` to its status. New kinds: `unauthorized` → 401, `forbidden` → 403, `rate_limited` → 429.
-- Log lines carry `user=<uuid>` (never email), `thread=`, `run=`. At `LOG_LEVEL=debug`, prompts and the profile are still logged as today (the README warns). Tokens, keys, ciphertext and `Authorization` headers are never logged at any level, and `redact()` is applied in `log.error`.
+- `safe()` (`http/handlers.ts`) keeps mapping `UserError` (`lib/errors.ts`) to a status. New kinds: `unauthorized` → 401, `forbidden` → 403, `rate_limited` → 429, `too_large` → 413.
+- Log lines carry `user=<uuid>` (never email), `thread=`, `run=`. At `LOG_LEVEL=debug`, prompts and the profile are logged as today (the README warns). Tokens, keys, ciphertext and `authorization` headers are never logged, and `redact()` runs in `log.error/warn`.
 
 ### Evals
 
-`agent/evals/run.ts` drops `readSecret` from the container. It reads `AGENT_SERVICE_SECRET` and an access token for a dedicated eval user. The token is minted by `agent/evals/auth.ts`: with the secret key, `auth.admin.generateLink({ type: "magiclink", email: EVAL_USER_EMAIL })`, then `verifyOtp({ type: "email", token_hash })` with the publishable key, which returns a session. The eval user is created once by `bootstrap-admin.mjs --user <email>` (not admin) and needs its own provider key added through the app.
+`agent/evals/run.ts` drops `readSecret` (which today reads `/data/shared/agent-secret` from the container). It reads `AGENT_SERVICE_SECRET` and `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` from `deploy-config/.env-agent` and `SUPABASE_ADMIN_SECRET_KEY` from `deploy-config/env-files/.env-supabase-admin`, then mints a token in `agent/evals/auth.ts`: `auth.admin.generateLink({ type: "magiclink", email: EVAL_USER_EMAIL })` with the secret key, then `verifyOtp({ type: "email", token_hash: data.properties.hashed_token })` with the publishable key. `EVAL_USER_EMAIL` defaults to `oab-eval@example.test`; the user is created once with `bootstrap-admin.mjs oab-eval@example.test --user` and needs a provider key added through the app.
 
 ## Web changes
 
-New dependency: `@supabase/ssr` (latest), `@supabase/supabase-js` (latest 2.x).
+New dependencies: `@supabase/ssr` (0.8.x or newer, exact pin), `@supabase/supabase-js` (2.x, exact pin). The web makes no database calls.
 
 | File | Change |
 | --- | --- |
-| `web/lib/supabase/server.ts` | `createClient()` → `createServerClient(NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { cookies: { getAll, setAll }, cookieOptions: { httpOnly: true, secure: true, sameSite: "lax", path: "/" } })`. `setAll` swallows the error thrown in Server Components (proxy handles refresh). |
-| `web/lib/supabase/proxy.ts` | `updateSession(request)`, exactly the documented pattern, with `getClaims()` immediately after client creation; returns `{ response, claims }`. |
-| `web/proxy.ts` | Calls `updateSession`, then enforces the public/protected/admin rules from flow 6. Matcher excludes `_next/static`, `_next/image`, `favicon.ico` and image extensions. |
-| `web/lib/auth.ts` | `getClaimsOrNull()`, `requireUser()` (redirects to `/login`), `requireAdmin()` (`notFound()`), `getAgentAuth()` (above), `safeNext(raw)`. |
-| `web/lib/agentServer.ts` | Delete the secret-file reading. `agentHeaders(auth)` → `{ authorization, "x-agent-secret": process.env.AGENT_SERVICE_SECRET }`. `forwardToAgent(req, path)` calls `getAgentAuth()` first (401 if signed out), checks `Origin` equals `APP_ORIGIN` for non-GET methods (403 otherwise), and forwards only `content-type` and the body. `AGENT_SERVICE_SECRET` missing → throw at module load in production. |
-| `web/app/api/*/route.ts` (profile, providers, settings, models, places, onboarding/options, artifacts) | Go through `forwardToAgent` / `agentFetch` with auth. The artifacts route keeps the CSP and `nosniff` and adds `cache-control: private, no-store`. |
-| `web/app/api/copilotkit/[[...slug]]/route.ts` | Per-request runtime or headers (flow 6), plus `maxDuration`. |
-| `web/app/login/page.tsx` + `actions.ts` | Google button and email-link form. Error banner mapped from `?error=` (`not_invited`, `link_expired`, `auth_failed`, `signed_out`), with fixed copy only. Link to `/request-access`. A signed-in visitor is redirected to `/`. |
-| `web/app/request-access/page.tsx` + `actions.ts` | The form and honeypot from flow 1. On submit, the same thank-you state is shown no matter what happened. |
+| `web/lib/supabase/server.ts` | `createClient()` → `createServerClient(NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { cookies: { getAll, setAll }, cookieOptions: { httpOnly: true, secure: true, sameSite: "lax", path: "/" } })`. `@supabase/ssr` merges `cookieOptions` over its defaults (`httpOnly: false`, `maxAge` 400 days), so `httpOnly: true` takes effect. `setAll` swallows the error thrown in Server Components (proxy refreshes). |
+| `web/lib/supabase/proxy.ts` | `updateSession(request)`: the documented pattern with `getClaims()` right after client creation and the same `cookieOptions`; returns `{ response, claims }`. |
+| `web/proxy.ts` | `updateSession`, route rules from flow 6, CSP header. `config.matcher` excludes `_next/static`, `_next/image`, `favicon.ico` and image extensions. |
+| `web/lib/auth.ts` | `getClaimsOrNull()`, `requireUser()` (redirects to `/login`), `requireAdmin()` (`notFound()`), `getAgentAuth()`, `safeNext(raw)`. |
+| `web/lib/agentServer.ts` | Delete `agentSecret()` and the secret-file read. `agentHeaders(auth)` → `{ authorization, "x-agent-secret" }`. `agentFetch` and `forwardToAgent` as in flow 6. `AGENT_SERVICE_SECRET`, `AGENT_URL` and `APP_ORIGIN` are validated on first use and throw a named error if missing; no defaults. |
+| `web/lib/formToken.ts`, `web/lib/authErrors.ts` | Flow 1 form token; error copy table. |
+| `web/app/api/*/route.ts` (profile, providers, settings, models, places, onboarding/options, artifacts) | Through `forwardToAgent` / `agentFetch` with auth. The artifacts route keeps `ARTIFACT_CSP` and `nosniff` and adds `cache-control: private, no-store`. |
+| `web/app/api/chats/route.ts`, `web/app/api/chats/[id]/messages/route.ts` | Proxies to the agent's chat endpoints. |
+| `web/app/api/copilotkit/[[...slug]]/route.ts` | Flow 6. |
+| `web/app/login/page.tsx` + `actions.ts` | Google button, email-link form, error banner from `authErrors.ts`, link to `/request-access`. A signed-in visitor is redirected to `/`. |
+| `web/app/request-access/page.tsx` + `actions.ts` | Flow 1. |
 | `web/app/auth/callback/route.ts` | Flow 4. |
-| `web/app/auth/confirm/page.tsx` + `actions.ts` | Flow 3 (button, then `verifyOtp`). |
-| `web/app/auth/signout/route.ts` | Flow 7 (POST only). |
-| `web/app/admin/page.tsx`, `web/components/admin/RequestsList.tsx`, `UsersList.tsx`, `ConfirmDialog.tsx` | Tabs: **Requests** (filter: Pending, Approved, Rejected, All) and **Users**. Each list shows 5 rows per page, newest first, with "Showing 1–5 of 16" and Previous/Next, via `.range()` + `count: "exact"`. Each row has **View** (expands name, email, note, IP-hash prefix, dates, invite status and error) and the actions (Approve / Reject / Resend; Deactivate / Reactivate / Delete). Destructive actions open a confirm dialog; Delete requires typing the email. Errors render inline on the row (`role="alert"`) with the agent's message, and a failed action never looks successful. Empty states: "No pending requests." |
-| `web/components/chat/RecentChats.tsx` | In the header or drawer: the user's chats, 5 per page, newest first ("5 of 16"), read via RLS in a server action. Selecting one sets `threadId` and loads its messages (text only) into the chat view. Builder's call on placement. |
-| `web/components/profile/models/ProviderRow.tsx`, `ProviderForms.tsx`, `SearchSettings.tsx` | Show `hint` (e.g. `sk-ant-…a91f`) instead of only "configured". Key inputs are `type="password"`, `autocomplete="off"`, and clear after save; there is no "show key". **Replace key** and **Remove** stay as they are. |
-| `web/components/Chat.tsx` | Header gets the user's email, plus a sign-out button and an "Admin" link if admin (`id="header-admin-link"`). The 401 `signed_out` response from any API → banner with a sign-in link. 403 `account_disabled` → full-page "Your access has been turned off." |
-| `web/next.config.ts` | `headers()` for all routes: `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `X-Frame-Options: DENY` (except `/api/artifacts/*`, which uses `frame-ancestors 'self'` in its own CSP). |
-| CSP | Set in `proxy.ts` with a per-request nonce: `default-src 'self'; script-src 'self' 'nonce-<n>' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://accounts.google.com https://dwiuzfvmevdzzabqeaog.supabase.co; base-uri 'none'; object-src 'none'`. The theme script in `layout.tsx` gets the nonce. `connect-src 'self'` works because no browser code talks to Supabase or the agent directly. Tune for Next/CopilotKit in development (`'unsafe-eval'` only in dev). |
+| `web/app/auth/confirm/page.tsx` + `actions.ts` | Flow 3. |
+| `web/app/auth/signout/route.ts` | Flow 7. |
+| `web/app/admin/page.tsx`, `web/app/admin/actions.ts`, `web/components/admin/RequestsList.tsx`, `UsersList.tsx`, `ConfirmDialog.tsx` | Tabs **Requests** (filter Pending, Approved, Rejected, All) and **Users**. 5 rows per page, newest first, "Showing 1–5 of 16", Previous/Next. Each row has **View** (expands name, email, note, IP-hash prefix, dates, invite status and error) and actions (Approve / Reject / Resend; Deactivate / Reactivate / Delete). Destructive actions open a confirm dialog; Delete requires typing the email. Errors render inline on the row (`role="alert"`) with the agent's message; a failed action never looks successful. Empty states: "No pending requests.", "No users yet." A list that fails to load shows "Couldn't load requests: <message>" with a Retry button. |
+| `web/components/chat/RecentChats.tsx` | In the profile drawer, under a "Recent chats" heading: 5 per page, newest first, "Showing 1–5 of 16", Previous/Next, each row with **View** (title, date) and **Open**. Open sets `threadId` and loads the messages (text only, interrupted ones marked "(stopped)"). |
+| `web/components/profile/models/ProviderRow.tsx`, `ProviderForms.tsx`, `SearchSettings.tsx`, `SignIn.tsx` | Show `hint` instead of only "configured". Key inputs are `type="password"`, `autoComplete="off"`, cleared after save; no "show key". SignIn explains the paste-the-redirect step. |
+| `web/components/Chat.tsx` | Header (`chat-header`) gets the user's email (`header-email`), sign-out (`header-signout`) and, for admins, an Admin link (`header-admin-link`). Any `401 signed_out` → banner with a sign-in link; `403 account_disabled` → full-page "Your access has been turned off." |
+| `web/next.config.ts` | `headers()` for all routes: `Strict-Transport-Security: max-age=63072000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `X-Frame-Options: DENY` except `/api/artifacts/*` (its CSP sets `frame-ancestors 'self'`). No `preload` (the Vercel domain may be a shared `vercel.app` subdomain). |
+| CSP (in `proxy.ts`) | Per-request nonce: `default-src 'self'; script-src 'self' 'nonce-<n>' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://accounts.google.com <NEXT_PUBLIC_SUPABASE_URL>; base-uri 'none'; object-src 'none'`; `'unsafe-eval'` added only when `NODE_ENV=development`. The theme script in `layout.tsx` (today `dangerouslySetInnerHTML`) reads the nonce from `headers()` and sets it. `form-action` includes Supabase and Google because Chrome applies it to the redirect chain after the Google button's form post. |
 
-Every new element gets a unique `id` (project rule) with prefixes `login-`, `request-access-`, `auth-confirm-`, `admin-requests-`, `admin-users-`, `recent-chats-`, `header-`. Row ids include the record id (`admin-requests-row-<uuid>`, `admin-requests-approve-<uuid>`).
+Every new element gets a unique `id` (project rule) with prefixes `login-`, `request-access-`, `auth-confirm-`, `admin-requests-`, `admin-users-`, `recent-chats-`, `header-`, `profile-signout-`. Row ids include the record id (`admin-requests-row-<uuid>`, `admin-requests-approve-<uuid>`, `recent-chats-open-<uuid>`).
 
-`docker-compose.yml`'s `shared` volume mount and `agentsecret` group in `web/Dockerfile` are removed.
+`docker-compose.yml`'s `shared` mount and the `agentsecret` group in `web/Dockerfile` are removed.
 
-**Vercel monorepo note:** the Vercel project's Root Directory is `web`, with "Include files outside the root directory" enabled, because `web` imports `@shared/*` and `next.config.ts` sets `outputFileTracingRoot` to the repo root.
+**Vercel monorepo note:** the project's Root Directory is `web` with "Include files outside the root directory" enabled, because `web` imports `@shared/*` and `next.config.ts` sets `outputFileTracingRoot` to the repo root (it does today).
 
 ## Supabase configuration script
 
-`supabase/scripts/configure-auth.mjs`: plain Node 22, no dependencies, idempotent. Run it with:
+`supabase/scripts/configure-auth.mjs`: Node 22, no dependencies, idempotent.
 
 ```
 set -a; . deploy-config/env-files/.env-supabase-admin; set +a
-node supabase/scripts/configure-auth.mjs --check     # prints a masked diff, exit 1 on drift
-node supabase/scripts/configure-auth.mjs --apply     # PATCHes only changed fields, then re-checks
+node supabase/scripts/configure-auth.mjs --check     # masked diff, exit 1 on drift
+node supabase/scripts/configure-auth.mjs --apply     # PATCH only changed fields, then re-check
 ```
 
-What it does:
-
 1. `GET https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth` with `Authorization: Bearer $SUPABASE_ACCESS_TOKEN`.
-2. Builds the desired object below and diffs it field by field. Secret fields (`smtp_pass`, `external_google_secret`) can't be compared because the GET returns them redacted or null. They are sent on `--apply` when `--rotate-secrets` is passed or the current value is null. The script prints `smtp_pass: <set>` and never the value.
-3. `PATCH /v1/projects/{ref}/config/auth` with only the differing fields.
-4. Signing keys: `GET /v1/projects/{ref}/config/auth/signing-keys`. It asserts that exactly one key is `in_use` with `algorithm: "ES256"` (true today: ES256 `18b8d44a…` in use, legacy HS256 `4f3b737b…` previously_used). It never rotates automatically.
-5. Legacy API keys: `GET /v1/projects/{ref}/api-keys/legacy`. If they are enabled, `--apply --disable-legacy-keys` calls `PUT …/api-keys/legacy?enabled=false`, and then `PATCH …/config/auth/signing-keys/{legacy_hs256_id}` with `{ "status": "revoked" }` (Supabase requires the legacy keys to be disabled before the legacy secret can be revoked). This is a separate flag because it can't be undone casually. Do it in rollout step 2, before any user exists.
+2. Diff against the desired object below field by field. Secrets (`smtp_pass`, `external_google_secret`) come back `null` when unset; they are sent when the current value is null or `--rotate-secrets` is passed, and printed as `<set>`, never the value.
+3. `PATCH /v1/projects/{ref}/config/auth` with the differing fields. If the PATCH is rejected only because of `sessions_timebox` / `sessions_inactivity_timeout` (plan restriction), the script retries without them and prints `sessions_*: skipped, requires Pro plan` (exit 0). Any other failure exits 1 with the API's message.
+4. Signing keys: `GET …/config/auth/signing-keys` must show exactly one `in_use` key with `algorithm: "ES256"`; otherwise exit 1. It never rotates.
+5. Legacy API keys: `GET …/api-keys/legacy`. With `--disable-legacy-keys`: `PUT …/api-keys/legacy?enabled=false`, then `PATCH …/config/auth/signing-keys/{id of the HS256 key}` with `{ "status": "revoked" }`. Separate flag because it's hard to undo; done in rollout step 2 before anything uses the legacy keys (nothing does).
+6. Before enabling the hook, `POST …/database/query/read-only` with `select to_regprocedure('private.before_user_created(jsonb)') is not null as ok`; refuse if false, because a missing hook function breaks every user-creation path.
 
-Desired auth config. Field names were checked against the live GET and the Management API's `UpdateAuthConfigBody`:
+Desired auth config (field names and types checked against the live GET and the Management API OpenAPI `UpdateAuthConfigBody`):
 
 | Field | Value | Note |
 | --- | --- | --- |
-| `site_url` | `$SITE_URL` (prod Vercel origin; `https://app.localhost` until it exists) | Fallback when `redirectTo` isn't allowlisted |
-| `uri_allow_list` | `https://app.localhost/auth/callback,https://app.localhost/auth/confirm,$PROD_ORIGIN/auth/callback,$PROD_ORIGIN/auth/confirm` | Exact URLs, no wildcards; Vercel preview URLs are deliberately excluded |
+| `site_url` | `$SITE_URL` | Prod origin once known; `https://app.localhost` until then |
+| `uri_allow_list` | `https://app.localhost/auth/callback,https://app.localhost/auth/confirm` plus `$PROD_ORIGIN/auth/callback,$PROD_ORIGIN/auth/confirm` when `PROD_ORIGIN` is set | Exact URLs (no query strings are used); previews excluded |
 | `disable_signup` | `true` | |
-| `external_email_enabled` | `true` | Needed for invite and magic link |
+| `external_email_enabled` | `true` | Invite and magic link |
 | `mailer_autoconfirm` | `false` | |
+| `mailer_allow_unverified_email_sign_ins` | `false` | Already false |
 | `external_anonymous_users_enabled` | `false` | Already false |
-| `external_phone_enabled` | `false` | |
+| `external_phone_enabled` | `false` | Already false |
 | `external_google_enabled` | `true` | |
 | `external_google_client_id` | `$GOOGLE_CLIENT_ID` | |
 | `external_google_secret` | `$GOOGLE_CLIENT_SECRET` | Secret |
@@ -798,47 +844,46 @@ Desired auth config. Field names were checked against the live GET and the Manag
 | `security_manual_linking_enabled` | `false` | |
 | `mailer_notifications_identity_linked_enabled` | `true` | |
 | `mailer_notifications_identity_unlinked_enabled` | `true` | |
-| `jwt_exp` | `900` | 15 min; bounds the window after deactivation (with the 30 s agent status check as the tighter guard) |
+| `jwt_exp` | `900` | Seconds (max 604800). Bounds token life after deactivation; the agent's 30 s status check is the tighter guard |
 | `refresh_token_rotation_enabled` | `true` | Already true |
-| `security_refresh_token_reuse_interval` | `10` | Already 10 |
-| `sessions_timebox` | 30 days | Units must be confirmed against the dashboard before applying |
-| `sessions_inactivity_timeout` | 7 days | Same caveat |
-| `mailer_otp_exp` | `3600` | 1 h for invite and magic links; admin can resend |
-| `mailer_otp_length` | `8` | Already 8 (unused; links only) |
-| `rate_limit_email_sent` | `30` | Per hour; the default 2 only applies to built-in SMTP |
+| `security_refresh_token_reuse_interval` | `10` | Seconds; already 10 |
+| `sessions_timebox` | `720` | **Hours** (30 days). Pro-only; skipped with a message on lower plans |
+| `sessions_inactivity_timeout` | `168` | **Hours** (7 days). Pro-only; same |
+| `mailer_otp_exp` | `3600` | Seconds; invite and magic links last 1 h |
+| `rate_limit_email_sent` | `30` | Per hour; only editable with custom SMTP |
 | `smtp_host` | `smtp.resend.com` | |
 | `smtp_port` | `"465"` | String in the API |
 | `smtp_user` | `resend` | |
-| `smtp_pass` | `$RESEND_API_KEY` | Secret, send-only key |
-| `smtp_admin_email` | `$SMTP_SENDER_EMAIL` (= `onboarding@resend.dev`) | |
+| `smtp_pass` | `$RESEND_API_KEY` | Secret, sending-only key |
+| `smtp_admin_email` | `$SMTP_SENDER_EMAIL` | `onboarding@resend.dev` |
 | `smtp_sender_name` | `Open Agent` | |
-| `smtp_max_frequency` | `60` | Seconds between emails to the same address |
+| `smtp_max_frequency` | `60` | Seconds between emails to one address; already 60 |
 | `mailer_subjects_invite` | `You're invited to Open Agent` | |
-| `mailer_templates_invite_content` | contents of `supabase/templates/invite.html` | |
+| `mailer_templates_invite_content` | `supabase/templates/invite.html` | |
 | `mailer_subjects_magic_link` | `Your Open Agent sign-in link` | |
-| `mailer_templates_magic_link_content` | contents of `supabase/templates/magic_link.html` | |
+| `mailer_templates_magic_link_content` | `supabase/templates/magic_link.html` | |
 | `hook_before_user_created_enabled` | `true` | |
-| `hook_before_user_created_uri` | `pg-functions://postgres/private/before_user_created` | Needs migration 3 first. Before enabling the hook, the script runs `select to_regprocedure('private.before_user_created(jsonb)') is not null` through `POST /v1/projects/{ref}/database/query/read-only` and refuses if the function is missing, because a missing hook function breaks every sign-up path |
-| `security_captcha_enabled` | `false` | See open questions |
+| `hook_before_user_created_uri` | `pg-functions://postgres/private/before_user_created` | Needs migration 3 (step 6 checks) |
+| `security_captcha_enabled` | `false` | Turnstile is a later step |
 | `password_min_length` | `12` | Defense in depth; no flow sets a password |
 
-**Templates** (`supabase/templates/*.html`): short, plain HTML and inline styles, no images, no tracking. Invite:
+**Templates** (`supabase/templates/*.html`): short plain HTML, inline styles, no images, no tracking. Invite:
 
 ```html
 <h2>You're invited to Open Agent</h2>
-<p>{{ .Data.name }}, your request was approved. This link signs you in and expires in one hour.</p>
+<p>Hi{{ if .Data.name }} {{ .Data.name }}{{ end }}, your request was approved. This link signs you in and expires in one hour.</p>
 <p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite">Accept the invite</a></p>
 <p>After this, sign in with Google using this email ({{ .Email }}), or ask for an email link on the sign-in page.</p>
 <p>If you didn't ask for access, ignore this email.</p>
 ```
 
-Magic link: the same structure with `type=email` and "Sign in to Open Agent". Builder's call on the exact copy. `{{ .Data.name }}` comes from the `data` passed to `inviteUserByEmail`; if it's empty, the template should still read naturally ("Hi, your request…").
+Magic link: the same structure, heading "Sign in to Open Agent", link `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`.
 
-**Switching to a verified domain later** is four settings plus DNS: verify the domain in Resend (SPF/DKIM records), then set `smtp_admin_email` (e.g. `hello@<domain>`) and `smtp_sender_name` in the script's env, and rerun `--apply`. If the owner creates a new domain-scoped Resend key, also update `RESEND_API_KEY` (`smtp_pass`, with `--rotate-secrets`). If the site moves, update `site_url` / `uri_allow_list` too. Code doesn't change.
+**Google Cloud console** (owner, by hand): OAuth client type "Web application", authorized redirect URI `https://dwiuzfvmevdzzabqeaog.supabase.co/auth/v1/callback`, consent screen published (or the owner's and testers' accounts added as test users while in testing mode). The client id and secret are already in `.env-supabase-admin`.
 
-**Google Cloud console** (owner, by hand; we can't read it): OAuth client type "Web application", Authorized redirect URI `https://dwiuzfvmevdzzabqeaog.supabase.co/auth/v1/callback`, and the consent screen published (or the owner's and testers' accounts added as test users while in testing mode).
+**Secret API keys** (dashboard → Settings → API keys, by hand, because creating them through the API would print the value): `agent` (for `.env-agent`) and `admin_scripts` (for `.env-supabase-admin`). Each can be revoked alone. The `default` secret key is then deleted.
 
-Migrations are applied with MCP `apply_migration` (one call per file, same name), then `list_migrations` and `get_advisors` confirm. The script does not apply SQL.
+Migrations are applied with MCP `apply_migration`; the script doesn't run DDL.
 
 ## Caddy and docker compose
 
@@ -853,7 +898,7 @@ Migrations are applied with MCP `apply_migration` (one call per file, same name)
 
   (agent_common) {
     request_body {
-      max_size 2MB
+      max_size 4MB
     }
     @public_health {
       path /health
@@ -869,64 +914,70 @@ Migrations are applied with MCP `apply_migration` (one call per file, same name)
     reverse_proxy agent:8000 {
       flush_interval -1
       transport http {
-        read_timeout 15m
-        write_timeout 15m
+        read_timeout 20m
+        write_timeout 20m
       }
     }
   }
 
   app.localhost {
     encode zstd gzip
-    reverse_proxy web:3000
+    reverse_proxy web:3000 {
+      flush_interval -1
+    }
   }
 
   agent.localhost {
     import agent_common
   }
   ```
-- `deploy-config/caddy/Caddyfile.ec2`: global options `{ admin off; email {$ACME_EMAIL} }` (automatic Let's Encrypt), the same `(agent_common)` snippet, and one site `{$AGENT_HOST} { import agent_common }`. There is no `app` site because web is on Vercel.
-- `flush_interval -1` is required so AG-UI SSE isn't buffered. The timeouts cover long runs.
+- `deploy-config/caddy/Caddyfile.ec2`: global options `{ admin off; email {$ACME_EMAIL} }`, the same `(agent_common)` snippet, and one site `{$AGENT_HOST} { import agent_common }`. No `app` site (web is on Vercel).
+- `flush_interval -1` keeps AG-UI SSE unbuffered on both hops. 4 MB covers AG-UI run bodies (the client still sends its message list); a larger body gets Caddy's 413.
 
 ### `docker-compose.yml`
 
-- New `caddy` service: `caddy:2.10` pinned by digest, ports `80:80` and `443:443` (on EC2 public; locally `127.0.0.1:443:443` and `127.0.0.1:80:80`), volumes `./deploy-config/caddy/${CADDYFILE:-Caddyfile.local}:/etc/caddy/Caddyfile:ro`, `caddy-data:/data`, `caddy-config:/config`. Env `AGENT_HOST` and `ACME_EMAIL` from `deploy-config/.env-caddy` (optional, not secret). `depends_on: agent (healthy)`.
-- `agent`: drop the `agent-data`, `artifacts-data` and `shared` volumes and the port `1455` mapping (sign-in uses the pasted redirect). Add `read_only: true`, `tmpfs: ["/tmp:size=512m,mode=1777"]` (pi scratch and Chromium; Playwright may also need `/home/pwuser/.cache` as tmpfs, so the builder verifies), `cap_drop: [ALL]`, `security_opt: ["no-new-privileges:true"]`. Keep `127.0.0.1:8000:8000` for local debugging; it's harmless on EC2 because it's bound to loopback. `env_file: deploy-config/.env-agent` becomes **required**.
-- `web`: `profiles: ["local"]`, so it only runs locally. `env_file: deploy-config/.env-nextjs` becomes required. Drop the `shared` volume. `AGENT_URL` stays `http://agent:8000` (container to container). The browser reaches web only through `https://app.localhost`, and the `3000` port mapping is removed to force the Caddy path.
-- `search`: the published port is removed (only the agent needs it, over the compose network).
+- New `caddy` service: image `caddy:2.10` pinned by digest; ports `127.0.0.1:80:80` and `127.0.0.1:443:443` by default, overridden on EC2 with `CADDY_BIND=0.0.0.0` (`"${CADDY_BIND:-127.0.0.1}:443:443"`); volumes `./deploy-config/caddy/${CADDYFILE:-Caddyfile.local}:/etc/caddy/Caddyfile:ro`, `caddy-data:/data`, `caddy-config:/config`; `env_file: [{ path: deploy-config/.env-caddy, required: false }]` (`AGENT_HOST`, `ACME_EMAIL`, not secret); `depends_on: agent (service_healthy)`.
+- `agent`: drop the `agent-data`, `artifacts-data` and `shared` volumes and the `127.0.0.1:1455:1455` port. Keep `PI_OAUTH_CALLBACK_HOST: 0.0.0.0`. Add `read_only: true`, `tmpfs: ["/tmp:size=512m,mode=1777", "/home/pwuser:size=128m,uid=<pwuser uid>,gid=<pwuser gid>,mode=0700"]` (uid/gid per claim 10; pi scratch, Chromium profile and crash dirs; the Playwright browsers live in the image under `/ms-playwright` and stay read-only), `cap_drop: [ALL]`, `security_opt: ["no-new-privileges:true"]`. Playwright launches Chromium with `--no-sandbox` by default (`chromiumSandbox: false`), so no capabilities are needed. Keep `127.0.0.1:8000:8000` for local debugging (loopback only, harmless on EC2). `env_file: [{ path: deploy-config/.env-agent, required: true }]`.
+- `web`: `profiles: ["local"]`; `env_file: [{ path: deploy-config/.env-nextjs, required: true }]`; drop the `shared` volume and the `3000` port (the browser reaches web only through Caddy); `AGENT_URL: http://agent:8000`.
+- `search`: drop the published port (only the agent uses it, over the compose network).
+- `llm` and `ollama` profiles stay as they are (admin-only use).
 - Volumes: remove `agent-data`, `artifacts-data`, `shared`; add `caddy-data`, `caddy-config`.
-- `agent/Dockerfile`: remove the `agentsecret` group and `/data/*` dirs. `web/Dockerfile`: remove the group.
+- `agent/Dockerfile`: remove the `agentsecret` group and the `/data/*` dirs. `web/Dockerfile`: remove the group.
 
-Local run: `docker compose --profile local up -d`. EC2: `CADDYFILE=Caddyfile.ec2 docker compose up -d`.
+Local: `docker compose --profile local up -d --build`. EC2: `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose up -d --build`.
 
-**Local TLS trust (one time):** `docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt && sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt`. Chrome resolves `*.localhost` to 127.0.0.1 without editing `/etc/hosts`. For `curl` and Node, use `--resolve app.localhost:443:127.0.0.1` or add hosts entries.
+Locally the web container calls the agent at `http://agent:8000` (compose network), while Vercel calls `https://$AGENT_HOST` through Caddy. The Caddy agent path is exercised locally by the E2E `curl` checks.
+
+**Local TLS trust (one time):** `docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt && sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt`. Chrome resolves `*.localhost` to 127.0.0.1 without `/etc/hosts`. For `curl`, use `--resolve app.localhost:443:127.0.0.1 --cacert /tmp/caddy-root.crt`.
 
 ### Cookies and CORS
 
-- Auth cookies live only on the web origin (`app.localhost` / the Vercel domain), host-only (no `Domain` attribute), `HttpOnly; Secure; SameSite=Lax; Path=/`. The agent domain never sees a browser cookie.
-- The agent sends **no** CORS headers and answers `OPTIONS` with 405. Browsers therefore can't call it cross-origin, and only server-side callers with the service secret can.
-- Because web and agent are on different sites (Vercel vs EC2 domain), nothing depends on cross-site cookies or third-party cookie policies.
+- Auth cookies live only on the web origin, host-only, `HttpOnly; Secure; SameSite=Lax; Path=/`. `oab_next` is `Path=/auth/callback`, 10 minutes. The agent domain never sees a browser cookie.
+- The agent sends no CORS headers and answers `OPTIONS` with 405.
 
 ## Environment variables
 
-`S` = secret (never committed, never `NEXT_PUBLIC_`, never logged).
+`S` = secret (never committed, never `NEXT_PUBLIC_`, never logged). All files below are git-ignored (`deploy-config/.env*`, `deploy-config/**/.env*`); example files with names only live in `deploy-config/env.examples/` (`agent.env.example`, `nextjs.env.example`, `caddy.env.example`, `supabase-admin.env.example`), a folder name the ignore rules don't match.
 
 ### Agent: `deploy-config/.env-agent` (local and EC2)
 
 | Variable | S | Example / format |
 | --- | --- | --- |
 | `SUPABASE_URL` | | `https://dwiuzfvmevdzzabqeaog.supabase.co` |
-| `SUPABASE_SECRET_KEY` | S | `sb_secret_…` (the `default` secret key; create a dedicated `agent` secret key so it can be rotated alone) |
+| `SUPABASE_PUBLISHABLE_KEY` | | `sb_publishable_…` |
+| `SUPABASE_SECRET_KEY` | S | `sb_secret_…` (the `agent` key) |
 | `AGENT_SERVICE_SECRET` | S | 64 hex chars (`openssl rand -hex 32`); same value in web |
-| `CREDENTIAL_KEYS` | S | `v1:<base64 32 bytes>` |
-| `ACCESS_REQUEST_PEPPER` | S | base64 32 bytes |
-| `APP_ORIGIN` | | `https://app.localhost` locally; `https://<vercel domain>` on EC2 |
-| `LOG_LEVEL`, `JEV_MODEL`, `JEV_CONCURRENCY`, `AGENT_MODEL_CAPS` | | unchanged |
+| `CREDENTIAL_KEYS` | S | `v1:<base64 32 bytes>`; **identical** on local and EC2 (one shared project) |
+| `ACCESS_REQUEST_PEPPER` | S | base64 32 bytes; identical on local and EC2 |
+| `APP_ORIGIN` | | `https://app.localhost` locally; `https://<APP_HOST>` on EC2 |
+| `RUN_TIME_LIMIT_SECONDS` | | optional, default `280` |
+| `LOG_LEVEL`, `JEV_MODEL`, `JEV_CONCURRENCY`, `AGENT_MODEL_CAPS`, `AGENT_MODELS` | | unchanged |
 | `LLM_API_KEY` | S | optional, admin-only gateway |
-| `LLM_BASE_URL`, `AGENT_MODELS` | | unchanged |
+| `LLM_BASE_URL` | | optional |
 
-Removed: `AGENT_SHARED_SECRET`, `AGENT_SECRET_FILE`, `AGENT_DATA_DIR`, `ARTIFACTS_DIR`.
+Removed: `AGENT_SHARED_SECRET`, `AGENT_SECRET_FILE`, `AGENT_DATA_DIR`, `ARTIFACTS_DIR`. Any pi provider key variable (`OPENAI_API_KEY`, …) makes startup fail.
 
-If local and EC2 share the one Supabase project (as they will at first), `CREDENTIAL_KEYS` **must be identical** in both, or each side sees the other's keys as corrupt. See open question 1.
+Sharing `CREDENTIAL_KEYS` means the owner's laptop holds the production master key. That is accepted while there is one project (owner decision 1); the second-project later step removes it.
 
 ### Web, local: `deploy-config/.env-nextjs`
 
@@ -935,175 +986,191 @@ If local and EC2 share the one Supabase project (as they will at first), `CREDEN
 | `NEXT_PUBLIC_SUPABASE_URL` | | `https://dwiuzfvmevdzzabqeaog.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | | `sb_publishable_…` (public by design) |
 | `APP_ORIGIN` | | `https://app.localhost` |
-| `AGENT_URL` | | set by compose: `http://agent:8000` |
 | `AGENT_SERVICE_SECRET` | S | same as agent |
 
-### Vercel (Production environment only; Preview gets none, so previews can't sign in)
+`AGENT_URL` is set by compose (`http://agent:8000`).
+
+### Vercel (Production only; Preview gets none, so previews can't sign in or reach the agent)
 
 | Variable | S | Value |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | | as above |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | | as above |
-| `APP_ORIGIN` | | `https://<vercel domain>` |
+| `APP_ORIGIN` | | `https://<APP_HOST>` |
 | `AGENT_URL` | | `https://<AGENT_HOST>` |
-| `AGENT_SERVICE_SECRET` | S | marked Sensitive in Vercel |
+| `AGENT_SERVICE_SECRET` | S | marked Sensitive |
 
 ### Supabase admin scripts: `deploy-config/env-files/.env-supabase-admin` (owner's machine only)
 
+Today the file holds `SUPABASE_ACCESS_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`. Add the rest:
+
 | Variable | S | Note |
 | --- | --- | --- |
-| `SUPABASE_ACCESS_TOKEN` | S | Management API personal token |
-| `SUPABASE_PROJECT_REF` | | `dwiuzfvmevdzzabqeaog` |
+| `SUPABASE_ACCESS_TOKEN` | S | Management API personal token (exists) |
+| `SUPABASE_PROJECT_REF` | | `dwiuzfvmevdzzabqeaog` (add) |
+| `SUPABASE_URL` | | `https://dwiuzfvmevdzzabqeaog.supabase.co` (add) |
+| `SUPABASE_PUBLISHABLE_KEY` | | (add; used by test and link scripts for `verifyOtp`) |
+| `SUPABASE_ADMIN_SECRET_KEY` | S | the `admin_scripts` secret key (add) |
 | `GOOGLE_CLIENT_ID` | | (exists) |
 | `GOOGLE_CLIENT_SECRET` | S | (exists) |
-| `RESEND_API_KEY` | S | (exists), send-only |
-| `SMTP_SENDER_EMAIL` | | `onboarding@resend.dev` |
-| `SITE_URL` | | prod origin once known |
-| `PROD_ORIGIN` | | Vercel origin (blank until known; the script omits it) |
-
-`bootstrap-admin.mjs` reads `SUPABASE_URL` and `SUPABASE_SECRET_KEY` from `.env-agent` and `ADMIN_EMAIL` from the command line.
+| `RESEND_API_KEY` | S | (exists), sending-only |
+| `SMTP_SENDER_EMAIL` | | `onboarding@resend.dev` (add) |
+| `SITE_URL` | | `https://app.localhost` until production exists (add) |
+| `PROD_ORIGIN` | | empty until production exists; the script omits it (add) |
+| `APP_ORIGIN` | | `https://app.localhost` (add; used by `dev-link.mjs` and printed by bootstrap) |
+| `E2E_OPENROUTER_KEY` | S | optional; an OpenRouter key for E2E step 7, pasted into the app by hand |
 
 ### Caddy: `deploy-config/.env-caddy` (EC2)
 
 `AGENT_HOST`, `ACME_EMAIL` (not secret).
 
-`.gitignore` already covers `deploy-config/.env*` and `deploy-config/**/.env*`. Commit example files with names only and no values: `deploy-config/env.examples/agent.env.example`, `nextjs.env.example`, `caddy.env.example`, `supabase-admin.env.example`. They go in a separate folder because `.env*.example` names under `deploy-config/` would be caught by the ignore rule.
-
 ## Security model and threats
 
-Principles: the user id comes only from a verified token; the service secret plus the token are both required; deny by default (RLS, Storage, CORS); fail closed; secrets stay server-side; least privilege for every key.
+Principles: the user id comes only from a verified token; the service secret plus the token are both required; deny by default (RLS, grants, Storage, CORS, header forwarding); fail closed; secrets stay server-side; least privilege for every key.
 
 | Threat | Mitigation |
 | --- | --- |
-| Uninvited sign-up via Google or OTP | `disable_signup`, plus the `before-user-created` hook allowlist, plus `shouldCreateUser: false` on OTP. Tested in E2E with a non-invited Google account. |
-| Admin privilege escalation | Role lives in `app_metadata` (only service role can write). Admin endpoints re-check live with `getUserById`. RLS admin policies read the JWT's `app_metadata`. There is no UI to grant admin. |
-| Forged or confused JWT (`alg: none`, HS256 with public key, RS/ES swap, other project's token) | `algorithms: ["ES256"]` pinned in `jose`; key only from the project's JWKS; `iss` exact; `aud = authenticated`; `role = authenticated`. Legacy HS256 secret revoked and legacy keys disabled (rollout). Unit tests for each case. |
-| Stolen access token used directly against the agent | Agent requires the service secret too, which isn't in the browser. Tokens last 15 min. Agent sends no CORS. |
-| IDOR on chats, artifacts, workspace, login flows | Ownership claimed in the DB (`chats.claim`); every repository query has `eq user_id`; composite FKs; sessions keyed by user+chat; login flows bound to the user; 404 for "not yours". RLS tests prove it. |
-| RLS gaps | RLS on every table, explicit grants, no write policies, `private.is_active()` in every own-row policy, `get_advisors` after each migration, a SQL test suite (below) that enumerates every table in `public` and fails if any lacks RLS or has a policy for `anon`. |
-| Secret key misuse in agent code | Single `db/client.ts`, exported only into `db/`; a lint test enforces this; repositories require `userId` at construction. |
-| Key exfiltration from DB or backups | Envelope AES-256-GCM; master key only in agent env; AAD binds the row; ciphertext useless without `CREDENTIAL_KEYS`. |
-| Key leakage to browser or logs | No endpoint returns keys; the UI shows only hints; `redact()` on logged errors; the pi runtime is in memory; debug logs are documented as containing prompts, never credentials. A unit test logs an error containing a fake key and asserts it's masked. |
-| Ambient server credentials serving all users | Startup refuses when provider key env vars are present; the LiteLLM gateway is admin-only. |
-| CSRF | SameSite=Lax cookies; Next server actions check Origin/Host; `forwardToAgent` checks `Origin === APP_ORIGIN` on non-GET; sign-out is POST-only. |
-| Open redirect via `next` | `safeNext(raw)`: must start with a single `/`, not `//` or `/\`, no control chars, at most 512 chars; `new URL(raw, APP_ORIGIN).origin === APP_ORIGIN`; path must match an allowlist (`/`, `/admin`, `/admin/*`). Otherwise `/`. The redirect target is always built from `APP_ORIGIN`, never from the `Host` header. Supabase's `uri_allow_list` is exact URLs. Unit tests cover `//evil.com`, `/\evil.com`, `https://evil.com`, `/%2F%2Fevil.com`, `javascript:`. |
-| Magic-link token prefetch by email scanners | `/auth/confirm` requires a button click (POST) before `verifyOtp`. |
-| Token leakage in URLs | Only one-time `token_hash` / `code` appear in URLs, and they're stripped by redirecting immediately after use. `Referrer-Policy: strict-origin-when-cross-origin`. No access tokens in URLs or query strings ever. |
-| Enumeration via request-access or email login | Identical response and padded latency; no read-back; DB rate limits by IP hash; OTP errors never surfaced. |
-| Request-access spam or flood | Honeypot, minimum fill time, per-IP and global daily caps in DB, unique pending per email, lengths limited by DB checks. Optional Turnstile (open question). |
-| SSRF via custom provider base URLs | Public-only for non-admins, re-checked at hub build; IMDSv2 hop limit 1 on EC2; compose network has nothing sensitive besides SearXNG. Existing `fetchPublic` and browser guard rules unchanged. |
-| Long-lived session after deactivation | Ban (no refresh), `status` check on every agent request (≤30 s), RLS `is_active()`, `jwt_exp = 900`. |
-| XSS in the web app | CSP with nonce and `strict-dynamic`; React escaping; artifacts only in a sandboxed iframe with `sandbox` CSP and no `allow-same-origin`. |
-| Clickjacking | `frame-ancestors 'none'` (artifacts: `'self'`). |
+| Uninvited sign-up via Google or OTP | `disable_signup`, the `before-user-created` allowlist hook, `shouldCreateUser: false`. Tested with a non-invited Google account (E2E) and by integration tests. |
+| Admin privilege escalation | Role in `app_metadata` (service role only). Agent admin endpoints re-check live with `getUserById`. No UI grants admin. No admin data path through PostgREST. |
+| Forged or confused JWT (`alg: none`, HS256 with the public key, RS/ES swap, another project's token) | `algorithms: ["ES256"]`; key only from this project's JWKS; exact `iss`; `aud`; `role`. Legacy HS256 secret revoked and legacy keys disabled in rollout. Unit test per case. |
+| Stolen access token used against the agent | Needs the service secret too (not in the browser). Tokens last 15 min. No CORS. |
+| Browser-set headers reaching the agent through CopilotKit | Route rebuilds the request with only `content-type`/`accept`; `forwardHeaders` denies `x-*`, `authorization`, `cookie`; the agent reads `x-client-ip` only on the two service-only routes. Unit test posts a request with `authorization`, `x-agent-secret`, `x-client-ip` set by the "browser" and asserts the agent receives only server values. |
+| IDOR on chats, artifacts, workspace, login flows | Ownership claimed in the DB (`chats.claim`); every repository query has `eq user_id`; composite FKs; sessions keyed by user+chat; login flows bound to the user; 404 for "not yours". Integration and E2E tests. |
+| Direct PostgREST access with the publishable key | No grants and no policies for `anon`/`authenticated`; RLS tests prove every table and RPC is denied. |
+| Secret key misuse in agent code | One `db/client.ts`, import-lint test, repositories require `userId` at construction. |
+| Key exfiltration from DB or backups | Envelope AES-256-GCM; master key only in agent env; AAD binds the row. |
+| Key leakage to browser or logs | No endpoint returns keys; hints only; `redact()`; unit test logs an error with a fake key and asserts it's masked; E2E greps logs. |
+| Ambient server credentials serving all users | Startup refuses pi provider env vars; LiteLLM gateway admin-only. |
+| CSRF | SameSite=Lax; Next server actions' built-in Origin check; `Origin === APP_ORIGIN` on every non-GET route handler (API proxies, CopilotKit, sign-out). |
+| Open redirect via `next` | `safeNext(raw)`: starts with a single `/`, not `//` or `/\`, no control chars or `%2f`/`%5c` after decoding, ≤ 512 chars, `new URL(raw, APP_ORIGIN).origin === APP_ORIGIN`, path in the allowlist (`/`, `/admin`). Otherwise `/`. Redirects are built from `APP_ORIGIN`. `next` never goes to Supabase. Unit tests: `//evil.com`, `/\evil.com`, `https://evil.com`, `/%2F%2Fevil.com`, `/%5Cevil.com`, `javascript:alert(1)`, `/admin`, `/`. |
+| Magic-link prefetch by email scanners | `/auth/confirm` needs a button click (POST) before `verifyOtp`. |
+| Token leakage in URLs | Only one-time `token_hash` / `code` appear in URLs and are consumed immediately. `Referrer-Policy: strict-origin-when-cross-origin`. |
+| Enumeration via request-access or email link | Identical `202` and padded latency; no read-back; errors never surfaced. |
+| Request-access / email-link spam | Honeypot, signed minimum fill time, DB caps per IP hash and global, unique pending per email, in-memory email-link caps, Supabase's per-address `smtp_max_frequency` and global `rate_limit_email_sent`. |
+| SSRF via custom provider base URLs | Public-only for non-admins, re-checked at hub build; IMDSv2 hop limit 1; existing `fetchPublic` and browser guard rules unchanged. |
+| Long-lived session after deactivation | Ban (no refresh, no new sign-in), status check on every agent request (≤ 30 s), `jwt_exp = 900`. |
+| Long-lived refresh tokens | Pro plan: time-box 30 days, inactivity 7 days. Lower plans: sessions last until sign-out; "Sign out everywhere" and deactivation end them. Documented. |
+| XSS in the web app | Nonce CSP with `strict-dynamic`; React escaping; artifacts only in a sandboxed iframe (`ARTIFACT_CSP`, no `allow-same-origin`). |
+| Clickjacking | `frame-ancestors 'none'` (artifacts `'self'`), `X-Frame-Options: DENY`. |
 | Cookie theft | HttpOnly, Secure, SameSite=Lax, host-only; HSTS on both origins. |
-| Agent exposed on EC2 | Only Caddy is public (80/443); security group allows 22 from the owner's IP only; the agent container runs read-only with no caps and no volumes; Caddy limits body size. |
-| Supabase outage | Agent returns 503 `auth_unavailable` or `storage unavailable`; web shows "Can't reach the account service. Try again." No fallback to unauthenticated. |
-| Replay of a pending ChatGPT OAuth paste across users | Flows bound to the user; one global ChatGPT flow at a time; PKCE state tied to the flow. |
-| Vercel preview deployments | No env vars in Preview, and their URLs aren't in `uri_allow_list`, so previews can't authenticate or reach the agent. |
+| Agent exposed on EC2 | Only Caddy is public (80/443); SSH from the owner's IP only; read-only container, no caps, no volumes; body size limit. |
+| Supabase outage | `503 auth_unavailable` / `unavailable`; web shows "Can't reach the account service. Try again in a minute." No unauthenticated fallback. |
+| Cross-user ChatGPT OAuth paste | Flows bound to the user; one ChatGPT flow per process; pi's PKCE state is tied to the flow. |
+| Vercel previews | No env vars in Preview; not in `uri_allow_list`. |
 
 ## Testing
 
 ### Unit (vitest, no network)
 
-- **Agent `crypto/`:** seal/open round trip; tampering with each field (ciphertext, nonce, dek_wrapped, dek_nonce, key_version) fails; moving a sealed row to another `userId` or `provider` fails; rotation rewrap keeps plaintext; `CREDENTIAL_KEYS` parsing rejects 31/33-byte keys and duplicate versions; `hint()` cases.
-- **Agent `auth/verify`:** a locally generated ES256 keypair served by a fake JWKS (inject a `fetch`). Valid passes. Rejected: `alg: none`, HS256 signed with the public key bytes, RS256, wrong `iss`, wrong `aud`, `role: anon`, `is_anonymous: true`, expired beyond tolerance, unknown `kid` (one refetch, then fail), oversize token.
-- **Agent middleware:** missing or wrong `x-agent-secret` → 401 before any token parsing; deactivated → 403; status DB down → 503.
-- **Agent with `Memory*` stores:** session keying (`userA:t1` vs `userB:t1` are distinct), login-flow ownership, rate limiter windows, `safe()` mappings, the startup refusal on ambient provider env vars, the `db/client` import lint test, `ENTITY_KINDS` vs the SQL `check` list.
-- **Web:** `safeNext` cases; login error mapping; `forwardToAgent` Origin check and header set (no cookie forwarding); admin list pagination text ("Showing 6–10 of 16"); every new component renders unique ids (extend the existing id-uniqueness checks in `web/test`).
+- **Agent `crypto/`:** seal/open round trip; tampering with each of ciphertext, nonce, dek_wrapped, dek_nonce, key_version fails; moving a sealed row to another `userId`, `provider` or `kind` fails; `rewrap` under a new key version opens with the same plaintext and the old version no longer appears; `CREDENTIAL_KEYS` parsing rejects 31/33-byte keys, duplicate versions, `v0`; `hint()` cases.
+- **Agent `auth/verify`:** a local ES256 keypair served by an injected `fetch` JWKS. Valid passes. Rejected: `alg: none`, HS256 signed with the public key bytes, RS256, wrong `iss`, wrong `aud`, `role: anon`, `is_anonymous: true`, expired beyond tolerance, missing `session_id`, unknown `kid` (one refetch, then fail), 9 KB token.
+- **Agent middleware:** missing or wrong `x-agent-secret` → 401 before any token parsing; deactivated → 403; status DB down → 503; admin endpoint as non-admin → 404.
+- **Agent with `Memory*` stores:** session keying (`userA:t1` vs `userB:t1`), login-flow ownership and the global ChatGPT lock, rate-limiter windows, `safe()` mappings, startup refusal on ambient provider env vars, the `db/client` import lint, `ENTITY_KINDS` vs the migration's check list, `RUN_TIME_LIMIT_SECONDS` ends a fake run with `TIME_LIMIT` and an interrupted message.
+- **Web:** `safeNext` cases; `checkFormTs` (valid, forged, < 3 s, > 1 h); login error mapping; `forwardToAgent` Origin check and header set (no cookie or browser header forwarding); the CopilotKit route strips browser headers; admin and recent-chats pagination text ("Showing 6–10 of 16"); every new component renders unique ids (extend `web/test/chat/components.test.tsx` and `web/test/profile/components.test.tsx`, which already check id uniqueness).
 
-### Integration against Supabase (`agent/test/supabase/*.int.test.ts`, run when `SUPABASE_INTEGRATION=1`)
+### Integration against Supabase (`agent/test/supabase/*.int.test.ts`, run with `SUPABASE_INTEGRATION=1`)
 
-They run against the real project with throwaway users `oab-test+<uuid>@example.test`. Before creating each user, they insert it into `invited_emails`. They create users with `auth.admin.createUser({ email_confirm: true })` (no email sent) and get sessions via `generateLink` + `verifyOtp`. Each test deletes everything it created in `afterAll` using the delete-user flow. Covered:
+They run against the real project with `.env-supabase-admin` loaded and throwaway users `oab-test+<uuid>@example.test`. Each test inserts the email into `invited_emails`, creates the user with `auth.admin.createUser({ email, email_confirm: true })` (no email is sent), and gets a session with `generateLink({ type: "magiclink" })` + `verifyOtp({ type: "email", token_hash })`. `afterAll` deletes every user it created through the same code as the delete-user flow, and a final check asserts `select count(*) from auth.users where email like 'oab-test+%@example.test'` is 0.
 
-- the profile trigger creates a row; `SupabaseProfileStore` round trip; an invalid profile is rejected;
-- `SupabaseCredentialStore` read/modify/delete with real bytea round trip, plus concurrent `modify` (two callers, one wins, other retries);
-- `workspace_put` version semantics, including a conflict and a cross-user id collision (user B can't overwrite user A's `(chat, kind, id)`);
+- profile trigger creates a row; `SupabaseProfileStore` round trip; invalid profile rejected;
+- `SupabaseCredentialStore` read/modify/delete with a real bytea round trip; two concurrent `modify` calls (one wins, the other retries and sees the first's value);
+- `workspace_put`: create, update with the right version, `PT409` with the current version on a stale one, cross-user chat id rejected (`23503`);
 - `chats.claim` ownership;
-- artifacts upload, get and PDF caching, and Storage cleanup on delete;
-- the hook: `auth.admin.createUser` for a non-invited email fails with the hook's message (this also records whether the hook fires on admin creation; see claims to verify);
-- `disable_signup`: `signInWithOtp({ shouldCreateUser: true })` for a new email fails.
+- `access_request_submit`: inserted, duplicate, already_member, the 3-per-hour IP cap;
+- artifacts upload, get, PDF cache, Storage cleanup on delete;
+- the hook: `auth.admin.createUser` for a non-invited email fails with the hook's message (records claim 2);
+- `disable_signup`: `signInWithOtp({ shouldCreateUser: true })` for an unknown `@example.test` email fails.
 
-### RLS tests (`supabase/tests/rls.test.ts`)
+### RLS and grants tests (`agent/test/supabase/rls.int.test.ts`)
 
-Two users A and B, each with a session from `generateLink`, and a publishable-key client per user:
+Users A and B with sessions, and a publishable-key client per user plus one with no session (anon):
 
-- for every table, A sees only A's rows, B sees only B's, and anon sees nothing;
-- every `insert`, `update` and `delete` from A or B on every table is denied (error or 0 rows), including `provider_credentials`, `invited_emails` and `access_requests`;
-- A can't call `workspace_put` (permission denied);
-- the admin sees `access_requests` and all `profiles`; a non-admin sees no `access_requests`;
-- after deactivating A, A's still-valid token reads 0 rows everywhere;
-- Storage: A's and B's clients can't list or download `artifacts/*`;
-- a catalog check (SQL via the secret key on `pg_class` / `pg_policies`): every `public` table has `relrowsecurity = true`, and no policy targets `anon` or `public`.
+- for every table in `public`, `select` as anon, A and B returns a permission error or 0 rows, including A's own rows;
+- every `insert`, `update`, `delete` as A, B and anon on every table is denied;
+- `rpc("workspace_put")` and `rpc("access_request_submit")` as A and anon → permission denied;
+- Storage: A's client can't `list`, `download` or `upload` in `artifacts`;
+- catalog check, sent with `SUPABASE_ACCESS_TOKEN` to `POST /v1/projects/{ref}/database/query/read-only`: every `public` table has `relrowsecurity = true`; the only policy in `public` is `invited_emails_auth_admin_read`; `has_table_privilege(role, t, 'select,insert,update,delete')` is false for `anon` and `authenticated` on every table; `has_function_privilege(role, f, 'execute')` is false for `anon` and `authenticated` on every function in `public`.
 
-### End-to-end (manual plus scripted, local compose with Caddy)
+### End-to-end (local compose with Caddy, owner present for Google consent)
 
-Prerequisites: migrations applied, `configure-auth.mjs --apply`, `.env-agent` and `.env-nextjs` filled in, Caddy root trusted, `bootstrap-admin.mjs ntnbhat9@gmail.com` run.
+Prerequisites: migrations applied, `configure-auth.mjs --apply` (and `--disable-legacy-keys`), `.env-agent`, `.env-nextjs` and `.env-supabase-admin` filled in, Caddy root trusted, `bootstrap-admin.mjs ntnbhat9@gmail.com` run.
 
-1. `docker compose --profile local up -d --build`; all services healthy. `curl --resolve agent.localhost:443:127.0.0.1 https://agent.localhost/agui -X POST` → 401 (no secret). With the secret and no token → 401 `signed_out`.
-2. In Chrome, open `https://app.localhost`. It redirects to `/login`. **Continue with Google** as `ntnbhat9@gmail.com` (the owner does the Google consent). You land on `/`, onboarding starts, and the header shows the Admin link.
-3. In a private window, open `/request-access` and submit `Dummy One / ntnbhat9+oab-e2e1@gmail.com / testing`. The thank-you page appears. Submit again; it's identical and no new row is created (check `/admin`).
-4. As admin, `/admin` → Requests → Pending shows "Showing 1–1 of 1" → **View** shows the details → **Approve**. Expected: `invite_status='sent'` if the Resend sandbox accepts the plus-address, otherwise `invite_status='failed'` with a visible error. Both outcomes are acceptable; record which one happened.
-5. Get the dummy's link without email: `node supabase/scripts/dev-link.mjs ntnbhat9+oab-e2e1@gmail.com`. This dev-only script uses the secret key and `auth.admin.generateLink({ type: "magiclink", email, options: { redirectTo: "https://app.localhost/auth/confirm" } })` and prints `https://app.localhost/auth/confirm?token_hash=<hashed_token>&type=email`. Open it in a second Chrome profile, click **Continue**, and you're signed in as the dummy with an empty profile.
-6. As the dummy: finish onboarding, open Models → OpenRouter, and paste a test key. The row shows `sk-or-…<last4>`. Network tab: no response contains the key. In SQL (`execute_sql`): `select provider, kind, hint, key_version, octet_length(ciphertext) from provider_credentials` shows the ciphertext only.
-7. As the dummy: run a chat ("price eggs and milk at Trader Joe's") that triggers `shop` (writes the workspace cart) and `create_artifact`. Then open the artifact and download the PDF.
-8. Make a second dummy (repeat 3–5 with `+oab-e2e2`). As dummy 2:
-   - the recent-chats list is empty; Models shows OpenRouter not configured;
-   - `fetch('/api/artifacts/<dummy1 artifact id>')` from the console → 404;
-   - posting an AG-UI run with dummy 1's `threadId` (copied by hand) → `RUN_ERROR NOT_FOUND`;
-   - `GET /api/profile` shows dummy 2's own profile.
-9. As admin, **Deactivate** dummy 1. Dummy 1's next action within 30 s shows "Your access has been turned off". Reload → `/login`, and Google or email-link sign-in fails.
-10. Try Google sign-in with a non-invited Google account → `/login?error=not_invited`, and no row in `auth.users` (`select count(*) from auth.users`).
-11. As admin, **Delete** dummy 1 and dummy 2 (type the email). Storage `artifacts/<id>/` is empty and every table has 0 rows for them.
-12. Check the agent logs: `docker compose logs agent | grep -E "sk-|sb_secret|Bearer|refresh"` returns nothing.
+1. `docker compose --profile local up -d --build`; all services healthy. `curl --resolve agent.localhost:443:127.0.0.1 --cacert /tmp/caddy-root.crt -X POST https://agent.localhost/agui` → `401 unauthorized`. With `x-agent-secret` and no token → `401 signed_out`. `curl … https://agent.localhost/health` → 200 locally (the request reaches Caddy from the Docker bridge, a private range); the public 404 is checked on EC2 in the deploy steps.
+2. In Chrome, open `https://app.localhost` → `/login`. **Continue with Google** as `ntnbhat9@gmail.com` (the owner does the consent). Land on `/`, onboarding starts, the header shows `header-admin-link`. DevTools → Application → Cookies: every `sb-*` cookie is HttpOnly, Secure, SameSite=Lax, no Domain.
+3. Sign out, then on `/login` request an email link for `ntnbhat9@gmail.com`. The email arrives from `onboarding@resend.dev` (proves SMTP); open it, click **Continue**, land on `/` as the admin (same user id: proves Google and email resolve to one user).
+4. In a second Chrome profile, open `/request-access` and submit `Dummy One / ntnbhat9+oab-e2e1@gmail.com / testing`. Thank-you page. Submit again: identical, and `/admin` → Requests → Pending shows "Showing 1–1 of 1".
+5. As admin: **View** shows the details → **Approve**. Expect `invite_status='sent'` if the Resend sandbox accepts the plus-address, else `invite_status='failed'` with a visible error. Record which.
+6. `node supabase/scripts/dev-link.mjs ntnbhat9+oab-e2e1@gmail.com` (dev-only, `.env-supabase-admin` loaded): if `profiles` has the email it calls `generateLink({ type: "magiclink", email, options: { redirectTo: APP_ORIGIN + "/auth/confirm" } })` and prints `…/auth/confirm?token_hash=<hashed_token>&type=email`; otherwise `generateLink({ type: "invite", … })` and prints `…&type=invite`. Open it in the second profile, click **Continue**: signed in as the dummy with an empty profile.
+7. As the dummy: finish onboarding, Models → OpenRouter, paste the OpenRouter key from `E2E_OPENROUTER_KEY`. The row shows `sk-or-…<last4>`. DevTools Network: no response contains the key. MCP `execute_sql`: `select provider, kind, hint, key_version, octet_length(ciphertext) from provider_credentials` shows ciphertext only.
+8. As the dummy: run "price eggs and milk at Trader Joe's" (exercises `shop`, the workspace cart, and `create_artifact` when the model makes one; if not, ask "make that a printable list"). Open the artifact and download the PDF. Reload; the chat appears in Recent chats ("Showing 1–1 of 1") and reopens with its text.
+9. Second dummy (`+oab-e2e2`, repeat 4–6). As dummy 2:
+   - Recent chats is empty; Models shows OpenRouter not configured;
+   - `fetch('/api/artifacts/<dummy 1 artifact id>')` in the console → 404;
+   - `fetch('/api/chats/<dummy 1 chat id>/messages')` → 404;
+   - an AG-UI run with dummy 1's `threadId` (set by hand in the console against `/api/copilotkit`) → `RUN_ERROR NOT_FOUND`;
+   - `GET /api/profile` is dummy 2's own profile;
+   - `document.cookie` in the console shows no `sb-*` cookie (HttpOnly).
+10. As admin, **Deactivate** dummy 1. Dummy 1's next action within 30 s shows "Your access has been turned off". Reload → `/login`; email-link sign-in shows the neutral message and no email arrives; `dev-link.mjs` + Continue → `link_expired` (banned).
+11. Google sign-in with a non-invited Google account (the owner's second account) → `/login?error=not_invited`; `select count(*) from auth.users` unchanged.
+12. As admin, **Delete** dummy 1 and dummy 2 (type the email). Storage `artifacts/<id>/` is empty and every table has 0 rows for them.
+13. `docker compose logs agent web caddy | grep -E "sk-|sb_secret|Bearer|refresh_token|eyJ"` returns nothing.
+14. Cleanup: `node supabase/scripts/cleanup-e2e.mjs` deletes any remaining user whose email matches `ntnbhat9+oab-e2e%@gmail.com` or `%@example.test` (same delete flow, including Storage and `access_requests`), then prints the remaining user count (expected: 1, the admin; plus the eval user if created).
 
 The builder records the run as a checklist in the PR description.
 
-## Rollout
+## Rollout and deploy
 
-1. **Code and migrations on the branch.** Apply migrations 1–6 via MCP `apply_migration`, then `get_advisors`, then run the RLS tests.
-2. **Supabase config.** Run `configure-auth.mjs --check`, then `--apply`. Then `--apply --disable-legacy-keys` (nothing uses `anon` / `service_role`; verify the "last used" indicators in the dashboard first). Create a dedicated secret key named `agent` (Settings → API keys) for `.env-agent`.
-3. **Bootstrap the admin** (`bootstrap-admin.mjs`), then run the local E2E above.
-4. **EC2** (Amazon Linux 2023 or Ubuntu 24.04, t3.large or bigger for Chromium):
+1. **Migrations.** Apply 1–6 with MCP `apply_migration`, then `list_migrations`, `get_advisors` (security, performance), then the RLS tests.
+2. **Supabase config.** Create the `agent` and `admin_scripts` secret keys in the dashboard; delete the `default` secret key. `configure-auth.mjs --check`, `--apply`, then `--apply --disable-legacy-keys`.
+3. **Admin.** `bootstrap-admin.mjs ntnbhat9@gmail.com`, then the local E2E and `cleanup-e2e.mjs`.
+4. **EC2** (Ubuntu 24.04 or Amazon Linux 2023, t3.large or bigger for Chromium):
    - security group inbound 80/443 from anywhere, 22 from the owner's IP only;
-   - IMDSv2 required with hop limit 1 (`aws ec2 modify-instance-metadata-options --http-tokens required --http-put-response-hop-limit 1`);
-   - install Docker with the compose plugin; clone the repo at the release commit;
-   - DNS A record for `AGENT_HOST` → Elastic IP;
-   - create `deploy-config/.env-agent` (with `APP_ORIGIN` = prod web origin), `.env-caddy`, and `.env-search` if used; `chmod 600`;
-   - `CADDYFILE=Caddyfile.ec2 docker compose up -d --build`; check `curl https://$AGENT_HOST/agui` → 401;
-   - unattended security upgrades on; Docker log rotation (`max-size: 10m`, `max-file: 5`) in `/etc/docker/daemon.json`.
-5. **Vercel:** import the repo, set Root Directory `web`, enable files outside root, set the Production env vars above (none for Preview), deploy. Add the production origin to `PROD_ORIGIN` and `SITE_URL` and rerun `configure-auth.mjs --apply`. Set `APP_ORIGIN` on EC2 and restart the agent.
-6. **Production smoke test:** steps 2, 6, 7 and 10 of the E2E against the production URLs, with the owner's account plus one dummy, then delete the dummy.
-7. **README:** replace "Run" with the local compose + Caddy instructions, the TLS trust step, the env var tables, and the admin bootstrap. Remove the "no login" warning. Add a "Deploy" section for EC2 and Vercel. Update CONTRIBUTING's layout (new `auth/`, `db/`, `crypto/`, `chats/`, `supabase/`).
-8. **Commit cadence (owner rules):** a commit after each major step (migrations; agent auth; stores; crypto; web auth; admin; compose/Caddy; docs). Run `npm run build` in both packages before each commit, rebuild and restart containers after each major change, and self-review every diff.
+   - `aws ec2 modify-instance-metadata-options --instance-id <id> --http-tokens required --http-put-response-hop-limit 1`;
+   - Docker with the compose plugin; `/etc/docker/daemon.json` log rotation (`"log-opts": { "max-size": "10m", "max-file": "5" }`); unattended security upgrades;
+   - Elastic IP; DNS A record `<AGENT_HOST>` → Elastic IP;
+   - clone the repo at the release commit; create `deploy-config/.env-agent` (same `CREDENTIAL_KEYS` and `ACCESS_REQUEST_PEPPER` as local, `APP_ORIGIN=https://<APP_HOST>`), `deploy-config/.env-caddy` (`AGENT_HOST`, `ACME_EMAIL`), `deploy-config/.env-search`; `chmod 600 deploy-config/.env-*`;
+   - `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose up -d --build` (no `local` profile, so no web);
+   - `curl -X POST https://<AGENT_HOST>/agui` → `401`; `curl https://<AGENT_HOST>/health` → 404.
+5. **Vercel:** import the repo; Root Directory `web`; "Include files outside the root directory" on; Production env vars above (none for Preview); deploy. Note the plan: Hobby → keep `maxDuration = 300` and `RUN_TIME_LIMIT_SECONDS=280`; Pro → optionally `maxDuration = 800` in the route and `RUN_TIME_LIMIT_SECONDS=780` on EC2. Fluid compute must be on (Settings → Functions); without it Hobby caps at 60 s and runs would be cut early.
+6. **Wire the origins.** Set `PROD_ORIGIN=https://<APP_HOST>` and `SITE_URL=https://<APP_HOST>` in `.env-supabase-admin`, rerun `configure-auth.mjs --apply`. Confirm `APP_ORIGIN` on EC2 matches; restart the agent.
+7. **Production smoke test:** E2E steps 2, 7, 8, 11 against production with the owner and one dummy; then `cleanup-e2e.mjs`.
+8. **Docs:** README "Run" → local compose + Caddy, TLS trust, env tables, admin bootstrap; remove the "no login" warnings (README line 24, SECURITY.md line 11) and describe the new model in SECURITY.md; add "Deploy" (this section). CONTRIBUTING layout gains `auth/`, `db/`, `crypto/`, `supabase/`.
+9. **Commit cadence (owner rules):** a commit after each major step (migrations; agent auth; stores; crypto; web auth; admin; compose/Caddy; docs). `npm run build` in `agent` and `web` before each commit, rebuild and restart containers after each major change, self-review every diff, never commit `.env*`, keys or `.mcp.json`.
 
 ## Claims to verify during build
 
-Each of these is checked by a named test above, not assumed.
+Each is checked by a named test, not assumed.
 
-1. **Google linking with `disable_signup = true`.** Supabase docs say identities with the same email are linked automatically. They don't explicitly say linking still happens when sign-ups are disabled. Expected yes, since no user is created. Verified by E2E step 2 for the bootstrap admin, and by a dummy whose email is a Google account.
-2. **Whether `before-user-created` fires for admin `inviteUserByEmail` / `createUser`.** The docs say it runs "before a new user is created" without listing paths. The design works either way because emails are inserted into `invited_emails` before any admin creation. The integration test records the behavior.
-3. **Whether a failed invite email rolls back user creation.** If it doesn't, the user exists and **Resend invite** takes the magic-link path. Both paths are designed. Confirm in E2E step 4.
-4. **Resend sandbox and plus-addresses** (`ntnbhat9+x@gmail.com`). Unknown; E2E step 4 records it, and the design doesn't depend on it.
-5. **The exact error code on the Google callback for a non-invited account** (`signup_disabled` vs the hook's 403). Map both to `not_invited`; E2E step 10.
-6. **`@supabase/ssr` with `cookieOptions.httpOnly: true`.** This is supported when only server clients are used (no browser client). Verify cookie flags in DevTools during E2E.
-7. **Units of `sessions_timebox` / `sessions_inactivity_timeout` in the Management API** (the schema says `number`). Check against the dashboard before applying.
-8. **Whether pi's `contextNote` hook can be async, and whether pi's OpenAI login can run two flows at once** (port 1455). The design assumes neither.
-9. **CopilotKit v2 per-request headers.** The fallback is a runtime per request.
+1. **Google linking to an invited user with `disable_signup = true`.** Docs say same-email identities link automatically; they don't say so explicitly for disabled sign-ups. Expected yes (no user is created). E2E step 2 (bootstrap admin, confirmed) and a dummy whose address is a Google account trying Google before and after using the invite. If linking is refused, the fix is to keep `disable_signup = true` and rely on email links for that user; the design doesn't change.
+2. **Whether `before-user-created` fires for admin `inviteUserByEmail` / `createUser` / `generateLink`.** The design works either way (emails are allowlisted first). Integration test records it.
+3. **Whether a failed invite email leaves the user created.** Both outcomes are handled (Resend invite and `dev-link.mjs` branch on `profiles`). E2E step 5.
+4. **Resend sandbox and plus-addresses.** E2E step 5 records it; nothing depends on it.
+5. **The Google callback error for a non-invited account** (`signup_disabled` vs the hook's message). Both map to `not_invited`. E2E step 11.
+6. **The hook URI in schema `private`.** `pg-functions://postgres/private/before_user_created` with `USAGE` on `private` granted to `supabase_auth_admin`. The integration hook test proves it fires; if the Management API rejects a non-`public` schema, move only this function to `public` with the same revokes (it's still not callable by `anon`/`authenticated`).
+7. **Storage `allowed_mime_types` with the upload content type.** Integration test uploads `text/html` and `application/pdf`.
+8. **Nonce CSP with `cacheComponents` (enabled in `next.config.ts`).** Next requires dynamic rendering for nonces. E2E checks the Chrome console for CSP violations on `/login`, `/request-access`, `/auth/confirm`, `/`, `/admin`. If static shells drop the nonce, set `cacheComponents: false`: every page is per-user and dynamic anyway.
+9. **`sessions_timebox` / `sessions_inactivity_timeout` on the current plan.** The script reports applied or skipped.
+10. **Read-only agent container.** `pwuser`'s uid/gid in `mcr.microsoft.com/playwright:v1.64.1-noble` (set the `/home/pwuser` tmpfs `uid`/`gid` to `docker compose run --rm agent id -u pwuser` / `id -g`), and that Chromium (both `browser/pool.ts` and the PDF renderer in `artifacts/store.ts`), pi sessions and Node start with `read_only: true`. E2E step 8 exercises both Chromium paths.
+11. **Banned user and `verifyOtp`.** E2E step 10 expects a banned user's `token_hash` to fail verification (mapped to `link_expired`).
 
-## Open questions for the owner
+Resolved during review (no longer open): auth field names and units (`sessions_*` in hours, `jwt_exp` and `security_refresh_token_reuse_interval` in seconds, `smtp_port` a string); CopilotKit per-request agents (`AgentsFactory`) and default header forwarding; pi `CredentialStore` signature and env fallback; `contextNote` can be async (pi's `context` handler accepts a Promise); pi's ChatGPT callback port is fixed at 1455; `@supabase/ssr` honors `cookieOptions.httpOnly`; `supabase_auth_admin` already has `USAGE` on `public`.
 
-1. **One Supabase project for local and production?** Today there's one (`dwiuzfvmevdzzabqeaog`). Local test users would then be real users in production, and both environments must share `CREDENTIAL_KEYS`. Recommendation: a second free project for development. The scripts already take `SUPABASE_PROJECT_REF`.
-2. **Should invitees share the operator LiteLLM gateway (your keys and your bill), or must they bring their own keys?** The default here is admin-only.
-3. **Domains:** the Vercel production domain, and the EC2 agent hostname (needed for Let's Encrypt).
-4. **Vercel plan:** chat runs can take minutes; the route's `maxDuration` is capped by the plan. Is the plan Hobby or Pro?
-5. **Bot protection on request-access:** is honeypot plus rate limits enough, or do you want Cloudflare Turnstile (a site key in Vercel, a secret in the agent)?
+## Decisions made by the owner (formerly open questions)
 
-## Left to the builder (builder's calls)
+1. **One Supabase project for local and production** — decided: use `dwiuzfvmevdzzabqeaog` for both. Local test users are real users and are deleted after each E2E run (`cleanup-e2e.mjs`). `CREDENTIAL_KEYS` and `ACCESS_REQUEST_PEPPER` are shared. A separate development project is a later step.
+2. **Operator LiteLLM gateway and private-network provider URLs** — decided: admin-only.
+3. **Domains** — decided: unknown for now. Everything reads `APP_ORIGIN`, `AGENT_HOST`, `SITE_URL`, `PROD_ORIGIN` from env, with `<APP_HOST>` / `<AGENT_HOST>` placeholders in docs; local uses `app.localhost` / `agent.localhost`. Deploy steps are above.
+4. **Vercel plan** — decided: unknown; design works on both. `maxDuration = 300` plus the agent's `RUN_TIME_LIMIT_SECONDS = 280`; Pro may raise to 800/780.
+5. **Bot protection** — decided: honeypot, signed fill time and rate limits now; Turnstile later.
 
-- Exact UI copy, the recent-chats placement, and admin page styling (follow the existing glass style).
-- Rate-limit numbers within the table's spirit.
-- Per-request CopilotKit runtime vs native header support.
-- Global vs local default for sign-out (spec default: local, plus "Sign out everywhere").
-- Whether the admin requests list reads via RLS directly (spec default) or via the agent endpoint.
-- Persisting widget payloads for reopened chats (not in this version).
-- How the signed render timestamp for the request-access form is built.
+## Later steps (documented, not built)
+
+- **Second Supabase project for development.** Create a free project, run the migrations and `configure-auth.mjs` against it (`SUPABASE_PROJECT_REF`), give local its own `CREDENTIAL_KEYS` and pepper, and point `.env-agent` / `.env-nextjs` at it.
+- **Verified Resend domain.** Add SPF/DKIM in Resend, set `SMTP_SENDER_EMAIL` (e.g. `hello@<domain>`), optionally a domain-scoped `RESEND_API_KEY`, rerun `configure-auth.mjs --apply --rotate-secrets`. No code change.
+- **Cloudflare Turnstile on request-access.** Site key in Vercel (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`), secret in `.env-agent` (`TURNSTILE_SECRET_KEY`), verified by the agent in `POST /access-requests` before `access_request_submit`; `connect-src`/`script-src`/`frame-src` gain `https://challenges.cloudflare.com`.
+- **AWS KMS** for the master key (`KmsKeyWrapper`).
+- **Persisting widget payloads** for reopened chats (`chat_messages.parts jsonb`).
+
+## UI copy and styling
+
+Exact copy beyond the strings fixed above, and the admin and recent-chats styling, follow the existing glass style and are the builder's only open choices.
