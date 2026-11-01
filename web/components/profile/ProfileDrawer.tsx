@@ -139,9 +139,9 @@ export function ProfileDrawer(props: {
               onChange={(id) => setDraft({ ...draft, defaultModel: id })}
             />
           </Group>
-          <Group id="profile-group-notes" title="Anything else">
-            <label id="profile-notes-label" htmlFor="profile-notes-input" className="sr-only">
-              Anything else I should keep in mind?
+          <Group id="profile-group-notes" title="Notes for the agent">
+            <label id="profile-notes-label" htmlFor="profile-notes-input" className="block pb-2 text-xs leading-relaxed text-text-muted">
+              Added to every chat. For example: allergic to shellfish, prefer morning flights.
             </label>
             <textarea
               id="profile-notes-input"
@@ -149,7 +149,7 @@ export function ProfileDrawer(props: {
               maxLength={1000}
               value={draft.notes ?? ""}
               onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-              placeholder="Anything else I should keep in mind?"
+              placeholder="Anything I should always keep in mind?"
               className="w-full resize-none rounded-xl border border-border bg-paper px-3.5 py-2.5 text-[15px] text-text-primary outline-none transition placeholder:text-text-faint focus:border-mist-300"
             />
           </Group>
@@ -165,13 +165,18 @@ export function ProfileDrawer(props: {
             >
               Run setup again
             </button>
-            <SignOutForm
-              id="profile-signout-all"
-              scope="global"
-              className="block text-sm text-text-secondary underline-offset-4 hover:underline"
-            >
-              Sign out everywhere
-            </SignOutForm>
+            <div id="profile-signout-all-row">
+              <SignOutForm
+                id="profile-signout-all"
+                scope="global"
+                className="block text-sm text-text-secondary underline-offset-4 hover:underline"
+              >
+                Sign out on all devices
+              </SignOutForm>
+              <p id="profile-signout-all-hint" className="text-xs text-text-muted">
+                Ends your sessions on every phone and computer, not just this one.
+              </p>
+            </div>
             {confirming ? (
               <div id="profile-clear-confirm" className="flex items-center gap-2 text-sm">
                 <span id="profile-clear-question" className="text-text-secondary">

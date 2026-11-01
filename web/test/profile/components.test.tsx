@@ -307,7 +307,7 @@ describe("ProfileDrawer", () => {
     expect(onClear).toHaveBeenCalled();
   });
 
-  it("shows recent chats and a sign-out-everywhere form, with unique ids", () => {
+  it("shows recent chats and a sign-out-on-all-devices form, with unique ids", () => {
     const { container } = render(
       <ProfileDrawer
         profile={profile}
@@ -320,7 +320,7 @@ describe("ProfileDrawer", () => {
       />,
     );
     expect(screen.getByRole("heading", { name: "Recent chats" })).toBeInTheDocument();
-    const signOut = screen.getByRole("button", { name: "Sign out everywhere" });
+    const signOut = screen.getByRole("button", { name: "Sign out on all devices" });
     expect(signOut).toHaveAttribute("id", "profile-signout-all");
     const form = signOut.closest("form") as HTMLFormElement;
     expect(form).toHaveAttribute("action", "/auth/signout");

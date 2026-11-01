@@ -1,8 +1,9 @@
 "use client";
 
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { type ModelList, type ModelOption, modelLabel, normalizeRef } from "@/lib/models";
+import { useDismiss } from "@/lib/useDismiss";
 
 export function ModelMenu(props: {
   models: ModelList | null;
@@ -14,17 +15,8 @@ export function ModelMenu(props: {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(root, open, close);
 
   if (!models) return null;
   const current = normalizeRef(value) ?? models.default ?? undefined;

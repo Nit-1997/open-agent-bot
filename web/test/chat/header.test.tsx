@@ -1,5 +1,5 @@
 import { emptyProfile } from "@shared/profile";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Chat } from "@/components/Chat";
 import { noteAuthFailure, resetAuthState } from "@/lib/authState";
@@ -32,33 +32,64 @@ const expectUniqueIds = (root: HTMLElement) => {
 };
 
 describe("Chat header", () => {
-  it("shows the email, an Admin link for admins and a local sign-out", async () => {
-    const { container } = render(<Chat email="ntn@example.test" isAdmin />);
-    expect(await screen.findByText("ntn@example.test")).toHaveAttribute("id", "header-email");
-    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("id", "header-admin-link");
-    const signOut = screen.getByRole("button", { name: "Sign out" });
-    expect(signOut).toHaveAttribute("id", "header-signout");
+  it("puts the profile, Admin and a local sign-out behind the initials", async () => {
+    const { container } = render(<Chat email="ntn@example.test" name="" isAdmin />);
+    const trigger = await screen.findByRole("button", { name: "Account" });
+    expect(trigger).toHaveTextContent("N");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Sign out" })).toBeNull();
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu")).toHaveTextContent("ntn@example.test");
+    expect(screen.getByRole("menuitem", { name: "Admin" })).toHaveAttribute("href", "/admin");
+    const signOut = screen.getByRole("menuitem", { name: "Sign out" });
     const form = signOut.closest("form") as HTMLFormElement;
     expect(form).toHaveAttribute("action", "/auth/signout");
     expect(new FormData(form).get("scope")).toBe("local");
     expectUniqueIds(container);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("hides the Admin link from other users", async () => {
-    render(<Chat email="user@example.test" isAdmin={false} />);
-    await screen.findByText("user@example.test");
-    expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
+  it("opens the profile drawer from the menu", async () => {
+    render(<Chat email="ntn@example.test" name="" isAdmin={false} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Account" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Profile & settings" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("hides the Admin item from other users", async () => {
+    render(<Chat email="user@example.test" name="" isAdmin={false} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Account" }));
+    expect(screen.queryByRole("menuitem", { name: "Admin" })).toBeNull();
+  });
+
+  it("uses the sign-in name for initials when the profile has none", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/profile") return Response.json({ profile: { ...emptyProfile(), onboardedAt: "2026-10-30" } });
+        if (url === "/api/models") return Response.json({ default: null, models: [] });
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }),
+    );
+    render(<Chat email="sb@example.test" name="Shrishtika Bora" isAdmin={false} />);
+    expect(await screen.findByRole("button", { name: "Account" })).toHaveTextContent("SB");
+  });
+
+  it("prefers the saved profile name over the sign-in name", async () => {
+    render(<Chat email="ntn@example.test" name="Someone Else" isAdmin={false} />);
+    expect(await screen.findByRole("button", { name: "Account" })).toHaveTextContent(/^N$/);
   });
 
   it("shows a sign-in banner after signed_out and a full page after account_disabled", async () => {
-    const { container } = render(<Chat email="user@example.test" isAdmin={false} />);
-    await screen.findByText("user@example.test");
+    const { container } = render(<Chat email="user@example.test" name="" isAdmin={false} />);
+    await screen.findByRole("button", { name: "Account" });
     act(() => noteAuthFailure(401, "signed_out"));
     expect(screen.getByRole("alert")).toHaveTextContent("You were signed out. Sign in again.");
     expectUniqueIds(container);
     act(() => noteAuthFailure(403, "account_disabled"));
     expect(screen.getByRole("alert")).toHaveTextContent("Your access has been turned off.");
-    expect(screen.queryByText("user@example.test")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Account" })).toBeNull();
     expectUniqueIds(container);
   });
 });

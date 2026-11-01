@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { decideRoute } from "@/lib/routeRules";
 
-const user = { user: { id: "u1", email: "a@b.c", isAdmin: false }, unavailable: false };
-const admin = { user: { id: "u2", email: "admin@b.c", isAdmin: true }, unavailable: false };
+const user = { user: { id: "u1", email: "a@b.c", name: "", isAdmin: false }, unavailable: false };
+const admin = { user: { id: "u2", email: "admin@b.c", name: "", isAdmin: true }, unavailable: false };
 const none = { user: null, unavailable: false };
 const down = { user: null, unavailable: true };
 

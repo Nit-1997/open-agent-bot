@@ -65,7 +65,7 @@ describe("/login", () => {
   });
 
   it("sends a signed-in visitor home", async () => {
-    vi.mocked(getClaimsOrNull).mockResolvedValueOnce({ id: "u", email: "a@b.test", isAdmin: false });
+    vi.mocked(getClaimsOrNull).mockResolvedValueOnce({ id: "u", email: "a@b.test", name: "", isAdmin: false });
     await expect(LoginPage(params({}))).rejects.toThrow("/");
   });
 });

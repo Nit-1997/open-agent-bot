@@ -6,7 +6,7 @@ export default async function Home() {
   const user = await requireUser();
   return (
     <Providers>
-      <Chat email={user.email} isAdmin={user.isAdmin} />
+      <Chat email={user.email} name={user.name} isAdmin={user.isAdmin} />
     </Providers>
   );
 }

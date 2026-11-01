@@ -51,7 +51,7 @@ export function YouSection({ id, profile, onChange, options }: SectionProps) {
           value={profile.name ?? ""}
           maxLength={80}
           onChange={(e) => onChange({ ...profile, name: e.target.value })}
-          placeholder="Your first name"
+          placeholder="Your name"
           className="w-full rounded-xl border border-border bg-paper px-3.5 py-2.5 text-[15px] text-text-primary outline-none transition placeholder:text-text-faint focus:border-mist-300"
         />
       </div>

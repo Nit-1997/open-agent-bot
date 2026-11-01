@@ -1,10 +1,9 @@
 "use client";
 
-import { SignOutForm } from "@/components/auth/SignOutForm";
 import { useAgentContext } from "@copilotkit/react-core/v2";
-import { LogOut, Moon, Plus, Sun, User } from "lucide-react";
-import Link from "next/link";
-import { useCallback, useState } from "react";
+import { Moon, Plus, Sun } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { AccountMenu } from "@/components/AccountMenu";
 import { ChatSession } from "@/components/chat/ChatSession";
 import { RecentChats } from "@/components/chat/RecentChats";
 import { AccessDisabled, SignedOutBanner } from "@/components/SessionNotices";
@@ -15,7 +14,7 @@ import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
 import { useAuthState } from "@/lib/authState";
 import type { HistoryMessage } from "@/lib/chats";
 import { useModels } from "@/lib/models";
-import { clearedProfile, initials, type Profile, saveProfile, useProfile } from "@/lib/profile";
+import { clearedProfile, type Profile, saveProfile, useProfile } from "@/lib/profile";
 import { getUserContext, type UserContext, withChat } from "@/lib/userContext";
 
 const AGENT_ID = "openagent";
@@ -71,25 +70,10 @@ function ProfileLoading({ error, onRetry }: { error?: string; onRetry: () => voi
   );
 }
 
-function SignOutButton() {
-  return (
-    <SignOutForm
-      id="header-signout"
-      scope="local"
-      label="Sign out"
-      className="glass-pill inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium text-text-secondary transition hover:bg-paper hover:text-text-primary sm:px-3"
-    >
-      <LogOut id="header-signout-icon" aria-hidden="true" size={14} />
-      <span id="header-signout-label" className="hidden sm:inline">
-        Sign out
-      </span>
-    </SignOutForm>
-  );
-}
-
-export function Chat({ email, isAdmin }: { email: string; isAdmin: boolean }) {
+export function Chat({ email, name, isAdmin }: { email: string; name: string; isAdmin: boolean }) {
   const authState = useAuthState();
-  const { profile, error, reload } = useProfile();
+  const { profile: stored, error, reload } = useProfile();
+  const profile = useMemo(() => (stored && !stored.name?.trim() && name ? { ...stored, name } : stored), [stored, name]);
   const { list: models, reload: reloadModels } = useModels();
   const [modelsPanel, setModelsPanel] = useState(false);
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
@@ -165,30 +149,9 @@ export function Chat({ email, isAdmin }: { email: string; isAdmin: boolean }) {
               </h1>
             </div>
             <div id="chat-actions" className="flex items-center gap-1.5">
-              <span id="header-email" className="hidden max-w-[180px] truncate text-[12px] text-text-muted md:inline" title={email}>
-                {email}
-              </span>
-              {isAdmin && (
-                <Link
-                  id="header-admin-link"
-                  href="/admin"
-                  className="glass-pill rounded-full px-3 py-2 text-[12px] font-medium text-text-secondary transition hover:bg-paper hover:text-text-primary"
-                >
-                  Admin
-                </Link>
-              )}
               <ModelMenu models={models} value={chatModel} onChange={setChatModel} onManage={() => setModelsPanel(true)} />
               <ThemeToggle />
-              <SignOutButton />
-              <button
-                id="chat-profile-button"
-                type="button"
-                onClick={() => setDrawer(true)}
-                aria-label="Open profile"
-                className="glass-pill flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-medium text-text-primary transition hover:bg-paper"
-              >
-                {initials(profile.name) || <User id="chat-profile-icon" aria-hidden="true" size={15} />}
-              </button>
+              <AccountMenu name={profile.name} email={email} isAdmin={isAdmin} onOpenProfile={() => setDrawer(true)} />
               <button
                 id="chat-new-button"
                 type="button"
