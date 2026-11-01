@@ -74,7 +74,7 @@ describe("ArtifactCard", () => {
   });
 
   it("shows the report inline in a sandboxed, scrollable frame with new tab, full screen and PDF", () => {
-    render(<ArtifactCard toolCallId="a1" title="Diwali plan" result="artifact abcdefghijkl created: Diwali plan" />);
+    render(<ArtifactCard idPrefix="t" toolCallId="a1" title="Diwali plan" result="artifact abcdefghijkl created: Diwali plan" />);
     const inline = screen.getByTitle("Diwali plan");
     expect(inline.tagName).toBe("IFRAME");
     expect(inline).toHaveAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");

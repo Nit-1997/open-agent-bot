@@ -5,6 +5,7 @@ import type { Plan } from "@shared/widgets";
 import { Minus, Plus } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { PlanEdits } from "@shared/workspace";
+import { widgetId } from "./widgetId";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const INPUT = "rounded-lg border border-border bg-paper px-2 py-1 text-sm disabled:opacity-60";
@@ -149,16 +150,18 @@ type TripDraft = { start: string; end: string; travelers: number; budget?: numbe
 
 export function PlanCard({
   toolCallId,
+  idPrefix,
   widget,
   onEdit,
   stale = false,
 }: {
   toolCallId: string;
+  idPrefix?: string;
   widget: Plan;
   onEdit?: (e: PlanEdits) => void;
   stale?: boolean;
 }) {
-  const id = `plan-${toolCallId}`;
+  const id = widgetId("plan", toolCallId, idPrefix);
   const locked = stale || !onEdit;
   const initial =
     widget.entity === "event"

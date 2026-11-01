@@ -86,6 +86,7 @@ export function TurnView(props: {
                 return (
                   <WidgetRenderer
                     key={item.id}
+                    idPrefix={props.idPrefix}
                     toolCallId={item.id}
                     args={{ widget: item.widget }}
                     locale={props.locale}
@@ -110,7 +111,7 @@ export function TurnView(props: {
                   </div>
                 );
               }
-              return <ArtifactCard key={item.id} toolCallId={item.id} title={item.title} result={item.result} />;
+              return <ArtifactCard key={item.id} idPrefix={props.idPrefix} toolCallId={item.id} title={item.title} result={item.result} />;
             })}
           </div>
           {!running && <SourcesRow id={`${id}-sources`} sources={turn.sources} />}

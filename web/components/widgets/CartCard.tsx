@@ -7,6 +7,7 @@ import { Info, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { money as formatMoney } from "@/lib/format";
 import { Picture } from "./CardRow";
+import { widgetId } from "./widgetId";
 
 type Line = { qty: number; choice: number; removed: boolean };
 type Shared = Record<string, { qty: number; removed: boolean }>;
@@ -15,18 +16,20 @@ const portalOf = (name: string) => name.match(/\(([^)]+)\)\s*$/)?.[1] ?? name;
 
 export function CartCard({
   toolCallId,
+  idPrefix,
   widget,
   locale = "en-US",
   onEdit,
   stale = false,
 }: {
   toolCallId: string;
+  idPrefix?: string;
   widget: Cart;
   locale?: string;
   onEdit?: (e: CartEdits) => void;
   stale?: boolean;
 }) {
-  const id = `cart-${toolCallId}`;
+  const id = widgetId("cart", toolCallId, idPrefix);
   const locked = stale || !onEdit;
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState<Shared>({});

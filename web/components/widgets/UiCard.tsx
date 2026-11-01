@@ -4,6 +4,7 @@ import type { UiBlock, UiWidget } from "@shared/widgets";
 import { useState } from "react";
 import { ExternalLink } from "./ExternalLink";
 import { CardRow, ImageBlock } from "./CardRow";
+import { widgetId } from "./widgetId";
 
 const VISIBLE_ITEMS = 5;
 
@@ -236,8 +237,8 @@ function Block({ id, block, flags, label }: { id: string; block: UiBlock; flags:
   }
 }
 
-export function UiCard({ toolCallId, widget }: { toolCallId: string; widget: UiWidget }) {
-  const id = `ui-${toolCallId}`;
+export function UiCard({ toolCallId, idPrefix, widget }: { toolCallId: string; idPrefix?: string; widget: UiWidget }) {
+  const id = widgetId("ui", toolCallId, idPrefix);
   const flags = widget.unverified ?? [];
   const removed = widget.removedLinks ?? 0;
   return (

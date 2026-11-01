@@ -4,6 +4,8 @@ import { FlightList } from "@/components/widgets/FlightList";
 import { UiCard } from "@/components/widgets/UiCard";
 import { WeatherCard } from "@/components/widgets/WeatherCard";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
+import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { expectUniqueIds } from "../support/ids";
 import { validWidgets } from "./fixtures";
 
 const twoDays = {
@@ -194,17 +196,17 @@ describe("widgets", () => {
   });
 
   it("GroundingNote lists the claims", () => {
-    render(<WidgetRenderer toolCallId="g1" args={{ widget: validWidgets.grounding_note }} locale="en-US" />);
+    render(<WidgetRenderer idPrefix="t" toolCallId="g1" args={{ widget: validWidgets.grounding_note }} locale="en-US" />);
     expect(screen.getByText(/\$7\.49, In Stock/)).toBeInTheDocument();
   });
 
   it("WidgetRenderer renders nothing for invalid payload", () => {
-    const { container } = render(<WidgetRenderer toolCallId="x" args={{ widget: { kind: "weather_card" } }} locale="en-US" />);
+    const { container } = render(<WidgetRenderer idPrefix="t" toolCallId="x" args={{ widget: { kind: "weather_card" } }} locale="en-US" />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("WidgetRenderer dispatches on kind", () => {
-    render(<WidgetRenderer toolCallId="x" args={{ widget: validWidgets.ui }} locale="en-US" />);
+    render(<WidgetRenderer idPrefix="t" toolCallId="x" args={{ widget: validWidgets.ui }} locale="en-US" />);
     expect(screen.getByText("Diwali party for 25")).toBeInTheDocument();
   });
 
@@ -212,7 +214,7 @@ describe("widgets", () => {
     const { container } = render(
       <div id="t-root">
         {Object.values(validWidgets).map((w, i) => (
-          <WidgetRenderer key={i} toolCallId={`tc${i}`} args={{ widget: w }} locale="en-IN" />
+          <WidgetRenderer key={i} idPrefix="t" toolCallId={`tc${i}`} args={{ widget: w }} locale="en-IN" />
         ))}
       </div>,
     );
@@ -220,5 +222,38 @@ describe("widgets", () => {
     const ids = els.map((e) => e.id);
     expect(ids.filter((id) => !id)).toEqual([]);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("prefixes widget and report card ids with the pane, so two panes never collide", () => {
+    const cart = {
+      kind: "cart",
+      stores: [
+        {
+          name: "Trader Joe's",
+          total: 3,
+          url: "https://www.traderjoes.com/",
+          missing: [],
+          items: [{ query: "tortillas", qty: 1, picks: [{ title: "Tortillas", price: 3, url: "https://www.traderjoes.com/t" }] }],
+        },
+      ],
+    };
+    const plan = { kind: "plan", entity: "event", id: "main", version: 1, value: { title: "Party", guests: 4 } };
+    const all = [...Object.values(validWidgets), cart, plan];
+    const pane = (prefix: string) => (
+      <section id={prefix} key={prefix}>
+        {all.map((w, i) => (
+          <WidgetRenderer key={i} idPrefix={prefix} toolCallId={`tc${i}`} args={{ widget: w }} locale="en-US" />
+        ))}
+        <ArtifactCard idPrefix={prefix} toolCallId="tc-report" title="Guide" result="artifact abcdefghijkl created" />
+      </section>
+    );
+    const { container } = render(<div id="t-panes">{[pane("chat-pane-a"), pane("chat-pane-b")]}</div>);
+    expectUniqueIds(container);
+    for (const id of ["weather-card-tc0", "cart-tc4", "plan-tc5", "artifact-card-tc-report"])
+      expect(document.getElementById(`chat-pane-b-${id}`)).not.toBeNull();
+    for (const prefix of ["chat-pane-a", "chat-pane-b"]) {
+      const inside = [...document.getElementById(prefix)!.querySelectorAll("[id]")].map((e) => e.id);
+      expect(inside.filter((id) => !id.startsWith(`${prefix}-`))).toEqual([]);
+    }
   });
 });

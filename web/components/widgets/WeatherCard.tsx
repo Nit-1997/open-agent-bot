@@ -1,7 +1,8 @@
 import type { WeatherCard as WeatherCardData } from "@shared/widgets";
+import { widgetId } from "./widgetId";
 
-export function WeatherCard({ toolCallId, widget }: { toolCallId: string; widget: WeatherCardData }) {
-  const id = `weather-card-${toolCallId}`;
+export function WeatherCard({ toolCallId, idPrefix, widget }: { toolCallId: string; idPrefix?: string; widget: WeatherCardData }) {
+  const id = widgetId("weather-card", toolCallId, idPrefix);
   const deg = widget.units === "imperial" ? "°F" : "°C";
   const typical = widget.mode === "typical";
   return (

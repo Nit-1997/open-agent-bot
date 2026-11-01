@@ -6,6 +6,7 @@ import { useState } from "react";
 import { money } from "@/lib/format";
 import { Favicon } from "@/components/chat/Favicon";
 import { Picture } from "./CardRow";
+import { widgetId } from "./widgetId";
 
 type Source = StayListWidget["sources"][number];
 type Stay = Source["stays"][number] & { source: string };
@@ -135,8 +136,18 @@ function StayCard({
 
 const NARROW_SHOWN = 4;
 
-export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId: string; widget: StayListWidget; locale?: string }) {
-  const id = `stays-${toolCallId}`;
+export function StayList({
+  toolCallId,
+  idPrefix,
+  widget,
+  locale = "en-US",
+}: {
+  toolCallId: string;
+  idPrefix?: string;
+  widget: StayListWidget;
+  locale?: string;
+}) {
+  const id = widgetId("stays", toolCallId, idPrefix);
   const read = widget.sources.filter((s) => s.status === "ok" && s.stays.length);
   const others = widget.sources.filter((s) => !(s.status === "ok" && s.stays.length));
   const [tab, setTab] = useState(read.length > 1 ? ALL : (read[0]?.id ?? ALL));

@@ -4,6 +4,7 @@ import { Download, ExternalLink, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { reportHtmlHref, reportPdfHref } from "@/lib/reports";
 import { ArtifactFrame } from "./ArtifactFrame";
+import { widgetId } from "@/components/widgets/widgetId";
 import { ArtifactViewer } from "./ArtifactViewer";
 
 export function parseArtifactId(result: string | undefined): string | null {
@@ -14,10 +15,20 @@ export function parseArtifactId(result: string | undefined): string | null {
 const action =
   "flex h-8 w-8 items-center justify-center rounded-full text-text-secondary transition hover:bg-surface hover:text-text-primary";
 
-export function ArtifactCard({ toolCallId, title, result }: { toolCallId: string; title: string; result: string | undefined }) {
+export function ArtifactCard({
+  idPrefix,
+  toolCallId,
+  title,
+  result,
+}: {
+  idPrefix: string;
+  toolCallId: string;
+  title: string;
+  result: string | undefined;
+}) {
   const [fullScreen, setFullScreen] = useState(false);
   const artifactId = parseArtifactId(result);
-  const id = `artifact-card-${toolCallId}`;
+  const id = widgetId("artifact-card", toolCallId, idPrefix);
   if (!artifactId) {
     return (
       <p id={`${id}-error`} className="my-2 text-sm text-danger-fg">
