@@ -21,6 +21,7 @@ export default defineConfig({
     baseURL: env("APP_ORIGIN"),
     ignoreHTTPSErrors: true,
     storageState: storageFor(DEMO_USER),
+    launchOptions: { slowMo: Number(process.env.DEMO_SLOWMO ?? 0) },
     trace: "off",
     screenshot: "off",
   },
