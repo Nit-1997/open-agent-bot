@@ -18,8 +18,8 @@
   },
   "dependencies": {
     "@ag-ui/client": "1.0.2",
-    "@copilotkit/react-core": "^1.81.0",
-    "@copilotkit/runtime": "^1.81.0",
+    "@copilotkit/react-core": "^1.83.0",
+    "@copilotkit/runtime": "^1.83.0",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.118.0",
     "hono": "^4.13.14",
@@ -46,5 +46,11 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "@ai-sdk/provider-utils": {
+      "undici": "^6.29.1"
+    },
+    "graphql-scalars": "^2.0.1"
   }
 }
