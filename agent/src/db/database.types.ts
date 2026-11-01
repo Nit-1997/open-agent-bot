@@ -355,6 +355,7 @@ export type Database = {
         }
         Returns: Json
       }
+      workspace_counts: { Args: { p_user: string }; Returns: Json }
       workspace_put: {
         Args: {
           p_chat: string

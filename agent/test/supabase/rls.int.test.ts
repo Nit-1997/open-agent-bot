@@ -84,6 +84,8 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
       });
       const found = await c.rpc("search_user_content", { p_user: a.id, p_query: "secret", p_scope: "all", p_limit: 10, p_offset: 0 });
       expect(found.error, `${who} search_user_content`).not.toBeNull();
+      const counted = await c.rpc("workspace_counts", { p_user: a.id });
+      expect(counted.error, `${who} workspace_counts`).not.toBeNull();
       expect(put.error, `${who} workspace_put`).not.toBeNull();
       expect(submit.error, `${who} access_request_submit`).not.toBeNull();
     }
@@ -117,6 +119,13 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
       "select count(*)::int as n from pg_proc p join pg_namespace s on s.oid = p.pronamespace cross join (values ('anon'), ('authenticated')) r(role) where s.nspname = 'public' and has_function_privilege(r.role, p.oid, 'execute')",
     );
     expect(fns[0].n).toBe(0);
+  });
+
+  it("keeps workspace_counts service-only, invoker-rights with an empty search_path", async () => {
+    const fn = await managementQuery<{ acl: string; definer: boolean; config: string[] }>(
+      "select p.proacl::text as acl, p.prosecdef as definer, p.proconfig as config from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'workspace_counts'",
+    );
+    expect(fn).toEqual([{ acl: "{postgres=X/postgres,service_role=X/postgres}", definer: false, config: ['search_path=""'] }]);
   });
 
   it("keeps search_user_content service-only, invoker-rights with an empty search_path, with its indexes and pg_trgm in extensions", async () => {

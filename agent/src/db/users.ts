@@ -183,6 +183,8 @@ const toEntity = (r: EntityRow): VersionedEntity => ({
   updatedAt: Date.parse(r.updated_at),
 });
 
+const CountsSchema = Type.Record(Type.String(), Type.Integer({ minimum: 0 }));
+
 function workspace(db: Db, userId: string): WorkspaceRepo {
   const base = (chatId: string) =>
     db.from("workspace_entities").select("kind, entity_id, value, version, updated_at").eq("chat_id", chatId).eq("user_id", userId);
@@ -252,15 +254,11 @@ function workspace(db: Db, userId: string): WorkspaceRepo {
       return { items: (data ?? []).map((r): ChatEntity => ({ ...toEntity(r), chatId: r.chat_id })), total };
     },
     async counts() {
-      const counted = await Promise.all(
-        ENTITY_KINDS.map(async (kind) => {
-          const { count } = await read("workspace.counts", () =>
-            db.from("workspace_entities").select("entity_id", { count: "exact", head: true }).eq("user_id", userId).eq("kind", kind),
-          );
-          return [kind, count ?? 0] as const;
-        }),
-      );
-      return Object.fromEntries(counted) as Record<(typeof ENTITY_KINDS)[number], number>;
+      const res = await db.rpc("workspace_counts", { p_user: userId });
+      if (res.error) throw dbError("workspace.counts", { ...res.error, status: res.status });
+      if (!Value.Check(CountsSchema, res.data)) throw new Error("unexpected workspace_counts result");
+      const counted = res.data as Record<string, number>;
+      return Object.fromEntries(ENTITY_KINDS.map((kind) => [kind, counted[kind] ?? 0])) as Record<(typeof ENTITY_KINDS)[number], number>;
     },
   };
 }

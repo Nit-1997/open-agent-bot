@@ -205,6 +205,18 @@ describe("user repos against PostgREST", () => {
     expect(s.calls[1].body).toMatchObject({ p_expected: null });
   });
 
+  it("counts plans per kind with one grouped call and fills missing kinds with zero", async () => {
+    const s = stub([{ body: { trip: 2, event: 1 } }]);
+    expect(await forUser(s.db, ALICE.id).workspace.counts()).toEqual({ cart: 0, trip: 2, event: 1, shortlist: 0 });
+    expect(s.calls).toHaveLength(1);
+    expect(s.calls[0]).toMatchObject({ method: "POST", path: "/rest/v1/rpc/workspace_counts", body: { p_user: ALICE.id } });
+  });
+
+  it("refuses a malformed counts result", async () => {
+    const s = stub([{ body: { trip: -1 } }]);
+    await expect(forUser(s.db, ALICE.id).workspace.counts()).rejects.toThrow(/workspace_counts/);
+  });
+
   it("guards credential updates by version", async () => {
     const row = {
       provider: "openrouter",
