@@ -94,7 +94,7 @@ export function ModelsPanel({ onClose, onChanged, pollMs = 1000 }: { onClose: ()
               Models
             </h2>
             <p id="models-panel-sub" className="mt-2 text-xs text-text-muted">
-              Connect providers and pick which models appear in your menu. Keys stay on this machine and are never shown again.
+              Connect providers and pick which models appear in your menu. Keys are encrypted on the server and never shown again.
             </p>
           </div>
           <button

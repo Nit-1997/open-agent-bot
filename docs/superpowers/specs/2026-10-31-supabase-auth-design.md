@@ -1207,3 +1207,22 @@ Two reviews (security and code) after the build. What changed:
 - **Supabase settings applied** with `configure-auth.mjs --apply`: password-reauth flags, password-change notifications, MFA off, the custom access token hook (migration `20261101073603_no_password_tokens`), templates with `&email=`. Pro-only fields (`sessions_*`, `password_hibp_enabled`) are reported, not enforced.
 - **Pending owner action:** `node supabase/scripts/configure-auth.mjs --apply --disable-legacy-keys` (revokes the HS256 key, disables legacy anon/service_role, deletes the unused `default` secret key). `--check` exits 1 until then.
 - **Dependencies.** undici, zod and minimatch pinned to fixed versions via overrides in the agent (audit clean). Web: CopilotKit 1.83, scoped undici override, graphql-scalars 2; what remains (zod 3 inside CopilotKit/ag-ui, `@hono/node-server` 1.x `serveStatic`, katex) has no compatible fix and isn't reachable in our use.
+
+## End-to-end run (2026-11-01)
+
+Driven with Playwright against the local Caddy stack (the Chrome extension cannot pass Caddy's untrusted local CA). Recording: `~/Downloads/auth-demo.mp4`.
+
+| Step | Result |
+| --- | --- |
+| Request access | 202 at once; row stored; no account created |
+| Admin approve | Request approved; invite email refused by the Resend sandbox for a `+alias` (claim 4: sandbox does not deliver to plus-addresses) |
+| Failed invite email | Supabase rolls back the invited user (claim 3); the account exists only once an invite link is used. UI shows "invite failed" with Resend invite |
+| Invite and magic links | Confirm page names the account; cross-browser warning shows; login-page links in the same browser show no warning |
+| Real email | Email link to the owner's address sent through Resend SMTP |
+| Provider key | Saved through the app's endpoint; responses carry only the hint; the row holds ciphertext, 12-byte nonce and wrapped DEK, no plaintext |
+| Chat | Reply streamed with the user's own OpenRouter key; user and assistant messages saved; Recent chats lists it; reopening shows no duplicates |
+| Session | Cookie HttpOnly, Secure, SameSite=Lax; `document.cookie` empty; sign-out clears it and `/api/chats` returns 401 |
+| Isolation | Admin's chat list is empty; the user's chat id (any case) returns 404 for the admin |
+| Deactivate | A deactivated user's new link fails (claim 11) and lands on `/login?error=link_expired` |
+| CSP | No console errors on public or signed-in pages |
+| Not run | Google sign-in (needs the owner's Chrome with the local CA trusted) and the non-invited Google account check (claims 1 and 5) |

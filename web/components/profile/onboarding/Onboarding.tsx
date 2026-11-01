@@ -46,7 +46,7 @@ const modelCopy = (hasModels: boolean): Copy => ({
   title: hasModels ? "Choose your model" : "Add a model to start",
   why: hasModels
     ? "This is the default for new chats. You can switch per chat from the header."
-    : "Connect a cloud provider with a key, or a model server on this machine. Keys stay on this computer.",
+    : "Connect a cloud provider with a key, or a model server. Keys are encrypted and never shown again.",
 });
 
 function clearSection(p: Profile, s: Section): Profile {
