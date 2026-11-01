@@ -1,5 +1,5 @@
 import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
-import type { MessageRole, MessageStatus } from "../../../shared/chats.js";
+import type { MessagePart, MessageRole, MessageStatus } from "../../../shared/chats.js";
 import { isUuid } from "../../../shared/ids.js";
 import { CHATS_PAGE_SIZE, PLANS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "../../../shared/lists.js";
 import { ENTITY_KINDS } from "../../../shared/workspace.js";
@@ -142,32 +142,60 @@ function chats(db: Db, userId: string): ChatRepo {
 const MESSAGE_ROLES: readonly MessageRole[] = ["user", "assistant"];
 const MESSAGE_STATUSES: readonly MessageStatus[] = ["complete", "interrupted"];
 
+const PartsSchema = Type.Array(
+  Type.Union([
+    Type.Object({ type: Type.Literal("text"), text: Type.String() }),
+    Type.Object({
+      type: Type.Literal("tool"),
+      id: Type.String(),
+      name: Type.String(),
+      args: Type.String(),
+      result: Type.Optional(Type.String()),
+    }),
+  ]),
+);
+const partsOf = (raw: Json | null): MessagePart[] | undefined => (raw !== null && Value.Check(PartsSchema, raw) ? raw : undefined);
+
 function messages(db: Db, userId: string): MessageRepo {
   return {
     async append(chatId, runId, rows) {
       if (!rows.length) return;
       await must(
         "messages.append",
-        db.from("chat_messages").insert(rows.map((r) => ({ chat_id: chatId, user_id: userId, run_id: runId.slice(0, 100), ...r }))),
+        db
+          .from("chat_messages")
+          .insert(
+            rows.map(({ parts, ...r }) => ({
+              chat_id: chatId,
+              user_id: userId,
+              run_id: runId.slice(0, 100),
+              ...r,
+              ...(parts && { parts }),
+            })),
+          ),
       );
     },
     async history(chatId, limit = HISTORY_LIMIT) {
       const { data, count } = await read("messages.history", () =>
         db
           .from("chat_messages")
-          .select("role, content, status, created_at", { count: "exact" })
+          .select("role, content, status, created_at, parts", { count: "exact" })
           .eq("chat_id", chatId)
           .eq("user_id", userId)
           .order("id", { ascending: false })
           .limit(limit),
       );
       const items = (data ?? [])
-        .map((r) => ({
-          role: oneOf(MESSAGE_ROLES, r.role, "chat_messages.role"),
-          content: r.content,
-          status: oneOf(MESSAGE_STATUSES, r.status, "chat_messages.status"),
-          createdAt: r.created_at,
-        }))
+        .map((r) => {
+          const parts = partsOf(r.parts);
+          return {
+            role: oneOf(MESSAGE_ROLES, r.role, "chat_messages.role"),
+            content: r.content,
+            status: oneOf(MESSAGE_STATUSES, r.status, "chat_messages.status"),
+            createdAt: r.created_at,
+            ...(parts && { parts }),
+          };
+        })
         .reverse();
       return { items, total: count ?? 0 };
     },

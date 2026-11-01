@@ -192,6 +192,33 @@ describe("user repos against PostgREST", () => {
     expect(s.calls[1].method).toBe("HEAD");
   });
 
+  it("saves message parts and reads them back, dropping malformed ones", async () => {
+    const parts = [
+      { type: "tool", id: "c2", name: "create_artifact", args: '{"title":"T"}', result: "artifact abcdefghijkl created: T" },
+      { type: "text", text: "Here it is." },
+    ] as const;
+    const row = (p: unknown) => ({
+      role: "assistant",
+      content: "Here it is.",
+      status: "complete",
+      created_at: "2026-11-01T00:00:00Z",
+      parts: p,
+    });
+    const s = stub([{ status: 201 }, { body: [row(null), row([{ type: "tool" }]), row(parts)], headers: { "content-range": "0-2/3" } }]);
+    const r = forUser(s.db, ALICE.id);
+    await r.messages.append(CHAT_1, "run", [
+      { role: "user", content: "hi", status: "complete" },
+      { role: "assistant", content: "Here it is.", status: "complete", parts: [...parts] },
+    ]);
+    expect(s.calls[0].body).toEqual([
+      { chat_id: CHAT_1, user_id: ALICE.id, run_id: "run", role: "user", content: "hi", status: "complete" },
+      { chat_id: CHAT_1, user_id: ALICE.id, run_id: "run", role: "assistant", content: "Here it is.", status: "complete", parts },
+    ]);
+    const { items } = await r.messages.history(CHAT_1);
+    expect(items.map((m) => m.parts)).toEqual([parts, undefined, undefined]);
+    expect(one(s.calls[1], "select")).toContain("parts");
+  });
+
   it("maps PT409 from workspace_put to a version conflict or a missing chat", async () => {
     const conflict = { status: 409, body: { code: "PT409", details: "4", message: "version conflict", hint: null } };
     const s = stub([conflict, conflict]);

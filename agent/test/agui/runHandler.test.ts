@@ -522,6 +522,58 @@ describe("chat ownership and persistence", () => {
     expect((await db.forUser(ALICE.id).chats.page(1)).items[0]).toMatchObject({ id: CHAT_1, title: "price eggs at Trader Joe's" });
   });
 
+  it("saves the report and widget tool calls with their results, in order, so a reload can show them", async () => {
+    const ended = (toolCallId: string, toolName: string, text: string, details?: object) =>
+      ({
+        type: "tool_execution_end",
+        toolCallId,
+        toolName,
+        isError: false,
+        result: { content: [{ type: "text", text }], details },
+      }) as unknown as PiEvent;
+    const cart = { kind: "cart", stores: ["traderjoes"], scope: ["Trader Joe's"], items: [], picks: {}, homes: {} };
+    const { store } = setup(async (emit) => {
+      emit(ev.assistantStart);
+      emit(ev.delta("Writing it up."));
+      emit({ type: "tool_execution_start", toolCallId: "c1", toolName: "web_search", args: { query: "big sur" } } as unknown as PiEvent);
+      emit(ended("c1", "web_search", "results"));
+      emit({
+        type: "tool_execution_start",
+        toolCallId: "c2",
+        toolName: "create_artifact",
+        args: { title: "Big Sur guide", html: "<p>x</p>" },
+      } as unknown as PiEvent);
+      emit(ended("c2", "create_artifact", "artifact abcdefghijkl created: Big Sur guide"));
+      emit({ type: "tool_execution_start", toolCallId: "c3", toolName: "shop", args: {} } as unknown as PiEvent);
+      emit(ended("c3", "shop", "priced", { widget: cart }));
+      emit(ev.assistantEnd());
+      emit(ev.assistantStart);
+      emit(ev.delta("Here it is."));
+      emit(ev.assistantEnd());
+    });
+    await collect(run(input(), store, new AbortController().signal));
+    const reply = (await db.forUser(ALICE.id).messages.history(CHAT_1)).items.at(-1);
+    expect(reply?.content).toBe("Writing it up.\n\nHere it is.");
+    expect(reply?.parts?.map((p) => (p.type === "text" ? p.text : `${p.name}:${p.id}`))).toEqual([
+      "Writing it up.",
+      "create_artifact:c2",
+      "show_widget:c3-widget",
+      "Here it is.",
+    ]);
+    const [, report, widget] = reply?.parts ?? [];
+    expect(report).toMatchObject({
+      args: JSON.stringify({ title: "Big Sur guide" }),
+      result: "artifact abcdefghijkl created: Big Sur guide",
+    });
+    expect(widget).toMatchObject({ args: JSON.stringify({ widget: cart }), result: "rendered cart" });
+  });
+
+  it("keeps plain text replies without parts", async () => {
+    const { store } = setup();
+    await collect(run(input(), store, new AbortController().signal));
+    expect((await db.forUser(ALICE.id).messages.history(CHAT_1)).items.at(-1)).not.toHaveProperty("parts");
+  });
+
   it("tells the client before the run ends when the reply couldn't be saved", async () => {
     const { store } = setup(async (emit) => {
       emit(ev.assistantStart);

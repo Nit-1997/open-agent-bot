@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { expectContrast, expectNoHorizontalScroll } from "./support/a11y";
-import { BIG_SUR, SEED, TRIP_ID } from "./support/seed";
+import { BIG_SUR, BIG_SUR_REPORT, SEED, TRIP_ID } from "./support/seed";
 import { seeded } from "./support/state";
 
 function entityKey(id: string): string {
@@ -148,6 +148,10 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     await download;
     await page.locator("#report-detail-from").click();
     await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}$`));
+    const card = `#chat-pane-${s.bigSur}-artifact-card-${BIG_SUR_REPORT.toolCallId}`;
+    await expect(page.locator(card)).toBeVisible();
+    await page.reload();
+    await expect(page.locator(`${card}-title`)).toHaveText(BIG_SUR_REPORT.title);
   });
 
   await test.step("7. Plans: counts, the trip filter and a read-only trip", async () => {

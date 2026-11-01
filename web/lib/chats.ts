@@ -1,8 +1,13 @@
-import type { ChatSummary, StoredMessage } from "@shared/chats";
+import type { ChatSummary, MessagePart, StoredMessage } from "@shared/chats";
 import type { Page, PageResponse } from "@shared/pages";
 import { readApi } from "@/lib/api";
 
-export type HistoryMessage = { id: string; role: "user" | "assistant"; content: string };
+type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
+type AssistantMessage = { id: string; role: "assistant"; content: string; toolCalls?: ToolCall[] };
+export type HistoryMessage =
+  | { id: string; role: "user"; content: string }
+  | AssistantMessage
+  | { id: string; role: "tool"; toolCallId: string; content: string };
 
 export const STOPPED_MARK = "(stopped)";
 
@@ -13,12 +18,44 @@ export const chatsApi = {
     readApi<Page<StoredMessage>>(await fetch(`/api/chats/${encodeURIComponent(id)}/messages`, { cache: "no-store" })),
 };
 
+function partsOf(m: StoredMessage): MessagePart[] {
+  const parts = m.parts ?? [{ type: "text", text: m.content }];
+  if (m.status !== "interrupted") return parts;
+  const last = parts.at(-1);
+  return last?.type === "text"
+    ? [...parts.slice(0, -1), { type: "text", text: `${last.text}\n\n${STOPPED_MARK}` }]
+    : [...parts, { type: "text", text: STOPPED_MARK }];
+}
+
+function assistantMessages(base: string, parts: MessagePart[]): HistoryMessage[] {
+  const out: HistoryMessage[] = [];
+  let current: AssistantMessage | undefined;
+  let results: HistoryMessage[] = [];
+  const next = (content: string) => {
+    if (current) out.push(current, ...results);
+    results = [];
+    current = { id: out.length ? `${base}-${out.length}` : base, role: "assistant", content };
+    return current;
+  };
+  for (const p of parts) {
+    if (p.type === "text") {
+      if (current && !current.toolCalls) current.content = current.content ? `${current.content}\n\n${p.text}` : p.text;
+      else next(p.text);
+      continue;
+    }
+    const at = current ?? next("");
+    (at.toolCalls ??= []).push({ id: p.id, type: "function", function: { name: p.name, arguments: p.args } });
+    results.push({ id: `${base}-result-${p.id}`, role: "tool", toolCallId: p.id, content: p.result ?? "" });
+  }
+  if (current) out.push(current, ...results);
+  return out;
+}
+
 export function toHistory(chatId: string, items: StoredMessage[]): HistoryMessage[] {
-  return items.map((m, i) => ({
-    id: `history-${chatId}-${i}`,
-    role: m.role,
-    content: m.status === "interrupted" ? `${m.content}\n\n${STOPPED_MARK}` : m.content,
-  }));
+  return items.flatMap((m, i): HistoryMessage[] => {
+    const id = `history-${chatId}-${i}`;
+    return m.role === "user" ? [{ id, role: "user", content: m.content }] : assistantMessages(id, partsOf(m));
+  });
 }
 
 export function formatWhen(iso: string | null | undefined, locale?: string): string {

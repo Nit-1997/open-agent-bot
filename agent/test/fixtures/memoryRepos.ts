@@ -110,7 +110,15 @@ export class MemoryDb {
         async history(chatId: string, limit = 200) {
           const mine = db.messages.filter((m) => m.chatId === chatId && m.userId === userId);
           return {
-            items: mine.slice(-limit).map(({ role, content, status, createdAt }) => ({ role, content, status, createdAt })),
+            items: mine
+              .slice(-limit)
+              .map(({ role, content, status, createdAt, parts }) => ({
+                role,
+                content,
+                status,
+                createdAt,
+                ...(parts && { parts: structuredClone(parts) }),
+              })),
             total: mine.length,
           };
         },

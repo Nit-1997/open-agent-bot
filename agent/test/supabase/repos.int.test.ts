@@ -89,10 +89,18 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
     expect((await ra.workspace.list(chat)).map((e) => e.kind).sort()).toEqual(["event", "trip"]);
     await ra.messages.append(chat, "run-1", [
       { role: "user", content: "hi", status: "complete" },
-      { role: "assistant", content: "hello", status: "interrupted" },
+      {
+        role: "assistant",
+        content: "hello",
+        status: "interrupted",
+        parts: [{ type: "tool", id: "c1", name: "create_artifact", args: "{}" }],
+      },
     ]);
     await ra.chats.touch(chat, { titleIfEmpty: "hi" });
-    expect((await ra.messages.history(chat)).items.map((m) => m.content)).toEqual(["hi", "hello"]);
+    expect((await ra.messages.history(chat)).items.map((m) => [m.content, m.parts])).toEqual([
+      ["hi", undefined],
+      ["hello", [{ type: "tool", id: "c1", name: "create_artifact", args: "{}" }]],
+    ]);
     expect((await ra.chats.page(1)).items[0]).toMatchObject({ id: chat, title: "hi" });
     expect(await rb.chats.exists(chat)).toBe(false);
     expect((await rb.messages.history(chat)).total).toBe(0);

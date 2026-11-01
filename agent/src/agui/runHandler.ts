@@ -20,6 +20,7 @@ import type { WorkspaceStore } from "../workspace/store.js";
 import { custom, runError, runFinished, runStarted } from "./events.js";
 import { historyFromStored, messageText, readUserContext, readWorkspaceEdits } from "./input.js";
 import { createStatsCollector, type StatsCollector, type Usage } from "./stats.js";
+import { Transcript } from "./transcript.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
 export const EMPTY_REPLY_NUDGE =
@@ -82,23 +83,6 @@ export async function readStored(profiles: ProfileStore | undefined): Promise<Pr
 
 export function mergeStored(ctx: UserContext | null, stored: Profile | undefined): UserContext | null {
   return ctx && stored ? { ...ctx, profile: { ...stored, ...ctx.profile } } : ctx;
-}
-
-class Transcript {
-  private readonly parts = new Map<string, string>();
-
-  see(e: BaseEvent): void {
-    if (e.type !== EventType.TEXT_MESSAGE_CONTENT) return;
-    const { messageId, delta } = e as BaseEvent & { messageId: string; delta: string };
-    this.parts.set(messageId, (this.parts.get(messageId) ?? "") + delta);
-  }
-
-  text(): string {
-    return [...this.parts.values()]
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .join("\n\n");
-  }
 }
 
 export const NOT_SAVED_EVENT = "not_saved";
@@ -201,7 +185,11 @@ export async function* handleRun(
   const saveReply = async (outcome: "complete" | "interrupted") => {
     saved = true;
     const text = transcript.text();
-    return !text || (await persist(ctx, threadId, runId, [{ role: "assistant", content: text.slice(0, 200_000), status: outcome }]));
+    const parts = transcript.parts();
+    if (!text && !parts) return true;
+    return persist(ctx, threadId, runId, [
+      { role: "assistant", content: text.slice(0, 200_000), status: outcome, ...(parts && { parts }) },
+    ]);
   };
   try {
     for await (const e of runTurn({ input, entry, signal, ctx, last, history, userContext, stats: createStatsCollector() })) {

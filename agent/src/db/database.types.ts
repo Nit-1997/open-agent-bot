@@ -106,6 +106,7 @@ export type Database = {
           content: string
           created_at: string
           id: number
+          parts: Json | null
           role: string
           run_id: string
           status: string
@@ -116,6 +117,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: never
+          parts?: Json | null
           role: string
           run_id: string
           status?: string
@@ -126,6 +128,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: never
+          parts?: Json | null
           role?: string
           run_id?: string
           status?: string

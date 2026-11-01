@@ -5,6 +5,7 @@ import { env } from "./env";
 export const BIG_SUR = "Weekend in Big Sur for two";
 export const SEED = { chats: 24, reports: 13, plans: { cart: 1, trip: 1, event: 1, shortlist: 1 } } as const;
 export const TRIP_ID = "big-sur/weekend";
+export const BIG_SUR_REPORT = { id: "e2eReport001", title: "Big Sur weekend plan", toolCallId: "call-e2eReport001" } as const;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -61,6 +62,9 @@ function ageOf(i: number): number {
   return 8 + (i - 8);
 }
 
+const BIG_SUR_REPLY =
+  "Here's a two-night plan from San Luis Obispo: Highway 1 north on Saturday morning, a cabin near Pfeiffer Big Sur, sunset at McWay Falls and vegetarian dinners.";
+
 const reportHtml = (title: string) =>
   `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:sans-serif;padding:24px"><h1>${title}</h1><p>A one-page guide made for the end-to-end demo.</p></body></html>`;
 
@@ -82,18 +86,27 @@ export async function seed(demoEmail: string, otherEmail: string): Promise<Seede
       user_id: user,
       run_id: `seed-${i}`,
       role: "assistant",
-      content:
-        i === 0
-          ? "Here's a two-night plan from San Luis Obispo: Highway 1 north on Saturday morning, a cabin near Pfeiffer Big Sur, sunset at McWay Falls and vegetarian dinners."
-          : `Here is what I found for ${c.title.toLowerCase()}.`,
+      content: i === 0 ? BIG_SUR_REPLY : `Here is what I found for ${c.title.toLowerCase()}.`,
       status: "complete",
+      ...(i === 0 && {
+        parts: [
+          {
+            type: "tool",
+            id: BIG_SUR_REPORT.toolCallId,
+            name: "create_artifact",
+            args: JSON.stringify({ title: BIG_SUR_REPORT.title }),
+            result: `artifact ${BIG_SUR_REPORT.id} created: ${BIG_SUR_REPORT.title}`,
+          },
+          { type: "text", text: BIG_SUR_REPLY },
+        ],
+      }),
     },
   ]);
   await must("messages", db.from("chat_messages").insert(messages));
 
   const reports = Array.from({ length: SEED.reports }, (_, i) => ({
-    id: `e2eReport${String(i + 1).padStart(3, "0")}`,
-    title: i === 0 ? "Big Sur weekend plan" : `Guide ${i + 1}: ${TITLES[(i + 3) % TITLES.length]}`,
+    id: i === 0 ? BIG_SUR_REPORT.id : `e2eReport${String(i + 1).padStart(3, "0")}`,
+    title: i === 0 ? BIG_SUR_REPORT.title : `Guide ${i + 1}: ${TITLES[(i + 3) % TITLES.length]}`,
     chat: i === 0 ? bigSur : i % 3 === 0 ? null : chats[i % chats.length].id,
     at: ago(i),
   }));
