@@ -1,20 +1,39 @@
 import { randomUUID } from "node:crypto";
-import type { BaseEvent, Message, RunAgentInput } from "@ag-ui/core";
-import type { UserContext } from "../prompt/userContext.js";
-import type { HistoryMessage, SessionEntry, SessionStore } from "../session/sessionStore.js";
+import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
+import type { AuthUser } from "../auth/verify.js";
+import type { ChatRepo, MessageRepo, NewMessage } from "../db/types.js";
+import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
+import type { ProfileStore } from "../profile/store.js";
+import type { UserContext } from "../prompt/userContext.js";
+import {
+  type HistoryMessage,
+  SessionCapacityError,
+  type SessionEntry,
+  type SessionOwner,
+  type SessionStore,
+} from "../session/sessionStore.js";
 import { applyEntityEdits } from "../workspace/edits.js";
 import type { WorkspaceStore } from "../workspace/store.js";
-import type { ProfileStore } from "../profile/store.js";
 import { custom, runError, runFinished, runStarted } from "./events.js";
-import { messageText, readUserContext, readWorkspaceEdits, restoreHistory } from "./input.js";
+import { historyFromStored, messageText, readUserContext, readWorkspaceEdits } from "./input.js";
 import { createStatsCollector, type StatsCollector, type Usage } from "./stats.js";
 import { createTranslator, type PiEvent } from "./translate.js";
 
 export const EMPTY_REPLY_NUDGE =
   "Your reply so far shows me no answer. Answer my previous message now, in full, from what the tools already returned, without searching again.";
 
-export type RunOptions = { workspace?: WorkspaceStore; profiles?: ProfileStore };
+export const TIME_LIMIT_MESSAGE = "This run hit the time limit. Ask me to continue.";
+const TITLE_CHARS = 80;
+
+export type RunContext = {
+  user: AuthUser;
+  chats: Pick<ChatRepo, "claim" | "touch">;
+  messages: MessageRepo;
+  profiles?: ProfileStore;
+  workspace?: WorkspaceStore;
+  timeLimitMs: number;
+};
 
 type AssistantEnd = {
   role?: string;
@@ -61,41 +80,89 @@ export async function withStoredProfile(ctx: UserContext | null, profiles: Profi
   return stored ? { ...ctx, profile: { ...stored, ...ctx.profile } } : ctx;
 }
 
+class Transcript {
+  private readonly parts = new Map<string, string>();
+
+  see(e: BaseEvent): void {
+    if (e.type !== EventType.TEXT_MESSAGE_CONTENT) return;
+    const { messageId, delta } = e as BaseEvent & { messageId: string; delta: string };
+    this.parts.set(messageId, (this.parts.get(messageId) ?? "") + delta);
+  }
+
+  text(): string {
+    return [...this.parts.values()]
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .join("\n\n");
+  }
+}
+
+async function persist(ctx: RunContext, chatId: string, runId: string, rows: NewMessage[], titleIfEmpty?: string): Promise<void> {
+  try {
+    await ctx.messages.append(chatId, runId, rows);
+    await ctx.chats.touch(chatId, { ...(titleIfEmpty && { titleIfEmpty }) });
+  } catch (err) {
+    log.warn(`[run] user=${ctx.user.id} thread=${chatId} couldn't save messages`, err instanceof UserError ? err.kind : err);
+  }
+}
+
+async function claim(ctx: RunContext, chatId: string, model: string | undefined): Promise<BaseEvent | undefined> {
+  try {
+    await ctx.chats.claim(chatId, { model });
+    return undefined;
+  } catch (err) {
+    if (err instanceof UserError && err.kind === "not_found") return runError("NOT_FOUND", "This chat doesn't exist.");
+    log.warn(`[run] user=${ctx.user.id} thread=${chatId} claim failed`, err instanceof UserError ? err.kind : err);
+    return runError("UNAVAILABLE", "Can't reach the data service. Try again in a minute.");
+  }
+}
+
+async function seedHistory(ctx: RunContext, chatId: string): Promise<HistoryMessage[] | undefined> {
+  const stored = await ctx.messages.history(chatId);
+  const history = historyFromStored(stored.items);
+  return history.length ? history : undefined;
+}
+
 export async function* handleRun(
   input: RunAgentInput,
+  ctx: RunContext,
   store: SessionStore,
   signal: AbortSignal,
-  opts: RunOptions = {},
 ): AsyncIterable<BaseEvent> {
   const { threadId, runId } = input;
   yield runStarted(threadId, runId);
 
-  const userMessages = input.messages.filter((m) => m.role === "user");
-  const last = userMessages.at(-1);
-  if (!last) {
+  const last = input.messages.filter((m) => m.role === "user").at(-1);
+  const prompt = last ? messageText(last) : "";
+  if (!last || !prompt.trim()) {
     yield runError("BAD_INPUT", "No user message in run input.");
     return;
   }
 
-  const history = !store.get(threadId) && userMessages.length > 1 ? restoreHistory(input.messages) : undefined;
+  const userContext = await withStoredProfile(readUserContext(input), ctx.profiles);
+  const denied = await claim(ctx, threadId, userContext?.model);
+  if (denied) {
+    yield denied;
+    return;
+  }
+  const owner: SessionOwner = { user: ctx.user, chatId: threadId };
+  log.info(`[run] user=${ctx.user.id} thread=${threadId} run=${runId} model=${userContext?.model ?? "default"}`);
+  log.debug(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(prompt.slice(0, 200))}`);
 
-  const userContext = await withStoredProfile(readUserContext(input), opts.profiles);
-  log.info(`[run] thread=${threadId} run=${runId} model=${userContext?.model ?? "default"}`);
-  log.debug(`[run] thread=${threadId} context=${JSON.stringify(userContext)} prompt=${JSON.stringify(messageText(last).slice(0, 200))}`);
-
-  const stats = createStatsCollector();
-  let made: { entry: SessionEntry } | { error: unknown };
+  let made: { entry: SessionEntry; history?: HistoryMessage[] } | { error: unknown };
   try {
-    made = { entry: await store.getOrCreate(threadId, userContext, history) };
+    const history = store.get(owner) ? undefined : await seedHistory(ctx, threadId);
+    made = { entry: await store.getOrCreate(owner, userContext, history), history };
   } catch (error) {
     made = { error };
   }
-
   if ("error" in made) {
-    yield runError("MODEL_ERROR", made.error instanceof Error ? made.error.message : String(made.error));
+    if (made.error instanceof SessionCapacityError) yield runError("BUSY", made.error.message);
+    else if (made.error instanceof UserError) yield runError("UNAVAILABLE", made.error.message);
+    else yield runError("MODEL_ERROR", made.error instanceof Error ? made.error.message : String(made.error));
     return;
   }
-  const entry: SessionEntry = made.entry;
+  const { entry, history } = made;
   if (entry.busy) {
     yield runError("THREAD_BUSY", "Still working on the last message.");
     return;
@@ -107,14 +174,29 @@ export async function* handleRun(
   if (signal.aborted) return;
   entry.busy = true;
   entry.lastRunId = runId;
+  await persist(
+    ctx,
+    threadId,
+    runId,
+    [{ role: "user", content: prompt.slice(0, 200_000), status: "complete" }],
+    prompt.trim().slice(0, TITLE_CHARS),
+  );
+  const transcript = new Transcript();
+  let outcome: "complete" | "interrupted" = "interrupted";
   try {
-    yield* runTurn({ input, entry, signal, opts, last, history, userContext, stats });
+    for await (const e of runTurn({ input, entry, signal, ctx, last, history, userContext, stats: createStatsCollector() })) {
+      transcript.see(e);
+      if (e.type === EventType.RUN_FINISHED) outcome = "complete";
+      yield e;
+    }
   } catch (err) {
     log.error(`[run] thread=${threadId} failed`, err);
     yield runError("INTERNAL_ERROR", "Something went wrong on the agent. Try again.");
   } finally {
     entry.busy = false;
-    store.touch(threadId);
+    store.touch(owner);
+    const text = transcript.text();
+    if (text) await persist(ctx, threadId, runId, [{ role: "assistant", content: text.slice(0, 200_000), status: outcome }]);
   }
 }
 
@@ -122,14 +204,14 @@ type Turn = {
   input: RunAgentInput;
   entry: SessionEntry;
   signal: AbortSignal;
-  opts: RunOptions;
+  ctx: RunContext;
   last: Message;
   history: HistoryMessage[] | undefined;
   userContext: UserContext | null;
   stats: StatsCollector;
 };
 
-async function* runTurn({ input, entry, signal, opts, last, history, userContext, stats }: Turn): AsyncGenerator<BaseEvent> {
+async function* runTurn({ input, entry, signal, ctx, last, history, userContext, stats }: Turn): AsyncGenerator<BaseEvent> {
   const { threadId, runId } = input;
   entry.onRunStart?.();
 
@@ -137,6 +219,7 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
   let wake: (() => void) | undefined;
   let done = false;
   let modelError: string | undefined;
+  let timedOut = false;
   const push = (events: BaseEvent[]) => {
     if (!events.length) return;
     queue.push(...events);
@@ -154,10 +237,10 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
 
   const edits = readWorkspaceEdits(input);
   if (edits?.cart) entry.cart?.applyEdits(edits.cart);
-  if (edits && opts.workspace) applyEntityEdits(opts.workspace, threadId, edits);
+  if (edits && ctx.workspace) await applyEntityEdits(ctx.workspace, edits);
   entry.evidence?.add(messageText(last));
   for (const m of history ?? []) entry.evidence?.add(m.text);
-  if (opts.workspace) entry.evidence?.add(opts.workspace.summary(threadId));
+  if (ctx.workspace) entry.evidence?.add(await ctx.workspace.summary());
   const statsEvent = (): BaseEvent => {
     const turn = entry.turnStats?.();
     return custom("run_stats", stats.snapshot(turn));
@@ -172,10 +255,16 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
 
   const unwatch = entry.frames?.subscribe((value) => push([custom("browser_frame", value)]));
 
+  const stopped = () => signal.aborted || timedOut;
   const onAbort = () => {
     void entry.session.abort();
   };
   signal.addEventListener("abort", onAbort, { once: true });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    log.info(`[run] thread=${threadId} hit the time limit`);
+    void entry.session.abort();
+  }, ctx.timeLimitMs);
 
   let running: Promise<void> = Promise.resolve();
   const start = (text: string) => {
@@ -203,18 +292,20 @@ async function* runTurn({ input, entry, signal, opts, last, history, userContext
   start(messageText(last));
   try {
     yield* drain();
-    if (!modelError && !signal.aborted && !translator.answered()) {
+    if (!modelError && !stopped() && !translator.answered()) {
       log.info(`[run] thread=${threadId} empty reply, asking for the answer`);
       start(EMPTY_REPLY_NUDGE);
       yield* drain();
     }
     for (const e of translator.finish()) yield e;
     if (signal.aborted) return;
-    log.info(`[run] thread=${threadId} done error=${modelError ?? "none"}`);
+    log.info(`[run] thread=${threadId} done error=${modelError ?? "none"} timedOut=${timedOut}`);
     yield statsEvent();
-    if (modelError) yield runError("MODEL_ERROR", modelError);
+    if (timedOut) yield runError("TIME_LIMIT", TIME_LIMIT_MESSAGE);
+    else if (modelError) yield runError("MODEL_ERROR", modelError);
     else yield runFinished(threadId, runId);
   } finally {
+    clearTimeout(timer);
     if (!done) await entry.session.abort().catch(() => {});
     await running;
     signal.removeEventListener("abort", onAbort);

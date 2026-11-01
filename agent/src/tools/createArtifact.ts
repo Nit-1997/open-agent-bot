@@ -2,7 +2,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { withReportFrame } from "../artifacts/frame.js";
 import { type ImageCheck, vetImages } from "../artifacts/images.js";
-import type { ArtifactStore } from "../artifacts/store.js";
+import type { ArtifactSink } from "../artifacts/store.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 const MAX_HTML_BYTES = 2_000_000;
@@ -35,7 +35,7 @@ function firstPicture(html: string): { src: string; alt: string } | undefined {
 }
 
 export async function storeArtifact(
-  artifacts: ArtifactStore,
+  artifacts: ArtifactSink,
   images: ImageCheck | undefined,
   title: string,
   html: string,
@@ -55,7 +55,7 @@ export async function storeArtifact(
   return ok(`artifact ${id} created: ${title}${pictures}`, { artifactId: id, title });
 }
 
-export function createArtifactTool(artifacts: ArtifactStore, images?: ImageCheck) {
+export function createArtifactTool(artifacts: ArtifactSink, images?: ImageCheck) {
   return defineTool({
     name: "create_artifact",
     label: "Create artifact",

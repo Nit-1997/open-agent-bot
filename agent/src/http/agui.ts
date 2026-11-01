@@ -1,8 +1,13 @@
 import type { RunAgentInput } from "@ag-ui/core";
 import { EventEncoder } from "@ag-ui/encoder";
 import { Hono } from "hono";
-import { handleRun, type RunOptions } from "../agui/runHandler.js";
+import { handleRun, type RunContext } from "../agui/runHandler.js";
+import type { AuthEnv } from "../auth/middleware.js";
+import type { AuthUser } from "../auth/verify.js";
+import { type ConcurrencyGate, LIMITS, type RateLimiter, rateLimited } from "../lib/rateLimit.js";
 import type { SessionStore } from "../session/sessionStore.js";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isRunInput(x: unknown): x is RunAgentInput {
   const v = x as Partial<RunAgentInput> | null;
@@ -14,20 +19,25 @@ const HEARTBEAT = new TextEncoder().encode(": ping\n\n");
 
 export function aguiRoutes(deps: {
   store: SessionStore;
-  authorized: (secret: string | undefined) => boolean;
-  run?: RunOptions;
+  context: (user: AuthUser, chatId: string) => RunContext;
+  limiter: RateLimiter;
+  gate: ConcurrencyGate;
   heartbeatMs?: number;
   handle?: typeof handleRun;
 }) {
   const handle = deps.handle ?? handleRun;
-  const app = new Hono();
+  const app = new Hono<AuthEnv>();
 
   app.post("/agui", async (c) => {
-    if (!deps.authorized(c.req.header("x-agent-secret"))) {
-      return c.json({ error: "unauthorized" }, 401);
-    }
     const body = await c.req.json().catch(() => null);
-    if (!isRunInput(body)) return c.json({ error: "invalid RunAgentInput" }, 400);
+    if (!isRunInput(body) || !UUID_RE.test(body.threadId)) return c.json({ error: "invalid", message: "invalid RunAgentInput" }, 400);
+    const user = c.get("user");
+    const verdict = deps.limiter.take(`run:${user.id}`, LIMITS.run);
+    if (!verdict.ok) return rateLimited(verdict.retryAfter);
+    const leave = deps.gate.enter(user.id);
+    if (!leave) return rateLimited(5);
+    const input: RunAgentInput = { ...body, threadId: body.threadId.toLowerCase() };
+    const ctx = deps.context(user, input.threadId);
 
     const encoder = new EventEncoder({ accept: c.req.header("accept") });
     const ac = new AbortController();
@@ -46,11 +56,12 @@ export function aguiRoutes(deps: {
         };
         const beat = sse ? setInterval(ping, deps.heartbeatMs ?? HEARTBEAT_MS) : undefined;
         try {
-          for await (const event of handle(body, deps.store, ac.signal, deps.run)) {
+          for await (const event of handle(input, ctx, deps.store, ac.signal)) {
             controller.enqueue(textEncoder.encode(encoder.encode(event)));
           }
         } finally {
           clearInterval(beat);
+          leave();
           try {
             controller.close();
           } catch {}

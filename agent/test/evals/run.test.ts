@@ -1,7 +1,11 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { evaluateAll } from "../../evals/assert.js";
 import { renderReport, summarize } from "../../evals/report.js";
-import { buildInput, createTurnCollector, loadScenarios, pool, readSecret, rescore, runScenario } from "../../evals/run.js";
+import { readEnvFile } from "../../evals/auth.js";
+import { buildInput, createTurnCollector, loadScenarios, pool, rescore, runScenario } from "../../evals/run.js";
 import type { RunRecord, Scenario } from "../../evals/types.js";
 
 const ev = (e: object) => `data: ${JSON.stringify(e)}\n\n`;
@@ -52,7 +56,7 @@ const scenario = (over: Partial<Scenario> = {}): Scenario => ({
 
 const deps = (fetchImpl: typeof fetch, timeoutMs = 5000) => ({
   url: "http://x/agui",
-  secret: "sek",
+  headers: async () => ({ "x-agent-secret": "sek", authorization: "Bearer tok" }),
   model: "m1",
   timeoutMs,
   fetch: fetchImpl,
@@ -98,7 +102,7 @@ describe("runScenario", () => {
     const sc = scenario({ turns: [{ prompt: "one" }, { prompt: "two" }], assert: [{ type: "must_call", tool: "shop", turn: 2 }] });
     const r = await runScenario(sc, 0, deps(f));
     expect(r.passed).toBe(true);
-    expect(headers[0]).toMatchObject({ "x-agent-secret": "sek", accept: "text/event-stream" });
+    expect(headers[0]).toMatchObject({ "x-agent-secret": "sek", authorization: "Bearer tok", accept: "text/event-stream" });
     expect(bodies[1].threadId).toBe(bodies[0].threadId);
     expect(bodies[1].messages.map((m: any) => [m.role, m.content])).toEqual([
       ["user", "one"],
@@ -200,14 +204,11 @@ describe("helpers", () => {
     expect(() => loadScenarios(new URL("../../evals/scenarios", import.meta.url).pathname, ["nope"])).toThrow(/nope/);
   });
 
-  it("reads the secret from the environment first, then from the running agent container", () => {
-    expect(readSecret({ AGENT_SHARED_SECRET: "env" }, () => "file")).toBe("env");
-    expect(readSecret({}, () => "abc123\n")).toBe("abc123");
-    expect(
-      readSecret({}, () => {
-        throw new Error("no docker");
-      }),
-    ).toBeUndefined();
+  it("reads KEY=value env files, ignoring comments and blank lines, and tolerates a missing file", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "env-")), ".env-x");
+    writeFileSync(file, "# comment\nA=1\n\nB=x=y\n");
+    expect(readEnvFile(file)).toEqual({ A: "1", B: "x=y" });
+    expect(readEnvFile(`${file}-missing`)).toEqual({});
   });
 
   it("builds RunAgentInput with a unique run id", () => {

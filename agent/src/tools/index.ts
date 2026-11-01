@@ -1,5 +1,5 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { ArtifactStore } from "../artifacts/store.js";
+import type { ArtifactSink } from "../artifacts/store.js";
 import type { AgentConfig } from "../config.js";
 import { regionFor } from "../prompt/region.js";
 import type { UserContext } from "../prompt/userContext.js";
@@ -36,7 +36,7 @@ import { registry as sourceRegistry } from "../sources/index.js";
 
 type ToolDeps = {
   cfg: AgentConfig;
-  artifacts: ArtifactStore;
+  artifacts: ArtifactSink;
   pool: BrowserPool;
   threadId: string;
   userContext: UserContext | null;
@@ -178,7 +178,7 @@ export function buildTools(deps: ToolDeps): ToolDefinition<any, any, any>[] {
         ]
       : []),
     loadSkillTool(() => deps.skills ?? []),
-    ...(deps.workspace ? [planTool({ store: deps.workspace, threadId: deps.threadId })] : []),
+    ...(deps.workspace ? [planTool({ store: deps.workspace })] : []),
   ];
   return scopeToCodemode(tools);
 }

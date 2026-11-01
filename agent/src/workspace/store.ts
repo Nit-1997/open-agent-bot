@@ -1,86 +1,79 @@
-import { chmodSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import type { EntityKind } from "../../../shared/workspace.js";
+import type { VersionedEntity, WorkspaceRepo } from "../db/types.js";
 import { VersionConflict } from "./conflict.js";
-import { type StoredEntity, summarize } from "./summary.js";
+import { summarize } from "./summary.js";
 
-type Versioned = StoredEntity & { version: number; updatedAt: number };
+export type { VersionedEntity };
 
-type Row = { kind: string; id: string; json: string; version: number; updated_at: number };
+export interface WorkspaceStore {
+  get(kind: EntityKind, id: string): Promise<VersionedEntity | undefined>;
+  list(kind?: EntityKind): Promise<VersionedEntity[]>;
+  put(kind: EntityKind, id: string, value: unknown, expectedVersion?: number): Promise<number>;
+  remove(kind: EntityKind, id: string): Promise<boolean>;
+  summary(): Promise<string>;
+}
 
-const toEntity = (r: Row): Versioned => ({
-  kind: r.kind as EntityKind,
-  id: r.id,
-  value: JSON.parse(r.json),
-  version: r.version,
-  updatedAt: r.updated_at,
-});
+export class SupabaseWorkspaceStore implements WorkspaceStore {
+  constructor(
+    private readonly repo: WorkspaceRepo,
+    private readonly chatId: string,
+  ) {}
 
-export class WorkspaceStore {
-  private readonly db: DatabaseSync;
-  private readonly now: () => number;
-
-  constructor(file: string, now: () => number = Date.now) {
-    mkdirSync(dirname(file), { recursive: true });
-    this.db = new DatabaseSync(file);
-    chmodSync(file, 0o600);
-    this.now = now;
-    this.db.exec(`CREATE TABLE IF NOT EXISTS workspace (
-      thread_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      id TEXT NOT NULL,
-      json TEXT NOT NULL,
-      version INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (thread_id, kind, id)
-    )`);
+  get(kind: EntityKind, id: string) {
+    return this.repo.get(this.chatId, kind, id);
   }
 
-  static at(dataDir: string): WorkspaceStore {
-    return new WorkspaceStore(join(dataDir, "workspace.sqlite"));
+  list(kind?: EntityKind) {
+    return this.repo.list(this.chatId, kind);
   }
 
-  get(thread: string, kind: EntityKind, id: string): Versioned | undefined {
-    const row = this.db
-      .prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? AND kind = ? AND id = ?")
-      .get(thread, kind, id) as Row | undefined;
-    return row && toEntity(row);
+  put(kind: EntityKind, id: string, value: unknown, expectedVersion?: number) {
+    return this.repo.put(this.chatId, kind, id, value, expectedVersion);
   }
 
-  list(thread: string, kind?: EntityKind): Versioned[] {
-    const rows = (
-      kind
-        ? this.db
-            .prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? AND kind = ? ORDER BY updated_at, id")
-            .all(thread, kind)
-        : this.db
-            .prepare("SELECT kind, id, json, version, updated_at FROM workspace WHERE thread_id = ? ORDER BY updated_at, kind, id")
-            .all(thread)
-    ) as Row[];
-    return rows.map(toEntity);
+  remove(kind: EntityKind, id: string) {
+    return this.repo.remove(this.chatId, kind, id);
   }
 
-  put(thread: string, kind: EntityKind, id: string, value: unknown, expectedVersion?: number): number {
-    const current = this.get(thread, kind, id);
+  async summary(): Promise<string> {
+    return summarize(await this.list());
+  }
+}
+
+export class MemoryWorkspaceStore implements WorkspaceStore {
+  private readonly rows = new Map<string, VersionedEntity>();
+  private tick = 0;
+
+  constructor(private readonly now: () => number = () => ++this.tick) {}
+
+  private key = (kind: EntityKind, id: string) => `${kind}\0${id}`;
+
+  async get(kind: EntityKind, id: string) {
+    const row = this.rows.get(this.key(kind, id));
+    return row && structuredClone(row);
+  }
+
+  async list(kind?: EntityKind) {
+    return [...this.rows.values()]
+      .filter((r) => !kind || r.kind === kind)
+      .sort((a, b) => a.updatedAt - b.updatedAt || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id))
+      .map((r) => structuredClone(r));
+  }
+
+  async put(kind: EntityKind, id: string, value: unknown, expectedVersion?: number) {
+    const current = this.rows.get(this.key(kind, id));
     if (expectedVersion !== undefined && (current?.version ?? 0) !== expectedVersion)
       throw new VersionConflict(kind, id, expectedVersion, current?.version ?? 0);
     const version = (current?.version ?? 0) + 1;
-    this.db
-      .prepare("INSERT OR REPLACE INTO workspace (thread_id, kind, id, json, version, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(thread, kind, id, JSON.stringify(value), version, this.now());
+    this.rows.set(this.key(kind, id), { kind, id, value: structuredClone(value), version, updatedAt: this.now() });
     return version;
   }
 
-  remove(thread: string, kind: EntityKind, id: string): boolean {
-    return Number(this.db.prepare("DELETE FROM workspace WHERE thread_id = ? AND kind = ? AND id = ?").run(thread, kind, id).changes) > 0;
+  async remove(kind: EntityKind, id: string) {
+    return this.rows.delete(this.key(kind, id));
   }
 
-  summary(thread: string): string {
-    return summarize(this.list(thread));
-  }
-
-  close(): void {
-    this.db.close();
+  async summary() {
+    return summarize(await this.list());
   }
 }

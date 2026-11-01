@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { hasCap, loadConfig } from "../src/config.js";
+import { ConfigError, hasCap, loadConfig, parseCredentialKeys } from "../src/config.js";
+import { TEST_ENV, testConfig } from "./fixtures/config.js";
+
+const b64 = (n: number, fill = 1) => Buffer.alloc(n, fill).toString("base64");
 
 describe("loadConfig", () => {
   it("reads model capabilities and matches gateway refs with or without the litellm prefix", () => {
-    const cfg = loadConfig({ AGENT_MODEL_CAPS: "chat-sonnet-5.5=codemode|openai/gpt-x=codemode" });
+    const cfg = testConfig({ AGENT_MODEL_CAPS: "chat-sonnet-5.5=codemode|openai/gpt-x=codemode" });
     expect(cfg.modelCaps["chat-sonnet-5.5"]).toEqual(["codemode"]);
     expect(hasCap(cfg, "litellm/chat-sonnet-5.5", "codemode")).toBe(true);
     expect(hasCap(cfg, "litellm/chat-default", "codemode")).toBe(false);
@@ -11,64 +14,96 @@ describe("loadConfig", () => {
     expect(hasCap(cfg, undefined, "codemode")).toBe(false);
   });
 
-  it("applies defaults with no environment at all", () => {
-    expect(loadConfig({})).toEqual({
+  it("applies defaults for the optional settings", () => {
+    const cfg = testConfig();
+    expect(cfg).toMatchObject({
       port: 8000,
       llmBaseUrl: "http://llm:4000/v1",
       llmApiKey: undefined,
       searxngUrl: "http://search:8080",
-      artifactsDir: "/data/artifacts",
-      sharedSecret: undefined,
-      sharedSecretFile: "/data/shared/agent-secret",
-      dataDir: "/data/agent",
       models: [],
       jevModels: ["typesafe/jev-latest", "openrouter/typesafe/jev-1.14"],
       jevConcurrency: 64,
       modelCaps: {},
       logLevel: "info",
+      runTimeLimitSeconds: 280,
+      appOrigin: "https://app.localhost",
     });
+    expect(cfg.credentialKeys.current).toBe(1);
+    expect(cfg.accessRequestPepper).toHaveLength(32);
   });
 
-  it("keeps the secret file next to the data dir unless AGENT_SECRET_FILE is set", () => {
-    expect(loadConfig({ AGENT_DATA_DIR: "/tmp/oa/agent" }).sharedSecretFile).toBe("/tmp/oa/shared/agent-secret");
-    expect(loadConfig({ AGENT_SECRET_FILE: "/x/s" }).sharedSecretFile).toBe("/x/s");
+  it("names every missing or invalid variable at once, without echoing values", () => {
+    let err: unknown;
+    try {
+      loadConfig({ SUPABASE_URL: "http://evil.example", AGENT_SERVICE_SECRET: "short-secret-value", APP_ORIGIN: "https://app.localhost/" });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(ConfigError);
+    const message = (err as Error).message;
+    for (const name of [
+      "SUPABASE_URL",
+      "SUPABASE_PUBLISHABLE_KEY",
+      "SUPABASE_SECRET_KEY",
+      "AGENT_SERVICE_SECRET",
+      "CREDENTIAL_KEYS",
+      "APP_ORIGIN",
+      "ACCESS_REQUEST_PEPPER",
+    ])
+      expect(message).toContain(name);
+    expect(message).not.toContain("short-secret-value");
+  });
+
+  it("checks key prefixes, the run time limit and the pepper length", () => {
+    expect(() => loadConfig({ ...TEST_ENV, SUPABASE_SECRET_KEY: "eyJhbGciOi" })).toThrow(/SUPABASE_SECRET_KEY/);
+    expect(() => loadConfig({ ...TEST_ENV, SUPABASE_PUBLISHABLE_KEY: "anon" })).toThrow(/SUPABASE_PUBLISHABLE_KEY/);
+    expect(() => loadConfig({ ...TEST_ENV, RUN_TIME_LIMIT_SECONDS: "10" })).toThrow(/RUN_TIME_LIMIT_SECONDS/);
+    expect(() => loadConfig({ ...TEST_ENV, ACCESS_REQUEST_PEPPER: b64(16) })).toThrow(/ACCESS_REQUEST_PEPPER/);
+    expect(testConfig({ RUN_TIME_LIMIT_SECONDS: "780" }).runTimeLimitSeconds).toBe(780);
   });
 
   it("tags Claude Sonnet models from any provider with codemode unless AGENT_MODEL_CAPS says otherwise", () => {
-    const cfg = loadConfig({});
+    const cfg = testConfig();
     expect(hasCap(cfg, "openrouter/anthropic/claude-sonnet-5.5", "codemode")).toBe(true);
     expect(hasCap(cfg, "anthropic/claude-sonnet-5-5", "codemode")).toBe(true);
     expect(hasCap(cfg, "openrouter/deepseek/deepseek-v4-flash", "codemode")).toBe(false);
-    const off = loadConfig({ AGENT_MODEL_CAPS: "anthropic/claude-sonnet-5-5=none" });
+    const off = testConfig({ AGENT_MODEL_CAPS: "anthropic/claude-sonnet-5-5=none" });
     expect(hasCap(off, "anthropic/claude-sonnet-5-5", "codemode")).toBe(false);
   });
 
   it("reads LOG_LEVEL and ignores unknown levels", () => {
-    expect(loadConfig({ LOG_LEVEL: "debug" }).logLevel).toBe("debug");
-    expect(loadConfig({ LOG_LEVEL: "loud" }).logLevel).toBe("info");
+    expect(testConfig({ LOG_LEVEL: "debug" }).logLevel).toBe("debug");
+    expect(testConfig({ LOG_LEVEL: "loud" }).logLevel).toBe("info");
   });
 
   it("pins Jev to JEV_MODEL when it is set", () => {
-    expect(loadConfig({ JEV_MODEL: "openrouter/typesafe/jev-1.13" }).jevModels).toEqual(["openrouter/typesafe/jev-1.13"]);
+    expect(testConfig({ JEV_MODEL: "openrouter/typesafe/jev-1.13" }).jevModels).toEqual(["openrouter/typesafe/jev-1.13"]);
   });
 
-  it("treats LLM_API_KEY as optional, since providers can be added in the app", () => {
-    expect(loadConfig({}).llmApiKey).toBeUndefined();
-  });
-
-  it("parses AGENT_PORT", () => {
-    expect(loadConfig({ LLM_API_KEY: "k", AGENT_PORT: "9001" }).port).toBe(9001);
-  });
-
-  it("treats empty AGENT_SHARED_SECRET as unset", () => {
-    expect(loadConfig({ LLM_API_KEY: "k", AGENT_SHARED_SECRET: "" }).sharedSecret).toBeUndefined();
-  });
-
-  it("parses AGENT_MODELS for the LiteLLM gateway", () => {
-    const cfg = loadConfig({ AGENT_MODELS: "chat-sonnet-5.5=Sonnet 5.5=Best quality, about $0.05 a turn|chat-gemma4=Gemma 4" });
+  it("parses AGENT_PORT and AGENT_MODELS for the LiteLLM gateway", () => {
+    expect(testConfig({ AGENT_PORT: "9001" }).port).toBe(9001);
+    const cfg = testConfig({ AGENT_MODELS: "chat-sonnet-5.5=Sonnet 5.5=Best quality, about $0.05 a turn|chat-gemma4=Gemma 4" });
     expect(cfg.models).toEqual([
       { id: "chat-sonnet-5.5", label: "Sonnet 5.5", note: "Best quality, about $0.05 a turn" },
       { id: "chat-gemma4", label: "Gemma 4" },
     ]);
+  });
+});
+
+describe("parseCredentialKeys", () => {
+  it("takes the first entry as current and keeps older keys for reading", () => {
+    const keys = parseCredentialKeys(`v2:${b64(32, 2)},v1:${b64(32, 1)}`);
+    expect(keys.current).toBe(2);
+    expect([...keys.keys.keys()]).toEqual([2, 1]);
+  });
+
+  it("rejects 31- and 33-byte keys, duplicate versions, v0 and junk", () => {
+    expect(() => parseCredentialKeys(`v1:${b64(31)}`)).toThrow(/32 bytes/);
+    expect(() => parseCredentialKeys(`v1:${b64(33)}`)).toThrow(/32 bytes/);
+    expect(() => parseCredentialKeys(`v1:${b64(32)},v1:${b64(32, 2)}`)).toThrow(/twice/);
+    expect(() => parseCredentialKeys(`v0:${b64(32)}`)).toThrow(/v<n>/);
+    expect(() => parseCredentialKeys("")).toThrow(/empty/);
+    expect(() => parseCredentialKeys("key")).toThrow(/v<n>/);
   });
 });

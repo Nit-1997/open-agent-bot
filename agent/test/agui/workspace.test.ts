@@ -1,15 +1,14 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseWorkspaceEdits } from "../../../shared/workspace.js";
-import { readWorkspaceEdits, restoreHistory } from "../../src/agui/input.js";
-import { handleRun } from "../../src/agui/runHandler.js";
+import { historyFromStored, readWorkspaceEdits } from "../../src/agui/input.js";
+import { handleRun, type RunContext } from "../../src/agui/runHandler.js";
+import { Evidence } from "../../src/grounding/evidence.js";
 import { type HistoryMessage, type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
 import { workspaceCart, workspaceNote } from "../../src/workspace/cart.js";
-import { WorkspaceStore } from "../../src/workspace/store.js";
-import { Evidence } from "../../src/grounding/evidence.js";
+import { MemoryWorkspaceStore, type WorkspaceStore } from "../../src/workspace/store.js";
+import { MemoryDb } from "../fixtures/memoryRepos.js";
+import { ALICE, CHAT_1 } from "../fixtures/users.js";
 import { ev, fakeSession, type Script } from "./fakeSession.js";
 
 const say: Script = async (emit) => {
@@ -18,31 +17,31 @@ const say: Script = async (emit) => {
   emit(ev.assistantEnd());
 };
 
-const open: WorkspaceStore[] = [];
-afterEach(() => {
-  for (const s of open.splice(0)) s.close();
-});
+const party = { title: "8th birthday", guests: 12, date: "2026-11-14", budget: 300 };
 
-function setup() {
-  const workspace = new WorkspaceStore(join(mkdtempSync(join(tmpdir(), "run-")), "w.sqlite"));
-  open.push(workspace);
+function setup(opts: { evidence?: Evidence } = {}) {
+  const db = new MemoryDb();
+  const workspace = new MemoryWorkspaceStore();
   const session = fakeSession(say);
-  const created: { threadId: string; history?: HistoryMessage[] }[] = [];
+  const created: { chatId: string; history?: HistoryMessage[] }[] = [];
   const store = new SessionStore({
     idleMs: 60000,
-    create: async (threadId, _ctx, history): Promise<SessionEntry> => {
-      created.push({ threadId, history });
-      return { session, busy: false, lastUsed: 0, dispose: async () => {}, cart: workspaceCart(workspace, threadId) };
+    create: async (owner, _ctx, history): Promise<SessionEntry> => {
+      created.push({ chatId: owner.chatId, history });
+      return { session, busy: false, lastUsed: 0, dispose: async () => {}, cart: await workspaceCart(workspace), evidence: opts.evidence };
     },
   });
-  return { workspace, store, session, created };
+  const repos = db.forUser(ALICE.id);
+  const ctx: RunContext = { user: ALICE, chats: repos.chats, messages: repos.messages, workspace, timeLimitMs: 60_000 };
+  const run = (inp: RunAgentInput) => collect(handleRun(inp, ctx, store, new AbortController().signal));
+  return { db, repos, workspace, store, session, created, run };
 }
 
 const msg = (id: string, role: string, content: string) => ({ id, role, content }) as never;
 
 function input(over: Partial<RunAgentInput> = {}): RunAgentInput {
   return {
-    threadId: "t1",
+    threadId: CHAT_1,
     runId: "r1",
     messages: [msg("m1", "user", "hello")],
     tools: [],
@@ -59,23 +58,21 @@ async function collect(it: AsyncIterable<BaseEvent>) {
   return out;
 }
 
-const party = { title: "8th birthday", guests: 12, date: "2026-11-14", budget: 300 };
-const prior = [
-  msg("m1", "user", "plan a party"),
-  msg("m2", "assistant", "Here is the plan."),
-  msg("m3", "tool", "ignored"),
-  msg("m4", "user", "make it 16 kids"),
-];
+const owner = { user: ALICE, chatId: CHAT_1 };
 
 describe("session restore", () => {
-  it("creates the session with the prior user and assistant text and prompts with the last message", async () => {
-    const { store, workspace, session, created } = setup();
-    const out = await collect(handleRun(input({ messages: prior }), store, new AbortController().signal, { workspace }));
+  it("seeds a new session for an existing chat from the stored messages and prompts with the last message", async () => {
+    const { repos, session, created, run } = setup();
+    await repos.chats.claim(CHAT_1, {});
+    await repos.messages.append(CHAT_1, "r0", [
+      { role: "user", content: "plan a party", status: "complete" },
+      { role: "assistant", content: "Here is the plan.", status: "complete" },
+    ]);
+    const out = await run(input({ messages: [msg("m4", "user", "make it 16 kids")] }));
     expect(out.map((e) => e.type)).toContain(EventType.RUN_FINISHED);
-    expect(out.some((e) => e.type === EventType.RUN_ERROR)).toBe(false);
     expect(created).toEqual([
       {
-        threadId: "t1",
+        chatId: CHAT_1,
         history: [
           { role: "user", text: "plan a party" },
           { role: "assistant", text: "Here is the plan." },
@@ -86,55 +83,44 @@ describe("session restore", () => {
   });
 
   it("brings the saved cart and entities back with the restored session", async () => {
-    const { store, workspace } = setup();
-    workspace.put("t1", "event", "main", party);
-    const cart = workspaceCart(workspace, "t1");
+    const { store, workspace, run } = setup();
+    await workspace.put("event", "main", party);
+    const cart = await workspaceCart(workspace);
     cart.start(["target"], [{ query: "pizza", qty: 3 }]);
     cart.save();
-    await collect(handleRun(input({ messages: prior }), store, new AbortController().signal, { workspace }));
-    expect(store.get("t1")?.cart?.items).toEqual([{ query: "pizza", qty: 3 }]);
-    expect(workspaceNote(workspace, "t1")).toContain("12 guests");
+    await new Promise((r) => setTimeout(r, 0));
+    await run(input());
+    expect(store.get(owner)?.cart?.items).toEqual([{ query: "pizza", qty: 3 }]);
+    expect(await workspaceNote(workspace)).toContain("12 guests");
   });
 
   it("counts the restored chat and the saved workspace as evidence, so their numbers aren't flagged", async () => {
-    const workspace = new WorkspaceStore(join(mkdtempSync(join(tmpdir(), "run-")), "w.sqlite"));
-    open.push(workspace);
-    workspace.put("t1", "event", "main", party);
     const evidence = new Evidence();
-    const store = new SessionStore({
-      idleMs: 60000,
-      create: async (): Promise<SessionEntry> => ({
-        session: fakeSession(say),
-        busy: false,
-        lastUsed: 0,
-        dispose: async () => {},
-        evidence,
-      }),
-    });
-    const history = [
-      msg("m1", "user", "plan a party"),
-      msg("m2", "assistant", "The cart comes to $17.22."),
-      msg("m4", "user", "how many guests now?"),
-    ];
-    await collect(handleRun(input({ messages: history }), store, new AbortController().signal, { workspace }));
+    const { repos, workspace, run } = setup({ evidence });
+    await workspace.put("event", "main", party);
+    await repos.chats.claim(CHAT_1, {});
+    await repos.messages.append(CHAT_1, "r0", [
+      { role: "user", content: "plan a party", status: "complete" },
+      { role: "assistant", content: "The cart comes to $17.22.", status: "complete" },
+    ]);
+    await run(input({ messages: [msg("m4", "user", "how many guests now?")] }));
     expect(evidence.unverified("It's for 12 guests, budget $300, and the cart is $17.22.")).toEqual([]);
   });
 
   it("does not seed history for a brand-new chat or an existing session", async () => {
-    const { store, workspace, created } = setup();
-    await collect(handleRun(input(), store, new AbortController().signal, { workspace }));
-    await collect(handleRun(input({ messages: prior, runId: "r2" }), store, new AbortController().signal, { workspace }));
-    expect(created).toEqual([{ threadId: "t1", history: undefined }]);
+    const { created, run } = setup();
+    await run(input());
+    await run(input({ runId: "r2" }));
+    expect(created).toEqual([{ chatId: CHAT_1, history: undefined }]);
   });
 
   it("merges back-to-back same-role messages, clips and starts history on a user turn", () => {
-    const history = restoreHistory([
-      msg("a", "assistant", "stray"),
-      msg("b", "user", "one"),
-      msg("c", "user", "two"),
-      msg("d", "assistant", ""),
-      msg("e", "assistant", "x".repeat(5000)),
-      msg("f", "user", "now"),
+    const history = historyFromStored([
+      { role: "assistant", content: "stray" },
+      { role: "user", content: "one" },
+      { role: "user", content: "two" },
+      { role: "assistant", content: "" },
+      { role: "assistant", content: "x".repeat(5000) },
     ]);
     expect(history).toEqual([
       { role: "user", text: "one\n\ntwo" },
@@ -147,9 +133,9 @@ describe("workspace_edits", () => {
   const ctx = (value: unknown, description = "workspace_edits") => [{ description, value: JSON.stringify(value) }];
 
   it("applies cart, event and trip edits before the turn and they show in the next summary", async () => {
-    const { store, workspace, session } = setup();
-    workspace.put("t1", "event", "main", party);
-    workspace.put("t1", "trip", "main", {
+    const { workspace, session, run } = setup();
+    await workspace.put("event", "main", party);
+    await workspace.put("trip", "main", {
       destination: "Tahoe",
       start: "2026-12-01",
       end: "2026-12-04",
@@ -157,7 +143,7 @@ describe("workspace_edits", () => {
       stays: [],
       days: [],
     });
-    const cart = workspaceCart(workspace, "t1");
+    const cart = await workspaceCart(workspace);
     cart.start(
       ["target"],
       [
@@ -167,31 +153,28 @@ describe("workspace_edits", () => {
     );
     cart.save();
     let seen: string | undefined;
+    const ws: WorkspaceStore = workspace;
     session.prompt = async () => {
-      seen = workspaceNote(workspace, "t1");
+      await new Promise((r) => setTimeout(r, 0));
+      seen = await workspaceNote(ws);
     };
-    await collect(
-      handleRun(
-        input({
-          context: ctx({
-            cart: { removed: ["cake"], qty: { pizza: 5 } },
-            event: { guests: 16, date: "2026-11-21", budget: 350 },
-            trip: { travelers: 3, end: "2026-12-05" },
-          }),
+    await run(
+      input({
+        context: ctx({
+          cart: { removed: ["cake"], qty: { pizza: 5 } },
+          event: { guests: 16, date: "2026-11-21", budget: 350 },
+          trip: { travelers: 3, end: "2026-12-05" },
         }),
-        store,
-        new AbortController().signal,
-        { workspace },
-      ),
+      }),
     );
-    expect(workspace.get("t1", "event", "main")).toMatchObject({
+    expect(await workspace.get("event", "main")).toMatchObject({
       version: 2,
       value: { guests: 16, date: "2026-11-21", budget: 350, title: "8th birthday" },
     });
-    expect(workspace.get("t1", "trip", "main")?.value).toMatchObject({ travelers: 3, end: "2026-12-05", start: "2026-12-01" });
-    expect((workspace.get("t1", "cart", "main")!.value as { items: unknown }).items).toEqual([{ query: "pizza", qty: 5 }]);
+    expect((await workspace.get("trip", "main"))?.value).toMatchObject({ travelers: 3, end: "2026-12-05", start: "2026-12-01" });
+    expect(((await workspace.get("cart", "main"))!.value as { items: unknown }).items).toEqual([{ query: "pizza", qty: 5 }]);
     expect(seen).toContain("16 guests");
-    expect(workspace.summary("t1")).toContain("event main: 8th birthday, 16 guests, 2026-11-21, budget $350");
+    expect(await workspace.summary()).toContain("event main: 8th birthday, 16 guests, 2026-11-21, budget $350");
   });
 
   it("drops invalid sections, strips unknown fields and returns null when nothing is left", () => {

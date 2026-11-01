@@ -1,11 +1,14 @@
+import type { AuthUser } from "../auth/verify.js";
 import type { FrameBus } from "../browser/frames.js";
 import type { Evidence } from "../grounding/evidence.js";
-import type { ActiveCart } from "../shop/cart.js";
+import { log } from "../lib/log.js";
 import type { PiSession } from "../pi/createPiSession.js";
 import type { UserContext } from "../prompt/userContext.js";
-import { log } from "../lib/log.js";
+import type { ActiveCart } from "../shop/cart.js";
 
 export type HistoryMessage = { role: "user" | "assistant"; text: string };
+
+export type SessionOwner = { user: AuthUser; chatId: string };
 
 export type SessionEntry = {
   session: PiSession;
@@ -21,59 +24,100 @@ export type SessionEntry = {
   turnStats?: () => { jevCalls: number; jevCostUsd: number };
 };
 
+export type CreateSession = (owner: SessionOwner, ctx: UserContext | null, history?: HistoryMessage[]) => Promise<SessionEntry>;
+
+export class SessionCapacityError extends Error {
+  constructor() {
+    super("The agent is at capacity. Try again shortly.");
+    this.name = "SessionCapacityError";
+  }
+}
+
+export const sessionKey = (owner: SessionOwner) => `${owner.user.id}:${owner.chatId}`;
+
+type Limits = { perUser: number; total: number };
+
 export class SessionStore {
   private entries = new Map<string, SessionEntry>();
   private pending = new Map<string, Promise<SessionEntry>>();
   private readonly idleMs: number;
   private readonly now: () => number;
-  private readonly create: (threadId: string, ctx: UserContext | null, history?: HistoryMessage[]) => Promise<SessionEntry>;
+  private readonly create: CreateSession;
+  private readonly limits: Limits;
 
-  constructor(opts: {
-    idleMs: number;
-    now?: () => number;
-    create: (threadId: string, ctx: UserContext | null, history?: HistoryMessage[]) => Promise<SessionEntry>;
-  }) {
+  constructor(opts: { idleMs: number; now?: () => number; create: CreateSession; limits?: Partial<Limits> }) {
     this.idleMs = opts.idleMs;
     this.now = opts.now ?? Date.now;
     this.create = opts.create;
+    this.limits = { perUser: 3, total: 50, ...opts.limits };
   }
 
-  get(threadId: string): SessionEntry | undefined {
-    return this.entries.get(threadId);
+  get(owner: SessionOwner): SessionEntry | undefined {
+    return this.entries.get(sessionKey(owner));
   }
 
-  async getOrCreate(threadId: string, ctx: UserContext | null, history?: HistoryMessage[]): Promise<SessionEntry> {
-    const existing = this.entries.get(threadId);
+  private keysOf(userId: string): string[] {
+    return [...this.entries.keys(), ...this.pending.keys()].filter((k) => k.startsWith(`${userId}:`));
+  }
+
+  private async makeRoom(userId: string): Promise<void> {
+    const mine = this.keysOf(userId);
+    if (mine.length >= this.limits.perUser) {
+      const idle = mine
+        .map((k) => [k, this.entries.get(k)] as const)
+        .filter((x): x is readonly [string, SessionEntry] => !!x[1] && !x[1].busy)
+        .sort((a, b) => a[1].lastUsed - b[1].lastUsed)[0];
+      if (!idle) throw new SessionCapacityError();
+      await this.drop(idle[0]);
+    }
+    if (this.entries.size + this.pending.size >= this.limits.total) throw new SessionCapacityError();
+  }
+
+  async getOrCreate(owner: SessionOwner, ctx: UserContext | null, history?: HistoryMessage[]): Promise<SessionEntry> {
+    const key = sessionKey(owner);
+    const existing = this.entries.get(key);
     if (existing) {
       existing.lastUsed = this.now();
       return existing;
     }
-    let p = this.pending.get(threadId);
+    let p = this.pending.get(key);
     if (!p) {
-      p = this.create(threadId, ctx, history).then((e) => {
+      await this.makeRoom(owner.user.id);
+      p = this.create(owner, ctx, history).then((e) => {
         e.lastUsed = this.now();
-        this.entries.set(threadId, e);
-        this.pending.delete(threadId);
+        this.entries.set(key, e);
+        this.pending.delete(key);
         return e;
       });
-      p.catch(() => this.pending.delete(threadId));
-      this.pending.set(threadId, p);
+      p.catch(() => this.pending.delete(key));
+      this.pending.set(key, p);
     }
     return p;
   }
 
-  touch(threadId: string): void {
-    const e = this.entries.get(threadId);
+  touch(owner: SessionOwner): void {
+    const e = this.entries.get(sessionKey(owner));
     if (e) e.lastUsed = this.now();
+  }
+
+  private async drop(key: string): Promise<void> {
+    const e = this.entries.get(key);
+    if (!e) return;
+    this.entries.delete(key);
+    await e.dispose().catch((err: unknown) => log.error(`[session] dispose failed key=${key}`, err));
   }
 
   async sweep(): Promise<void> {
     const cutoff = this.now() - this.idleMs;
-    for (const [id, e] of this.entries) {
-      if (!e.busy && e.lastUsed < cutoff) {
-        this.entries.delete(id);
-        await e.dispose().catch((err: unknown) => log.error(`[session] dispose failed thread=${id}`, err));
-      }
+    for (const [key, e] of [...this.entries]) if (!e.busy && e.lastUsed < cutoff) await this.drop(key);
+  }
+
+  async disposeUser(userId: string): Promise<void> {
+    await Promise.allSettled(this.keysOf(userId).flatMap((k) => (this.pending.get(k) ? [this.pending.get(k)!] : [])));
+    for (const key of this.keysOf(userId)) {
+      const e = this.entries.get(key);
+      if (e?.busy) await e.session.abort().catch(() => {});
+      await this.drop(key);
     }
   }
 

@@ -49,29 +49,29 @@ function planResult(kind: EntityKind, id: string, version: number, value: unknow
   return ok(text, widget.ok ? { widget: widget.value } : {});
 }
 
-type Target = { store: WorkspaceStore; threadId: string; kind: EntityKind; id: string };
+type Target = { store: WorkspaceStore; kind: EntityKind; id: string };
 
 const describe = (kind: EntityKind, id: string, version: number, value: unknown) =>
   `${kind} "${id}" (version ${version}): ${JSON.stringify(value)}`;
 
-function getEntity({ store, threadId, kind, id }: Target, byId: boolean): ToolResult {
+async function getEntity({ store, kind, id }: Target, byId: boolean): Promise<ToolResult> {
   if (byId) {
-    const found = store.get(threadId, kind, id);
+    const found = await store.get(kind, id);
     return found ? ok(describe(kind, id, found.version, found.value)) : fail(`No ${kind} "${id}" is saved in this chat.`);
   }
-  const all = store.list(threadId, kind);
+  const all = await store.list(kind);
   return all.length ? ok(all.map((e) => describe(kind, e.id, e.version, e.value)).join("\n")) : fail(`No ${kind} is saved in this chat.`);
 }
 
-function setEntity({ store, threadId, kind, id }: Target, raw: unknown): ToolResult {
+async function setEntity({ store, kind, id }: Target, raw: unknown): Promise<ToolResult> {
   const value = looseJson(raw);
   const valid = validateEntity(kind, value);
   if (!valid.ok) return fail(`Invalid ${kind}: ${valid.errors.join("; ")}`);
-  return planResult(kind, id, store.put(threadId, kind, id, value), value, "Saved");
+  return planResult(kind, id, await store.put(kind, id, value), value, "Saved");
 }
 
-function patchEntity({ store, threadId, kind, id }: Target, rawOps: unknown): ToolResult {
-  const current = store.get(threadId, kind, id);
+async function patchEntity({ store, kind, id }: Target, rawOps: unknown): Promise<ToolResult> {
+  const current = await store.get(kind, id);
   if (!current) return fail(`No ${kind} "${id}" is saved yet; use set first.`);
   const ops = readOps(rawOps);
   if (typeof ops === "string") return fail(ops);
@@ -80,15 +80,15 @@ function patchEntity({ store, threadId, kind, id }: Target, rawOps: unknown): To
   const valid = validateEntity(kind, patched.value);
   if (!valid.ok) return fail(`Patch makes the ${kind} invalid: ${valid.errors.join("; ")}`);
   try {
-    return planResult(kind, id, store.put(threadId, kind, id, patched.value, current.version), patched.value, "Updated");
+    return planResult(kind, id, await store.put(kind, id, patched.value, current.version), patched.value, "Updated");
   } catch (err) {
     if (err instanceof VersionConflict) return fail(`${kind} "${id}" changed meanwhile; get it and patch again.`);
     throw err;
   }
 }
 
-export function planTool(deps: { store: WorkspaceStore; threadId: string }) {
-  const { store, threadId } = deps;
+export function planTool(deps: { store: WorkspaceStore }) {
+  const { store } = deps;
   return defineTool({
     name: "plan",
     label: "Plan",
@@ -102,7 +102,7 @@ export function planTool(deps: { store: WorkspaceStore; threadId: string }) {
     }),
     async execute(_id, params): Promise<ToolResult> {
       if (!isEntityKind(params.kind)) return fail(`kind must be one of ${ENTITY_KINDS.join(", ")}`);
-      const at: Target = { store, threadId, kind: params.kind, id: params.id?.trim() || DEFAULT_ID };
+      const at: Target = { store, kind: params.kind, id: params.id?.trim() || DEFAULT_ID };
       if (params.action === "get") return getEntity(at, !!params.id);
       if (at.kind === "cart") return fail("The cart is changed with the shop tool, not plan.");
       return params.action === "set" ? setEntity(at, params.value) : patchEntity(at, params.ops);

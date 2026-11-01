@@ -1,11 +1,9 @@
-import { mkdtempSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPiSession } from "../../src/pi/createPiSession.js";
-import { ProviderHub } from "../../src/providers/hub.js";
+import type { ProviderHub } from "../../src/providers/hub.js";
+import { testHub } from "../fixtures/hub.js";
 
 let server: Server;
 const bodies: { messages: { role: string; content: unknown }[] }[] = [];
@@ -27,8 +25,7 @@ beforeAll(async () => {
     });
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-  hub = await ProviderHub.create({
-    dataDir: mkdtempSync(join(tmpdir(), "wsctx-")),
+  hub = await testHub({
     litellm: {
       baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
       apiKey: "none",
@@ -57,7 +54,7 @@ describe("pi session with a workspace", () => {
         { role: "user", text: "plan a party" },
         { role: "assistant", text: "Here is the plan." },
       ],
-      contextNote: () => note,
+      contextNote: async () => note,
     });
     try {
       await handle.session.prompt("make it 16 kids");
@@ -83,7 +80,13 @@ describe("pi session with a workspace", () => {
   it("sends the prompt untouched when there is nothing to note", async () => {
     const model = hub.resolve("litellm/m") ?? hub.resolve("m");
     if (!model) throw new Error("no model");
-    const handle = await createPiSession({ runtime: hub.runtime, model, systemPrompt: "sys", tools: [], contextNote: () => undefined });
+    const handle = await createPiSession({
+      runtime: hub.runtime,
+      model,
+      systemPrompt: "sys",
+      tools: [],
+      contextNote: async () => undefined,
+    });
     try {
       await handle.session.prompt("hi");
       expect(textOf(bodies.at(-1)!.messages.at(-1)!.content)).toBe("hi");

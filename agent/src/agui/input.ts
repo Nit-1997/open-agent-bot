@@ -70,11 +70,10 @@ export function readWorkspaceEdits(input: RunAgentInput): WorkspaceEdits | null 
 const HISTORY_LIMIT = 40;
 const HISTORY_CLIP = 4000;
 
-export function restoreHistory(messages: Message[]): HistoryMessage[] {
-  const lastUser = messages.map((m) => m.role).lastIndexOf("user");
-  const turns = messages.slice(0, Math.max(lastUser, 0)).flatMap((m): HistoryMessage[] => {
-    const text = messageText(m).trim().slice(0, HISTORY_CLIP);
-    return (m.role === "user" || m.role === "assistant") && text ? [{ role: m.role, text }] : [];
+export function historyFromStored(messages: ReadonlyArray<{ role: "user" | "assistant"; content: string }>): HistoryMessage[] {
+  const turns = messages.flatMap((m): HistoryMessage[] => {
+    const text = m.content.trim().slice(0, HISTORY_CLIP);
+    return text ? [{ role: m.role, text }] : [];
   });
   const merged = turns.reduce<HistoryMessage[]>((out, t) => {
     const prev = out.at(-1);

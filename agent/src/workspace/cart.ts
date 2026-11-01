@@ -1,21 +1,25 @@
 import { type CartEntity, validateEntity } from "../../../shared/workspace.js";
+import { log } from "../lib/log.js";
 import { ActiveCart } from "../shop/cart.js";
 import type { WorkspaceStore } from "./store.js";
 
 const CART_ID = "main";
 
-export function workspaceCart(store: WorkspaceStore, threadId: string): ActiveCart {
+export async function workspaceCart(store: WorkspaceStore): Promise<ActiveCart> {
   const cart = new ActiveCart();
-  const saved = store.get(threadId, "cart", CART_ID);
+  const saved = await store.get("cart", CART_ID);
   if (saved && validateEntity("cart", saved.value).ok) cart.load(saved.value as CartEntity);
+  let saving: Promise<unknown> = Promise.resolve();
   cart.onSave = (state) => {
-    store.put(threadId, "cart", CART_ID, state);
+    saving = saving
+      .then(() => store.put("cart", CART_ID, state))
+      .catch((err: unknown) => log.warn("[workspace] couldn't save the cart", err));
   };
   return cart;
 }
 
-export const workspaceNote = (store: WorkspaceStore, threadId: string): string | undefined => {
-  const summary = store.summary(threadId);
+export const workspaceNote = async (store: WorkspaceStore): Promise<string | undefined> => {
+  const summary = await store.summary();
   return summary
     ? `<workspace>\nSaved plan state for this chat (the user can edit it in the cards; trust it over earlier messages):\n${summary}\n</workspace>`
     : undefined;

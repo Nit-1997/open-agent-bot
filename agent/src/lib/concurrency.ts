@@ -11,7 +11,9 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Pr
   return out;
 }
 
-export function createLimiter(limit: number): <T>(fn: () => Promise<T>) => Promise<T> {
+export type Limiter = <T>(fn: () => Promise<T>) => Promise<T>;
+
+export function createLimiter(limit: number): Limiter {
   let active = 0;
   const waiting: (() => void)[] = [];
   const release = () => {

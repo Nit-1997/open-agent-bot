@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadConfig } from "../../src/config.js";
+import { testConfig } from "../fixtures/config.js";
 import { TurnBudget } from "../../src/tools/budget.js";
 import { buildTools, PER_REPLY_LIMITS } from "../../src/tools/index.js";
 
@@ -7,7 +7,7 @@ const ctx = { timeZone: "Asia/Kolkata", locale: "en-IN", localTime: "2026-10-27T
 
 function tools(userContext = ctx) {
   return buildTools({
-    cfg: loadConfig({}),
+    cfg: testConfig(),
     artifacts: {} as never,
     pool: {} as never,
     threadId: "t",

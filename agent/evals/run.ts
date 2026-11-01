@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
@@ -7,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { parse as parseYaml } from "yaml";
 import { evaluateAll } from "./assert.js";
+import { type AuthHeaders, evalAuth } from "./auth.js";
 import { mergeStats, renderReport, type Summary, summarize } from "./report.js";
 import { type AguiEvent, readEvents } from "./sse.js";
 import type { Assertion, RunRecord, RunStats, Scenario, ToolRecord, TurnRecord, WidgetRecord } from "./types.js";
@@ -154,7 +154,7 @@ export function buildInput(opts: { threadId: string; messages: Message[]; scenar
   };
 }
 
-export type RunnerDeps = { url: string; secret: string | undefined; model: string; timeoutMs: number; fetch?: typeof fetch };
+export type RunnerDeps = { url: string; headers: AuthHeaders; model: string; timeoutMs: number; fetch?: typeof fetch };
 
 export async function runScenario(scenario: Scenario, runIndex: number, deps: RunnerDeps): Promise<RunRecord> {
   const doFetch = deps.fetch ?? fetch;
@@ -182,7 +182,7 @@ export async function runScenario(scenario: Scenario, runIndex: number, deps: Ru
           headers: {
             "content-type": "application/json",
             accept: "text/event-stream",
-            ...(deps.secret && { "x-agent-secret": deps.secret }),
+            ...(await deps.headers()),
           },
           body: JSON.stringify(buildInput({ threadId, messages, scenario, model: deps.model })),
           signal: ac.signal,
@@ -278,23 +278,6 @@ export function loadScenarios(dir: string, only?: string[], set?: string): Scena
   return inSet.filter((s) => only.includes(s.id));
 }
 
-type ReadContainerSecret = () => string;
-
-const fromContainer: ReadContainerSecret = () =>
-  execFileSync("docker", ["compose", "exec", "-T", "agent", "cat", "/data/shared/agent-secret"], {
-    cwd: resolve(evalsDir, "../.."),
-    stdio: ["ignore", "pipe", "ignore"],
-  }).toString();
-
-export function readSecret(env: NodeJS.ProcessEnv = process.env, container: ReadContainerSecret = fromContainer): string | undefined {
-  if (env.AGENT_SHARED_SECRET) return env.AGENT_SHARED_SECRET;
-  try {
-    return container().trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 export async function pool<T>(items: T[], concurrency: number, work: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items];
   await Promise.all(
@@ -332,14 +315,14 @@ async function main() {
       .filter(Boolean),
     values.set,
   );
-  const secret = readSecret();
+  const headers = await evalAuth(resolve(evalsDir, "../.."));
   const date = new Date().toISOString().slice(0, 10);
   const outDir = join(evalsDir, "results", `${date}-${label}-${model}`);
   await mkdir(outDir, { recursive: true });
   const jsonl = join(outDir, "runs.jsonl");
   await writeFile(jsonl, "");
 
-  const deps: RunnerDeps = { url: values.url as string, secret, model, timeoutMs: Number(values["timeout-s"]) * 1000 };
+  const deps: RunnerDeps = { url: values.url as string, headers, model, timeoutMs: Number(values["timeout-s"]) * 1000 };
   const jobs = scenarios.flatMap((s) => Array.from({ length: runs }, (_, i) => ({ s, i })));
   const records: RunRecord[] = [];
   await pool(jobs, Number(values.concurrency), async ({ s, i }) => {

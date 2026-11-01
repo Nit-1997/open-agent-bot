@@ -1,0 +1,432 @@
+import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
+import type { EntityKind } from "../../../shared/workspace.js";
+import type { CredentialKind } from "../crypto/envelope.js";
+import { UserError } from "../lib/errors.js";
+import { VersionConflict } from "../workspace/conflict.js";
+import { fromBytea, toBytea } from "./bytea.js";
+import type { Db } from "./client.js";
+import { dbError, must, read, timeout } from "./errors.js";
+import {
+  type ArtifactFile,
+  type ArtifactRepo,
+  type ArtifactStorage,
+  artifactPath,
+  type ChatRepo,
+  type CredentialRepo,
+  type CredentialRow,
+  type MessageRepo,
+  PAGE_SIZE,
+  type ProfileRepo,
+  type ProviderSettingsRepo,
+  type UserRepos,
+  type VersionedEntity,
+  type WorkspaceRepo,
+} from "./types.js";
+
+export const ARTIFACTS_BUCKET = "artifacts";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const CONTENT_TYPE: Record<ArtifactFile, string> = { html: "text/html", pdf: "application/pdf" };
+const HISTORY_LIMIT = 200;
+
+const offset = (page: number) => (Math.max(1, Math.floor(page)) - 1) * PAGE_SIZE;
+
+function profiles(db: Db, userId: string): ProfileRepo {
+  return {
+    async get() {
+      const { data } = await read("profiles.get", () =>
+        db.from("profiles").select("data").eq("user_id", userId).abortSignal(timeout()).maybeSingle<{ data: unknown }>(),
+      );
+      if (!data) throw new UserError("Your account has no profile.", "not_found");
+      return data.data;
+    },
+    async putData(value) {
+      const { data } = await must(
+        "profiles.put",
+        db.from("profiles").update({ data: value }).eq("user_id", userId).select("user_id").abortSignal(timeout()),
+      );
+      if (!data?.length) throw new UserError("Your account has no profile.", "not_found");
+    },
+  };
+}
+
+type ChatRowDb = { id: string; title: string; last_message_at: string };
+
+function chats(db: Db, userId: string): ChatRepo {
+  const exists = async (chatId: string) => {
+    const { data } = await read("chats.get", () =>
+      db.from("chats").select("id").eq("id", chatId).eq("user_id", userId).abortSignal(timeout()).maybeSingle(),
+    );
+    return !!data;
+  };
+  return {
+    exists,
+    async claim(chatId, opts) {
+      if (!UUID_RE.test(chatId)) throw new UserError("This chat doesn't exist.", "not_found");
+      await must(
+        "chats.claim",
+        db
+          .from("chats")
+          .upsert(
+            { id: chatId, user_id: userId, ...(opts.model && { model: opts.model.slice(0, 200) }) },
+            { onConflict: "id", ignoreDuplicates: true },
+          )
+          .abortSignal(timeout()),
+      );
+      if (!(await exists(chatId))) throw new UserError("This chat doesn't exist.", "not_found");
+    },
+    async touch(chatId, opts) {
+      await must(
+        "chats.touch",
+        db
+          .from("chats")
+          .update({ last_message_at: new Date().toISOString(), ...(opts.model && { model: opts.model.slice(0, 200) }) })
+          .eq("id", chatId)
+          .eq("user_id", userId)
+          .abortSignal(timeout()),
+      );
+      if (opts.titleIfEmpty) {
+        await must(
+          "chats.title",
+          db
+            .from("chats")
+            .update({ title: opts.titleIfEmpty.slice(0, 200) })
+            .eq("id", chatId)
+            .eq("user_id", userId)
+            .eq("title", "")
+            .abortSignal(timeout()),
+        );
+      }
+    },
+    async page(page) {
+      const from = offset(page);
+      const { data, count } = await read("chats.page", () =>
+        db
+          .from("chats")
+          .select("id, title, last_message_at", { count: "exact" })
+          .eq("user_id", userId)
+          .order("last_message_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1)
+          .abortSignal(timeout()),
+      );
+      return {
+        items: ((data ?? []) as ChatRowDb[]).map((r) => ({ id: r.id, title: r.title, lastMessageAt: r.last_message_at })),
+        total: count ?? 0,
+      };
+    },
+  };
+}
+
+type MessageRowDb = { role: "user" | "assistant"; content: string; status: "complete" | "interrupted"; created_at: string };
+
+function messages(db: Db, userId: string): MessageRepo {
+  return {
+    async append(chatId, runId, rows) {
+      if (!rows.length) return;
+      await must(
+        "messages.append",
+        db
+          .from("chat_messages")
+          .insert(rows.map((r) => ({ chat_id: chatId, user_id: userId, run_id: runId.slice(0, 100), ...r })))
+          .abortSignal(timeout()),
+      );
+    },
+    async history(chatId, limit = HISTORY_LIMIT) {
+      const { data, count } = await read("messages.history", () =>
+        db
+          .from("chat_messages")
+          .select("role, content, status, created_at", { count: "exact" })
+          .eq("chat_id", chatId)
+          .eq("user_id", userId)
+          .order("id", { ascending: false })
+          .limit(limit)
+          .abortSignal(timeout()),
+      );
+      const items = ((data ?? []) as MessageRowDb[])
+        .map((r) => ({ role: r.role, content: r.content, status: r.status, createdAt: r.created_at }))
+        .reverse();
+      return { items, total: count ?? 0 };
+    },
+  };
+}
+
+type EntityRowDb = { kind: EntityKind; entity_id: string; value: unknown; version: number; updated_at: string };
+const toEntity = (r: EntityRowDb): VersionedEntity => ({
+  kind: r.kind,
+  id: r.entity_id,
+  value: r.value,
+  version: r.version,
+  updatedAt: Date.parse(r.updated_at),
+});
+
+function workspace(db: Db, userId: string): WorkspaceRepo {
+  const base = (chatId: string) =>
+    db.from("workspace_entities").select("kind, entity_id, value, version, updated_at").eq("chat_id", chatId).eq("user_id", userId);
+  return {
+    async get(chatId, kind, id) {
+      const { data } = await read("workspace.get", () =>
+        base(chatId).eq("kind", kind).eq("entity_id", id).abortSignal(timeout()).maybeSingle<EntityRowDb>(),
+      );
+      return data ? toEntity(data) : undefined;
+    },
+    async list(chatId, kind) {
+      const { data } = await read("workspace.list", () => {
+        const q = kind ? base(chatId).eq("kind", kind) : base(chatId);
+        return q.order("updated_at").order("kind").order("entity_id").abortSignal(timeout());
+      });
+      return ((data ?? []) as EntityRowDb[]).map(toEntity);
+    },
+    async put(chatId, kind, id, value, expectedVersion) {
+      const res = await db
+        .rpc("workspace_put", {
+          p_user: userId,
+          p_chat: chatId,
+          p_kind: kind,
+          p_id: id,
+          p_value: value,
+          p_expected: expectedVersion ?? null,
+        })
+        .abortSignal(timeout());
+      if (res.error?.code === "PT409") throw new VersionConflict(kind, id, expectedVersion ?? 0, Number(res.error.details) || 0);
+      if (res.error) throw dbError("workspace.put", { ...res.error, status: res.status });
+      return res.data as number;
+    },
+    async remove(chatId, kind, id) {
+      const { data } = await must(
+        "workspace.remove",
+        db
+          .from("workspace_entities")
+          .delete()
+          .eq("chat_id", chatId)
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("entity_id", id)
+          .select("entity_id")
+          .abortSignal(timeout()),
+      );
+      return (data?.length ?? 0) > 0;
+    },
+  };
+}
+
+const validArtifactId = (id: string) => {
+  if (!ARTIFACT_ID_RE.test(id)) throw new UserError("That report doesn't exist.", "not_found");
+  return id;
+};
+
+type ArtifactRowDb = { id: string; chat_id: string | null; title: string; pdf_path: string | null };
+
+function artifacts(db: Db, userId: string): ArtifactRepo {
+  return {
+    async insert(row) {
+      const id = validArtifactId(row.id);
+      await must(
+        "artifacts.insert",
+        db
+          .from("artifacts")
+          .insert({
+            id,
+            user_id: userId,
+            chat_id: row.chatId,
+            title: row.title.slice(0, 200),
+            html_path: artifactPath(userId, id, "html"),
+            size_bytes: row.sizeBytes,
+          })
+          .abortSignal(timeout()),
+      );
+    },
+    async get(id) {
+      if (!ARTIFACT_ID_RE.test(id)) return undefined;
+      const { data } = await read("artifacts.get", () =>
+        db
+          .from("artifacts")
+          .select("id, chat_id, title, pdf_path")
+          .eq("id", id)
+          .eq("user_id", userId)
+          .abortSignal(timeout())
+          .maybeSingle<ArtifactRowDb>(),
+      );
+      return data ? { id: data.id, chatId: data.chat_id, title: data.title, pdfReady: !!data.pdf_path } : undefined;
+    },
+    async setPdf(id) {
+      await must(
+        "artifacts.setPdf",
+        db
+          .from("artifacts")
+          .update({ pdf_path: artifactPath(userId, validArtifactId(id), "pdf") })
+          .eq("id", id)
+          .eq("user_id", userId)
+          .abortSignal(timeout()),
+      );
+    },
+  };
+}
+
+type StorageFailure = { message?: string; statusCode?: string; status?: number; name?: string };
+
+function storageError(where: string, e: StorageFailure): UserError {
+  const status = Number(e.statusCode ?? e.status ?? 0);
+  return dbError(where, { code: status ? String(status) : "", status, message: e.message });
+}
+
+function isMissingObject(e: StorageFailure): boolean {
+  const status = Number(e.statusCode ?? e.status ?? 0);
+  return status === 404 || (status === 400 && /not found/i.test(e.message ?? ""));
+}
+
+function storage(db: Db, userId: string): ArtifactStorage {
+  const bucket = () => db.storage.from(ARTIFACTS_BUCKET);
+  return {
+    async upload(id, file, bytes) {
+      const { error } = await bucket().upload(artifactPath(userId, validArtifactId(id), file), bytes, {
+        contentType: CONTENT_TYPE[file],
+        upsert: file === "pdf",
+      });
+      if (error) throw storageError("storage.upload", error as StorageFailure);
+    },
+    async download(id, file) {
+      const { data, error } = await bucket().download(artifactPath(userId, validArtifactId(id), file));
+      if (error) {
+        if (isMissingObject(error as StorageFailure)) return undefined;
+        throw storageError("storage.download", error as StorageFailure);
+      }
+      return Buffer.from(await data.arrayBuffer());
+    },
+    async remove(id, file) {
+      const { error } = await bucket().remove([artifactPath(userId, validArtifactId(id), file)]);
+      if (error) throw storageError("storage.remove", error as StorageFailure);
+    },
+  };
+}
+
+const DEFAULT_SETTINGS = { custom: {}, enabled: {}, hidden: [] };
+
+function providerSettings(db: Db, userId: string): ProviderSettingsRepo {
+  return {
+    async get() {
+      await must(
+        "providerSettings.create",
+        db
+          .from("provider_settings")
+          .upsert({ user_id: userId, data: DEFAULT_SETTINGS }, { onConflict: "user_id", ignoreDuplicates: true })
+          .abortSignal(timeout()),
+      );
+      const { data } = await read("providerSettings.get", () =>
+        db
+          .from("provider_settings")
+          .select("data, device_id")
+          .eq("user_id", userId)
+          .abortSignal(timeout())
+          .single<{ data: unknown; device_id: string }>(),
+      );
+      return { data: data!.data, deviceId: data!.device_id };
+    },
+    async put(value) {
+      await must("providerSettings.put", db.from("provider_settings").update({ data: value }).eq("user_id", userId).abortSignal(timeout()));
+    },
+  };
+}
+
+type CredentialRowDb = {
+  provider: string;
+  kind: CredentialKind;
+  ciphertext: string;
+  nonce: string;
+  dek_wrapped: string;
+  dek_nonce: string;
+  key_version: number;
+  hint: string;
+  version: number;
+};
+
+const CREDENTIAL_COLUMNS = "provider, kind, ciphertext, nonce, dek_wrapped, dek_nonce, key_version, hint, version";
+
+export const credentialFromDb = (r: CredentialRowDb): CredentialRow => ({
+  provider: r.provider,
+  kind: r.kind,
+  ciphertext: fromBytea(r.ciphertext),
+  nonce: fromBytea(r.nonce),
+  dekWrapped: fromBytea(r.dek_wrapped),
+  dekNonce: fromBytea(r.dek_nonce),
+  keyVersion: r.key_version,
+  hint: r.hint,
+  version: r.version,
+});
+
+export const credentialToDb = (r: Omit<CredentialRow, "version">) => ({
+  provider: r.provider,
+  kind: r.kind,
+  ciphertext: toBytea(r.ciphertext),
+  nonce: toBytea(r.nonce),
+  dek_wrapped: toBytea(r.dekWrapped),
+  dek_nonce: toBytea(r.dekNonce),
+  key_version: r.keyVersion,
+  hint: r.hint,
+});
+
+function credentials(db: Db, userId: string): CredentialRepo {
+  return {
+    async read(provider) {
+      const { data } = await read("credentials.read", () =>
+        db
+          .from("provider_credentials")
+          .select(CREDENTIAL_COLUMNS)
+          .eq("user_id", userId)
+          .eq("provider", provider)
+          .abortSignal(timeout())
+          .maybeSingle<CredentialRowDb>(),
+      );
+      return data ? credentialFromDb(data) : undefined;
+    },
+    async list() {
+      const { data } = await read("credentials.list", () =>
+        db.from("provider_credentials").select("provider, kind, hint").eq("user_id", userId).order("provider").abortSignal(timeout()),
+      );
+      return (data ?? []) as Array<{ provider: string; kind: CredentialKind; hint: string }>;
+    },
+    async insert(row) {
+      await must(
+        "credentials.insert",
+        db
+          .from("provider_credentials")
+          .insert({ user_id: userId, ...credentialToDb(row) })
+          .abortSignal(timeout()),
+      );
+    },
+    async update(row, expectedVersion) {
+      const { data } = await must(
+        "credentials.update",
+        db
+          .from("provider_credentials")
+          .update({ ...credentialToDb(row), version: expectedVersion + 1 })
+          .eq("user_id", userId)
+          .eq("provider", row.provider)
+          .eq("version", expectedVersion)
+          .select("version")
+          .abortSignal(timeout()),
+      );
+      return (data?.length ?? 0) > 0;
+    },
+    async delete(provider) {
+      await must(
+        "credentials.delete",
+        db.from("provider_credentials").delete().eq("user_id", userId).eq("provider", provider).abortSignal(timeout()),
+      );
+    },
+  };
+}
+
+export function forUser(db: Db, userId: string): UserRepos {
+  if (!UUID_RE.test(userId)) throw new Error("forUser needs a verified user id");
+  return Object.freeze({
+    userId,
+    profiles: profiles(db, userId),
+    chats: chats(db, userId),
+    messages: messages(db, userId),
+    workspace: workspace(db, userId),
+    artifacts: artifacts(db, userId),
+    storage: storage(db, userId),
+    providerSettings: providerSettings(db, userId),
+    credentials: credentials(db, userId),
+  });
+}

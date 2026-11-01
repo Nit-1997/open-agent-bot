@@ -1,78 +1,64 @@
-import { mkdtempSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { VersionConflict } from "../../src/workspace/conflict.js";
-import { WorkspaceStore } from "../../src/workspace/store.js";
-import { SUMMARY_LIMIT } from "../../src/workspace/summary.js";
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { ENTITY_KINDS } from "../../../shared/workspace.js";
 import { ActiveCart } from "../../src/shop/cart.js";
-
-const stores: WorkspaceStore[] = [];
-function open(now?: () => number) {
-  const dir = mkdtempSync(join(tmpdir(), "ws-"));
-  const s = new WorkspaceStore(join(dir, "nested", "workspace.sqlite"), now);
-  stores.push(s);
-  return { s, dir };
-}
-afterEach(() => {
-  for (const s of stores.splice(0)) s.close();
-});
+import { VersionConflict } from "../../src/workspace/conflict.js";
+import { MemoryWorkspaceStore, SupabaseWorkspaceStore, type WorkspaceStore } from "../../src/workspace/store.js";
+import { SUMMARY_LIMIT } from "../../src/workspace/summary.js";
+import { MemoryDb } from "../fixtures/memoryRepos.js";
+import { ALICE, BOB, CHAT_1, CHAT_2 } from "../fixtures/users.js";
 
 const party = { title: "8th birthday", date: "Nov 14", guests: 12, budget: 300, currency: "USD" };
 
-describe("WorkspaceStore", () => {
-  it("creates the file with mode 0600 inside a missing directory", () => {
-    const { dir } = open();
-    expect(statSync(join(dir, "nested", "workspace.sqlite")).mode & 0o777).toBe(0o600);
+const backends: Array<[string, () => Promise<{ s: WorkspaceStore; other: WorkspaceStore }>]> = [
+  ["memory", async () => ({ s: new MemoryWorkspaceStore(), other: new MemoryWorkspaceStore() })],
+  [
+    "repository-backed",
+    async () => {
+      const db = new MemoryDb();
+      const r = db.forUser(ALICE.id);
+      await r.chats.claim(CHAT_1, {});
+      await r.chats.claim(CHAT_2, {});
+      return { s: new SupabaseWorkspaceStore(r.workspace, CHAT_1), other: new SupabaseWorkspaceStore(r.workspace, CHAT_2) };
+    },
+  ],
+];
+
+describe.each(backends)("%s WorkspaceStore", (_name, open) => {
+  it("puts, gets and lists entities per chat with increasing versions", async () => {
+    const { s, other } = await open();
+    expect(await s.put("event", "main", party)).toBe(1);
+    expect(await s.put("event", "main", { ...party, guests: 16 })).toBe(2);
+    await s.put("shortlist", "gifts", { title: "Gifts", items: [] });
+    await other.put("event", "main", party);
+    expect(await s.get("event", "main")).toMatchObject({ version: 2, value: { guests: 16 } });
+    expect(await s.get("event", "other")).toBeUndefined();
+    expect((await s.list()).map((e) => `${e.kind}:${e.id}`).sort()).toEqual(["event:main", "shortlist:gifts"]);
+    expect(await s.list("event")).toHaveLength(1);
+    expect(await other.list()).toHaveLength(1);
   });
 
-  it("puts, gets and lists entities per thread with increasing versions", () => {
-    const { s } = open();
-    expect(s.put("t1", "event", "main", party)).toBe(1);
-    expect(s.put("t1", "event", "main", { ...party, guests: 16 })).toBe(2);
-    s.put("t1", "shortlist", "gifts", { title: "Gifts", items: [] });
-    s.put("t2", "event", "main", party);
-    expect(s.get("t1", "event", "main")).toMatchObject({ version: 2, value: { guests: 16 } });
-    expect(s.get("t1", "event", "other")).toBeUndefined();
-    expect(
-      s
-        .list("t1")
-        .map((e) => `${e.kind}:${e.id}`)
-        .sort(),
-    ).toEqual(["event:main", "shortlist:gifts"]);
-    expect(s.list("t1", "event")).toHaveLength(1);
-    expect(s.list("nobody")).toEqual([]);
+  it("rejects a write whose expected version is stale and accepts the current one", async () => {
+    const { s } = await open();
+    await s.put("event", "main", party);
+    await s.put("event", "main", { ...party, guests: 14 });
+    await expect(s.put("event", "main", party, 1)).rejects.toBeInstanceOf(VersionConflict);
+    expect((await s.get("event", "main"))?.value).toMatchObject({ guests: 14 });
+    expect(await s.put("event", "main", { ...party, guests: 15 }, 2)).toBe(3);
+    expect(await s.put("trip", "new", { destination: "x" }, 0)).toBe(1);
+    await expect(s.put("trip", "new2", {}, 3)).rejects.toBeInstanceOf(VersionConflict);
   });
 
-  it("rejects a write whose expected version is stale and accepts the current one", () => {
-    const { s } = open();
-    s.put("t", "event", "main", party);
-    s.put("t", "event", "main", { ...party, guests: 14 });
-    expect(() => s.put("t", "event", "main", party, 1)).toThrow(VersionConflict);
-    expect(s.get("t", "event", "main")?.value).toMatchObject({ guests: 14 });
-    expect(s.put("t", "event", "main", { ...party, guests: 15 }, 2)).toBe(3);
-    expect(s.put("t", "trip", "new", { destination: "x" }, 0)).toBe(1);
-    expect(() => s.put("t", "trip", "new2", {}, 3)).toThrow(VersionConflict);
+  it("removes entities", async () => {
+    const { s } = await open();
+    await s.put("event", "main", party);
+    expect(await s.remove("event", "main")).toBe(true);
+    expect(await s.remove("event", "main")).toBe(false);
+    expect(await s.get("event", "main")).toBeUndefined();
   });
 
-  it("removes entities", () => {
-    const { s } = open();
-    s.put("t", "event", "main", party);
-    expect(s.remove("t", "event", "main")).toBe(true);
-    expect(s.remove("t", "event", "main")).toBe(false);
-    expect(s.get("t", "event", "main")).toBeUndefined();
-  });
-
-  it("survives a reopen", () => {
-    const { s, dir } = open();
-    s.put("t", "event", "main", party);
-    const again = new WorkspaceStore(join(dir, "nested", "workspace.sqlite"));
-    stores.push(again);
-    expect(again.get("t", "event", "main")?.version).toBe(1);
-  });
-
-  it("summarizes every entity compactly, including the cart's best store", () => {
-    const { s } = open();
+  it("summarizes every entity compactly, including the cart's best store", async () => {
+    const { s, other } = await open();
     const cart = new ActiveCart();
     cart.start(
       ["target"],
@@ -92,9 +78,9 @@ describe("WorkspaceStore", () => {
       },
     ]);
     cart.scopeTo(["Target"]);
-    s.put("t", "cart", "main", cart.snapshot());
-    s.put("t", "event", "party", party);
-    s.put("t", "trip", "main", {
+    await s.put("cart", "main", cart.snapshot());
+    await s.put("event", "party", party);
+    await s.put("trip", "main", {
       destination: "Tahoe",
       start: "2026-12-01",
       end: "2026-12-04",
@@ -102,17 +88,38 @@ describe("WorkspaceStore", () => {
       stays: [{ name: "Lodge" }],
       days: [],
     });
-    const text = s.summary("t");
+    const text = await s.summary();
     expect(text).toContain("event party: 8th birthday, 12 guests, Nov 14, budget $300");
     expect(text).toContain("cart: 2 items at Target (best $40 at Target)");
     expect(text).toContain("trip main: Tahoe, 2026-12-01 to 2026-12-04, 1 traveler, 1 stays shortlisted");
     expect(text.length).toBeLessThan(SUMMARY_LIMIT);
-    expect(s.summary("empty")).toBe("");
+    expect(await other.summary()).toBe("");
   });
 
-  it("caps the summary length", () => {
-    const { s } = open();
-    for (let i = 0; i < 30; i++) s.put("t", "event", `e${i}`, { ...party, title: `A long party title number ${i}` });
-    expect(s.summary("t").length).toBeLessThanOrEqual(SUMMARY_LIMIT);
+  it("caps the summary length", async () => {
+    const { s } = await open();
+    for (let i = 0; i < 30; i++) await s.put("event", `e${i}`, { ...party, title: `A long party title number ${i}` });
+    expect((await s.summary()).length).toBeLessThanOrEqual(SUMMARY_LIMIT);
+  });
+});
+
+describe("workspace ownership", () => {
+  it("never writes into another user's chat", async () => {
+    const db = new MemoryDb();
+    await db.forUser(BOB.id).chats.claim(CHAT_1, {});
+    const alice = new SupabaseWorkspaceStore(db.forUser(ALICE.id).workspace, CHAT_1);
+    await expect(alice.put("event", "main", party)).rejects.toMatchObject({ kind: "not_found" });
+    expect(await alice.list()).toEqual([]);
+  });
+
+  it("keeps the database's kind check in step with ENTITY_KINDS", () => {
+    const sql = readFileSync(new URL("../../../supabase/migrations/20261101060645_chats_workspace.sql", import.meta.url), "utf8");
+    const listed = /kind\s+text not null check \(kind in \(([^)]*)\)\)/.exec(sql)?.[1];
+    expect(
+      listed
+        ?.split(",")
+        .map((k) => k.trim().replace(/'/g, ""))
+        .sort(),
+    ).toEqual([...ENTITY_KINDS].sort());
   });
 });

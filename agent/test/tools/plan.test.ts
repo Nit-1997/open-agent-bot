@@ -1,23 +1,14 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { applyPatch } from "../../../shared/workspace.js";
 import { planTool } from "../../src/tools/plan.js";
-import { WorkspaceStore } from "../../src/workspace/store.js";
+import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
 
-const stores: WorkspaceStore[] = [];
 function setup() {
-  const store = new WorkspaceStore(join(mkdtempSync(join(tmpdir(), "plan-")), "w.sqlite"));
-  stores.push(store);
-  const tool = planTool({ store, threadId: "t" });
+  const store = new MemoryWorkspaceStore();
+  const tool = planTool({ store });
   const run = async (params: Record<string, unknown>) => tool.execute("c", params as never, undefined, undefined, {} as never);
   return { store, run };
 }
-afterEach(() => {
-  for (const s of stores.splice(0)) s.close();
-});
-
 const party = { title: "8th birthday", guests: 12, budget: 300, menu: ["pizza"] };
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -26,14 +17,14 @@ describe("plan tool", () => {
     const { store, run } = setup();
     const r = await run({ action: "set", kind: "event", value: party });
     expect(r.isError).toBeUndefined();
-    expect(store.get("t", "event", "main")).toMatchObject({ version: 1, value: party });
+    expect(await store.get("event", "main")).toMatchObject({ version: 1, value: party });
     expect(r.details.widget).toMatchObject({ kind: "plan", entity: "event", id: "main", version: 1, value: party });
   });
 
   it("accepts the value as a JSON string", async () => {
     const { store, run } = setup();
     await run({ action: "set", kind: "event", id: "bday", value: JSON.stringify(party) });
-    expect(store.get("t", "event", "bday")?.value).toEqual(party);
+    expect((await store.get("event", "bday"))?.value).toEqual(party);
   });
 
   it("rejects an invalid entity with the failing paths and saves nothing", async () => {
@@ -41,7 +32,7 @@ describe("plan tool", () => {
     const r = await run({ action: "set", kind: "event", value: { title: "x", guests: 0 } });
     expect(r.isError).toBe(true);
     expect(text(r)).toContain("/guests");
-    expect(store.list("t")).toEqual([]);
+    expect(await store.list()).toEqual([]);
   });
 
   it("patches with replace, add and remove, validates the result and bumps the version", async () => {
@@ -58,11 +49,11 @@ describe("plan tool", () => {
       ],
     });
     expect(r.isError).toBeUndefined();
-    expect(store.get("t", "event", "main")).toMatchObject({
+    expect(await store.get("event", "main")).toMatchObject({
       version: 2,
       value: { title: "8th birthday", guests: 16, menu: ["pizza", "cake"], theme: "space" },
     });
-    expect(store.get("t", "event", "main")?.value).not.toHaveProperty("budget");
+    expect((await store.get("event", "main"))?.value).not.toHaveProperty("budget");
     expect(r.details.widget).toMatchObject({ version: 2 });
   });
 
@@ -76,7 +67,7 @@ describe("plan tool", () => {
     const required = await run({ action: "patch", kind: "event", ops: [{ op: "remove", path: "/guests" }] });
     for (const r of [bad, missing, noValue, unknownOp, required]) expect(r.isError).toBe(true);
     expect(text(bad)).toContain("invalid");
-    expect(store.get("t", "event", "main")).toMatchObject({ version: 1, value: party });
+    expect(await store.get("event", "main")).toMatchObject({ version: 1, value: party });
   });
 
   it("patching an entity that does not exist asks for set first", async () => {
@@ -120,7 +111,7 @@ describe("plan tool", () => {
 
   it("describes when to patch instead of rebuilding", () => {
     const { store } = setup();
-    const description = planTool({ store, threadId: "t" }).description;
+    const description = planTool({ store }).description;
     expect(description).toContain("make it 16 kids");
     expect(description).toContain("Never rebuild the plan or re-search unchanged items");
   });
