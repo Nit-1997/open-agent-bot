@@ -85,8 +85,11 @@ export function ReportPanel(props: {
   }, []);
 
   const { guardFocus, composerId } = props;
+  const lastFocus = useRef<HTMLElement | null>(null);
   const pullBack = useCallback(() => {
-    if (!userInput.current && frame.current && document.activeElement === frame.current) document.getElementById(composerId)?.focus();
+    if (userInput.current || !frame.current || document.activeElement !== frame.current) return;
+    const back = lastFocus.current?.isConnected ? lastFocus.current : document.getElementById(composerId);
+    back?.focus({ preventScroll: true });
   }, [composerId]);
   useEffect(() => {
     if (!guardFocus) return;
@@ -95,10 +98,15 @@ export function ReportPanel(props: {
       clearTimeout(timer);
       timer = setTimeout(pullBack, 0);
     };
+    const onFocusIn = (e: FocusEvent) => {
+      if (e.target instanceof HTMLElement && e.target !== frame.current) lastFocus.current = e.target;
+    };
     window.addEventListener("blur", onBlur);
+    document.addEventListener("focusin", onFocusIn);
     return () => {
       clearTimeout(timer);
       window.removeEventListener("blur", onBlur);
+      document.removeEventListener("focusin", onFocusIn);
     };
   }, [guardFocus, pullBack]);
   const onFrameLoad = useCallback(() => {

@@ -655,6 +655,21 @@ describe("focus guard", () => {
     }
   });
 
+  it("gives focus back to what had it before the steal, not always the composer", async () => {
+    renderShell(<ShellFrame>{null}</ShellFrame>);
+    await go(`/chats/${A}?report=${R1}`);
+    const frame = (await waitFor(() => $(`${panelId()}-frame`)!)) as HTMLIFrameElement;
+    fireEvent.load(frame);
+    const sep = $(`${pane()}-report-separator`) as HTMLElement;
+    sep.focus();
+    frame.focus();
+    await act(async () => {
+      window.dispatchEvent(new Event("blur"));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(document.activeElement).toBe(sep);
+  });
+
   it("leaves focus alone after a pointerdown in the panel", async () => {
     renderShell(<ShellFrame>{null}</ShellFrame>);
     await go(`/chats/${A}?report=${R1}`);
