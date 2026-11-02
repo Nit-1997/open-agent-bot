@@ -5,7 +5,7 @@ import { parsePage } from "./pages.ts";
 import { type EntityKind, entityIdFromKey, isEntityKind } from "./workspace.ts";
 
 export type Route =
-  | { section: "chat"; chatId: string | null }
+  | { section: "chat"; chatId: string | null; report: string | null }
   | { section: "chats"; page: number }
   | { section: "reports"; page: number }
   | { section: "report"; id: string }
@@ -27,13 +27,15 @@ export function parseRoute(pathname: string, params: Params = new URLSearchParam
   if (rest.length) return null;
   switch (head) {
     case "":
-      return parts.length === 1 ? { section: "chat", chatId: null } : null;
+      return parts.length === 1 ? { section: "chat", chatId: null, report: null } : null;
     case "admin":
       return parts.length === 1 ? { section: "admin" } : null;
     case "chats": {
       if (a === undefined) return { section: "chats", page: pageOf(params) };
       const chatId = normalizeId(a);
-      return chatId && b === undefined ? { section: "chat", chatId } : null;
+      if (!chatId || b !== undefined) return null;
+      const report = params.get("report");
+      return { section: "chat", chatId, report: report !== null && ARTIFACT_ID_RE.test(report) ? report : null };
     }
     case "reports": {
       if (a === undefined) return { section: "reports", page: pageOf(params) };
@@ -71,7 +73,7 @@ const pageParam = (page: number) => (page > 1 ? page : null);
 export function hrefFor(route: Route): string {
   switch (route.section) {
     case "chat":
-      return route.chatId ? `/chats/${route.chatId}` : "/";
+      return route.chatId ? withQuery(`/chats/${route.chatId}`, { report: route.report }) : "/";
     case "chats":
       return withQuery("/chats", { page: pageParam(route.page) });
     case "reports":

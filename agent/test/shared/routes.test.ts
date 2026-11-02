@@ -12,6 +12,7 @@ describe("parseRoute and hrefFor", () => {
   it.each([
     "/",
     `/chats/${CHAT}`,
+    `/chats/${CHAT}?report=AbCdEf_-1234`,
     "/chats",
     "/chats?page=3",
     "/reports",
@@ -38,6 +39,17 @@ describe("parseRoute and hrefFor", () => {
     expect(hrefFor(parse(`/search?q=${"a".repeat(101)}&scope=plans`)!)).toBe("/search");
     expect(hrefFor(parse("/search?q=a")!)).toBe("/search");
     expect(hrefFor(parse("/search?q=%20big%20%20sur%20&scope=all")!)).toBe("/search?q=big+sur");
+  });
+
+  it("keeps a valid report on a chat and drops a bad one or one anywhere else", () => {
+    expect(parse(`/chats/${CHAT}?report=AbCdEf_-1234`)).toEqual({ section: "chat", chatId: CHAT, report: "AbCdEf_-1234" });
+    for (const bad of ["AbCdEf_-123", "AbCdEf_-12345", "..", "%2f", "abc%2fdefghij", "javascript:x", "abcd.efghijk"])
+      expect(parse(`/chats/${CHAT}?report=${bad}`), bad).toEqual({ section: "chat", chatId: CHAT, report: null });
+    expect(parse(`/chats/${CHAT}?report=AbCdEf_-1234&report=ZZZZZZZZZZZZ`)).toMatchObject({ report: "AbCdEf_-1234" });
+    expect(hrefFor(parse(`/chats/${CHAT}?report=bad`)!)).toBe(`/chats/${CHAT}`);
+    expect(parse("/?report=AbCdEf_-1234")).toEqual({ section: "chat", chatId: null, report: null });
+    expect(hrefFor(parse("/?report=AbCdEf_-1234")!)).toBe("/");
+    expect(hrefFor(parse("/reports?report=AbCdEf_-1234")!)).toBe("/reports");
   });
 
   it.each([

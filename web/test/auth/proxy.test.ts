@@ -24,6 +24,15 @@ describe("proxy sign-in redirect", () => {
     expect(to.searchParams.get("next")).toBe("/search?q=tacos&scope=chats");
   });
 
+  it("keeps the open report on a chat link through sign-in", async () => {
+    const chat = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const res = await proxy(new NextRequest(`${APP_ORIGIN}/chats/${chat}?report=AbCdEf_-1234`));
+    expect(res.status).toBe(302);
+    const to = new URL(res.headers.get("location") ?? "");
+    expect(to.pathname).toBe("/login");
+    expect(to.searchParams.get("next")).toBe(`/chats/${chat}?report=AbCdEf_-1234`);
+  });
+
   it("sends an unknown page to /", async () => {
     const res = await proxy(new NextRequest(`${APP_ORIGIN}/nowhere?x=1`));
     expect(new URL(res.headers.get("location") ?? "").searchParams.get("next")).toBe("/");

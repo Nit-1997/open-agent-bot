@@ -29,6 +29,7 @@ describe("safeNext", () => {
     "/chats",
     "/chats?page=2",
     "/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?report=AbCdEf_-1234",
     "/reports?page=3",
     "/reports/AbCdEf_-1234",
     "/plans?kind=trip&page=2",
@@ -45,6 +46,15 @@ describe("safeNext", () => {
     expect(safeNext("/plans/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trip/%%%", ORIGIN)).toBe("/");
     expect(safeNext("/plans/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trip/!!", ORIGIN)).toBe("/");
     expect(safeNext("/chats/not-a-uuid", ORIGIN)).toBe("/");
+    expect(safeNext("/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?report=..%2f..%2fx", ORIGIN)).toBe(
+      "/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+    expect(safeNext("/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?report=javascript:x", ORIGIN)).toBe(
+      "/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+    expect(safeNext("//evil.example/chats?report=AbCdEf_-1234", ORIGIN)).toBe("/");
+    expect(safeNext("/\\evil.example?report=AbCdEf_-1234", ORIGIN)).toBe("/");
+    expect(safeNext("https://evil.example/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?report=AbCdEf_-1234", ORIGIN)).toBe("/");
   });
 
   it("keeps the allowed paths", () => {
