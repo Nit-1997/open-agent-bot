@@ -159,7 +159,7 @@ export function Onboarding(props: {
             {current === "agent" ? (
               <span id="onboarding-orb-spacer" />
             ) : (
-              <AgentOrb id="onboarding-orb" look={agentPersona(draft).look} name={agentPersona(draft).name} size={36} breathing />
+              <AgentOrb id="onboarding-orb" look={agentPersona(draft).look} size={36} breathing />
             )}
             <span id="onboarding-step" className="eyebrow">
               {ready

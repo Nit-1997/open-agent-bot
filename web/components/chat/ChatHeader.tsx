@@ -13,7 +13,7 @@ export function ChatHeader(props: { id: string; title: string; running: boolean;
       </h1>
       {props.running && (
         <p id={`${id}-status`} role="status" className="flex shrink-0 items-center gap-2 text-[13px] text-text-muted">
-          <AgentOrb id={`${id}-status-orb`} look={props.persona.look} name={props.persona.name} size={22} breathing />
+          <AgentOrb id={`${id}-status-orb`} look={props.persona.look} size={22} breathing />
           <span id={`${id}-status-text`}>
             <bdi id={`${id}-status-name`}>{props.persona.name}</bdi> is working on this
           </span>

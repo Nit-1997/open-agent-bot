@@ -11,19 +11,20 @@ const SIZE: Record<OrbSize, string> = {
   36: "h-9 w-9 text-[13px]",
   40: "h-10 w-10 text-sm",
   44: "h-11 w-11 text-[15px]",
-  72: "h-[72px] w-[72px] text-2xl orb-glow",
-  112: "h-28 w-28 text-4xl orb-glow",
+  72: "h-[72px] w-[72px] orb-glow",
+  112: "h-28 w-28 orb-glow",
 };
 
 export function AgentOrb(props: { id: string; look: AgentLook; size: OrbSize; name?: string; breathing?: boolean; className?: string }) {
+  const dp = props.name !== undefined;
   return (
     <span
       id={props.id}
       aria-hidden="true"
       data-look={props.look}
-      className={`orb inline-flex shrink-0 items-center justify-center font-semibold leading-none ${SIZE[props.size]} ${props.breathing ? "animate-breathe" : ""} ${props.className ?? ""}`}
+      className={`${dp ? "agent-dp inline-flex items-center justify-center font-semibold leading-none" : "orb inline-block"} shrink-0 ${SIZE[props.size]} ${props.breathing ? "animate-breathe" : ""} ${props.className ?? ""}`}
     >
-      {initials(props.name)}
+      {dp ? initials(props.name) : null}
     </span>
   );
 }

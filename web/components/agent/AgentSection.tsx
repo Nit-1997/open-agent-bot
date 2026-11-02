@@ -35,7 +35,7 @@ export function AgentSection(props: {
     <div id={id} className="flex flex-col gap-6">
       {props.scope === "onboarding" && (
         <div id={`${id}-hero`} className="flex flex-col items-center gap-3 py-1 text-center">
-          <AgentOrb id={`${id}-orb`} look={persona.look} name={persona.name} size={112} breathing />
+          <AgentOrb id={`${id}-orb`} look={persona.look} size={112} breathing />
           <h1 id={`${id}-title`} className="font-display text-[34px] leading-[1.1] text-text-primary">
             {"Hi, I'm "}
             <em id={`${id}-title-name`}>

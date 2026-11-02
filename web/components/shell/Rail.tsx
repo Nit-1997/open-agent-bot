@@ -33,7 +33,7 @@ export function Rail(props: { sidebarOpen: boolean; onToggleSidebar: () => void;
       className="flex w-[68px] shrink-0 flex-col items-center justify-between border-r border-surface-accent bg-bg py-[18px]"
     >
       <div id="rail-top" className="flex flex-col items-center gap-2.5">
-        <AgentOrb id="rail-orb" look={persona.look} name={persona.name} size={30} className="mb-[18px]" />
+        <AgentOrb id="rail-orb" look={persona.look} size={30} className="mb-[18px]" />
         <RailLink
           id="rail-chats"
           href={chatHrefOf(shell.chats, { withReport: desktop })}

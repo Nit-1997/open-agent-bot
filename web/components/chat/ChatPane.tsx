@@ -156,7 +156,7 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
           <>
             {!phone && <div id={`${id}-header-skeleton`} className="h-16 shrink-0 border-b border-surface-accent" aria-hidden="true" />}
             <div id={`${id}-loading`} aria-busy="true" className="flex flex-1 flex-col items-center justify-center gap-3">
-              <AgentOrb id={`${id}-loading-orb`} look={persona.look} name={persona.name} size={40} breathing />
+              <AgentOrb id={`${id}-loading-orb`} look={persona.look} size={40} breathing />
               <p id={`${id}-loading-text`} className="text-sm text-text-muted">
                 Opening chat…
               </p>

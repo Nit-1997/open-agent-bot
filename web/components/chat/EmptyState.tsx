@@ -30,8 +30,8 @@ export function EmptyState(props: {
   return (
     <div id={id} className="mx-auto flex w-full max-w-[760px] flex-1 flex-col justify-center px-3 py-5 sm:px-6 sm:py-10">
       <div id={`${id}-hero`} className="flex flex-col items-center gap-3 text-center sm:gap-3.5">
-        <AgentOrb id={`${id}-orb`} look={persona.look} name={persona.name} size={72} className="hidden sm:inline-flex" />
-        <AgentOrb id={`${id}-orb-small`} look={persona.look} name={persona.name} size={44} className="sm:hidden" />
+        <AgentOrb id={`${id}-orb`} look={persona.look} size={72} className="hidden sm:inline-block" />
+        <AgentOrb id={`${id}-orb-small`} look={persona.look} size={44} className="sm:hidden" />
         <Heading
           id={`${id}-title`}
           className="font-display text-[30px] leading-[1.1] text-text-primary text-balance sm:text-[44px] sm:leading-[1.1]"
