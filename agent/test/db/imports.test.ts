@@ -36,7 +36,6 @@ describe("database access", () => {
   it("never touches the retired workspace table or its functions", () => {
     const offenders = files(SRC)
       .map((f) => relative(SRC, f))
-      .filter((f) => f !== "db/database.types.ts")
       .filter((f) => /workspace_entities|workspace_put|workspace_counts/.test(readFileSync(join(SRC, f), "utf8")));
     expect(offenders).toEqual([]);
   });

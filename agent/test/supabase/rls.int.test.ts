@@ -10,7 +10,6 @@ const TABLES = [
   "invited_emails",
   "chats",
   "chat_messages",
-  "workspace_entities",
   "artifacts",
   "provider_settings",
   "provider_credentials",
@@ -68,14 +67,6 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
 
   it("denies the agent-only functions", async () => {
     for (const [who, c] of clients) {
-      const put = await c.rpc("workspace_put", {
-        p_user: a.id,
-        p_chat: randomUUID(),
-        p_kind: "cart",
-        p_id: "main",
-        p_value: {},
-        p_expected: null,
-      });
       const submit = await c.rpc("access_request_submit", {
         p_name: "x",
         p_email: "x@example.test",
@@ -84,9 +75,6 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
       });
       const found = await c.rpc("search_user_content", { p_user: a.id, p_query: "secret", p_scope: "all", p_limit: 10, p_offset: 0 });
       expect(found.error, `${who} search_user_content`).not.toBeNull();
-      const counted = await c.rpc("workspace_counts", { p_user: a.id });
-      expect(counted.error, `${who} workspace_counts`).not.toBeNull();
-      expect(put.error, `${who} workspace_put`).not.toBeNull();
       expect(submit.error, `${who} access_request_submit`).not.toBeNull();
     }
   });
@@ -121,11 +109,11 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
     expect(fns[0].n).toBe(0);
   });
 
-  it("keeps workspace_counts service-only, invoker-rights with an empty search_path", async () => {
-    const fn = await managementQuery<{ acl: string; definer: boolean; config: string[] }>(
-      "select p.proacl::text as acl, p.prosecdef as definer, p.proconfig as config from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'workspace_counts'",
+  it("has no workspace functions left after the drop", async () => {
+    const fn = await managementQuery<{ proname: string }>(
+      "select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'workspace%'",
     );
-    expect(fn).toEqual([{ acl: "{postgres=X/postgres,service_role=X/postgres}", definer: false, config: ['search_path=""'] }]);
+    expect(fn).toEqual([]);
   });
 
   it("keeps search_user_content service-only, invoker-rights with an empty search_path, with its indexes and pg_trgm in extensions", async () => {
@@ -141,13 +129,12 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
     );
     expect(ext).toEqual([{ schema: "extensions" }]);
     const idx = await managementQuery<{ indexname: string }>(
-      "select indexname from pg_indexes where schemaname = 'public' and indexname in ('chats_title_trgm_idx', 'chat_messages_content_trgm_idx', 'artifacts_title_trgm_idx', 'workspace_entities_user_recent_idx') order by indexname",
+      "select indexname from pg_indexes where schemaname = 'public' and indexname in ('chats_title_trgm_idx', 'chat_messages_content_trgm_idx', 'artifacts_title_trgm_idx') order by indexname",
     );
     expect(idx.map((i) => i.indexname)).toEqual([
       "artifacts_title_trgm_idx",
       "chat_messages_content_trgm_idx",
       "chats_title_trgm_idx",
-      "workspace_entities_user_recent_idx",
     ]);
   });
 });

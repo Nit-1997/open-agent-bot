@@ -299,44 +299,6 @@ export type Database = {
         }
         Relationships: []
       }
-      workspace_entities: {
-        Row: {
-          chat_id: string
-          entity_id: string
-          kind: string
-          updated_at: string
-          user_id: string
-          value: Json
-          version: number
-        }
-        Insert: {
-          chat_id: string
-          entity_id: string
-          kind: string
-          updated_at?: string
-          user_id: string
-          value: Json
-          version: number
-        }
-        Update: {
-          chat_id?: string
-          entity_id?: string
-          kind?: string
-          updated_at?: string
-          user_id?: string
-          value?: Json
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_entities_chat_id_user_id_fkey"
-            columns: ["chat_id", "user_id"]
-            isOneToOne: false
-            referencedRelation: "chats"
-            referencedColumns: ["id", "user_id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -360,18 +322,6 @@ export type Database = {
           p_user: string
         }
         Returns: Json
-      }
-      workspace_counts: { Args: { p_user: string }; Returns: Json }
-      workspace_put: {
-        Args: {
-          p_chat: string
-          p_expected: number
-          p_id: string
-          p_kind: string
-          p_user: string
-          p_value: Json
-        }
-        Returns: number
       }
     }
     Enums: {
