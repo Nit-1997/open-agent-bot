@@ -1,4 +1,5 @@
 import type { Message, RunAgentInput } from "@ag-ui/core";
+import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
 import { parseWorkspaceEdits, type WorkspaceEdits } from "../../../shared/workspace.js";
 import { type Profile, parseProfile } from "../../../shared/profile.js";
 import type { ProfileOverride, UserContext, Viewport } from "../prompt/userContext.js";
@@ -65,6 +66,12 @@ function contextValue(input: RunAgentInput, description: string): unknown {
 
 export function readWorkspaceEdits(input: RunAgentInput): WorkspaceEdits | null {
   return parseWorkspaceEdits(contextValue(input, "workspace_edits"));
+}
+
+export function readOpenReport(input: RunAgentInput): string | null {
+  const v = contextValue(input, "open_report") as { openReport?: { id?: unknown } } | undefined;
+  const id = v && typeof v === "object" ? v.openReport?.id : undefined;
+  return typeof id === "string" && ARTIFACT_ID_RE.test(id) ? id : null;
 }
 
 const HISTORY_LIMIT = 40;

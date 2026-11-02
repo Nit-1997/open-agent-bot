@@ -24,6 +24,7 @@ export type SessionEntry = {
   frames?: FrameBus;
   cart?: ActiveCart;
   turnStats?: () => { jevCalls: number; jevCostUsd: number };
+  setOpenReport?: (note: string | undefined) => void;
 };
 
 export type CreateSession = (

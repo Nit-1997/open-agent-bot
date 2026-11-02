@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPiSession } from "../../src/pi/createPiSession.js";
+import { joinNotes } from "../../src/session/createSession.js";
 import type { ProviderHub } from "../../src/providers/hub.js";
 import { testHub } from "../fixtures/hub.js";
 
@@ -93,5 +94,16 @@ describe("pi session with a workspace", () => {
     } finally {
       await handle.dispose();
     }
+  });
+});
+
+describe("joinNotes", () => {
+  it("joins the workspace and open-report notes with a blank line, either alone, or gives nothing", () => {
+    expect(joinNotes("<workspace>w</workspace>", "<open_report>r</open_report>")).toBe(
+      "<workspace>w</workspace>\n\n<open_report>r</open_report>",
+    );
+    expect(joinNotes("<workspace>w</workspace>", undefined)).toBe("<workspace>w</workspace>");
+    expect(joinNotes(undefined, "<open_report>r</open_report>")).toBe("<open_report>r</open_report>");
+    expect(joinNotes(undefined, undefined)).toBeUndefined();
   });
 });

@@ -3,6 +3,7 @@ import { createAccessService } from "./access/service.js";
 import { createAuthAdmin } from "./admin/authAdmin.js";
 import { createAdminService, createLiveAdminCheck } from "./admin/service.js";
 import { createApp } from "./app.js";
+import { loadOpenReport } from "./artifacts/openReport.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { ambientProviderEnv } from "./auth/ambientEnv.js";
 import { createGuards } from "./auth/middleware.js";
@@ -137,6 +138,7 @@ const app = createApp({
       messages: r.messages,
       profiles: profiles(user.id),
       workspace: new SupabaseWorkspaceStore(r.workspace, chatId),
+      openReport: (id) => loadOpenReport(artifacts, r, chatId, id),
       timeLimitMs: cfg.runTimeLimitSeconds * 1000,
     };
   },

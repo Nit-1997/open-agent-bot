@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
+import { type OpenReport, openReportNote } from "../artifacts/openReport.js";
 import type { AuthUser } from "../auth/verify.js";
 import type { ChatRepo, MessageRepo, NewMessage } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
@@ -18,7 +19,7 @@ import {
 import { applyEntityEdits } from "../workspace/edits.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import { custom, runError, runFinished, runStarted } from "./events.js";
-import { historyFromStored, messageText, readUserContext, readWorkspaceEdits } from "./input.js";
+import { historyFromStored, messageText, readOpenReport, readUserContext, readWorkspaceEdits } from "./input.js";
 import { createStatsCollector, type StatsCollector, type Usage } from "./stats.js";
 import { Transcript } from "./transcript.js";
 import { createTranslator, type PiEvent } from "./translate.js";
@@ -34,6 +35,7 @@ export type RunContext = {
   messages: MessageRepo;
   profiles?: ProfileStore;
   workspace?: WorkspaceStore;
+  openReport?: (id: string) => Promise<OpenReport | null>;
   timeLimitMs: number;
 };
 
@@ -113,6 +115,15 @@ async function claim(ctx: RunContext, chatId: string, model: string | undefined)
   }
 }
 
+async function openReportFor(ctx: RunContext, id: string | null): Promise<string | undefined> {
+  if (!id || !ctx.openReport) return undefined;
+  const report = await ctx.openReport(id).catch((err) => {
+    log.warn(`[run] user=${ctx.user.id} open report failed`, err);
+    return null;
+  });
+  return report ? openReportNote(report) : undefined;
+}
+
 async function seedHistory(ctx: RunContext, chatId: string): Promise<HistoryMessage[] | undefined> {
   const stored = await ctx.messages.history(chatId);
   const history = historyFromStored(stored.items);
@@ -172,6 +183,7 @@ export async function* handleRun(
   if (signal.aborted) return;
   entry.busy = true;
   entry.lastRunId = runId;
+  entry.setOpenReport?.(await openReportFor(ctx, readOpenReport(input)));
   const savedPrompt = await persist(
     ctx,
     threadId,

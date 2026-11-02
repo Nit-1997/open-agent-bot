@@ -42,6 +42,11 @@ export function pickModel(hub: Pick<ProviderHub, "resolve">, ref: string | undef
   return model;
 }
 
+export function joinNotes(...notes: (string | undefined)[]): string | undefined {
+  const present = notes.filter((n): n is string => !!n);
+  return present.length ? present.join("\n\n") : undefined;
+}
+
 export function sessionFactory(deps: SessionDeps): CreateSession {
   const { cfg, artifacts, pool } = deps;
   return async (owner, userContext, persona, history) => {
@@ -54,6 +59,7 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = await workspaceCart(workspace);
+    let openReport: string | undefined;
     let current = pickModel(hub, userContext?.model, userContext?.profile?.defaultModel);
     const skills = loadSkillCatalog(skillsDir(), { codemode: hasCap(cfg, modelRef(current), "codemode") });
     const turnJudge = scopeJudge(await deps.judgeFor(hub)());
@@ -81,7 +87,7 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
       onCodemodeOff: (reason: string) => log.info(`[codemode] user=${user.id} thread=${chatId} off for this chat: ${reason}`),
       history,
-      contextNote: () => workspaceNote(workspace),
+      contextNote: async () => joinNotes(await workspaceNote(workspace), openReport),
     });
     return {
       session: handle.session,
@@ -98,6 +104,9 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       evidence,
       frames,
       cart,
+      setOpenReport: (note) => {
+        openReport = note;
+      },
       setModel: async (ref: string) => {
         const model = hub.resolve(ref);
         if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);
