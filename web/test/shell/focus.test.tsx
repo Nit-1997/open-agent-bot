@@ -27,8 +27,7 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (url: string) => {
       const chat = /^\/api\/chats\/([0-9a-f-]{36})(\/messages)?$/.exec(url);
-      if (chat?.[2])
-        return Response.json({ items: [{ role: "user", content: "hello a", status: "complete", createdAt: "x" }], total: 1 });
+      if (chat?.[2]) return Response.json({ items: [{ role: "user", content: "hello a", status: "complete", createdAt: "x" }], total: 1 });
       if (chat) return Response.json({ chat: { id: chat[1], title: "Chat a", lastMessageAt: new Date().toISOString() } });
       if (url.startsWith("/api/chats?")) return Response.json({ items: [], total: 0, page: 1, pageSize: 20 });
       if (url.startsWith("/api/search?")) return new Promise(() => {});

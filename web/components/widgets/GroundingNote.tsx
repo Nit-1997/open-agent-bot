@@ -11,7 +11,9 @@ export function GroundingNote({ toolCallId, idPrefix, widget }: { toolCallId: st
         </p>
       )}
       {widget.fromReport?.length ? (
-        <p id={`${id}-report`}>{`From your open report: ${widget.fromReport.join(", ")}. Not checked against new sources in this reply.`}</p>
+        <p
+          id={`${id}-report`}
+        >{`From your open report: ${widget.fromReport.join(", ")}. Not checked against new sources in this reply.`}</p>
       ) : null}
     </div>
   );

@@ -5,7 +5,16 @@ import { expectUniqueIds } from "./support/ids";
 
 const result = "artifact abcdefghijkl created: Diwali plan";
 const card = (over: Partial<Parameters<typeof ReportCard>[0]> = {}) => (
-  <ReportCard idPrefix="chat-pane-x" toolCallId="tc1" title="Diwali plan" result={result} current={false} hint="right" onOpen={() => {}} {...over} />
+  <ReportCard
+    idPrefix="chat-pane-x"
+    toolCallId="tc1"
+    title="Diwali plan"
+    result={result}
+    current={false}
+    hint="right"
+    onOpen={() => {}}
+    {...over}
+  />
 );
 
 describe("ReportCard", () => {

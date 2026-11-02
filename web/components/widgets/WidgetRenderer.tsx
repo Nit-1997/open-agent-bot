@@ -37,7 +37,16 @@ export function WidgetRenderer(props: {
     case "grounding_note":
       return <GroundingNote idPrefix={idPrefix} toolCallId={toolCallId} widget={w} />;
     case "ask":
-      return <AskCard idPrefix={idPrefix} toolCallId={toolCallId} widget={w} locale={locale} answered={props.answered} onAnswer={props.onAnswer} />;
+      return (
+        <AskCard
+          idPrefix={idPrefix}
+          toolCallId={toolCallId}
+          widget={w}
+          locale={locale}
+          answered={props.answered}
+          onAnswer={props.onAnswer}
+        />
+      );
     case "followups":
       return null;
     case "stay_list":
@@ -58,7 +67,8 @@ export function WidgetRenderer(props: {
     case "cart":
       return (
         <CartCard
-          idPrefix={idPrefix} toolCallId={toolCallId}
+          idPrefix={idPrefix}
+          toolCallId={toolCallId}
           widget={w}
           locale={locale}
           stale={props.staleCart}

@@ -81,7 +81,11 @@ describe("reportRefs", () => {
   });
 
   it("lists finished reports in chat order and skips pending and failed ones", () => {
-    const call = (id: string, name: string, args: unknown) => ({ id, type: "function", function: { name, arguments: JSON.stringify(args) } });
+    const call = (id: string, name: string, args: unknown) => ({
+      id,
+      type: "function",
+      function: { name, arguments: JSON.stringify(args) },
+    });
     const messages: ChatMessage[] = [
       { id: "u1", role: "user", content: "two reports" },
       {

@@ -62,7 +62,11 @@ const pageAction =
 
 export function ReportViewer(props: ReportViewerProps) {
   const { state, retry } = useReportSummary(props.reportId);
-  return props.variant === "page" ? <PageViewer {...props} state={state} retry={retry} /> : <PanelViewer {...props} state={state} retry={retry} />;
+  return props.variant === "page" ? (
+    <PageViewer {...props} state={state} retry={retry} />
+  ) : (
+    <PanelViewer {...props} state={state} retry={retry} />
+  );
 }
 
 function PanelViewer({ titleRef, frameRef, ...props }: ReportViewerProps & { state: State; retry(): void }) {
@@ -106,7 +110,10 @@ function PanelViewer({ titleRef, frameRef, ...props }: ReportViewerProps & { sta
           >
             <bdi id={`${id}-title-bdi`}>{title}</bdi>
           </h2>
-          <p id={`${id}-position`} className={`font-mono uppercase tracking-[0.06em] text-text-faint ${screen ? "text-[10px]" : "text-[11px]"}`}>
+          <p
+            id={`${id}-position`}
+            className={`font-mono uppercase tracking-[0.06em] text-text-faint ${screen ? "text-[10px]" : "text-[11px]"}`}
+          >
             {kind}
           </p>
         </div>
@@ -193,7 +200,11 @@ function PanelViewer({ titleRef, frameRef, ...props }: ReportViewerProps & { sta
             <p id={`${id}-other-chat-text`} className="text-[14px] text-text-secondary">
               This report is from another chat.
             </p>
-            <Link id={`${id}-other-chat-link`} href={`/reports/${reportId}`} className="text-[13px] text-mist-600 underline-offset-2 hover:underline">
+            <Link
+              id={`${id}-other-chat-link`}
+              href={`/reports/${reportId}`}
+              className="text-[13px] text-mist-600 underline-offset-2 hover:underline"
+            >
               Open it in Reports
             </Link>
           </div>
@@ -236,7 +247,10 @@ function PageViewer(props: ReportViewerProps & { state: State; retry(): void }) 
         {state.status === "error" && (
           <div id={`${id}-failed`} className="flex flex-col gap-3 py-6">
             {back}
-            <ListState id={`${id}-error`} state={{ kind: "error", message: `Couldn't load this report: ${state.error}`, onRetry: props.retry }} />
+            <ListState
+              id={`${id}-error`}
+              state={{ kind: "error", message: `Couldn't load this report: ${state.error}`, onRetry: props.retry }}
+            />
           </div>
         )}
         {state.status === "ready" && (

@@ -63,7 +63,8 @@ beforeEach(() => {
     vi.fn(async (url: string) => {
       const chat = /^\/api\/chats\/([0-9a-f-]{36})(\/messages)?$/.exec(url);
       if (chat?.[2]) return Response.json({ items: histories[chat[1]] ?? [], total: 1 });
-      if (chat) return Response.json({ chat: { id: chat[1], title: `Chat ${chat[1].slice(0, 1)}`, lastMessageAt: new Date().toISOString() } });
+      if (chat)
+        return Response.json({ chat: { id: chat[1], title: `Chat ${chat[1].slice(0, 1)}`, lastMessageAt: new Date().toISOString() } });
       if (url.startsWith("/api/chats?")) return Response.json({ items: [], total: 0, page: 1, pageSize: 20 });
       const rep = /^\/api\/reports\/([\w-]{12})$/.exec(url);
       if (rep) {
@@ -367,7 +368,11 @@ describe("tablet overlay", () => {
     await waitFor(() => expect($(panelId())).toHaveAttribute("role", "dialog"));
     await act(async () => fireEvent.click($(`${panelId()}-close`)!));
     await startRun();
-    act(() => copilot.agents.get(`chat-${A}`)!.toolCall("t-live", "create_artifact", { title: "Packing list" }, `artifact ${LIVE} created: Packing list`));
+    act(() =>
+      copilot.agents
+        .get(`chat-${A}`)!
+        .toolCall("t-live", "create_artifact", { title: "Packing list" }, `artifact ${LIVE} created: Packing list`),
+    );
     await flush();
     expect($(panelId())).toBeNull();
     expect($(`${pane()}-report-status`)).toHaveTextContent("Report ready: “Packing list”.");

@@ -125,7 +125,9 @@ describe("PlanCard trip and shortlist", () => {
 describe("WidgetRenderer plan", () => {
   it("renders a plan widget and passes edits up unless it is stale", () => {
     const onPlanEdit = vi.fn();
-    const { rerender } = render(<WidgetRenderer idPrefix="t" toolCallId="w1" args={{ widget: event }} locale="en-US" onPlanEdit={onPlanEdit} />);
+    const { rerender } = render(
+      <WidgetRenderer idPrefix="t" toolCallId="w1" args={{ widget: event }} locale="en-US" onPlanEdit={onPlanEdit} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Increase guests" }));
     expect(onPlanEdit).toHaveBeenCalledWith({ event: { guests: 13 } });
     rerender(<WidgetRenderer idPrefix="t" toolCallId="w1" args={{ widget: event }} locale="en-US" onPlanEdit={onPlanEdit} stalePlan />);

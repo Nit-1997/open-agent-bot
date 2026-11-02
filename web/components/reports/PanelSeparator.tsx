@@ -1,14 +1,7 @@
 "use client";
 
 import { type KeyboardEvent, type PointerEvent, useRef } from "react";
-import {
-  clampFraction,
-  DEFAULT_PANEL_FRACTION,
-  fractionLimits,
-  SEPARATOR_PX,
-  type SeparatorKey,
-  step,
-} from "@/lib/shell/panelWidth";
+import { clampFraction, DEFAULT_PANEL_FRACTION, fractionLimits, SEPARATOR_PX, type SeparatorKey, step } from "@/lib/shell/panelWidth";
 
 const KEYS: ReadonlySet<string> = new Set<SeparatorKey>(["ArrowLeft", "ArrowRight", "Home", "End"]);
 

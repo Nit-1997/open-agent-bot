@@ -50,7 +50,8 @@ function useHistoryLoader(threadId: string, status: string, attempt: number) {
     let alive = true;
     Promise.all([chatsApi.get(threadId), chatsApi.messages(threadId)])
       .then(([{ chat }, { items }]) => {
-        if (alive) dispatch({ type: "loaded", id: threadId, title: chat.title, history: toHistory(threadId, items), cardDates: cardDates(items) });
+        if (alive)
+          dispatch({ type: "loaded", id: threadId, title: chat.title, history: toHistory(threadId, items), cardDates: cardDates(items) });
       })
       .catch((e: unknown) => {
         if (alive) dispatch({ type: "failed", id: threadId, missing: e instanceof ApiError && e.status === 404, error: errorMessage(e) });
@@ -194,7 +195,11 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
               memory={rememberLine(profile, persona.name)}
               onOpenProfile={openProfile}
               composerPlaceholder={
-                panel ? REPORT_PLACEHOLDER : phone ? `Message ${isolate(persona.name)}` : `Ask ${isolate(persona.name)} to research, compare, or plan…`
+                panel
+                  ? REPORT_PLACEHOLDER
+                  : phone
+                    ? `Message ${isolate(persona.name)}`
+                    : `Ask ${isolate(persona.name)} to research, compare, or plan…`
               }
               composerLabel={`Message ${isolate(persona.name)}`}
               composerAccessory={
@@ -222,12 +227,7 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
         />
       ) : null}
       {showPanel && placement === "overlay" ? (
-        <div
-          id={backdropId}
-          aria-hidden="true"
-          onClick={onClose}
-          className="fixed inset-0 z-30 bg-black/45 backdrop-blur-[2px]"
-        />
+        <div id={backdropId} aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-black/45 backdrop-blur-[2px]" />
       ) : null}
       {showPanel ? (
         <ReportPanel

@@ -82,7 +82,11 @@ export function ReportCard(props: {
 
 function Tile({ id }: { id: string }) {
   return (
-    <span id={id} aria-hidden="true" className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-paper text-mist-500">
+    <span
+      id={id}
+      aria-hidden="true"
+      className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-paper text-mist-500"
+    >
       <FileText id={`${id}-glyph`} aria-hidden="true" size={15} />
     </span>
   );

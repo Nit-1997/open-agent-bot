@@ -15,7 +15,13 @@ const stored: StoredMessage[] = [
     createdAt: at,
     parts: [
       { type: "text", text: "Writing it up." },
-      { type: "tool", id: "c2", name: "create_artifact", args: '{"title":"Big Sur guide"}', result: "artifact abcdefghijkl created: Big Sur guide" },
+      {
+        type: "tool",
+        id: "c2",
+        name: "create_artifact",
+        args: '{"title":"Big Sur guide"}',
+        result: "artifact abcdefghijkl created: Big Sur guide",
+      },
       { type: "tool", id: "c3-widget", name: "show_widget", args: JSON.stringify({ widget: cart }), result: "rendered cart" },
       { type: "text", text: "Here it is." },
     ],
@@ -48,7 +54,10 @@ describe("toHistory", () => {
 
   it("shows a report the run never finished as failed rather than still writing", () => {
     const turns = buildTurns(toHistory("chat", stored) as ChatMessage[]);
-    expect(turns[1].items).toEqual([{ kind: "artifact", id: "c9", title: "Short", result: "" }, expect.objectContaining({ kind: "text", text: STOPPED_MARK })]);
+    expect(turns[1].items).toEqual([
+      { kind: "artifact", id: "c9", title: "Short", result: "" },
+      expect.objectContaining({ kind: "text", text: STOPPED_MARK }),
+    ]);
   });
 
   it("keeps plain replies and marks stopped ones", () => {

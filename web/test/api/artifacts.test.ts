@@ -16,7 +16,9 @@ afterEach(() => {
 
 const call = (id: string, qs = "") => GET(new Request(`http://localhost/api/artifacts/${id}${qs}`), { params: Promise.resolve({ id }) });
 const framed = (id: string) =>
-  GET(new Request(`http://localhost/api/artifacts/${id}`, { headers: { "sec-fetch-dest": "iframe" } }), { params: Promise.resolve({ id }) });
+  GET(new Request(`http://localhost/api/artifacts/${id}`, { headers: { "sec-fetch-dest": "iframe" } }), {
+    params: Promise.resolve({ id }),
+  });
 
 describe("artifacts route", () => {
   it("artifacts route forces sandbox CSP", async () => {

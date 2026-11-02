@@ -19,5 +19,7 @@ export function BackLink(props: { id: string; href: string; label: string }) {
 
 export function ReportDetail({ reportId }: { reportId: string }) {
   const id = "report-detail";
-  return <ReportViewer id={id} reportId={reportId} variant="page" back={<BackLink id={`${id}-back`} href="/reports" label="All reports" />} />;
+  return (
+    <ReportViewer id={id} reportId={reportId} variant="page" back={<BackLink id={`${id}-back`} href="/reports" label="All reports" />} />
+  );
 }
