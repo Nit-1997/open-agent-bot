@@ -8,18 +8,24 @@ const down = { user: null, unavailable: true };
 
 describe("decideRoute", () => {
   it("lets anyone reach the sign-in pages", () => {
-    for (const path of ["/login", "/request-access", "/auth/callback", "/auth/confirm", "/auth/signout", "/_next/data/x"]) {
+    for (const path of ["/login", "/request-access", "/auth/callback", "/auth/confirm", "/auth/signout", "/landing", "/_next/data/x"]) {
       expect(decideRoute(path, none)).toEqual({ kind: "pass" });
     }
   });
 
+  it("shows signed-out visitors the landing page at / and the app once signed in", () => {
+    expect(decideRoute("/", none)).toEqual({ kind: "landing" });
+    expect(decideRoute("/", down)).toEqual({ kind: "landing" });
+    expect(decideRoute("/", user)).toEqual({ kind: "pass" });
+  });
+
   it("sends signed-out visitors to /login and answers 401 on the API", () => {
-    expect(decideRoute("/", none)).toEqual({ kind: "login" });
+    expect(decideRoute("/chats", none)).toEqual({ kind: "login" });
     expect(decideRoute("/api/profile", none)).toEqual({ kind: "json", status: 401, error: "signed_out" });
   });
 
   it("fails closed when the account service is down", () => {
-    expect(decideRoute("/", down)).toEqual({ kind: "login", error: "auth_unavailable" });
+    expect(decideRoute("/chats", down)).toEqual({ kind: "login", error: "auth_unavailable" });
     expect(decideRoute("/api/profile", down)).toEqual({ kind: "json", status: 503, error: "auth_unavailable" });
   });
 

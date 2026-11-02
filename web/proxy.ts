@@ -8,6 +8,7 @@ import { updateSession } from "@/lib/supabase/proxy";
 
 const NOT_FOUND_PATH = "/__not-found";
 const REPORT_PATH = "/api/artifacts/";
+const LANDING_PATH = "/landing";
 
 async function respond(
   request: NextRequest,
@@ -24,6 +25,8 @@ async function respond(
       const page = await artifactErrorPage(json, request.nextUrl.pathname);
       return new NextResponse(page.body, page);
     }
+    case "landing":
+      return NextResponse.rewrite(new URL(LANDING_PATH, request.url), { request: { headers: forwardHeaders } });
     case "not_found_page":
       return NextResponse.rewrite(new URL(NOT_FOUND_PATH, request.url), { request: { headers: forwardHeaders } });
     case "login": {
