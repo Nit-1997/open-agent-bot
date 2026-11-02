@@ -1,9 +1,8 @@
 import type { EntityKind } from "../../../shared/workspace.js";
-import type { VersionedEntity, WorkspaceRepo } from "../db/types.js";
 import { VersionConflict } from "./conflict.js";
 import { summarize } from "./summary.js";
 
-export type { VersionedEntity };
+export type VersionedEntity = { kind: EntityKind; id: string; value: unknown; version: number; updatedAt: number };
 
 export interface WorkspaceStore {
   get(kind: EntityKind, id: string): Promise<VersionedEntity | undefined>;
@@ -11,33 +10,6 @@ export interface WorkspaceStore {
   put(kind: EntityKind, id: string, value: unknown, expectedVersion?: number): Promise<number>;
   remove(kind: EntityKind, id: string): Promise<boolean>;
   summary(): Promise<string>;
-}
-
-export class SupabaseWorkspaceStore implements WorkspaceStore {
-  constructor(
-    private readonly repo: WorkspaceRepo,
-    private readonly chatId: string,
-  ) {}
-
-  get(kind: EntityKind, id: string) {
-    return this.repo.get(this.chatId, kind, id);
-  }
-
-  list(kind?: EntityKind) {
-    return this.repo.list(this.chatId, kind);
-  }
-
-  put(kind: EntityKind, id: string, value: unknown, expectedVersion?: number) {
-    return this.repo.put(this.chatId, kind, id, value, expectedVersion);
-  }
-
-  remove(kind: EntityKind, id: string) {
-    return this.repo.remove(this.chatId, kind, id);
-  }
-
-  async summary(): Promise<string> {
-    return summarize(await this.list());
-  }
 }
 
 export class MemoryWorkspaceStore implements WorkspaceStore {

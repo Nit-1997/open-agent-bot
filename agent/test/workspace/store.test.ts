@@ -1,30 +1,17 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ENTITY_KINDS } from "../../../shared/workspace.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import { VersionConflict } from "../../src/workspace/conflict.js";
-import { MemoryWorkspaceStore, SupabaseWorkspaceStore, type WorkspaceStore } from "../../src/workspace/store.js";
+import { MemoryWorkspaceStore, type WorkspaceStore } from "../../src/workspace/store.js";
 import { SUMMARY_LIMIT } from "../../src/workspace/summary.js";
-import { MemoryDb } from "../fixtures/memoryRepos.js";
-import { ALICE, BOB, CHAT_1, CHAT_2 } from "../fixtures/users.js";
 
 const party = { title: "8th birthday", date: "Nov 14", guests: 12, budget: 300, currency: "USD" };
 
-const backends: Array<[string, () => Promise<{ s: WorkspaceStore; other: WorkspaceStore }>]> = [
-  ["memory", async () => ({ s: new MemoryWorkspaceStore(), other: new MemoryWorkspaceStore() })],
-  [
-    "repository-backed",
-    async () => {
-      const db = new MemoryDb();
-      const r = db.forUser(ALICE.id);
-      await r.chats.claim(CHAT_1, {});
-      await r.chats.claim(CHAT_2, {});
-      return { s: new SupabaseWorkspaceStore(r.workspace, CHAT_1), other: new SupabaseWorkspaceStore(r.workspace, CHAT_2) };
-    },
-  ],
-];
+const open = async (): Promise<{ s: WorkspaceStore; other: WorkspaceStore }> => ({
+  s: new MemoryWorkspaceStore(),
+  other: new MemoryWorkspaceStore(),
+});
 
-describe.each(backends)("%s WorkspaceStore", (_name, open) => {
+describe("MemoryWorkspaceStore", () => {
   it("puts, gets and lists entities per chat with increasing versions", async () => {
     const { s, other } = await open();
     expect(await s.put("event", "main", party)).toBe(1);
@@ -100,26 +87,5 @@ describe.each(backends)("%s WorkspaceStore", (_name, open) => {
     const { s } = await open();
     for (let i = 0; i < 30; i++) await s.put("event", `e${i}`, { ...party, title: `A long party title number ${i}` });
     expect((await s.summary()).length).toBeLessThanOrEqual(SUMMARY_LIMIT);
-  });
-});
-
-describe("workspace ownership", () => {
-  it("never writes into another user's chat", async () => {
-    const db = new MemoryDb();
-    await db.forUser(BOB.id).chats.claim(CHAT_1, {});
-    const alice = new SupabaseWorkspaceStore(db.forUser(ALICE.id).workspace, CHAT_1);
-    await expect(alice.put("event", "main", party)).rejects.toMatchObject({ kind: "not_found" });
-    expect(await alice.list()).toEqual([]);
-  });
-
-  it("keeps the database's kind check in step with ENTITY_KINDS", () => {
-    const sql = readFileSync(new URL("../../../supabase/migrations/20261101060645_chats_workspace.sql", import.meta.url), "utf8");
-    const listed = /kind\s+text not null check \(kind in \(([^)]*)\)\)/.exec(sql)?.[1];
-    expect(
-      listed
-        ?.split(",")
-        .map((k) => k.trim().replace(/'/g, ""))
-        .sort(),
-    ).toEqual([...ENTITY_KINDS].sort());
   });
 });

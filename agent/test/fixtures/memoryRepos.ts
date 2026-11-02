@@ -1,27 +1,8 @@
 import { emptyProfile } from "../../../shared/profile.js";
 import type { ChatSummary, StoredMessage } from "../../../shared/chats.js";
-import {
-  CHATS_PAGE_SIZE,
-  PLANS_PAGE_SIZE,
-  REPORTS_PAGE_SIZE,
-  SEARCH_PAGE_SIZE,
-  type SearchScope,
-  SNIPPET_CHARS,
-} from "../../../shared/lists.js";
-import { ENTITY_KINDS, type EntityKind } from "../../../shared/workspace.js";
-import type {
-  ArtifactFile,
-  ArtifactListRow,
-  ArtifactRow,
-  CredentialRow,
-  EntityCounts,
-  NewMessage,
-  SearchRow,
-  UserRepos,
-  VersionedEntity,
-} from "../../src/db/types.js";
+import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_PAGE_SIZE, type SearchScope, SNIPPET_CHARS } from "../../../shared/lists.js";
+import type { ArtifactFile, ArtifactListRow, ArtifactRow, CredentialRow, NewMessage, SearchRow, UserRepos } from "../../src/db/types.js";
 import { UserError } from "../../src/lib/errors.js";
-import { VersionConflict } from "../../src/workspace/conflict.js";
 
 type Chat = { id: string; userId: string; title: string; lastMessageAt: string; seq: number };
 
@@ -29,7 +10,6 @@ export class MemoryDb {
   profiles = new Map<string, unknown>();
   chats = new Map<string, Chat>();
   messages: Array<StoredMessage & { chatId: string; userId: string; runId: string }> = [];
-  entities = new Map<string, VersionedEntity & { chatId: string; userId: string }>();
   artifacts = new Map<string, ArtifactRow & { userId: string; sizeBytes: number; createdAt: string }>();
   objects = new Map<string, Buffer>();
   settings = new Map<string, { data: unknown; deviceId: string; stamp: string }>();
@@ -48,14 +28,12 @@ export class MemoryDb {
     const db = this;
     if (!db.profiles.has(userId)) db.profiles.set(userId, emptyProfile());
     const owned = (chatId: string) => db.chats.get(chatId)?.userId === userId;
-    const ekey = (chatId: string, kind: EntityKind, id: string) => `${chatId}\0${kind}\0${id}`;
     const okey = (id: string, file: ArtifactFile) => `${userId}/${id}.${file}`;
     const summary = (c: Chat): ChatSummary => ({ id: c.id, title: c.title, lastMessageAt: c.lastMessageAt });
     const myChats = () =>
       [...db.chats.values()]
         .filter((c) => c.userId === userId)
         .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt) || b.id.localeCompare(a.id));
-    const myEntities = () => [...db.entities.values()].filter((e) => e.userId === userId);
     const listRow = (a: ArtifactRow & { sizeBytes: number; createdAt: string }): ArtifactListRow => ({
       id: a.id,
       chatId: a.chatId,
@@ -119,60 +97,6 @@ export class MemoryDb {
             })),
             total: mine.length,
           };
-        },
-      },
-      workspace: {
-        async get(chatId: string, kind: EntityKind, id: string) {
-          const e = db.entities.get(ekey(chatId, kind, id));
-          return e && e.userId === userId
-            ? structuredClone({ kind: e.kind, id: e.id, value: e.value, version: e.version, updatedAt: e.updatedAt })
-            : undefined;
-        },
-        async list(chatId: string, kind?: EntityKind) {
-          return [...db.entities.values()]
-            .filter((e) => e.chatId === chatId && e.userId === userId && (!kind || e.kind === kind))
-            .sort((a, b) => a.updatedAt - b.updatedAt)
-            .map((e) => structuredClone({ kind: e.kind, id: e.id, value: e.value, version: e.version, updatedAt: e.updatedAt }));
-        },
-        async put(chatId: string, kind: EntityKind, id: string, value: unknown, expected?: number) {
-          if (!owned(chatId)) throw new UserError("That doesn't exist.", "not_found");
-          const cur = db.entities.get(ekey(chatId, kind, id));
-          if (expected !== undefined && (cur?.version ?? 0) !== expected) throw new VersionConflict(kind, id, expected, cur?.version ?? 0);
-          const version = (cur?.version ?? 0) + 1;
-          db.entities.set(ekey(chatId, kind, id), {
-            chatId,
-            userId,
-            kind,
-            id,
-            value: structuredClone(value),
-            version,
-            updatedAt: db.tick(),
-          });
-          return version;
-        },
-        async remove(chatId: string, kind: EntityKind, id: string) {
-          const e = db.entities.get(ekey(chatId, kind, id));
-          return !!e && e.userId === userId && db.entities.delete(ekey(chatId, kind, id));
-        },
-        async page(page: number, kind?: EntityKind) {
-          const mine = myEntities()
-            .filter((e) => !kind || e.kind === kind)
-            .sort(
-              (a, b) =>
-                b.updatedAt - a.updatedAt || a.chatId.localeCompare(b.chatId) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id),
-            );
-          return {
-            items: mine
-              .slice((page - 1) * PLANS_PAGE_SIZE, page * PLANS_PAGE_SIZE)
-              .map((e) =>
-                structuredClone({ chatId: e.chatId, kind: e.kind, id: e.id, value: e.value, version: e.version, updatedAt: e.updatedAt }),
-              ),
-            total: mine.length,
-          };
-        },
-        async counts() {
-          const mine = myEntities();
-          return Object.fromEntries(ENTITY_KINDS.map((k) => [k, mine.filter((e) => e.kind === k).length])) as EntityCounts;
         },
       },
       artifacts: {

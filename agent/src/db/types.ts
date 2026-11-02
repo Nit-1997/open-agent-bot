@@ -1,17 +1,12 @@
 import type { ChatSummary, StoredMessage } from "../../../shared/chats.js";
 import type { SearchScope } from "../../../shared/lists.js";
 import type { Page } from "../../../shared/pages.js";
-import type { EntityKind } from "../../../shared/workspace.js";
 import type { CredentialKind, Sealed } from "../crypto/envelope.js";
 
 export type NewMessage = Omit<StoredMessage, "createdAt">;
 
-export type VersionedEntity = { kind: EntityKind; id: string; value: unknown; version: number; updatedAt: number };
-
 export type ArtifactRow = { id: string; chatId: string | null; title: string; pdfReady: boolean; thumbReady: boolean };
 export type ArtifactListRow = Omit<ArtifactRow, "thumbReady"> & { sizeBytes: number; createdAt: string };
-export type ChatEntity = VersionedEntity & { chatId: string };
-export type EntityCounts = Record<EntityKind, number>;
 export type ArtifactFile = "html" | "pdf" | "jpg";
 
 export type ProviderSettingsRow = { data: unknown; deviceId: string; stamp: string };
@@ -36,15 +31,6 @@ export interface ChatRepo {
 export interface MessageRepo {
   append(chatId: string, runId: string, rows: NewMessage[]): Promise<void>;
   history(chatId: string, limit?: number): Promise<Page<StoredMessage>>;
-}
-
-export interface WorkspaceRepo {
-  get(chatId: string, kind: EntityKind, id: string): Promise<VersionedEntity | undefined>;
-  list(chatId: string, kind?: EntityKind): Promise<VersionedEntity[]>;
-  put(chatId: string, kind: EntityKind, id: string, value: unknown, expectedVersion?: number): Promise<number>;
-  remove(chatId: string, kind: EntityKind, id: string): Promise<boolean>;
-  page(page: number, kind?: EntityKind): Promise<Page<ChatEntity>>;
-  counts(): Promise<EntityCounts>;
 }
 
 export interface ArtifactRepo {
@@ -98,7 +84,6 @@ export type UserRepos = Readonly<{
   profiles: ProfileRepo;
   chats: ChatRepo;
   messages: MessageRepo;
-  workspace: WorkspaceRepo;
   artifacts: ArtifactRepo;
   search: SearchRepo;
   storage: ArtifactStorage;

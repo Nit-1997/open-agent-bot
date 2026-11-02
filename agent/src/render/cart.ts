@@ -1,9 +1,5 @@
-import type { Cart } from "../../../shared/widgets.js";
-import { validateWidget } from "../../../shared/widgets.js";
-import type { CartEntity } from "../../../shared/workspace.js";
-import { ActiveCart } from "../shop/cart.js";
 import { currencyOf } from "../shop/currency.js";
-import { bestValue, type StoreResult } from "../shop/rank.js";
+import type { StoreResult } from "../shop/rank.js";
 
 export const MAX_CART_STORES = 6;
 const MAX_PICKS = 3;
@@ -33,16 +29,4 @@ export function toCartStore(view: StoreView, sum: StoreTotal) {
         ),
     })),
   };
-}
-
-export function cartWidget(entity: CartEntity): Cart | null {
-  const view = ActiveCart.from(entity).view();
-  const summary = bestValue(view).filter((s) => s.found > 0);
-  if (!summary.length) return null;
-  const candidate = {
-    kind: "cart",
-    stores: summary.slice(0, MAX_CART_STORES).map((sum) => toCartStore(view.find((v) => v.store === sum.store)!, sum)),
-  };
-  const r = validateWidget(candidate);
-  return r.ok && r.value.kind === "cart" ? (r.value as Cart) : null;
 }

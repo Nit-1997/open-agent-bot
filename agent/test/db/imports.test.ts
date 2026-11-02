@@ -26,10 +26,18 @@ describe("database access", () => {
       .map((f) => relative(SRC, f))
       .filter((f) => !f.startsWith("db/") && !f.startsWith("admin/authAdmin"))
       .filter((f) =>
-        /\.from\(["'](profiles|chats|chat_messages|workspace_entities|artifacts|provider_settings|provider_credentials|access_requests|invited_emails)["']\)/.test(
+        /\.from\(["'](profiles|chats|chat_messages|artifacts|provider_settings|provider_credentials|access_requests|invited_emails)["']\)/.test(
           readFileSync(join(SRC, f), "utf8"),
         ),
       );
+    expect(offenders).toEqual([]);
+  });
+
+  it("never touches the retired workspace table or its functions", () => {
+    const offenders = files(SRC)
+      .map((f) => relative(SRC, f))
+      .filter((f) => f !== "db/database.types.ts")
+      .filter((f) => /workspace_entities|workspace_put|workspace_counts/.test(readFileSync(join(SRC, f), "utf8")));
     expect(offenders).toEqual([]);
   });
 });

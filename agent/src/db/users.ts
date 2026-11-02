@@ -1,13 +1,11 @@
 import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
 import type { MessagePart, MessageRole, MessageStatus } from "../../../shared/chats.js";
 import { isUuid } from "../../../shared/ids.js";
-import { CHATS_PAGE_SIZE, PLANS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "../../../shared/lists.js";
-import { ENTITY_KINDS } from "../../../shared/workspace.js";
+import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "../../../shared/lists.js";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { CredentialKind } from "../crypto/envelope.js";
 import { UserError } from "../lib/errors.js";
-import { VersionConflict } from "../workspace/conflict.js";
 import { fromBytea, toBytea } from "./bytea.js";
 import type { Db } from "./client.js";
 import type { Json, Tables } from "./database.types.js";
@@ -22,7 +20,6 @@ import {
   artifactPath,
   type ChatRepo,
   type CredentialRepo,
-  type ChatEntity,
   type CredentialRow,
   type MessageRepo,
   type ProfileRepo,
@@ -30,8 +27,6 @@ import {
   type SearchRepo,
   type SearchResult,
   type UserRepos,
-  type VersionedEntity,
-  type WorkspaceRepo,
 } from "./types.js";
 
 const CONTENT_TYPE: Record<ArtifactFile, string> = { html: "text/html", pdf: "application/pdf", jpg: "image/jpeg" };
@@ -162,17 +157,15 @@ function messages(db: Db, userId: string): MessageRepo {
       if (!rows.length) return;
       await must(
         "messages.append",
-        db
-          .from("chat_messages")
-          .insert(
-            rows.map(({ parts, ...r }) => ({
-              chat_id: chatId,
-              user_id: userId,
-              run_id: runId.slice(0, 100),
-              ...r,
-              ...(parts && { parts }),
-            })),
-          ),
+        db.from("chat_messages").insert(
+          rows.map(({ parts, ...r }) => ({
+            chat_id: chatId,
+            user_id: userId,
+            run_id: runId.slice(0, 100),
+            ...r,
+            ...(parts && { parts }),
+          })),
+        ),
       );
     },
     async history(chatId, limit = HISTORY_LIMIT) {
@@ -198,95 +191,6 @@ function messages(db: Db, userId: string): MessageRepo {
         })
         .reverse();
       return { items, total: count ?? 0 };
-    },
-  };
-}
-
-type EntityRow = Pick<Tables<"workspace_entities">, "kind" | "entity_id" | "value" | "version" | "updated_at">;
-const toEntity = (r: EntityRow): VersionedEntity => ({
-  kind: oneOf(ENTITY_KINDS, r.kind, "workspace_entities.kind"),
-  id: r.entity_id,
-  value: r.value,
-  version: r.version,
-  updatedAt: Date.parse(r.updated_at),
-});
-
-const CountsSchema = Type.Record(Type.String(), Type.Integer({ minimum: 0 }));
-
-function workspace(db: Db, userId: string): WorkspaceRepo {
-  const base = (chatId: string) =>
-    db.from("workspace_entities").select("kind, entity_id, value, version, updated_at").eq("chat_id", chatId).eq("user_id", userId);
-  return {
-    async get(chatId, kind, id) {
-      const { data } = await read("workspace.get", () => base(chatId).eq("kind", kind).eq("entity_id", id).maybeSingle());
-      return data ? toEntity(data) : undefined;
-    },
-    async list(chatId, kind) {
-      const { data } = await read("workspace.list", () => {
-        const q = kind ? base(chatId).eq("kind", kind) : base(chatId);
-        return q.order("updated_at").order("kind").order("entity_id");
-      });
-      return (data ?? []).map(toEntity);
-    },
-    async put(chatId, kind, id, value, expectedVersion) {
-      const res = await db.rpc("workspace_put", {
-        p_user: userId,
-        p_chat: chatId,
-        p_kind: kind,
-        p_id: id,
-        p_value: value as Json,
-        p_expected: (expectedVersion ?? null) as number,
-      });
-      if (res.error?.code === "PT409") {
-        if (expectedVersion === undefined) throw new UserError("This chat doesn't exist.", "not_found");
-        throw new VersionConflict(kind, id, expectedVersion, Number(res.error.details) || 0);
-      }
-      if (res.error) throw dbError("workspace.put", { ...res.error, status: res.status });
-      return res.data ?? 0;
-    },
-    async remove(chatId, kind, id) {
-      const { data } = await must(
-        "workspace.remove",
-        db
-          .from("workspace_entities")
-          .delete()
-          .eq("chat_id", chatId)
-          .eq("user_id", userId)
-          .eq("kind", kind)
-          .eq("entity_id", id)
-          .select("entity_id"),
-      );
-      return (data?.length ?? 0) > 0;
-    },
-    async page(page, kind) {
-      const from = pageOffset(page, PLANS_PAGE_SIZE);
-      const { data, total } = await readPage(
-        "workspace.page",
-        () => {
-          const q = db
-            .from("workspace_entities")
-            .select("chat_id, kind, entity_id, value, version, updated_at", { count: "exact" })
-            .eq("user_id", userId);
-          return (kind ? q.eq("kind", kind) : q)
-            .order("updated_at", { ascending: false })
-            .order("chat_id")
-            .order("kind")
-            .order("entity_id")
-            .range(from, from + PLANS_PAGE_SIZE - 1);
-        },
-        () => {
-          const q = db.from("workspace_entities").select("entity_id", { count: "exact", head: true }).eq("user_id", userId);
-          return kind ? q.eq("kind", kind) : q;
-        },
-      );
-      return { items: (data ?? []).map((r): ChatEntity => ({ ...toEntity(r), chatId: r.chat_id })), total };
-    },
-    async counts() {
-      const res = await db.rpc("workspace_counts", { p_user: userId });
-      if (res.error) throw dbError("workspace.counts", { ...res.error, status: res.status });
-      if (!Value.Check(CountsSchema, res.data)) throw new Error("unexpected workspace_counts result");
-      const counted = res.data as Record<string, number>;
-      return Object.fromEntries(ENTITY_KINDS.map((kind) => [kind, counted[kind] ?? 0])) as Record<(typeof ENTITY_KINDS)[number], number>;
     },
   };
 }
@@ -572,7 +476,6 @@ export function forUser(db: Db, userId: string): UserRepos {
     profiles: profiles(db, userId),
     chats: chats(db, userId),
     messages: messages(db, userId),
-    workspace: workspace(db, userId),
     artifacts: artifacts(db, userId),
     search: search(db, userId),
     storage: storage(db, userId),

@@ -12,7 +12,6 @@ import { adminRoutes } from "./http/admin.js";
 import { aguiRoutes } from "./http/agui.js";
 import { artifactRoutes } from "./http/artifacts.js";
 import { chatRoutes } from "./http/chats.js";
-import { planRoutes } from "./http/plans.js";
 import { reportRoutes } from "./http/reports.js";
 import { searchRoutes } from "./http/search.js";
 import { errorResponse } from "./http/handlers.js";
@@ -63,8 +62,6 @@ const USER_PATHS = [
   "/artifacts/*",
   "/reports",
   "/reports/*",
-  "/plans",
-  "/plans/*",
   "/search",
 ];
 
@@ -87,7 +84,6 @@ export function createApp(deps: AppDeps) {
   app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, limiter: deps.limiter, gate: deps.gate }));
   app.route("/", chatRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", reportRoutes({ repos: deps.repos, limiter: deps.limiter }));
-  app.route("/", planRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", searchRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", profileRoutes({ profiles: deps.profiles, limiter: deps.limiter, sessions: deps.store }));
   app.route("/", settingsRoutes({ hubs: deps.hubs, limiter: deps.limiter }));

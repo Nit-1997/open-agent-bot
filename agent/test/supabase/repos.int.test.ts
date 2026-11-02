@@ -7,7 +7,6 @@ import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
 import { forUser } from "../../src/db/users.js";
 import { SupabaseProfileStore } from "../../src/profile/store.js";
 import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
-import { VersionConflict } from "../../src/workspace/conflict.js";
 import {
   adminRepo,
   createBareUser,
@@ -71,22 +70,13 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
     expect(await store.read("openrouter")).toBeUndefined();
   });
 
-  it("claims chats for their owner only and keeps workspace versions in step", async () => {
+  it("claims chats for their owner only", async () => {
     const chat = randomUUID();
     const ra = forUser(service(), a.id);
     const rb = forUser(service(), b.id);
     await ra.chats.claim(chat, { model: "openrouter/x" });
     await ra.chats.claim(chat, {});
     await expect(rb.chats.claim(chat, {})).rejects.toMatchObject({ kind: "not_found" });
-    expect(await ra.workspace.put(chat, "event", "main", { title: "x", guests: 2 })).toBe(1);
-    expect(await ra.workspace.put(chat, "event", "main", { title: "x", guests: 3 }, 1)).toBe(2);
-    const stale = await ra.workspace.put(chat, "event", "main", { title: "x", guests: 4 }, 1).catch((e: unknown) => e);
-    expect(stale).toBeInstanceOf(VersionConflict);
-    expect((stale as VersionConflict).actual).toBe(2);
-    expect(await ra.workspace.put(chat, "trip", "new", { destination: "y" }, 0)).toBe(1);
-    await expect(rb.workspace.put(chat, "event", "main", { title: "y", guests: 1 })).rejects.toMatchObject({ kind: "not_found" });
-    expect(await rb.workspace.list(chat)).toEqual([]);
-    expect((await ra.workspace.list(chat)).map((e) => e.kind).sort()).toEqual(["event", "trip"]);
     await ra.messages.append(chat, "run-1", [
       { role: "user", content: "hi", status: "complete" },
       {
@@ -187,7 +177,7 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
     }
   });
 
-  it("reads one chat, chat titles, reports with their chats and plans across chats", async () => {
+  it("reads one chat, chat titles, reports with their chats", async () => {
     const ra = forUser(service(), (await createBareUser()).id);
     const rb = forUser(service(), b.id);
     const c1 = randomUUID();
@@ -214,16 +204,5 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
     expect(await rb.artifacts.summary("intRepA00001")).toBeUndefined();
     await service().from("chats").delete().eq("id", c2);
     expect((await ra.artifacts.summary("intRepA00002"))?.chatId).toBeNull();
-
-    await ra.workspace.put(c1, "trip", "t1", { destination: "Big Sur", start: "a", end: "b", travelers: 2, stays: [], days: [] });
-    await ra.workspace.put(c1, "event", "e1", { title: "Party", guests: 3 });
-    const all = await ra.workspace.page(1);
-    expect(all.total).toBe(2);
-    expect(all.items.map((e) => e.kind)).toEqual(["event", "trip"]);
-    expect(all.items[0].chatId).toBe(c1);
-    const trips = await ra.workspace.page(1, "trip");
-    expect(trips.items.map((e) => e.id)).toEqual(["t1"]);
-    expect(await ra.workspace.counts()).toEqual({ cart: 0, trip: 1, event: 1, shortlist: 0 });
-    expect((await rb.workspace.page(1)).total).toBe(0);
   });
 });

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminRepo } from "../../src/db/admin.js";
 import { createServiceClient } from "../../src/db/client.js";
 import { forUser } from "../../src/db/users.js";
-import { VersionConflict } from "../../src/workspace/conflict.js";
 import { ALICE, CHAT_1 } from "../fixtures/users.js";
 
 type Reply = { status?: number; body?: unknown; headers?: Record<string, string> } | Error;
@@ -217,31 +216,6 @@ describe("user repos against PostgREST", () => {
     const { items } = await r.messages.history(CHAT_1);
     expect(items.map((m) => m.parts)).toEqual([parts, undefined, undefined]);
     expect(one(s.calls[1], "select")).toContain("parts");
-  });
-
-  it("maps PT409 from workspace_put to a version conflict or a missing chat", async () => {
-    const conflict = { status: 409, body: { code: "PT409", details: "4", message: "version conflict", hint: null } };
-    const s = stub([conflict, conflict]);
-    const ws = forUser(s.db, ALICE.id).workspace;
-    const err = await ws.put(CHAT_1, "event", "main", { title: "x" }, 3).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(VersionConflict);
-    expect(err).toMatchObject({ expected: 3, actual: 4 });
-    await expect(ws.put(CHAT_1, "event", "main", { title: "x" })).rejects.toMatchObject({ kind: "not_found" });
-    expect(s.calls[0].path).toBe("/rest/v1/rpc/workspace_put");
-    expect(s.calls[0].body).toMatchObject({ p_user: ALICE.id, p_chat: CHAT_1, p_expected: 3 });
-    expect(s.calls[1].body).toMatchObject({ p_expected: null });
-  });
-
-  it("counts plans per kind with one grouped call and fills missing kinds with zero", async () => {
-    const s = stub([{ body: { trip: 2, event: 1 } }]);
-    expect(await forUser(s.db, ALICE.id).workspace.counts()).toEqual({ cart: 0, trip: 2, event: 1, shortlist: 0 });
-    expect(s.calls).toHaveLength(1);
-    expect(s.calls[0]).toMatchObject({ method: "POST", path: "/rest/v1/rpc/workspace_counts", body: { p_user: ALICE.id } });
-  });
-
-  it("refuses a malformed counts result", async () => {
-    const s = stub([{ body: { trip: -1 } }]);
-    await expect(forUser(s.db, ALICE.id).workspace.counts()).rejects.toThrow(/workspace_counts/);
   });
 
   it("guards credential updates by version", async () => {
