@@ -1,9 +1,12 @@
 "use client";
 
+import { ExternalLink } from "./ExternalLink";
 import type { Plan } from "@shared/widgets";
 import { Minus, Plus } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { PlanEdits } from "@shared/workspace";
+import { cardDate } from "@/lib/dates";
+import { widgetId } from "./widgetId";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const INPUT = "rounded-lg border border-border bg-paper px-2 py-1 text-sm disabled:opacity-60";
@@ -148,17 +151,28 @@ type TripDraft = { start: string; end: string; travelers: number; budget?: numbe
 
 export function PlanCard({
   toolCallId,
+  idPrefix,
   widget,
   onEdit,
   stale = false,
+  locale,
+  lockedAt,
+  agentName = "the agent",
+  now,
 }: {
   toolCallId: string;
+  idPrefix?: string;
   widget: Plan;
   onEdit?: (e: PlanEdits) => void;
   stale?: boolean;
+  locale?: string;
+  lockedAt?: string | null;
+  agentName?: string;
+  now?: Date;
 }) {
-  const id = `plan-${toolCallId}`;
+  const id = widgetId("plan", toolCallId, idPrefix);
   const locked = stale || !onEdit;
+  const shownOn = lockedAt === undefined ? undefined : cardDate(lockedAt, locale, now);
   const initial =
     widget.entity === "event"
       ? { guests: widget.value.guests, date: widget.value.date, budget: widget.value.budget }
@@ -197,6 +211,11 @@ export function PlanCard({
           {stale ? "Updated plan below" : kindLabel}
         </span>
       </header>
+      {lockedAt !== undefined && (
+        <p id={`${id}-locked-note`} className="mt-1 text-xs text-text-muted">
+          {shownOn ? `From ${shownOn} · ask ${agentName} to update it` : `From an earlier session · ask ${agentName} to update it`}
+        </p>
+      )}
 
       {widget.entity === "event" && (
         <div id={`${id}-fields`} className="mt-3 flex flex-wrap items-end gap-4">
@@ -261,15 +280,9 @@ export function PlanCard({
           {widget.value.stays.map((s, i) => (
             <li id={`${id}-stays-${i}`} key={i}>
               {s.url ? (
-                <a
-                  id={`${id}-stays-${i}-link`}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
+                <ExternalLink id={`${id}-stays-${i}-link`} href={s.url} className="font-medium hover:underline">
                   {s.name}
-                </a>
+                </ExternalLink>
               ) : (
                 <span id={`${id}-stays-${i}-name`} className="font-medium">
                   {s.name}
@@ -303,15 +316,9 @@ export function PlanCard({
           {widget.value.items.map((s, i) => (
             <li id={`${id}-items-${i}`} key={i}>
               {s.url ? (
-                <a
-                  id={`${id}-items-${i}-link`}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
+                <ExternalLink id={`${id}-items-${i}-link`} href={s.url} className="font-medium hover:underline">
                   {s.name}
-                </a>
+                </ExternalLink>
               ) : (
                 <span id={`${id}-items-${i}-name`} className="font-medium">
                   {s.name}

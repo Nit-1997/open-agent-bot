@@ -1,23 +1,14 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { applyPatch } from "../../../shared/workspace.js";
 import { planTool } from "../../src/tools/plan.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
 
-const stores: WorkspaceStore[] = [];
 function setup() {
-  const store = new WorkspaceStore(join(mkdtempSync(join(tmpdir(), "plan-")), "w.sqlite"));
-  stores.push(store);
-  const tool = planTool({ store, threadId: "t" });
+  const store = new WorkspaceStore();
+  const tool = planTool({ store });
   const run = async (params: Record<string, unknown>) => tool.execute("c", params as never, undefined, undefined, {} as never);
   return { store, run };
 }
-afterEach(() => {
-  for (const s of stores.splice(0)) s.close();
-});
-
 const party = { title: "8th birthday", guests: 12, budget: 300, menu: ["pizza"] };
 const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
@@ -26,14 +17,15 @@ describe("plan tool", () => {
     const { store, run } = setup();
     const r = await run({ action: "set", kind: "event", value: party });
     expect(r.isError).toBeUndefined();
-    expect(store.get("t", "event", "main")).toMatchObject({ version: 1, value: party });
+    expect(await store.get("event", "main")).toMatchObject({ version: 1, value: party });
     expect(r.details.widget).toMatchObject({ kind: "plan", entity: "event", id: "main", version: 1, value: party });
+    expect(text(r)).toMatch(/^Set event "main" \(version 1\)/);
   });
 
   it("accepts the value as a JSON string", async () => {
     const { store, run } = setup();
     await run({ action: "set", kind: "event", id: "bday", value: JSON.stringify(party) });
-    expect(store.get("t", "event", "bday")?.value).toEqual(party);
+    expect((await store.get("event", "bday"))?.value).toEqual(party);
   });
 
   it("rejects an invalid entity with the failing paths and saves nothing", async () => {
@@ -41,7 +33,7 @@ describe("plan tool", () => {
     const r = await run({ action: "set", kind: "event", value: { title: "x", guests: 0 } });
     expect(r.isError).toBe(true);
     expect(text(r)).toContain("/guests");
-    expect(store.list("t")).toEqual([]);
+    expect(await store.list()).toEqual([]);
   });
 
   it("patches with replace, add and remove, validates the result and bumps the version", async () => {
@@ -58,11 +50,11 @@ describe("plan tool", () => {
       ],
     });
     expect(r.isError).toBeUndefined();
-    expect(store.get("t", "event", "main")).toMatchObject({
+    expect(await store.get("event", "main")).toMatchObject({
       version: 2,
       value: { title: "8th birthday", guests: 16, menu: ["pizza", "cake"], theme: "space" },
     });
-    expect(store.get("t", "event", "main")?.value).not.toHaveProperty("budget");
+    expect((await store.get("event", "main"))?.value).not.toHaveProperty("budget");
     expect(r.details.widget).toMatchObject({ version: 2 });
   });
 
@@ -76,14 +68,14 @@ describe("plan tool", () => {
     const required = await run({ action: "patch", kind: "event", ops: [{ op: "remove", path: "/guests" }] });
     for (const r of [bad, missing, noValue, unknownOp, required]) expect(r.isError).toBe(true);
     expect(text(bad)).toContain("invalid");
-    expect(store.get("t", "event", "main")).toMatchObject({ version: 1, value: party });
+    expect(await store.get("event", "main")).toMatchObject({ version: 1, value: party });
   });
 
   it("patching an entity that does not exist asks for set first", async () => {
     const { run } = setup();
     const r = await run({ action: "patch", kind: "trip", ops: [{ op: "replace", path: "/travelers", value: 3 }] });
     expect(r.isError).toBe(true);
-    expect(text(r)).toContain("set first");
+    expect(text(r)).toBe('No trip "main" in this session yet; use set first.');
   });
 
   it("gets one entity or all of a kind", async () => {
@@ -92,7 +84,8 @@ describe("plan tool", () => {
     await run({ action: "set", kind: "event", id: "b", value: { ...party, guests: 3 } });
     expect(text(await run({ action: "get", kind: "event", id: "b" }))).toContain('"guests":3');
     expect(text(await run({ action: "get", kind: "event" }))).toContain('event "a"');
-    expect((await run({ action: "get", kind: "trip" })).isError).toBe(true);
+    expect(text(await run({ action: "get", kind: "trip" }))).toBe("No trip in this session yet.");
+    expect(text(await run({ action: "get", kind: "event", id: "zz" }))).toBe('No event "zz" in this session.');
   });
 
   it("reads the cart but never writes it", async () => {
@@ -120,9 +113,12 @@ describe("plan tool", () => {
 
   it("describes when to patch instead of rebuilding", () => {
     const { store } = setup();
-    const description = planTool({ store, threadId: "t" }).description;
+    const description = planTool({ store }).description;
     expect(description).toContain("make it 16 kids");
     expect(description).toContain("Never rebuild the plan or re-search unchanged items");
+    expect(description).toMatch(/^This chat's plans for the current session:/);
+    expect(description).toContain("they last for this session only and aren't saved anywhere else.");
+    expect(description).not.toContain("saved plan state");
   });
 });
 
@@ -138,5 +134,14 @@ describe("applyPatch", () => {
     expect(applyPatch({}, [{ op: "add", path: "/__proto__/x", value: 1 }]).ok).toBe(false);
     expect(applyPatch({}, [{ op: "add", path: "x", value: 1 }]).ok).toBe(false);
     expect(applyPatch([1], [{ op: "replace", path: "/5", value: 1 }]).ok).toBe(false);
+  });
+
+  it("refuses a new plan once the session holds 50", async () => {
+    const { store, run } = setup();
+    for (let i = 0; i < 50; i++) await store.put("event", `e${i}`, party);
+    const r = await run({ action: "set", kind: "event", id: "e50", value: party });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toBe("This session already holds 50 plans. Update one of them instead of adding another.");
+    expect((await run({ action: "set", kind: "event", id: "e1", value: party })).isError).toBeUndefined();
   });
 });

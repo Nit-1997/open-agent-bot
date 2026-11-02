@@ -10,7 +10,7 @@ import { createFollowupSplitter } from "./followups.js";
 export type PiEvent = AgentSessionEvent;
 
 type Widget = { kind: string };
-type Deps = { newId: () => string; render?: (data: unknown) => Widget | null; evidence?: Evidence };
+type Deps = { newId: () => string; render?: (data: unknown) => Widget | null; evidence?: Evidence; reportEvidence?: Evidence };
 
 function resultText(result: unknown): string {
   const content = (result as { content?: Array<{ type: string; text?: string }> } | undefined)?.content;
@@ -73,7 +73,13 @@ export function createTranslator(deps: Deps) {
       out.push(textEnd(assistantId));
       const claims = evidence.unverified(text).filter((c) => !notedClaims.has(c));
       for (const c of claims) notedClaims.add(c);
-      if (claims.length) out.push(...widgetCall(`${assistantId}-widget`, { kind: "grounding_note", claims } as Widget));
+      const fromReport = claims.filter((c) => deps.reportEvidence?.covers(c));
+      const note = {
+        kind: "grounding_note",
+        claims: claims.filter((c) => !fromReport.includes(c)),
+        ...(fromReport.length && { fromReport }),
+      };
+      if (claims.length) out.push(...widgetCall(`${assistantId}-widget`, note as Widget));
     }
     out.push(...followupsWidget());
     return out;

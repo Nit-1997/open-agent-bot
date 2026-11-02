@@ -1,31 +1,38 @@
 import { Hono } from "hono";
-import type { ProviderHub } from "../providers/hub.js";
-import { type Authorized, body, requireSecret, safe } from "./handlers.js";
+import type { AuthEnv } from "../auth/middleware.js";
+import type { RateLimiter } from "../lib/rateLimit.js";
+import type { UserHubs } from "../providers/hubs.js";
+import { body, limitBy, safe } from "./handlers.js";
 
-export function settingsRoutes(deps: { hub?: ProviderHub; authorized: Authorized }) {
-  const app = new Hono();
-  for (const path of ["/settings", "/settings/*"]) {
-    app.use(path, requireSecret(deps.authorized));
-    app.use(path, async (c, next) => (deps.hub ? next() : c.json({ error: "settings are not available" }, 503)));
-  }
-  const hub = () => deps.hub!;
+export function settingsRoutes(deps: { hubs: UserHubs; limiter: RateLimiter }) {
+  const app = new Hono<AuthEnv>();
 
   app.get(
     "/settings",
-    safe((c) => c.json({ braveSearch: !!hub().secret("brave-search") })),
+    safe<AuthEnv>(async (c) => {
+      const hub = await deps.hubs.get(c.get("user"));
+      const hint = hub.secretHint("brave-search");
+      return c.json({ braveSearch: !!hub.secret("brave-search"), ...(hint && { braveSearchHint: hint }) });
+    }),
   );
   app.post(
     "/settings/brave-search/key",
-    safe(async (c) => {
+    limitBy<AuthEnv>(deps.limiter, "keys"),
+    safe<AuthEnv>(async (c) => {
       const b = await body(c);
-      await hub().setSecret("brave-search", typeof b.apiKey === "string" ? b.apiKey : "");
+      const user = c.get("user");
+      await (await deps.hubs.get(user)).setSecret("brave-search", typeof b.apiKey === "string" ? b.apiKey : "");
+      deps.hubs.invalidate(user.id);
       return c.json({ ok: true });
     }),
   );
   app.delete(
     "/settings/brave-search",
-    safe(async (c) => {
-      await hub().removeSecret("brave-search");
+    limitBy<AuthEnv>(deps.limiter, "keys"),
+    safe<AuthEnv>(async (c) => {
+      const user = c.get("user");
+      await (await deps.hubs.get(user)).removeSecret("brave-search");
+      deps.hubs.invalidate(user.id);
       return c.json({ ok: true });
     }),
   );

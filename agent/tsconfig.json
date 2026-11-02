@@ -10,6 +10,7 @@
     "rootDir": "..",
     "declaration": false,
     "resolveJsonModule": true,
+    "rewriteRelativeImportExtensions": true,
     "paths": {
       "typebox": [
         "./node_modules/typebox/build/index.d.mts"

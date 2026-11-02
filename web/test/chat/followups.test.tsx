@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TurnView } from "@/components/chat/TurnView";
 import type { Turn } from "@/lib/turns";
+import { DEFAULT_AGENT } from "@shared/profile";
 
 const turn: Turn = {
   id: "t1",
@@ -15,7 +16,19 @@ const turn: Turn = {
 };
 
 const view = (over: Partial<Parameters<typeof TurnView>[0]> = {}) =>
-  render(<TurnView turn={turn} running={false} locale="en-US" now={0} answered={false} onAnswer={() => {}} {...over} />);
+  render(
+    <TurnView
+      idPrefix="p"
+      persona={DEFAULT_AGENT}
+      turn={turn}
+      running={false}
+      locale="en-US"
+      now={0}
+      answered={false}
+      onAnswer={() => {}}
+      {...over}
+    />,
+  );
 
 describe("follow-up pills", () => {
   it("shows tappable follow-ups after the sources that send the reply", () => {
@@ -37,8 +50,19 @@ describe("follow-up pills", () => {
 describe("quick-check answers", () => {
   it("shows a small line instead of a chat bubble", () => {
     const quiet: Turn = { ...turn, id: "answer-1", user: { id: "answer-1", text: "Travelers: 2\nBudget: Saver" }, items: [] };
-    render(<TurnView turn={quiet} running={false} locale="en-US" now={0} answered={false} onAnswer={() => {}} />);
+    render(
+      <TurnView
+        idPrefix="p"
+        persona={DEFAULT_AGENT}
+        turn={quiet}
+        running={false}
+        locale="en-US"
+        now={0}
+        answered={false}
+        onAnswer={() => {}}
+      />,
+    );
     expect(screen.getByText("Sent your answers")).toBeInTheDocument();
-    expect(document.querySelector("#turn-answer-1-user-text")?.closest("details")).not.toHaveAttribute("open");
+    expect(document.querySelector("#p-turn-answer-1-user-text")?.closest("details")).not.toHaveAttribute("open");
   });
 });

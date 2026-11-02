@@ -17,8 +17,46 @@ export const HomeSchema = Type.Object({
   lon: Type.Optional(Type.Number({ minimum: -180, maximum: 180 })),
 });
 
-export const SECTIONS = ["you", "travel", "shopping", "jev"] as const;
+export const SECTIONS = ["agent", "you", "travel", "shopping", "jev"] as const;
 export type Section = (typeof SECTIONS)[number];
+
+export const AGENT_LOOKS = ["mist", "ember", "moss", "dusk"] as const;
+export const AGENT_TONES = ["brief", "warm", "thorough"] as const;
+export type AgentLook = (typeof AGENT_LOOKS)[number];
+export type AgentTone = (typeof AGENT_TONES)[number];
+
+export const AGENT_NAME_MAX = 40;
+export const AGENT_NAME_SUGGESTIONS = ["Atlas", "Ivy", "Milo", "Sage"] as const;
+export type AgentPersona = { name: string; look: AgentLook; tone: AgentTone };
+export const DEFAULT_AGENT = { name: "Juno", look: "mist", tone: "warm" } as const satisfies AgentPersona;
+
+export const AgentSchema = Type.Object(
+  {
+    name: Type.Optional(Type.String({ minLength: 1, maxLength: AGENT_NAME_MAX })),
+    look: Type.Optional(Type.Union([Type.Literal("mist"), Type.Literal("ember"), Type.Literal("moss"), Type.Literal("dusk")])),
+    tone: Type.Optional(Type.Union([Type.Literal("brief"), Type.Literal("warm"), Type.Literal("thorough")])),
+  },
+  { additionalProperties: false },
+);
+
+export type NameCheck = { ok: true; name: string } | { ok: false; error: string };
+
+const NAME_EMPTY = "Give your agent a name.";
+const NAME_LONG = `Keep it to ${AGENT_NAME_MAX} characters.`;
+const NAME_CHARS = "Use letters, numbers, spaces, apostrophes, hyphens or periods.";
+const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} '’.\-]*$/u;
+const STACKED_MARKS = /\p{M}{3}/u;
+const CONTROL = /\p{Cc}/u;
+
+export function checkAgentName(raw: unknown): NameCheck {
+  if (typeof raw !== "string") return { ok: false, error: NAME_EMPTY };
+  if (CONTROL.test(raw)) return { ok: false, error: NAME_CHARS };
+  const name = raw.normalize("NFKC").replace(/\s+/gu, " ").trim();
+  if (!name) return { ok: false, error: NAME_EMPTY };
+  if (Array.from(name).length > AGENT_NAME_MAX) return { ok: false, error: NAME_LONG };
+  if (!NAME_RE.test(name) || STACKED_MARKS.test(name)) return { ok: false, error: NAME_CHARS };
+  return { ok: true, name };
+}
 
 export const ProfileSchema = Type.Object({
   name: Type.Optional(Short(80)),
@@ -40,9 +78,11 @@ export const ProfileSchema = Type.Object({
   }),
   defaultModel: Type.Optional(Type.String({ minLength: 3, maxLength: 200 })),
   notes: Type.Optional(Short(1000)),
-  skipped: Type.Array(Type.Union([Type.Literal("you"), Type.Literal("travel"), Type.Literal("shopping"), Type.Literal("jev")]), {
-    maxItems: SECTIONS.length,
-  }),
+  skipped: Type.Array(
+    Type.Union([Type.Literal("agent"), Type.Literal("you"), Type.Literal("travel"), Type.Literal("shopping"), Type.Literal("jev")]),
+    { maxItems: SECTIONS.length },
+  ),
+  agent: Type.Optional(AgentSchema),
   onboardedAt: Type.Optional(Type.String({ maxLength: 40 })),
 });
 
@@ -96,7 +136,25 @@ export function parseProfile(v: unknown): Profile | null {
   for (const key of ["name", "notes", "defaultModel", "onboardedAt"] as const) {
     if ((candidate as Record<string, unknown>)[key] === "") delete (candidate as Record<string, unknown>)[key];
   }
-  return Value.Check(ProfileSchema, candidate) ? (candidate as Profile) : null;
+  if (!Value.Check(ProfileSchema, candidate)) return null;
+  const profile = candidate as Profile;
+  if (profile.agent?.name === undefined) return profile;
+  const name = checkAgentName(profile.agent.name);
+  return name.ok ? { ...profile, agent: { ...profile.agent, name: name.name } } : null;
+}
+
+export function withoutInvalidAgent(v: unknown): { value: unknown; dropped: boolean } {
+  if (!isObject(v) || !("agent" in v)) return { value: v, dropped: false };
+  const agent = Value.Clean(AgentSchema, structuredClone(v.agent));
+  const valid = Value.Check(AgentSchema, agent) && (agent.name === undefined || checkAgentName(agent.name).ok);
+  if (valid) return { value: v, dropped: false };
+  const { agent: _dropped, ...rest } = v;
+  return { value: rest, dropped: true };
+}
+
+export function agentPersona(p: Pick<Profile, "agent"> | undefined): AgentPersona {
+  const a = p?.agent;
+  return { name: a?.name ?? DEFAULT_AGENT.name, look: a?.look ?? DEFAULT_AGENT.look, tone: a?.tone ?? DEFAULT_AGENT.tone };
 }
 
 export function homePlace(home: Home | undefined): string | undefined {

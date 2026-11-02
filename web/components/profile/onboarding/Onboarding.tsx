@@ -1,6 +1,7 @@
 "use client";
 
-import { emptyProfile, type Profile, type Section } from "@shared/profile";
+import { agentPersona, emptyProfile, type Profile, type Section } from "@shared/profile";
+import { AgentOrb } from "@/components/agent/AgentOrb";
 import { useCallback, useEffect, useState } from "react";
 import { type ModelList, normalizeRef } from "@/lib/models";
 import { jevProvider, type SlideId, slideOrder, starters, summaryLines } from "@/lib/onboarding";
@@ -8,12 +9,14 @@ import { useOnboardingOptions } from "@/lib/onboardingApi";
 import { type ProviderView, providersApi } from "@/lib/providers";
 import { JevSlide } from "./JevSlide";
 import { ModelStep } from "./ModelStep";
+import { AgentSection } from "@/components/agent/AgentSection";
 import { ShoppingSection, TravelSection, YouSection } from "./sections";
 import { Summary } from "./Summary";
 
 type Copy = { eyebrow: string; title: string; why: string; skip?: string };
 
 const COPY: Record<Exclude<SlideId, "model">, Copy> = {
+  agent: { eyebrow: "Your agent", title: "", why: "", skip: "Skip for now" },
   you: {
     eyebrow: "You",
     title: "Let's start with you",
@@ -46,7 +49,7 @@ const modelCopy = (hasModels: boolean): Copy => ({
   title: hasModels ? "Choose your model" : "Add a model to start",
   why: hasModels
     ? "This is the default for new chats. You can switch per chat from the header."
-    : "Connect a cloud provider with a key, or a model server on this machine. Keys stay on this computer.",
+    : "Connect a cloud provider with a key, or a model server. Keys are encrypted and never shown again.",
 });
 
 function clearSection(p: Profile, s: Section): Profile {
@@ -54,10 +57,11 @@ function clearSection(p: Profile, s: Section): Profile {
   if (s === "you") return { ...p, name: undefined, home: undefined, household: empty.household, food: [] };
   if (s === "travel") return { ...p, travel: empty.travel };
   if (s === "shopping") return { ...p, shopping: empty.shopping };
+  if (s === "agent") return { ...p, agent: undefined };
   return p;
 }
 
-const SECTION_OF: Partial<Record<SlideId, Section>> = { you: "you", travel: "travel", shopping: "shopping", jev: "jev" };
+const SECTION_OF: Partial<Record<SlideId, Section>> = { agent: "agent", you: "you", travel: "travel", shopping: "shopping", jev: "jev" };
 
 export function Onboarding(props: {
   profile: Profile;
@@ -75,6 +79,7 @@ export function Onboarding(props: {
   const [starter, setStarter] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentValid, setAgentValid] = useState(true);
   const options = useOnboardingOptions(draft.home);
 
   const refreshProviders = useCallback(() => {
@@ -109,6 +114,7 @@ export function Onboarding(props: {
 
   const go = (to: SlideId) => {
     setError(null);
+    if (to !== current) setAgentValid(true);
     setSlide(to);
   };
   const next = () => go(slides[Math.min(index + 1, slides.length - 1)]);
@@ -139,7 +145,7 @@ export function Onboarding(props: {
   const summary = summaryLines(draft, { jev: slides.includes("jev") || jev ? jev : undefined, modelLabel });
   const ideas = starters(draft, options?.airports ?? []);
   const last = current === "summary";
-  const blocked = current === "model" && !modelOk;
+  const blocked = (current === "model" && !modelOk) || (current === "agent" && !agentValid);
 
   return (
     <div id="onboarding" className="flex min-h-dvh w-full items-center justify-center px-4 py-4">
@@ -150,7 +156,11 @@ export function Onboarding(props: {
           className="w-full animate-rise rounded-[22px] border border-border bg-bg p-5 sm:px-7 sm:py-6"
         >
           <div id="onboarding-top" className="flex items-center justify-between">
-            <span id="onboarding-orb" aria-hidden="true" className="orb h-9 w-9 animate-breathe" />
+            {current === "agent" ? (
+              <span id="onboarding-orb-spacer" />
+            ) : (
+              <AgentOrb id="onboarding-orb" look={agentPersona(draft).look} size={36} breathing />
+            )}
             <span id="onboarding-step" className="eyebrow">
               {ready
                 ? `${String(index + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")} · ${copy.eyebrow}`
@@ -163,13 +173,25 @@ export function Onboarding(props: {
             </p>
           ) : (
             <>
-              <h1 id="onboarding-title" className="mt-4 font-display text-[30px] leading-[1.08] text-text-primary sm:text-[34px]">
-                {copy.title}
-              </h1>
-              <p id="onboarding-sub" className="mt-2 text-[14px] leading-relaxed text-text-secondary">
-                {copy.why}
-              </p>
+              {current !== "agent" && (
+                <>
+                  <h1 id="onboarding-title" className="mt-4 font-display text-[30px] leading-[1.08] text-text-primary sm:text-[34px]">
+                    {copy.title}
+                  </h1>
+                  <p id="onboarding-sub" className="mt-2 text-[14px] leading-relaxed text-text-secondary">
+                    {copy.why}
+                  </p>
+                </>
+              )}
               <div id="onboarding-body" className="mt-3">
+                {current === "agent" && (
+                  <AgentSection
+                    scope="onboarding"
+                    agent={draft.agent}
+                    onChange={(agent) => setDraft((d) => ({ ...d, agent }))}
+                    onValidity={setAgentValid}
+                  />
+                )}
                 {current === "you" && <YouSection id="onboarding-you" profile={draft} onChange={setDraft} options={options} />}
                 {current === "travel" && <TravelSection id="onboarding-travel" profile={draft} onChange={setDraft} options={options} />}
                 {current === "shopping" && (
@@ -253,7 +275,13 @@ export function Onboarding(props: {
                     onClick={() => (last ? void finish() : keep())}
                     className="rounded-full bg-charcoal px-5 py-2 text-sm font-medium text-on-charcoal transition hover:opacity-85 disabled:opacity-40"
                   >
-                    {last ? (saving ? "Saving…" : "Start chatting") : "Next"}
+                    {last
+                      ? saving
+                        ? "Saving…"
+                        : "Start chatting"
+                      : current === "agent" && slides[index + 1] === "you"
+                        ? "Next: about you"
+                        : "Next"}
                   </button>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { createLimiter } from "../lib/concurrency.js";
+import { createLimiter, type Limiter } from "../lib/concurrency.js";
 import { log as logger } from "../lib/log.js";
 
 export type Level = { means: string; not: string };
@@ -83,6 +83,7 @@ export async function createJudge(opts: {
   model: string;
   timeoutMs?: number;
   concurrency?: number;
+  limiter?: Limiter;
   log?: (line: string) => void;
 }): Promise<Judge> {
   const log = opts.log ?? logger.debug;
@@ -91,7 +92,7 @@ export async function createJudge(opts: {
   if (!model) return noJudge;
   const classifier = model;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const limit = createLimiter(opts.concurrency ?? DEFAULT_CONCURRENCY);
+  const limit = opts.limiter ?? createLimiter(opts.concurrency ?? DEFAULT_CONCURRENCY);
   const totals: Usage = { calls: 0, failures: 0, costUsd: 0 };
 
   async function ask(
@@ -279,9 +280,10 @@ export async function createJudgeFrom(opts: {
   runtime: Runtime;
   models: string[];
   concurrency?: number;
+  limiter?: Limiter;
 }): Promise<Judge & { model?: string }> {
   for (const model of opts.models) {
-    const judge = await createJudge({ runtime: opts.runtime, model, concurrency: opts.concurrency });
+    const judge = await createJudge({ runtime: opts.runtime, model, concurrency: opts.concurrency, limiter: opts.limiter });
     if (judge.available) return Object.assign(judge, { model });
   }
   return noJudge;

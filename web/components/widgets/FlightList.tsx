@@ -15,6 +15,7 @@ import type { FlightList as FlightListData } from "@shared/widgets";
 import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import { ExternalLink } from "./ExternalLink";
+import { widgetId } from "./widgetId";
 
 const VISIBLE_FLIGHTS = 8;
 
@@ -104,8 +105,18 @@ function Badge({ id, tone, children }: { id: string; tone: "agent" | "good" | "p
   );
 }
 
-export function FlightList({ toolCallId, widget, locale }: { toolCallId: string; widget: FlightListData; locale: string }) {
-  const id = `flight-list-${toolCallId}`;
+export function FlightList({
+  toolCallId,
+  idPrefix,
+  widget,
+  locale,
+}: {
+  toolCallId: string;
+  idPrefix?: string;
+  widget: FlightListData;
+  locale: string;
+}) {
+  const id = widgetId("flight-list", toolCallId, idPrefix);
   const [prefs, setPrefs] = useState<FlightPrefs>(widget.prefs ?? {});
   const [showAll, setShowAll] = useState(false);
   const visible = useMemo(() => widget.flights.filter((f) => matchesPrefs(f, prefs)), [widget.flights, prefs]);

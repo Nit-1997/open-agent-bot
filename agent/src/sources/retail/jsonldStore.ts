@@ -2,6 +2,7 @@ import type { Tile } from "../../shop/extract.js";
 import { formatMoney } from "../../shop/currency.js";
 import { BOT_WALL } from "../../browser/policy.js";
 import { BLOCKING_STATUSES, fetchPublic, readCapped, timeoutSignal } from "../../lib/net.js";
+import { publicTransport } from "../../lib/safeFetch.js";
 import { type LdRecord, parseJsonLd } from "../jsonld.js";
 import type { RetailCtx, RetailQuery, RetailResult, RetailSource } from "./types.js";
 
@@ -29,7 +30,7 @@ export function tileOf(r: LdRecord, pageUrl: string): Tile | null {
 async function readPage(url: string, ctx: RetailCtx): Promise<Read> {
   try {
     const { res, url: at } = await fetchPublic(
-      ctx.fetch ?? fetch,
+      ctx.fetch ?? publicTransport(ctx.allowPrivateHosts),
       url,
       {
         signal: timeoutSignal(15000, ctx.signal),

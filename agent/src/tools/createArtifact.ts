@@ -2,7 +2,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { withReportFrame } from "../artifacts/frame.js";
 import { type ImageCheck, vetImages } from "../artifacts/images.js";
-import type { ArtifactStore } from "../artifacts/store.js";
+import type { ArtifactSink } from "../artifacts/store.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
 const MAX_HTML_BYTES = 2_000_000;
@@ -35,7 +35,7 @@ function firstPicture(html: string): { src: string; alt: string } | undefined {
 }
 
 export async function storeArtifact(
-  artifacts: ArtifactStore,
+  artifacts: ArtifactSink,
   images: ImageCheck | undefined,
   title: string,
   html: string,
@@ -55,11 +55,11 @@ export async function storeArtifact(
   return ok(`artifact ${id} created: ${title}${pictures}`, { artifactId: id, title });
 }
 
-export function createArtifactTool(artifacts: ArtifactStore, images?: ImageCheck) {
+export function createArtifactTool(artifacts: ArtifactSink, images?: ImageCheck) {
   return defineTool({
     name: "create_artifact",
     label: "Create artifact",
-    description: `Save a complete, self-contained HTML document (no scripts from other sites) as a rich report shown inline in the chat as a scrollable page, which the user can also open in a new tab, full screen, or as a PDF. Use for research, guides, comparisons, printable plans, and pages the user asks for. Make it look like a magazine feature, not a document: lead with a hero picture and the verdict, use pictures for every product, place, or option, numbers as stat tiles, and comparisons as option cards, tables, and bar charts.\n\nUse for research reports, printable plans, and any page or PDF the user asks for. Before writing the HTML, call load_skill research: it has the report kit classes the page is styled with.`,
+    description: `Save a complete, self-contained HTML document (no scripts from other sites) as a rich report shown in the chat as a card that opens the page beside the conversation, where the user can also open it in a new tab or download it as a PDF. Use for research, guides, comparisons, printable plans, and pages the user asks for. Make it look like a magazine feature, not a document: lead with a hero picture and the verdict, use pictures for every product, place, or option, numbers as stat tiles, and comparisons as option cards, tables, and bar charts.\n\nUse for research reports, printable plans, and any page or PDF the user asks for. Before writing the HTML, call load_skill research: it has the report kit classes the page is styled with.`,
     parameters: Type.Object({
       title: Type.String({ minLength: 1, maxLength: 120 }),
       html: Type.String({ minLength: 1 }),

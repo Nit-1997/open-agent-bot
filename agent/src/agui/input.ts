@@ -1,4 +1,5 @@
 import type { Message, RunAgentInput } from "@ag-ui/core";
+import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
 import { parseWorkspaceEdits, type WorkspaceEdits } from "../../../shared/workspace.js";
 import { type Profile, parseProfile } from "../../../shared/profile.js";
 import type { ProfileOverride, UserContext, Viewport } from "../prompt/userContext.js";
@@ -15,7 +16,7 @@ const clip = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v
 
 function readProfile(v: unknown): ProfileOverride | undefined {
   if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
-  const raw = { ...(v as Record<string, unknown>) };
+  const { agent: _persona, ...raw } = v as Record<string, unknown>;
   const homeText = clip(raw.home, 200);
   if (homeText) raw.home = { label: homeText, city: homeText };
   const parsed = parseProfile(raw);
@@ -67,14 +68,19 @@ export function readWorkspaceEdits(input: RunAgentInput): WorkspaceEdits | null 
   return parseWorkspaceEdits(contextValue(input, "workspace_edits"));
 }
 
+export function readOpenReport(input: RunAgentInput): string | null {
+  const v = contextValue(input, "open_report") as { openReport?: { id?: unknown } } | undefined;
+  const id = v && typeof v === "object" ? v.openReport?.id : undefined;
+  return typeof id === "string" && ARTIFACT_ID_RE.test(id) ? id : null;
+}
+
 const HISTORY_LIMIT = 40;
 const HISTORY_CLIP = 4000;
 
-export function restoreHistory(messages: Message[]): HistoryMessage[] {
-  const lastUser = messages.map((m) => m.role).lastIndexOf("user");
-  const turns = messages.slice(0, Math.max(lastUser, 0)).flatMap((m): HistoryMessage[] => {
-    const text = messageText(m).trim().slice(0, HISTORY_CLIP);
-    return (m.role === "user" || m.role === "assistant") && text ? [{ role: m.role, text }] : [];
+export function historyFromStored(messages: ReadonlyArray<{ role: "user" | "assistant"; content: string }>): HistoryMessage[] {
+  const turns = messages.flatMap((m): HistoryMessage[] => {
+    const text = m.content.trim().slice(0, HISTORY_CLIP);
+    return text ? [{ role: m.role, text }] : [];
   });
   const merged = turns.reduce<HistoryMessage[]>((out, t) => {
     const prev = out.at(-1);

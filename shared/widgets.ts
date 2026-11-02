@@ -1,7 +1,7 @@
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
 
-const Url = Type.String({ minLength: 1 });
+const Url = Type.String({ minLength: 1, pattern: "^https?://" });
 
 export const WeatherCardSchema = Type.Object({
   kind: Type.Literal("weather_card"),
@@ -164,7 +164,8 @@ export const AskSchema = Type.Object({
 
 export const GroundingNoteSchema = Type.Object({
   kind: Type.Literal("grounding_note"),
-  claims: Type.Array(Str, { minItems: 1 }),
+  claims: Type.Array(Str),
+  fromReport: Type.Optional(Type.Array(Str, { minItems: 1 })),
 });
 
 const CartPickSchema = Type.Object({

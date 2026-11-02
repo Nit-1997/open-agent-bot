@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Mono, DM_Sans, Instrument_Serif } from "next/font/google";
-import { Providers } from "./providers";
+import { headers } from "next/headers";
 import "./globals.css";
 
 const display = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-instrument-serif" });
@@ -16,14 +16,15 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 
 const THEME_SCRIPT = `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html id="root-html" lang="en" className={`${display.variable} ${sans.variable} ${mono.variable} h-full`} suppressHydrationWarning>
       <head id="root-head">
-        <script id="theme-init" dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script id="theme-init" nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body id="root-body" className="h-full text-text-primary">
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );

@@ -14,6 +14,7 @@ type Mode = null | "key" | "connect" | "models" | "confirm" | "signin";
 function status(p: ProviderView): string {
   if (!p.configured) return "Not connected";
   if (p.kind === "local") return `Connected · ${p.baseUrl ?? ""}`;
+  if (p.hint) return `Connected · ${p.hint}`;
   return p.source === "signin" ? "Connected · signed in" : "Connected · API key";
 }
 
@@ -39,7 +40,7 @@ export function ProviderRow({
   const [error, setError] = useState<string | null>(null);
   const [test, setTest] = useState<TestResult | null>(null);
 
-  const run = async (action: () => Promise<unknown>) => {
+  const run = async (action: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     setError(null);
     try {
@@ -47,8 +48,10 @@ export function ProviderRow({
       await refresh();
       onChanged();
       setMode(null);
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -157,9 +160,9 @@ export function ProviderRow({
         </a>
       )}
 
-      {mode === "key" && <KeyForm id={id} p={p} busy={busy} onSubmit={(key) => void run(() => providersApi.saveKey(p.id, key))} />}
+      {mode === "key" && <KeyForm id={id} p={p} busy={busy} onSubmit={(key) => run(() => providersApi.saveKey(p.id, key))} />}
 
-      {mode === "connect" && <ConnectForm id={id} p={p} busy={busy} onSubmit={(local) => void run(() => providersApi.addLocal(local))} />}
+      {mode === "connect" && <ConnectForm id={id} p={p} busy={busy} onSubmit={(local) => run(() => providersApi.addLocal(local))} />}
 
       {mode === "confirm" && (
         <div id={`${id}-confirm`} className="mt-3 flex items-center justify-end gap-2 text-sm">

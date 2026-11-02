@@ -1,9 +1,10 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { AGENT_TONES } from "../../../shared/profile.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPORT_GUIDE } from "../../src/artifacts/reportKit.js";
-import { CORE_PROMPT, buildSystemPrompt, skillIndex } from "../../src/prompt/systemPrompt.js";
+import { corePrompt, buildSystemPrompt, skillIndex } from "../../src/prompt/systemPrompt.js";
 import { loadSkillCatalog, skillsDir } from "../../src/skills/catalog.js";
 import { loadSkillTool } from "../../src/tools/loadSkill.js";
 
@@ -98,13 +99,13 @@ describe("skill content", () => {
 describe("system prompt", () => {
   const skills = loadSkillCatalog(skillsDir({}));
 
-  it("keeps the core under 2,000 characters", () => {
-    expect(CORE_PROMPT.length).toBeLessThan(2000);
+  it.each(AGENT_TONES)("keeps the %s core under 2,100 characters", (tone) => {
+    expect(corePrompt(tone).length).toBeLessThan(2100);
   });
 
   it("lists every skill in the index after the core", () => {
     const p = buildSystemPrompt(null, skills);
-    expect(p.startsWith(CORE_PROMPT)).toBe(true);
+    expect(p.startsWith(corePrompt("warm"))).toBe(true);
     for (const s of skills) expect(p).toContain(`- ${s.name}: ${s.description}`);
     expect(p).toContain("call load_skill");
     expect(skillIndex([])).toBe("");

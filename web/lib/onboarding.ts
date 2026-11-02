@@ -9,14 +9,17 @@ import {
   SHOPPING_STYLES,
   TRAVEL_STYLES,
 } from "@shared/onboarding";
-import type { Home, Profile, Section } from "@shared/profile";
+import { agentPersona, type Home, type Profile, type Section } from "@shared/profile";
 import { TAG_MAX } from "@shared/profile";
 
-export type SlideId = "model" | "you" | "travel" | "shopping" | "jev" | "summary";
+export type SlideId = "agent" | "model" | "you" | "travel" | "shopping" | "jev" | "summary";
 
 export function slideOrder(opts: { modelFirst: boolean; showJev: boolean }): SlideId[] {
   const middle: SlideId[] = ["you", "travel", "shopping", ...(opts.showJev ? (["jev"] as const) : [])];
-  return opts.modelFirst ? ["model", ...middle, "summary"] : [...middle, "model", "summary"];
+  return [
+    "agent",
+    ...(opts.modelFirst ? ["model" as const, ...middle, "summary" as const] : [...middle, "model" as const, "summary" as const]),
+  ];
 }
 
 export function toggle(list: string[], value: string, exclusive: string[] = []): string[] {
@@ -101,7 +104,9 @@ export function summaryLines(p: Profile, opts: { jev?: string | null; modelLabel
   const s = p.shopping;
   const food = p.food.map((f) => (f === NO_FOOD_RULES ? "no food restrictions" : f.toLowerCase()));
   const you = [p.name, p.home?.city ? [p.home.city, p.home.region].filter(Boolean).join(", ") : p.home?.label].filter(Boolean).join(" · ");
+  const agent = agentPersona(p);
   const lines: SummaryLine[] = [
+    { slide: "agent", label: "Your agent", text: `${agent.name} · ${agent.tone} · ${agent.look} look` },
     { slide: "you", label: "You", text: or(you, "you") },
     { slide: "you", label: "Household", text: or([householdText(p), ...food].filter(Boolean).join(" · "), "you") },
     {

@@ -1,6 +1,5 @@
 import { validateWidget, type WidgetPayload } from "../../../shared/widgets.js";
-import { currencyOf } from "../shop/currency.js";
-import type { ItemResult } from "../shop/rank.js";
+import { MAX_CART_STORES, toCartStore } from "./cart.js";
 import type { FlightsData, StaysData, WeatherData } from "./data.js";
 
 const MAX_FLIGHTS = 8;
@@ -11,29 +10,12 @@ type ShopData = {
   summary: Array<{ store: string; total: number; missing: string[] }>;
 };
 
-const CART_FIELDS = ["title", "price", "priceText", "image", "url", "size", "rating", "sponsored", "match", "why"];
-
 const renderers: Record<string, (data: any) => unknown> = {
   shop: (d: ShopData) => {
     if (!d.summary.length) return null;
     return {
       kind: "cart",
-      stores: d.summary.slice(0, 6).map((sum) => {
-        const s = d.stores.find((x) => x.store === sum.store)!;
-        const currency = currencyOf(s.items as unknown as ItemResult[]);
-        return {
-          name: sum.store,
-          total: sum.total,
-          ...(currency && { currency }),
-          url: s.home ?? "",
-          missing: sum.missing,
-          items: s.items.map((i) => ({
-            query: i.query,
-            qty: i.qty,
-            picks: i.picks.slice(0, 3).map((p) => Object.fromEntries(CART_FIELDS.filter((k) => p[k] !== undefined).map((k) => [k, p[k]]))),
-          })),
-        };
-      }),
+      stores: d.summary.slice(0, MAX_CART_STORES).map((sum) => toCartStore(d.stores.find((x) => x.store === sum.store)!, sum)),
     };
   },
   stays: (d: StaysData) => ({

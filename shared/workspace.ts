@@ -1,6 +1,6 @@
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
-import { EventEntitySchema, ShortlistEntitySchema, TripEntitySchema } from "./widgets.js";
+import { EventEntitySchema, ShortlistEntitySchema, TripEntitySchema } from "./widgets.ts";
 
 export { EventEntitySchema, ShortlistEntitySchema, TripEntitySchema };
 
@@ -20,11 +20,15 @@ const Count = Type.Integer({ minimum: 1, maximum: 10_000 });
 const Day = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}", maxLength: 40 });
 const Money = Type.Number({ minimum: 0 });
 
+const EDIT_KEYS = 100;
+const Key = Type.String({ pattern: "^[\\s\\S]{1,500}$" });
+const Keyed = <T extends TSchema>(value: T) => Type.Record(Key, value, { additionalProperties: false, maxProperties: EDIT_KEYS });
+
 export const CartEditsSchema = Type.Object(
   {
     removed: Type.Optional(Type.Array(Str, { maxItems: 50 })),
-    qty: Type.Optional(Type.Record(Type.String(), Count)),
-    picks: Type.Optional(Type.Record(Type.String(), Type.Record(Type.String(), Str))),
+    qty: Type.Optional(Keyed(Count)),
+    picks: Type.Optional(Keyed(Keyed(Str))),
   },
   { additionalProperties: false },
 );
@@ -47,12 +51,17 @@ export type WorkspaceEdits = PlanEdits & { cart?: CartEdits };
 
 const EDIT_SECTIONS = { cart: CartEditsSchema, event: EventEditsSchema, trip: TripEditsSchema } as const;
 
+const tooWide = (v: unknown, depth: number): boolean =>
+  !!v &&
+  typeof v === "object" &&
+  (Object.keys(v).length > EDIT_KEYS || (depth > 0 && Object.values(v).some((x) => tooWide(x, depth - 1))));
+
 export function parseWorkspaceEdits(v: unknown): WorkspaceEdits | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   const out: Record<string, unknown> = {};
   for (const [key, schema] of Object.entries(EDIT_SECTIONS)) {
     const raw = (v as Record<string, unknown>)[key];
-    if (!raw || typeof raw !== "object") continue;
+    if (!raw || typeof raw !== "object" || tooWide(raw, 2)) continue;
     const section = Value.Clean(schema, structuredClone(raw));
     if (Value.Check(schema, section) && Object.keys(section as object).length) out[key] = section;
   }
@@ -133,4 +142,14 @@ export function applyPatch(doc: unknown, ops: PatchOp[]): { ok: true; value: unk
     }
   }
   return { ok: true, value: root };
+}
+
+export function safeHttpUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
 }

@@ -84,7 +84,7 @@ export async function createPiSession(opts: {
   tools: ToolDefinition<any, any, any>[];
   skillsDir?: string;
   history?: SeedMessage[];
-  contextNote?: () => string | undefined;
+  contextNote?: () => Promise<string | undefined>;
   codemode?: (model: Model<any>) => boolean;
   onCodemodeOff?: (reason: string) => void;
 }): Promise<PiSessionHandle> {
@@ -101,8 +101,8 @@ export async function createPiSession(opts: {
         ...(opts.contextNote
           ? [
               (pi: ExtensionAPI) => {
-                pi.on("context", (event) => {
-                  const note = opts.contextNote?.();
+                pi.on("context", async (event) => {
+                  const note = await opts.contextNote?.();
                   return note ? { messages: withNote(event.messages, note) } : undefined;
                 });
               },

@@ -1,41 +1,32 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { emptyProfile, type Profile, parseProfile } from "../../../shared/profile.js";
+import { emptyProfile, type Profile, parseProfile, withoutInvalidAgent } from "../../../shared/profile.js";
+import type { ProfileRepo } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
-import { readJsonFile, writeFileAtomic } from "../lib/files.js";
+import { log } from "../lib/log.js";
 
 export interface ProfileStore {
   get(): Promise<Profile>;
   put(profile: unknown): Promise<Profile>;
 }
 
-export class FileProfileStore implements ProfileStore {
-  private cached: Profile | undefined;
-  private writing: Promise<unknown> = Promise.resolve();
+const invalid = () => new UserError("that profile isn't valid");
 
-  private constructor(private readonly path: string) {}
+export function readStoredProfile(raw: unknown): Profile {
+  const { value, dropped } = withoutInvalidAgent(raw);
+  if (dropped) log.warn("[profile] dropped invalid agent");
+  return parseProfile(value) ?? emptyProfile();
+}
 
-  static at(dataDir: string): FileProfileStore {
-    return new FileProfileStore(join(dataDir, "profile.json"));
-  }
+export class SupabaseProfileStore implements ProfileStore {
+  constructor(private readonly repo: ProfileRepo) {}
 
   async get(): Promise<Profile> {
-    if (this.cached) return structuredClone(this.cached);
-    const raw = await readJsonFile<unknown>(this.path);
-    this.cached = (raw !== undefined && parseProfile(raw)) || emptyProfile();
-    return structuredClone(this.cached);
+    return readStoredProfile(await this.repo.get());
   }
 
   async put(input: unknown): Promise<Profile> {
     const profile = parseProfile(input);
-    if (!profile) throw new UserError("that profile isn't valid");
-    const write = this.writing.then(async () => {
-      await mkdir(join(this.path, ".."), { recursive: true, mode: 0o700 });
-      await writeFileAtomic(this.path, JSON.stringify(profile, null, 2));
-      this.cached = profile;
-    });
-    this.writing = write.catch(() => {});
-    await write;
+    if (!profile) throw invalid();
+    await this.repo.putData(profile);
     return structuredClone(profile);
   }
 }
@@ -49,7 +40,7 @@ export class MemoryProfileStore implements ProfileStore {
 
   async put(input: unknown): Promise<Profile> {
     const profile = parseProfile(input);
-    if (!profile) throw new UserError("that profile isn't valid");
+    if (!profile) throw invalid();
     this.profile = profile;
     return structuredClone(profile);
   }

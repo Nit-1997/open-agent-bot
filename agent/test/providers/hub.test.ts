@@ -1,9 +1,11 @@
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { BlockedAddressError } from "../../src/lib/net.js";
+import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { describe, expect, it } from "vitest";
-import { ProviderHub } from "../../src/providers/hub.js";
+import type { ProviderHub } from "../../src/providers/hub.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";
+import { testHub } from "../fixtures/hub.js";
+import { MemoryDb } from "../fixtures/memoryRepos.js";
+import { ADMIN, ALICE } from "../fixtures/users.js";
 
 const seed = {
   baseUrl: "http://llm:4000/v1",
@@ -14,16 +16,10 @@ const seed = {
   ],
 };
 
-const make = (dir = mkdtempSync(join(tmpdir(), "hub-")), extra: Partial<Parameters<typeof ProviderHub.create>[0]> = {}) =>
-  ProviderHub.create({ dataDir: dir, litellm: seed, fetch: fakeFetch([]), ...extra }).then((hub) => ({ hub, dir }));
+const make = (db = new MemoryDb(), extra: Partial<Parameters<typeof ProviderHub.create>[0]> = {}) =>
+  testHub({ litellm: seed, ...extra }, db).then((hub) => ({ hub, db }));
 
 describe("ProviderHub", () => {
-  it("refuses to start on a corrupt providers.json instead of dropping the settings", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "hub-"));
-    writeFileSync(join(dir, "providers.json"), '{"custom":');
-    await expect(make(dir)).rejects.toThrow(/providers\.json is not valid JSON/);
-  });
-
   it("takes context and output limits for gateway models from LiteLLM, keeping safe defaults for unknown ones", async () => {
     const f = fakeFetch([
       [
@@ -81,14 +77,17 @@ describe("ProviderHub", () => {
     });
   });
 
-  it("saves a key that survives a restart, never returns it, and keeps the file private", async () => {
-    const { hub, dir } = await make();
-    await hub.setKey("openai", "sk-secret-abc");
-    expect(JSON.stringify(hub.list())).not.toContain("sk-secret-abc");
-    const { hub: again } = await make(dir);
+  it("saves a key encrypted that survives a restart, and only ever shows a hint", async () => {
+    const { hub, db } = await make();
+    await hub.setKey("openai", "sk-proj-secretsecretsecret4242");
+    expect(JSON.stringify(hub.list())).not.toContain("secretsecret");
+    expect(hub.list().find((p) => p.id === "openai")).toMatchObject({ configured: true, hint: "sk-proj-…4242" });
+    const row = [...db.credentials.values()][0];
+    expect(row).toMatchObject({ provider: "openai", kind: "api_key", hint: "sk-proj-…4242", keyVersion: 1 });
+    expect(row.ciphertext.toString("latin1")).not.toContain("secretsecret");
+    const { hub: again } = await make(db);
     expect(again.list().find((p) => p.id === "openai")?.configured).toBe(true);
-    expect(statSync(join(dir, "auth.json")).mode & 0o077).toBe(0);
-    expect(statSync(dir).mode & 0o077).toBe(0);
+    expect((await again.runtime.checkAuth("openai"))?.type).toBe("api_key");
   });
 
   it("offers only the models enabled on configured providers, by provider/model reference", async () => {
@@ -117,11 +116,16 @@ describe("ProviderHub", () => {
     const f = fakeFetch([
       [/host\.docker\.internal:11434\/v1\/models$/, () => json({ data: [{ id: "qwen3.5:35b" }, { id: "gemma4:latest" }] })],
     ]);
-    const { hub, dir } = await make(undefined, { fetch: f });
-    const added = await hub.addLocal({ kind: "ollama", baseUrl: "http://host.docker.internal:11434/v1" });
+    const { hub, db } = await make(undefined, { fetch: f });
+    const added = await hub.addLocal({
+      kind: "ollama",
+      baseUrl: "http://host.docker.internal:11434/v1",
+      apiKey: "local-key-0123456789abcd",
+    });
     expect(added).toMatchObject({ id: "ollama", configured: true, enabled: ["qwen3.5:35b", "gemma4:latest"] });
     expect(hub.resolve("ollama/qwen3.5:35b")?.baseUrl).toBe("http://host.docker.internal:11434/v1");
-    const { hub: again } = await make(dir, { fetch: f });
+    expect([...db.credentials.values()].map((c) => c.provider)).toEqual(["ollama"]);
+    const { hub: again } = await make(db, { fetch: f });
     expect(again.resolve("ollama/gemma4:latest")).toBeDefined();
   });
 
@@ -169,20 +173,83 @@ describe("ProviderHub", () => {
     expect(await hub.test("litellm/chat-default")).toMatchObject({ ok: false, toolCall: false });
   });
 
-  it("keeps one device ID per installation for sign-in flows", async () => {
-    const { hub, dir } = await make();
-    const id = await hub.deviceId();
+  it("keeps one device ID per user for sign-in flows", async () => {
+    const { hub, db } = await make();
+    const id = hub.deviceId();
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    expect(await hub.deviceId()).toBe(id);
-    const { hub: again } = await make(dir);
-    expect(await again.deviceId()).toBe(id);
+    const { hub: again } = await make(db);
+    expect(again.deviceId()).toBe(id);
   });
 
-  it("stores the enabled models in a non-secret settings file", async () => {
-    const { hub, dir } = await make();
+  it("stores the enabled models in the user's settings, never the gateway or a key", async () => {
+    const { hub, db } = await make();
     await hub.setEnabled("openai", ["gpt-4.1"]);
-    const settings = readFileSync(join(dir, "providers.json"), "utf8");
+    const settings = JSON.stringify(db.settings.get(ADMIN.id)?.data);
     expect(JSON.parse(settings).enabled.openai).toEqual(["gpt-4.1"]);
+    expect(JSON.parse(settings).custom.litellm).toBeUndefined();
     expect(settings).not.toContain("sk-");
+  });
+
+  it("offers the operator gateway only to the admin", async () => {
+    const db = new MemoryDb();
+    const user = await testHub({ litellm: seed, userId: ALICE.id, isAdmin: false }, db);
+    expect(user.list().some((p) => p.id === "litellm")).toBe(false);
+    expect(user.resolve("litellm/chat-default")).toBeUndefined();
+  });
+
+  it("refuses private addresses for invited users, also when a stored one resolves inside", async () => {
+    const f = fakeFetch([[/\/models$/, () => json({ data: [{ id: "m1" }] })]]);
+    const db = new MemoryDb();
+    const user = await testHub({ userId: ALICE.id, isAdmin: false, fetch: f }, db);
+    await expect(user.addLocal({ kind: "custom", baseUrl: "http://10.0.0.5:8000/v1" })).rejects.toMatchObject({ kind: "unprocessable" });
+    await expect(user.addLocal({ kind: "custom", baseUrl: "http://localhost:8000/v1" })).rejects.toMatchObject({ kind: "unprocessable" });
+    const rebinding = await testHub({ userId: ALICE.id, isAdmin: false, fetch: f, lookup: async () => ["169.254.169.254"] }, db);
+    await expect(rebinding.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" })).rejects.toMatchObject({
+      kind: "unprocessable",
+    });
+    const ok = await user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" });
+    expect(ok.configured).toBe(true);
+    const later = await testHub({ userId: ALICE.id, isAdmin: false, fetch: f, lookup: async () => ["127.0.0.1"] }, db);
+    expect(later.list().find((p) => p.id === "custom")?.configured).toBe(false);
+  });
+
+  it("sends an invited user's model calls through the guarded fetch, never the default one", async () => {
+    const sse = () =>
+      new Response(
+        [
+          `data: ${JSON.stringify({ id: "x", object: "chat.completion.chunk", created: 1, model: "m1", choices: [{ index: 0, delta: { role: "assistant", content: "hi" }, finish_reason: "stop" }] })}`,
+          "data: [DONE]",
+          "",
+        ].join("\n\n"),
+        { headers: { "content-type": "text/event-stream" } },
+      );
+    const f = fakeFetch([
+      [/\/models$/, () => json({ data: [{ id: "m1" }] })],
+      [/\/chat\/completions$/, sse],
+    ]);
+    const user = await testHub({ userId: ALICE.id, isAdmin: false, userFetch: createSafeFetch(f) });
+    await user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" });
+    await user.test("custom/m1");
+    expect(f.calls).toContain("https://models.example.com/v1/chat/completions");
+  });
+
+  it("maps a connect-time refusal to the private-address error", async () => {
+    const blocked = (async () => {
+      throw new TypeError("fetch failed", { cause: new BlockedAddressError("refusing models.example.com") });
+    }) as typeof fetch;
+    const user = await testHub({ userId: ALICE.id, isAdmin: false, userFetch: blocked });
+    await expect(user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" })).rejects.toMatchObject({
+      kind: "unprocessable",
+      message: "That address isn't reachable from the server.",
+    });
+  });
+
+  it("refuses to overwrite settings another tab changed", async () => {
+    const db = new MemoryDb();
+    const f = fakeFetch([[/\/models$/, () => json({ data: [{ id: "m1" }] })]]);
+    const first = await testHub({ fetch: f }, db);
+    const second = await testHub({ fetch: f }, db);
+    await first.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" });
+    await expect(second.setEnabled("custom", [])).rejects.toMatchObject({ kind: "conflict", code: "settings_changed" });
   });
 });

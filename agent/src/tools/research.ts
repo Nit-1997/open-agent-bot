@@ -1,7 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { ImageCheck } from "../artifacts/images.js";
-import type { ArtifactStore } from "../artifacts/store.js";
+import type { ArtifactSink } from "../artifacts/store.js";
 import type { Evidence } from "../grounding/evidence.js";
 import { type Judge, noJudge } from "../judge/index.js";
 import type { Complete } from "../workflows/llm.js";
@@ -14,7 +14,7 @@ import { search as runSearch } from "./webSearch.js";
 
 type Deps = {
   search: { searxngUrl: string; braveApiKey?: string; fetch?: typeof fetch };
-  artifacts: ArtifactStore;
+  artifacts: ArtifactSink;
   images?: ImageCheck;
   complete: Complete;
   judge?: Judge;

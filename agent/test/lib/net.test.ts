@@ -32,6 +32,23 @@ describe("publicHttpUrlError", () => {
     "http://[ff02::1]/",
     "http://[64:ff9b::7f00:1]/",
     "http://[2001:db8::1]/",
+    "http://192.0.2.10/",
+    "http://198.51.100.7/",
+    "http://203.0.113.200/",
+    "http://100.127.255.254/",
+    "http://198.19.255.1/",
+    "http://192.88.99.1/",
+    "http://239.255.255.250/",
+    "http://240.0.0.1/",
+    "http://255.255.255.255/",
+    "http://[2002:a9fe:a9fe::1]/",
+    "http://[64:ff9b::a9fe:a9fe]/",
+    "http://[64:ff9b:1::1]/",
+    "http://[2001::1]/",
+    "http://[100::1]/",
+    "http://[fec0::1]/",
+    "http://[::ffff:169.254.169.254]/",
+    "http://[::a9fe:a9fe]/",
   ])("refuses %s", (url) => {
     expect(publicHttpUrlError(url)).toMatch(/refusing internal or private address/);
   });
@@ -81,6 +98,26 @@ describe("fetchPublic", () => {
     await expect(fetchPublic(f, "https://rebind.example/", {}, { lookup: async () => ["127.0.0.1"] })).rejects.toThrow(
       /resolves to a private address/,
     );
+  });
+
+  it("drops credentials on a cross-origin redirect and turns a 303 into a GET", async () => {
+    const seen: Array<{ url: string; method?: string; auth: string | null; body: unknown }> = [];
+    const f = (async (url: string, init: RequestInit) => {
+      seen.push({ url, method: init.method, auth: new Headers(init.headers).get("authorization"), body: init.body });
+      return url.startsWith("https://a.example")
+        ? new Response(null, { status: 303, headers: { location: "https://b.example/next" } })
+        : new Response("ok");
+    }) as typeof fetch;
+    await fetchPublic(
+      f,
+      "https://a.example/start",
+      { method: "POST", body: "{}", headers: { authorization: "Bearer k" } },
+      { lookup: publicDns },
+    );
+    expect(seen).toEqual([
+      { url: "https://a.example/start", method: "POST", auth: "Bearer k", body: "{}" },
+      { url: "https://b.example/next", method: "GET", auth: null, body: undefined },
+    ]);
   });
 
   it("stops after too many redirects", async () => {

@@ -1,31 +1,34 @@
 import type { Model } from "@earendil-works/pi-ai";
+import { isPlanKind } from "../../../shared/workspace.js";
 import type { ArtifactStore } from "../artifacts/store.js";
 import { FrameBus } from "../browser/frames.js";
 import type { BrowserPool } from "../browser/pool.js";
 import { type AgentConfig, hasCap } from "../config.js";
+import type { UserRepos } from "../db/types.js";
 import { Evidence } from "../grounding/evidence.js";
 import { type Judge, scopeJudge } from "../judge/index.js";
+import { log } from "../lib/log.js";
 import { createPiSession } from "../pi/createPiSession.js";
 import { buildSystemPrompt } from "../prompt/systemPrompt.js";
+import type { ActiveCart } from "../shop/cart.js";
 import type { ProviderHub } from "../providers/hub.js";
+import type { UserHubs } from "../providers/hubs.js";
 import { loadSkillCatalog, skillsDir } from "../skills/catalog.js";
 import { TurnBudget } from "../tools/budget.js";
 import { buildTools, PER_REPLY_LIMITS } from "../tools/index.js";
 import { completeWith } from "../workflows/llm.js";
 import { workspaceCart, workspaceNote } from "../workspace/cart.js";
-import type { WorkspaceStore } from "../workspace/store.js";
-import type { SessionStore } from "./sessionStore.js";
-import { log } from "../lib/log.js";
-
-type CreateSession = ConstructorParameters<typeof SessionStore>[0]["create"];
+import { type EarlierCards, earlierNote } from "../workspace/earlier.js";
+import { WorkspaceStore } from "../workspace/store.js";
+import { type CreateSession, sessionKey } from "./sessionStore.js";
 
 type SessionDeps = {
   cfg: AgentConfig;
-  hub: ProviderHub;
+  hubs: UserHubs;
+  repos: (userId: string) => UserRepos;
   artifacts: ArtifactStore;
   pool: BrowserPool;
-  workspace: WorkspaceStore;
-  judge: () => Promise<Judge>;
+  judgeFor: (hub: ProviderHub) => () => Promise<Judge>;
 };
 
 const modelRef = (m: Model<any>) => `${m.provider}/${m.id}`;
@@ -42,25 +45,56 @@ export function pickModel(hub: Pick<ProviderHub, "resolve">, ref: string | undef
   return model;
 }
 
+export function joinNotes(...notes: (string | undefined)[]): string | undefined {
+  const present = notes.filter((n): n is string => !!n);
+  return present.length ? present.join("\n\n") : undefined;
+}
+
+type NoteParts = {
+  workspace: WorkspaceStore;
+  cart: ActiveCart;
+  earlier?: EarlierCards;
+  edits?: string;
+  openReport?: string;
+  timeZone?: string;
+};
+
+export async function sessionNote({ workspace, cart, earlier, edits, openReport, timeZone }: NoteParts): Promise<string | undefined> {
+  const held = await workspace.list();
+  const live = {
+    cartLive: !cart.empty || held.some((e) => e.kind === "cart"),
+    plansLive: held.some((e) => isPlanKind(e.kind)),
+    timeZone,
+  };
+  return joinNotes(await workspaceNote(workspace), earlierNote(earlier, live), edits, openReport);
+}
+
 export function sessionFactory(deps: SessionDeps): CreateSession {
-  const { cfg, hub, artifacts, pool, workspace } = deps;
-  return async (threadId, userContext, history) => {
+  const { cfg, artifacts, pool } = deps;
+  return async (owner, userContext, persona, seed) => {
+    const { user, chatId } = owner;
+    const key = sessionKey(owner);
+    const hub = await deps.hubs.get(user);
+    const repos = deps.repos(user.id);
+    const workspace = new WorkspaceStore();
     const budget = new TurnBudget(PER_REPLY_LIMITS);
     const evidence = new Evidence();
     const frames = new FrameBus();
-    const cart = workspaceCart(workspace, threadId);
+    const cart = workspaceCart(workspace);
+    let openReport: string | undefined;
+    let editsNote: string | undefined;
     let current = pickModel(hub, userContext?.model, userContext?.profile?.defaultModel);
     const skills = loadSkillCatalog(skillsDir(), { codemode: hasCap(cfg, modelRef(current), "codemode") });
-    const turnJudge = scopeJudge(await deps.judge());
+    const turnJudge = scopeJudge(await deps.judgeFor(hub)());
     const handle = await createPiSession({
       runtime: hub.runtime,
       model: current,
-      systemPrompt: buildSystemPrompt(userContext, skills),
+      systemPrompt: buildSystemPrompt(userContext, skills, persona),
       tools: buildTools({
         cfg,
-        artifacts,
+        artifacts: artifacts.sink(repos, chatId),
         pool,
-        threadId,
+        sessionKey: key,
         userContext,
         budget,
         evidence,
@@ -74,9 +108,10 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       }),
       skillsDir: skillsDir(),
       codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
-      onCodemodeOff: (reason: string) => log.info(`[codemode] thread=${threadId} off for this chat: ${reason}`),
-      history,
-      contextNote: () => workspaceNote(workspace, threadId),
+      onCodemodeOff: (reason: string) => log.info(`[codemode] user=${user.id} thread=${chatId} off for this chat: ${reason}`),
+      history: seed?.history,
+      contextNote: () =>
+        sessionNote({ workspace, cart, earlier: seed?.earlier, edits: editsNote, openReport, timeZone: userContext?.timeZone }),
     });
     return {
       session: handle.session,
@@ -93,15 +128,22 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       evidence,
       frames,
       cart,
+      workspace,
+      setEditsNote: (note) => {
+        editsNote = note;
+      },
+      setOpenReport: (note) => {
+        openReport = note;
+      },
       setModel: async (ref: string) => {
         const model = hub.resolve(ref);
         if (!model) throw new Error(`The model ${ref} isn't available any more. Pick another one from the model menu.`);
         await handle.setModel(model);
         current = model;
-        log.debug(`[run] thread=${threadId} model=${ref}`);
+        log.debug(`[run] user=${user.id} thread=${chatId} model=${ref}`);
       },
       dispose: async () => {
-        await Promise.all([handle.dispose(), pool.close(threadId)]);
+        await Promise.all([handle.dispose(), pool.close(key)]);
       },
     };
   };

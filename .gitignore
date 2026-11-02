@@ -13,3 +13,15 @@ artifacts-data/
 
 # Local eval runs (baselines live in agent/evals/baseline/)
 agent/evals/results/
+
+# secrets in nested env folders
+deploy-config/**/.env*
+
+# End-to-end runs
+e2e/test-results/
+e2e/playwright-report/
+e2e/.auth/
+*.webm
+*.mp4
+
+.mcp.json

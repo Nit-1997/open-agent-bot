@@ -1,4 +1,6 @@
+import type { AgentPersona } from "@shared/profile";
 import { PartyPopper, Plane, ShoppingBag, Telescope } from "lucide-react";
+import { AgentOrb } from "@/components/agent/AgentOrb";
 
 const SUGGESTIONS = [
   { icon: PartyPopper, label: "Plan", text: "Plan a Diwali party for 20 people at my place this Saturday" },
@@ -14,47 +16,73 @@ function greeting(hour: number) {
   return "Good evening";
 }
 
-export function EmptyState({ name, onPick }: { name?: string; onPick: (text: string) => void }) {
+export function EmptyState(props: {
+  id: string;
+  name?: string;
+  persona: AgentPersona;
+  heading: "h1" | "h2";
+  memory: string | null;
+  onOpenProfile: () => void;
+  onPick: (text: string) => void;
+}) {
+  const { id, name, persona } = props;
+  const Heading = props.heading;
   return (
-    <div id="empty-state" className="mx-auto flex w-full max-w-[680px] flex-1 flex-col justify-center px-3 py-5 sm:px-4 sm:py-10">
-      <p id="empty-eyebrow" className="eyebrow hidden sm:block">
-        Open Agent
-      </p>
-      <h2
-        id="empty-title"
-        className="font-display text-[30px] leading-[1.1] text-text-primary text-balance sm:mt-3 sm:text-[56px] sm:leading-[1.05]"
-      >
-        {`${greeting(new Date().getHours())}${name ? `, ${name}` : ""}.`}
-        <br />
-        <span id="empty-title-sub" className="italic text-text-muted">
-          What should I look into?
-        </span>
-      </h2>
-      <ul id="empty-suggestions" aria-label="Suggestions" className="mt-5 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-2.5">
-        {SUGGESTIONS.map((s, i) => (
-          <li id={`empty-suggestion-${i}`} key={s.label}>
+    <div id={id} className="mx-auto flex w-full max-w-[760px] flex-1 flex-col justify-center px-3 py-5 sm:px-6 sm:py-10">
+      <div id={`${id}-hero`} className="flex flex-col items-center gap-3 text-center sm:gap-3.5">
+        <AgentOrb id={`${id}-orb`} look={persona.look} size={72} className="hidden sm:inline-block" />
+        <AgentOrb id={`${id}-orb-small`} look={persona.look} size={44} className="sm:hidden" />
+        <Heading
+          id={`${id}-title`}
+          className="font-display text-[30px] leading-[1.1] text-text-primary text-balance sm:text-[44px] sm:leading-[1.1]"
+        >
+          {`${greeting(new Date().getHours())}${name ? `, ${name}` : ""}. `}
+          <span id={`${id}-title-sub`} className="italic text-text-muted">
+            What should I look into?
+          </span>
+        </Heading>
+        {props.memory ? (
+          <p id={`${id}-memory`} className="max-w-[560px] text-[14px] leading-relaxed text-text-muted">
+            {props.memory}
+          </p>
+        ) : (
+          <p id={`${id}-memory`} className="max-w-[560px] text-[14px] leading-relaxed text-text-muted">
+            <span id={`${id}-memory-text`}>
+              {"Tell "}
+              <bdi id={`${id}-memory-name`}>{persona.name}</bdi>
+              {" about yourself in your profile so plans start from your home and tastes. "}
+            </span>
             <button
-              id={`empty-suggestion-${i}-button`}
+              id={`${id}-memory-open`}
               type="button"
-              onClick={() => onPick(s.text)}
-              className="group flex h-full w-full flex-col items-start gap-2 rounded-2xl border border-border bg-paper p-3 text-left transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mist-500 sm:flex-row sm:gap-3 sm:p-3.5"
+              onClick={props.onOpenProfile}
+              className="text-mist-600 underline underline-offset-2 hover:text-text-primary"
             >
-              <span
-                id={`empty-suggestion-${i}-icon`}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface text-text-primary sm:h-8 sm:w-8 sm:rounded-xl"
-              >
-                <s.icon id={`empty-suggestion-${i}-svg`} aria-hidden="true" size={16} />
-              </span>
-              <span id={`empty-suggestion-${i}-text`} className="min-w-0">
-                <span id={`empty-suggestion-${i}-label`} className="eyebrow block">
+              Open profile
+            </button>
+          </p>
+        )}
+      </div>
+      <ul id={`${id}-suggestions`} aria-label="Suggestions" className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-3">
+        {SUGGESTIONS.map((s, i) => (
+          <li id={`${id}-suggestion-${i}`} key={s.label}>
+            <button
+              id={`${id}-suggestion-${i}-button`}
+              type="button"
+              onClick={() => props.onPick(s.text)}
+              className="group flex h-full w-full flex-col items-start gap-2 rounded-2xl border border-surface-accent bg-surface p-3 text-left transition hover:-translate-y-0.5 hover:border-border hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mist-500 sm:p-4"
+            >
+              <span id={`${id}-suggestion-${i}-head`} className="flex items-center gap-2">
+                <s.icon id={`${id}-suggestion-${i}-svg`} aria-hidden="true" size={14} className="text-text-faint" />
+                <span id={`${id}-suggestion-${i}-label`} className="eyebrow">
                   {s.label}
                 </span>
-                <span
-                  id={`empty-suggestion-${i}-prompt`}
-                  className="mt-1 line-clamp-3 text-[13px] leading-snug text-text-secondary group-hover:text-text-primary sm:line-clamp-none sm:text-sm"
-                >
-                  {s.text}
-                </span>
+              </span>
+              <span
+                id={`${id}-suggestion-${i}-prompt`}
+                className="line-clamp-3 text-[13px] leading-snug text-text-primary sm:line-clamp-none sm:text-[14px] sm:leading-[1.45]"
+              >
+                {s.text}
               </span>
             </button>
           </li>

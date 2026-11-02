@@ -1,10 +1,14 @@
 import { randomUUID } from "node:crypto";
+import type { AuthUser } from "../auth/verify.js";
 import type { AuthEvent, AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
 import { log } from "../lib/log.js";
 import { UserError } from "../lib/errors.js";
 
 type Interaction = AuthInteraction & { signal: AbortSignal };
-type Login = (providerId: string, interaction: Interaction) => Promise<void>;
+type Login = (user: AuthUser, providerId: string, interaction: Interaction) => Promise<void>;
+
+const PROCESS_WIDE = new Set(["openai"]);
+const EXPIRED = "This sign-in expired. Start it again.";
 
 type FlowState = {
   providerId: string;
@@ -18,6 +22,7 @@ type FlowState = {
 };
 
 type Flow = {
+  userId: string;
   state: FlowState;
   createdAt: number;
   abort: AbortController;
@@ -37,10 +42,22 @@ export class LoginFlows {
     this.now = opts.now ?? Date.now;
   }
 
-  start(providerId: string): string {
-    for (const id of this.flows.keys()) this.live(id);
+  start(user: AuthUser, providerId: string): string {
+    const userId = user.id;
+    for (const id of [...this.flows.keys()]) this.live(id);
+    for (const [id, f] of this.flows) {
+      if (f.userId === userId && f.state.status === "running") {
+        f.abort.abort();
+        this.flows.delete(id);
+      }
+    }
+    if (
+      PROCESS_WIDE.has(providerId) &&
+      [...this.flows.values()].some((f) => f.state.providerId === providerId && f.state.status === "running")
+    )
+      throw new UserError("Another sign-in is in progress. Try again in a minute.", "conflict", { code: "login_busy" });
     const id = randomUUID();
-    const flow: Flow = { state: { providerId, status: "running" }, createdAt: this.now(), abort: new AbortController() };
+    const flow: Flow = { userId, state: { providerId, status: "running" }, createdAt: this.now(), abort: new AbortController() };
     this.flows.set(id, flow);
 
     const interaction: Interaction = {
@@ -77,7 +94,7 @@ export class LoginFlows {
         }),
     };
 
-    this.login(providerId, interaction)
+    this.login(user, providerId, interaction)
       .then(() => {
         flow.state.status = "done";
         flow.state.prompt = undefined;
@@ -101,19 +118,32 @@ export class LoginFlows {
     return flow;
   }
 
-  get(id: string): FlowState | undefined {
+  private owned(userId: string, id: string): Flow | undefined {
     const flow = this.live(id);
+    return flow?.userId === userId ? flow : undefined;
+  }
+
+  get(userId: string, id: string): FlowState | undefined {
+    const flow = this.owned(userId, id);
     return flow && { ...flow.state };
   }
 
-  answer(id: string, value: string): void {
-    const flow = this.live(id);
-    if (!flow) throw new UserError("This sign-in expired. Start it again.", "not_found");
+  answer(userId: string, id: string, value: string): void {
+    const flow = this.owned(userId, id);
+    if (!flow) throw new UserError(EXPIRED, "not_found");
     if (!flow.pending) throw new UserError("The sign-in isn't waiting for anything right now.", "conflict");
     flow.pending.resolve(value.trim());
   }
 
-  cancel(id: string): void {
-    this.live(id)?.abort.abort();
+  cancel(userId: string, id: string): void {
+    this.owned(userId, id)?.abort.abort();
+  }
+
+  cancelAll(userId: string): void {
+    for (const [id, f] of this.flows) {
+      if (f.userId !== userId) continue;
+      f.abort.abort();
+      this.flows.delete(id);
+    }
   }
 }

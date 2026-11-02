@@ -1,30 +1,23 @@
 "use client";
 
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { type ModelList, type ModelOption, modelLabel, normalizeRef } from "@/lib/models";
+import { useDismiss } from "@/lib/useDismiss";
 
 export function ModelMenu(props: {
+  id: string;
   models: ModelList | null;
   value: string | undefined;
   onChange: (id: string) => void;
   onManage: () => void;
 }) {
-  const { models, value, onChange } = props;
+  const { id, models, value, onChange } = props;
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(root, open, close);
 
   if (!models) return null;
   const current = normalizeRef(value) ?? models.default ?? undefined;
@@ -37,21 +30,20 @@ export function ModelMenu(props: {
   }, []);
 
   return (
-    <div id="model-menu" ref={root} className="relative">
+    <div id={id} ref={root} className="relative">
       <button
-        id="model-menu-button"
+        id={`${id}-button`}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="glass-pill inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] text-text-primary transition hover:bg-paper"
+        className="inline-flex h-9 items-center gap-1 rounded-full px-2.5 text-[13px] text-text-secondary transition hover:bg-surface hover:text-text-primary"
       >
-        <span id="model-menu-dot" aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-mist-500" />
-        <span id="model-menu-label" className="max-w-[140px] truncate">
+        <span id={`${id}-label`} className="max-w-[160px] truncate sm:max-w-[220px]">
           {modelLabel(models, current)}
         </span>
         <ChevronDown
-          id="model-menu-chevron"
+          id={`${id}-chevron`}
           aria-hidden="true"
           size={13}
           className={`text-text-faint transition ${open ? "rotate-180" : ""}`}
@@ -59,22 +51,22 @@ export function ModelMenu(props: {
       </button>
       {open && (
         <div
-          id="model-menu-list"
+          id={`${id}-list`}
           role="menu"
           aria-label="Model for this chat"
-          className="absolute right-0 top-full z-30 mt-2 w-72 animate-rise rounded-2xl border border-border bg-paper p-1.5 shadow-lift"
+          className="absolute bottom-full right-0 z-30 mb-2 w-72 animate-rise rounded-2xl border border-border bg-paper p-1.5 shadow-lift"
         >
-          <p id="model-menu-hint" className="eyebrow px-2.5 pb-1.5 pt-1">
+          <p id={`${id}-hint`} className="eyebrow px-2.5 pb-1.5 pt-1">
             This chat · from your next message
           </p>
-          <div id="model-menu-groups" className="max-h-[60vh] overflow-y-auto">
+          <div id={`${id}-groups`} className="max-h-[60vh] overflow-y-auto">
             {groups.map((g, gi) => (
-              <div id={`model-menu-group-${gi}`} key={g.provider} role="group" aria-label={g.provider} className="py-1">
-                <p id={`model-menu-group-${gi}-label`} className="px-2.5 pb-0.5 text-[11px] font-medium text-text-muted">
+              <div id={`${id}-group-${gi}`} key={g.provider} role="group" aria-label={g.provider} className="py-1">
+                <p id={`${id}-group-${gi}-label`} className="px-2.5 pb-0.5 text-[11px] font-medium text-text-muted">
                   {g.provider}
                 </p>
                 {g.items.map((m, n) => {
-                  const mid = `model-menu-item-${gi}-${n}`;
+                  const mid = `${id}-item-${gi}-${n}`;
                   const on = m.id === current;
                   return (
                     <button
@@ -109,7 +101,7 @@ export function ModelMenu(props: {
             ))}
           </div>
           <button
-            id="model-menu-manage"
+            id={`${id}-manage`}
             type="button"
             role="menuitem"
             onClick={() => {
@@ -118,7 +110,7 @@ export function ModelMenu(props: {
             }}
             className="mt-1 flex w-full items-center gap-2 rounded-xl border-t border-border px-2.5 py-2 text-left text-sm text-text-secondary transition hover:bg-surface hover:text-text-primary"
           >
-            <SlidersHorizontal id="model-menu-manage-icon" aria-hidden="true" size={14} />
+            <SlidersHorizontal id={`${id}-manage-icon`} aria-hidden="true" size={14} />
             Manage models…
           </button>
         </div>

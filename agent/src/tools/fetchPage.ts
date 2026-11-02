@@ -2,6 +2,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fail, ok, type ToolResult } from "./result.js";
 import { BLOCKING_STATUSES, fetchPublic, type Lookup, publicHttpUrlError, readCapped, timeoutSignal } from "../lib/net.js";
+import { guardedFetch } from "../lib/safeFetch.js";
 import { structuredLines, parseJsonLd } from "../sources/jsonld.js";
 import { htmlToText, imagesText, truncate } from "./text.js";
 
@@ -14,7 +15,7 @@ function httpErrorText(status: number, host: string): string {
 }
 
 export function fetchPageTool(deps: { fetch?: typeof fetch; lookup?: Lookup } = {}) {
-  const f = deps.fetch ?? fetch;
+  const f = deps.fetch ?? guardedFetch;
   return defineTool({
     name: "fetch_page",
     label: "Fetch page",

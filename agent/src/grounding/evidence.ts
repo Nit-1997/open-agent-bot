@@ -73,6 +73,11 @@ export class Evidence {
     return this.hasUrl(c.text);
   }
 
+  covers(claim: string): boolean {
+    const found = extractClaims(claim);
+    return found.length > 0 && found.every((c) => this.supports(c));
+  }
+
   unverified(text: string): string[] {
     return [
       ...new Set(

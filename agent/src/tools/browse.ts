@@ -44,7 +44,13 @@ async function settle(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
 }
 
-type BrowseDeps = { pool: BrowserPool; threadId: string; userContext: UserContext | null; allowPrivateHosts?: boolean; frames?: FrameBus };
+type BrowseDeps = {
+  pool: BrowserPool;
+  sessionKey: string;
+  userContext: UserContext | null;
+  allowPrivateHosts?: boolean;
+  frames?: FrameBus;
+};
 
 async function perform(page: Page, a: BrowseAction, loc: Locator | undefined): Promise<number | undefined> {
   switch (a.op) {
@@ -112,7 +118,9 @@ export async function runBrowse(
   opts: { fresh?: boolean; live?: boolean } = {},
 ): Promise<ToolResult> {
   if (actions.length > MAX_ACTIONS) return fail(`too many actions (max ${MAX_ACTIONS} per call)`);
-  const page = opts.fresh ? await deps.pool.tab(deps.threadId, deps.userContext) : await deps.pool.page(deps.threadId, deps.userContext);
+  const page = opts.fresh
+    ? await deps.pool.tab(deps.sessionKey, deps.userContext)
+    : await deps.pool.page(deps.sessionKey, deps.userContext);
   const stopWatch = deps.frames && opts.live !== false ? await watch(page, deps.frames).catch(() => undefined) : undefined;
   let lastStatus: number | undefined;
 

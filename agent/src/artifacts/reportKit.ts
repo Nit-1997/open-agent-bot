@@ -97,8 +97,12 @@ td.yes { color: var(--good); font-weight: 600; } td.no { color: var(--bad); font
 .steps li { counter-increment: step; position: relative; padding: 2px 0 10px 44px; }
 .steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--mist-100); color: var(--mist-900); font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
-.unverified { background: var(--warn-bg); text-decoration: underline wavy #d97706; text-underline-offset: 3px; cursor: help; }
+.unverified { background: var(--warn-bg); text-decoration: underline dashed var(--warn); text-underline-offset: 3px; cursor: help; }
+.unverified::after { content: "unverified"; display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--warn); color: #fff; font: 600 10px/1.5 var(--sans); letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 2px; text-decoration: none; }
 .unchecked { text-decoration: underline dotted var(--mist-300); text-underline-offset: 3px; cursor: help; }
+.verify-key { margin: 18px 0 26px; padding: 12px 16px; border-radius: 12px; background: var(--warn-bg); border: 1px solid #f0c890; font-size: 14px; color: var(--ink-2); }
+.verify-key p { margin: 4px 0; }
+.verify-key .unverified, .verify-key .unchecked { cursor: default; }
 .quote { margin: 22px 0; padding: 4px 0 4px 20px; border-left: 3px solid var(--mist-300); font: italic 400 22px/1.4 var(--serif); color: var(--ink-2); }
 .sources { font-size: 13px; color: var(--ink-3); }
 .sources li { margin: 3px 0; }

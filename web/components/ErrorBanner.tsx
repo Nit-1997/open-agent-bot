@@ -6,21 +6,22 @@ const TEXT: Record<RunErrorKind, string> = {
   UNKNOWN: "Something went wrong talking to the agent.",
 };
 
-export function ErrorBanner(props: { kind: RunErrorKind; message?: string; onRetry: () => void; onDismiss: () => void }) {
+export function ErrorBanner(props: { id: string; kind: RunErrorKind; message?: string; onRetry: () => void; onDismiss: () => void }) {
   const showRetry = props.kind === "MODEL_ERROR" || props.kind === "UNKNOWN";
+  const id = props.id;
   return (
     <div
-      id="error-banner"
+      id={id}
       role="alert"
       className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl bg-danger-bg px-4 py-2.5 text-sm text-danger-fg"
     >
-      <span id="error-banner-text" className="flex-1">
+      <span id={`${id}-text`} className="flex-1">
         {TEXT[props.kind]}
         {props.message ? ` ${props.message}` : ""}
       </span>
       {showRetry && (
         <button
-          id="error-banner-retry"
+          id={`${id}-retry`}
           type="button"
           onClick={props.onRetry}
           className="rounded-full bg-charcoal px-3 py-1 text-xs font-medium text-on-charcoal"
@@ -28,7 +29,7 @@ export function ErrorBanner(props: { kind: RunErrorKind; message?: string; onRet
           Retry
         </button>
       )}
-      <button id="error-banner-dismiss" type="button" onClick={props.onDismiss} aria-label="Dismiss" className="px-2">
+      <button id={`${id}-dismiss`} type="button" onClick={props.onDismiss} aria-label="Dismiss" className="px-2">
         ✕
       </button>
     </div>

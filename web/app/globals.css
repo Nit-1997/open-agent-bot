@@ -8,12 +8,14 @@
   --surface: #f2f0ed;
   --surface-accent: #eceae6;
   --paper: #ffffff;
+  --sidebar: #f6f4f1;
+  --panel: #f4f2ef;
   --border: #e5e3df;
   --border-strong: #d8d5cf;
   --text-primary: #111111;
   --text-secondary: #555555;
-  --text-muted: #6b6b6b;
-  --text-faint: #8a8a8a;
+  --text-muted: #5c5c5c;
+  --text-faint: #666666;
   --charcoal: #111111;
   --on-charcoal: #ffffff;
   --mist-50: #eef3f4;
@@ -46,12 +48,14 @@ html.dark {
   --surface: #1a1c21;
   --surface-accent: #23262d;
   --paper: #2c2f36;
+  --sidebar: #131418;
+  --panel: #16171b;
   --border: #383b42;
   --border-strong: #4a4d55;
   --text-primary: #f2f1ef;
   --text-secondary: #d4d2cf;
   --text-muted: #adabac;
-  --text-faint: #8f9094;
+  --text-faint: #9a9b9f;
   --charcoal: #e8e6e2;
   --on-charcoal: #111111;
   --mist-50: color-mix(in srgb, #4d7f87 20%, #2c2f36);
@@ -82,6 +86,8 @@ html.dark {
   --color-surface: var(--surface);
   --color-surface-accent: var(--surface-accent);
   --color-paper: var(--paper);
+  --color-sidebar: var(--sidebar);
+  --color-panel: var(--panel);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-text-primary: var(--text-primary);
@@ -116,6 +122,36 @@ html.dark {
   --animate-rise: rise 0.35s var(--ease-out) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-breathe: breathe 2.4s ease-in-out infinite;
+  --animate-slide-left: slide-left 0.2s var(--ease-out) both;
+  --animate-slide-right: slide-right 0.2s var(--ease-out) both;
+  --animate-slide-up: slide-up 0.2s var(--ease-out) both;
+}
+
+@keyframes slide-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 @keyframes rise {
@@ -187,6 +223,49 @@ html.dark {
   border-radius: 9999px;
 }
 
+.orb[data-look="mist"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #d5e3e5 32%, #6f9aa1 70%, #23474d 100%);
+}
+.orb[data-look="ember"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #f6d9c7 32%, #d9895e 70%, #5a2614 100%);
+}
+.orb[data-look="moss"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #dde9cc 32%, #8fae6a 70%, #2c3d1a 100%);
+}
+.orb[data-look="dusk"] {
+  --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #ddd6f1 32%, #9a8bc9 70%, #2d2550 100%);
+}
+html.dark .orb[data-look="mist"] {
+  --orb: radial-gradient(circle at 35% 30%, #e3eff1, #7fa6ac 45%, #183a40);
+}
+html.dark .orb[data-look="ember"] {
+  --orb: radial-gradient(circle at 35% 30%, #fbe3d4, #d9895e 45%, #5a2614);
+}
+html.dark .orb[data-look="moss"] {
+  --orb: radial-gradient(circle at 35% 30%, #e6f0d8, #8fae6a 45%, #2c3d1a);
+}
+html.dark .orb[data-look="dusk"] {
+  --orb: radial-gradient(circle at 35% 30%, #e7e1f6, #9a8bc9 45%, #2d2550);
+}
+@utility agent-dp {
+  background: var(--dp-bg);
+  color: var(--dp-fg);
+  border: 1px solid var(--dp-ring);
+  border-radius: 9999px;
+}
+
+.agent-dp[data-look="mist"] { --dp-bg: #d5e3e5; --dp-fg: #23474d; --dp-ring: #b4cdd1; }
+.agent-dp[data-look="ember"] { --dp-bg: #f6d9c7; --dp-fg: #5a2614; --dp-ring: #e8bea4; }
+.agent-dp[data-look="moss"] { --dp-bg: #dde9cc; --dp-fg: #2c3d1a; --dp-ring: #c3d6aa; }
+.agent-dp[data-look="dusk"] { --dp-bg: #ddd6f1; --dp-fg: #2d2550; --dp-ring: #c4b9e6; }
+html.dark .agent-dp[data-look="mist"] { --dp-bg: #23474d; --dp-fg: #e3eff1; --dp-ring: #39656c; }
+html.dark .agent-dp[data-look="ember"] { --dp-bg: #5a2614; --dp-fg: #fbe3d4; --dp-ring: #7d3c24; }
+html.dark .agent-dp[data-look="moss"] { --dp-bg: #2c3d1a; --dp-fg: #e6f0d8; --dp-ring: #44592c; }
+html.dark .agent-dp[data-look="dusk"] { --dp-bg: #2d2550; --dp-fg: #e7e1f6; --dp-ring: #463c72; }
+.orb-glow {
+  box-shadow: 0 0 60px rgba(127, 166, 172, 0.25);
+}
+
 @utility glass {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -228,6 +307,10 @@ html.dark {
     font-size: 14.5px;
     line-height: 1.6;
   }
+}
+
+.report-card-current {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mist-500) 18%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

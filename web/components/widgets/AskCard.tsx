@@ -3,6 +3,7 @@
 import type { AskField, AskWidget } from "@shared/widgets";
 import { Check, ChevronDown, Minus, Plus } from "lucide-react";
 import { useState } from "react";
+import { widgetId } from "./widgetId";
 
 const DAY = 86_400_000;
 const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -42,13 +43,14 @@ const label = "text-[13px] font-medium leading-snug text-text-secondary";
 
 export function AskCard(props: {
   toolCallId: string;
+  idPrefix?: string;
   widget: AskWidget;
   locale: string;
   answered?: boolean;
   onAnswer?: (text: string) => void;
 }) {
   const { widget, answered } = props;
-  const id = `ask-${props.toolCallId}`;
+  const id = widgetId("ask", props.toolCallId, props.idPrefix);
   const [values, setValues] = useState<string[]>(() => widget.fields.map(initial));
   const set = (i: number, v: string) => setValues((vs) => vs.map((x, j) => (j === i ? v : x)));
   const invalid = widget.fields.some((f, i) => f.type === "date_range" && nights(...(values[i].split("|") as [string, string])) < 0);

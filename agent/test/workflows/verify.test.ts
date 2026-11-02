@@ -25,7 +25,7 @@ describe("verifyReport", () => {
     const html = `<p>It lasts 40 years <a href="${src.url}">[1]</a>.</p><ul><li>Costs $900 <a href="${src.url}">[1]</a>.</li></ul><table><tr><td>Price</td><td>$900 <a href="${src.url}">[1]</a></td></tr></table><div class="stat">$900</div>`;
     const r = await verifyReport(html, [src], numberJudge());
     expect(r).toMatchObject({ removed: 0, flagged: 4 });
-    expect(r.html.match(/class="unverified"/g)).toHaveLength(4);
+    expect(r.html.match(/class="unverified" title=/g)).toHaveLength(4);
   });
 
   it("drops a false list item when the list keeps others", async () => {
@@ -59,6 +59,24 @@ describe("verifyReport", () => {
       expect(r.html).toContain('class="unchecked"');
       expect(r.html).not.toContain('class="unverified"');
     }
+  });
+
+  it("explains flagged claims in a key placed after the hero", async () => {
+    const src = { url: "https://s.example.org/a", text: "The unit costs $100 and lasts 15 years." };
+    const html = `<header class="hero"><h1>Guide</h1></header><p>It lasts 40 years <a href="${src.url}">[1]</a>.</p><p>Costs $900 <a href="${src.url}">[1]</a>.</p>`;
+    const r = await verifyReport(html, [src], numberJudge());
+    expect(r.flagged).toBe(2);
+    expect(r.html.startsWith('<header class="hero"><h1>Guide</h1></header><aside class="verify-key"')).toBe(true);
+    expect(r.html).toContain("2 claims couldn't be confirmed by the sources they cite");
+    expect(r.html.match(/class="verify-key"/g)).toHaveLength(1);
+  });
+
+  it("explains unchecked claims and adds no key when everything checks out", async () => {
+    const unchecked = await verifyReport(REPORT, sources, nullJudge);
+    expect(unchecked.html).toContain(`${unchecked.unchecked} claims weren't checked against a source`);
+    const src = { url: "https://s.example.org/a", text: "The unit costs $100 and lasts 15 years." };
+    const clean = await verifyReport(`<h1>Guide</h1><p>It lasts 15 years <a href="${src.url}">[1]</a>.</p>`, [src], numberJudge());
+    expect(clean.html).not.toContain("verify-key");
   });
 
   it("sends one batch per source with the source text shared", async () => {

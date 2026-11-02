@@ -1,13 +1,11 @@
-import { mkdtempSync } from "node:fs";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { defineTool, type ModelRuntime, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { codemodeFailure, createPiSession } from "../../src/pi/createPiSession.js";
-import { ProviderHub } from "../../src/providers/hub.js";
+import type { ProviderHub } from "../../src/providers/hub.js";
+import { testHub } from "../fixtures/hub.js";
 import { TurnBudget, withBudget } from "../../src/tools/budget.js";
 import { fetchPageTool } from "../../src/tools/fetchPage.js";
 import { scopeToCodemode } from "../../src/tools/index.js";
@@ -49,8 +47,7 @@ beforeAll(async () => {
     });
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-  hub = await ProviderHub.create({
-    dataDir: mkdtempSync(join(tmpdir(), "codemode-")),
+  hub = await testHub({
     litellm: {
       baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
       apiKey: "none",

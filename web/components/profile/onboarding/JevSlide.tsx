@@ -95,7 +95,7 @@ export function JevSlide({ id, onSaved }: { id: string; onSaved: () => void }) {
         onSaved={onSaved}
       />
       <p id={`${id}-legend`} className="text-[11px] text-text-muted">
-        Keys stay on this computer. Skipping still works; picks are just less precise.
+        Keys are encrypted on the server. Skipping still works; picks are just less precise.
       </p>
     </div>
   );

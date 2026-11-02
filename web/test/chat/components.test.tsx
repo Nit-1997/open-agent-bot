@@ -1,12 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { ActivitySteps } from "@/components/chat/ActivitySteps";
 import { Markdown } from "@/components/chat/Markdown";
 import { SourcesRow } from "@/components/chat/SourcesRow";
+import { AccessDisabled, SignedOutBanner } from "@/components/SessionNotices";
+import { noteAuthFailure, resetAuthState, useAuthState } from "@/lib/authState";
 import type { Step } from "@/lib/turns";
 
-const htmlIds = (root: HTMLElement) =>
-  [...root.querySelectorAll("*")].filter((e) => e.namespaceURI === "http://www.w3.org/1999/xhtml").map((e) => e.id);
+import { expectUniqueIds, htmlIds } from "../support/ids";
 
 describe("Markdown", () => {
   it("gives every element a unique id and opens links in a new tab", () => {
@@ -71,5 +72,36 @@ describe("ActivitySteps", () => {
   it("says it's thinking before any step starts", () => {
     render(<ActivitySteps id="a3" steps={[]} running now={0} />);
     expect(screen.getByRole("status")).toHaveTextContent("Thinking");
+  });
+});
+
+function AuthProbe() {
+  return <p id="probe">{useAuthState()}</p>;
+}
+
+describe("session notices", () => {
+  afterEach(() => resetAuthState());
+
+  it("render unique ids", () => {
+    const { container } = render(
+      <>
+        <SignedOutBanner />
+        <AccessDisabled />
+      </>,
+    );
+    expectUniqueIds(container);
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    expect(screen.getByText("Your access has been turned off.")).toBeInTheDocument();
+  });
+
+  it("tracks signed_out and account_disabled from API answers, and never downgrades disabled", () => {
+    render(<AuthProbe />);
+    act(() => noteAuthFailure(401, "unauthorized"));
+    expect(screen.getByText("active")).toBeInTheDocument();
+    act(() => noteAuthFailure(401, "signed_out"));
+    expect(screen.getByText("signed_out")).toBeInTheDocument();
+    act(() => noteAuthFailure(403, "account_disabled"));
+    act(() => noteAuthFailure(401, "signed_out"));
+    expect(screen.getByText("account_disabled")).toBeInTheDocument();
   });
 });

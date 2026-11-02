@@ -6,6 +6,8 @@ import { useState } from "react";
 import { money } from "@/lib/format";
 import { Favicon } from "@/components/chat/Favicon";
 import { Picture } from "./CardRow";
+import { ExternalLink } from "./ExternalLink";
+import { widgetId } from "./widgetId";
 
 type Source = StayListWidget["sources"][number];
 type Stay = Source["stays"][number] & { source: string };
@@ -52,11 +54,9 @@ function StayCard({
   const details = [stay.kind, stay.area].filter(Boolean).join(" · ");
   return (
     <li id={id} className={`min-w-0 snap-start sm:w-60 sm:shrink-0 ${folded ? "hidden sm:block" : ""}`}>
-      <a
+      <ExternalLink
         id={`${id}-link`}
         href={stay.url}
-        target="_blank"
-        rel="noopener noreferrer"
         className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-paper transition hover:border-border-strong hover:shadow-sm"
       >
         <span id={`${id}-media`} className="relative block aspect-[16/10] w-full overflow-hidden bg-surface">
@@ -128,15 +128,25 @@ function StayCard({
             {showSource && <span id={`${id}-source`}>{stay.source}</span>}
           </span>
         </span>
-      </a>
+      </ExternalLink>
     </li>
   );
 }
 
 const NARROW_SHOWN = 4;
 
-export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId: string; widget: StayListWidget; locale?: string }) {
-  const id = `stays-${toolCallId}`;
+export function StayList({
+  toolCallId,
+  idPrefix,
+  widget,
+  locale = "en-US",
+}: {
+  toolCallId: string;
+  idPrefix?: string;
+  widget: StayListWidget;
+  locale?: string;
+}) {
+  const id = widgetId("stays", toolCallId, idPrefix);
   const read = widget.sources.filter((s) => s.status === "ok" && s.stays.length);
   const others = widget.sources.filter((s) => !(s.status === "ok" && s.stays.length));
   const [tab, setTab] = useState(read.length > 1 ? ALL : (read[0]?.id ?? ALL));
@@ -218,17 +228,15 @@ export function StayList({ toolCallId, widget, locale = "en-US" }: { toolCallId:
       {others.length > 0 && (
         <footer id={`${id}-others`} className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-text-muted">
           {others.map((s) => (
-            <a
+            <ExternalLink
               id={`${id}-other-${s.id}`}
               key={s.id}
               href={s.url}
-              target="_blank"
-              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-text-secondary transition hover:border-border-strong hover:text-text-primary"
             >
               <Favicon id={`${id}-other-${s.id}-icon`} host={s.site} size={14} className="ring-0" />
               {`${s.status === "ok" ? "Search on" : STATUS_TEXT[s.status]} ${s.label} ↗`}
-            </a>
+            </ExternalLink>
           ))}
         </footer>
       )}

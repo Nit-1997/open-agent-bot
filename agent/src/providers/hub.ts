@@ -1,12 +1,14 @@
-import { randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
-import type { AssistantMessage, Context, Model } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Context, CredentialStore, Model } from "@earendil-works/pi-ai";
+import { streamSimple as openAiCompletions } from "@earendil-works/pi-ai/api/openai-completions";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { readJsonFile, writeFileAtomic } from "../lib/files.js";
-import { type CatalogEntry, catalogEntry, CLOUD, LOCAL, LOCAL_KINDS, type LocalKind } from "./catalog.js";
+import { keyHint } from "../crypto/hint.js";
+import type { CredentialListing, ProviderSettingsRepo } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
+import { log } from "../lib/log.js";
+import { isBlockedError, type Lookup, publicHttpUrlError, resolvesInternal } from "../lib/net.js";
+import { createSafeFetch } from "../lib/safeFetch.js";
+import { type CatalogEntry, catalogEntry, CLOUD, LOCAL, LOCAL_KINDS, type LocalKind } from "./catalog.js";
 
 type AnyModel = Model<any>;
 type Complete = (model: AnyModel, context: Context, options?: { maxTokens?: number; signal?: AbortSignal }) => Promise<AssistantMessage>;
@@ -28,6 +30,7 @@ type ProviderView = {
   note?: string;
   configured: boolean;
   source?: "key" | "signin" | "server";
+  hint?: string;
   baseUrl?: string;
   enabled: string[];
   modelCount: number;
@@ -103,60 +106,99 @@ function priceNote(m: AnyModel): string | undefined {
   return `${n(input)} in · ${n(output)} out per 1M tokens`;
 }
 
+export type HubOptions = {
+  userId: string;
+  isAdmin: boolean;
+  settings: ProviderSettingsRepo;
+  credentials: HubCredentials;
+  litellm?: { baseUrl: string; apiKey: string; models: SeedModel[] };
+  fetch?: typeof fetch;
+  userFetch?: typeof fetch;
+  complete?: Complete;
+  lookup?: Lookup;
+};
+
+export type HubCredentials = CredentialStore & { listings(): Promise<CredentialListing[]> };
+
+const PRIVATE_TARGET = "That address isn't reachable from the server.";
+
+function parseSettings(raw: unknown): Settings {
+  const v = (raw && typeof raw === "object" ? raw : {}) as Partial<Settings>;
+  return {
+    custom: v.custom && typeof v.custom === "object" ? { ...v.custom } : {},
+    enabled: v.enabled && typeof v.enabled === "object" ? { ...v.enabled } : {},
+    hidden: Array.isArray(v.hidden) ? [...v.hidden] : [],
+  };
+}
+
 export class ProviderHub {
   private constructor(
     private readonly rt: ModelRuntime,
-    private readonly dir: string,
+    private readonly opts: HubOptions,
     private settings: Settings,
     private keys: Record<string, string>,
-    private readonly f: typeof fetch,
+    private readonly hints: Map<string, string>,
+    private readonly devId: string,
+    private readonly userFetch: typeof fetch,
     private readonly completeFn: Complete,
     private readonly signedIn: Map<string, "key" | "signin">,
+    private stamp: string,
   ) {}
 
-  static async create(opts: {
-    dataDir: string;
-    litellm?: { baseUrl: string; apiKey: string; models: SeedModel[] };
-    fetch?: typeof fetch;
-    complete?: Complete;
-  }): Promise<ProviderHub> {
-    await mkdir(opts.dataDir, { recursive: true, mode: 0o700 });
-    await chmod(opts.dataDir, 0o700);
+  static async create(opts: HubOptions): Promise<ProviderHub> {
     const rt = await ModelRuntime.create({
-      authPath: join(opts.dataDir, "auth.json"),
+      credentials: opts.credentials,
       modelsPath: null,
       refreshOnCreate: false,
       allowModelNetwork: false,
     });
-    const settings: Settings = {
-      custom: {},
-      enabled: {},
-      hidden: [],
-      ...(await readJsonFile<Partial<Settings>>(join(opts.dataDir, "providers.json"))),
-    };
-    const keys = (await readJsonFile<Record<string, string>>(join(opts.dataDir, "local-keys.json"))) ?? {};
+    const stored = await opts.settings.get();
+    const settings = parseSettings(stored.data);
+    const listings = await opts.credentials.listings();
+    const hints = new Map(listings.map((l) => [l.provider, l.hint]));
     const signedIn = new Map<string, "key" | "signin">();
-    for (const e of CLOUD) {
-      const check = await rt.checkAuth(e.id).catch(() => undefined);
-      if (check) signedIn.set(e.id, (check as { type?: string }).type === "oauth" ? "signin" : "key");
+    for (const l of listings)
+      if (catalogEntry(l.provider)?.kind === "cloud") signedIn.set(l.provider, l.kind === "oauth" ? "signin" : "key");
+    const keys: Record<string, string> = {};
+    for (const l of listings) {
+      if (catalogEntry(l.provider)?.kind === "cloud" || l.kind !== "api_key") continue;
+      const c = await opts.credentials.read(l.provider);
+      if (c?.type === "api_key" && c.key) keys[l.provider] = c.key;
     }
+    delete settings.custom.litellm;
     const hub = new ProviderHub(
       rt,
-      opts.dataDir,
+      opts,
       settings,
       keys,
-      opts.fetch ?? fetch,
+      hints,
+      stored.deviceId,
+      opts.isAdmin ? (opts.fetch ?? fetch) : (opts.userFetch ?? createSafeFetch()),
       opts.complete ?? ((m, c, o) => rt.completeSimple(m, c, o)),
       signedIn,
+      stored.stamp,
     );
-    if (opts.litellm && !settings.hidden.includes("litellm")) {
+    if (opts.isAdmin && opts.litellm && !settings.hidden.includes("litellm")) {
       const models = await withGatewayLimits(opts.fetch ?? fetch, opts.litellm);
       settings.custom.litellm = { kind: "litellm", label: "LiteLLM gateway", baseUrl: opts.litellm.baseUrl, models };
       keys.litellm = opts.litellm.apiKey;
       settings.enabled.litellm ??= models.map((m) => m.id);
     }
-    for (const id of Object.keys(settings.custom)) hub.registerCustom(id);
+    for (const id of Object.keys(settings.custom)) {
+      if (id !== "litellm" && !(await hub.targetAllowed(settings.custom[id].baseUrl))) {
+        log.warn(`[providers] user=${opts.userId} skipped ${id}: private address`);
+        delete settings.custom[id];
+        continue;
+      }
+      hub.registerCustom(id);
+    }
     return hub;
+  }
+
+  private async targetAllowed(baseUrl: string): Promise<boolean> {
+    if (this.opts.isAdmin) return true;
+    if (publicHttpUrlError(baseUrl)) return false;
+    return !(await resolvesInternal(new URL(baseUrl).hostname, this.opts.lookup));
   }
 
   get runtime(): ModelRuntime {
@@ -165,11 +207,16 @@ export class ProviderHub {
 
   private registerCustom(id: string): void {
     const c = this.settings.custom[id];
+    const userFetch = this.userFetch;
     this.rt.registerProvider(id, {
       name: c.label,
       baseUrl: c.baseUrl,
       apiKey: this.keys[id] || "none",
       api: "openai-completions",
+      ...(!this.opts.isAdmin && {
+        streamSimple: (model, context, options) =>
+          openAiCompletions(model as Model<"openai-completions">, context, { ...options, fetch: userFetch }),
+      }),
       models: c.models.map((m) => ({
         id: m.id,
         name: m.label,
@@ -211,6 +258,7 @@ export class ProviderHub {
         ...(e.note && { note: e.note }),
         configured,
         ...(configured && { source: e.kind === "local" ? "server" : this.signedIn.get(e.id) }),
+        ...(configured && this.hints.get(e.id) && { hint: this.hints.get(e.id) }),
         ...(custom && { baseUrl: custom.baseUrl }),
         enabled: configured ? this.enabledFor(e.id) : [],
         modelCount: this.rt.getModels(e.id).length,
@@ -230,17 +278,18 @@ export class ProviderHub {
     if (!value) throw new UserError("the key is empty");
     await this.rt.login(id, "api_key", { prompt: async () => value, notify: () => {} });
     this.signedIn.set(id, "key");
-    await this.lockAuthFile();
+    this.hints.set(id, keyHint(value));
   }
 
   async login(id: string, interaction: Parameters<ModelRuntime["login"]>[2]): Promise<void> {
     if (!this.cloud(id).oauthLabel) throw new UserError(`${id} has no sign-in option here`);
-    const deviceId = await this.deviceId();
+    const deviceId = this.deviceId();
     await this.rt.login(id, "oauth", interaction, { agentName: "Open Agent", getDeviceId: () => deviceId }).catch((err: unknown) => {
       throw signInError(id, err);
     });
     this.signedIn.set(id, "signin");
-    await this.lockAuthFile();
+    const hint = (await this.opts.credentials.listings()).find((l) => l.provider === id)?.hint;
+    if (hint) this.hints.set(id, hint);
   }
 
   async remove(id: string): Promise<void> {
@@ -249,15 +298,16 @@ export class ProviderHub {
     if (entry.kind === "cloud") {
       await this.rt.logout(id);
       this.signedIn.delete(id);
-      await this.lockAuthFile();
+      this.hints.delete(id);
       return;
     }
     if (!(id in this.settings.custom)) return;
     this.rt.unregisterProvider(id);
     delete this.settings.custom[id];
     delete this.settings.enabled[id];
-    delete this.keys[id];
     if (id === "litellm" && !this.settings.hidden.includes("litellm")) this.settings.hidden.push("litellm");
+    if (id !== "litellm") await this.dropKey(id);
+    delete this.keys[id];
     await this.save();
   }
 
@@ -272,23 +322,26 @@ export class ProviderHub {
     }
     if (!/^https?:$/.test(base.protocol)) throw new UserError("the base URL must start with http:// or https://");
     const baseUrl = base.href.replace(/\/+$/, "");
+    if (!(await this.targetAllowed(baseUrl))) throw new UserError(PRIVATE_TARGET, "unprocessable");
     let ids: string[];
     try {
-      const res = await this.f(`${baseUrl}/models`, {
+      const res = await this.userFetch(`${baseUrl}/models`, {
         headers: input.apiKey ? { authorization: `Bearer ${input.apiKey}` } : {},
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       ids = (((await res.json()) as { data?: Array<{ id?: string }> }).data ?? []).map((m) => m.id).filter((m): m is string => !!m);
     } catch (err) {
+      if (isBlockedError(err)) throw new UserError(PRIVATE_TARGET, "unprocessable");
       throw new UserError(`couldn't list models at ${baseUrl}/models (${err instanceof Error ? err.message : String(err)})`, "upstream");
     }
     if (!ids.length) throw new UserError(`the server at ${baseUrl} has no models`, "upstream");
     const label = input.label?.trim() || catalogEntry(kind)!.label;
     this.settings.custom[kind] = { kind, label, baseUrl, models: ids.map((m) => ({ id: m, label: m })) };
     this.settings.enabled[kind] = ids;
-    if (input.apiKey?.trim()) this.keys[kind] = input.apiKey.trim();
-    else delete this.keys[kind];
+    const apiKey = input.apiKey?.trim();
+    if (apiKey) await this.storeKey(kind, apiKey);
+    else await this.dropKey(kind);
     this.registerCustom(kind);
     await this.save();
     return this.list().find((p) => p.id === kind)!;
@@ -370,32 +423,36 @@ export class ProviderHub {
   async setSecret(name: SecretName, value: string): Promise<void> {
     const v = value.trim();
     if (!v) throw new UserError("the key is empty");
-    this.keys[`secret:${name}`] = v;
-    await this.save();
+    await this.storeKey(`secret:${name}`, v);
   }
 
   async removeSecret(name: SecretName): Promise<void> {
-    delete this.keys[`secret:${name}`];
-    await this.save();
+    await this.dropKey(`secret:${name}`);
   }
 
-  async deviceId(): Promise<string> {
-    const path = join(this.dir, "device-id");
-    const existing = (await readFile(path, "utf8").catch(() => "")).trim();
-    if (existing) return existing;
-    const id = randomUUID();
-    await writeFileAtomic(path, id);
-    return id;
+  secretHint(name: SecretName): string | undefined {
+    return this.hints.get(`secret:${name}`);
   }
 
-  private async lockAuthFile(): Promise<void> {
-    await chmod(join(this.dir, "auth.json"), 0o600).catch(() => {});
+  deviceId(): string {
+    return this.devId;
+  }
+
+  private async storeKey(id: string, key: string): Promise<void> {
+    await this.opts.credentials.modify(id, async () => ({ type: "api_key", key }));
+    this.keys[id] = key;
+    this.hints.set(id, keyHint(key));
+  }
+
+  private async dropKey(id: string): Promise<void> {
+    await this.opts.credentials.delete(id);
+    delete this.keys[id];
+    this.hints.delete(id);
   }
 
   private async save(): Promise<void> {
-    await writeFileAtomic(join(this.dir, "providers.json"), JSON.stringify(this.settings, null, 2));
-    const secrets = Object.fromEntries(Object.entries(this.keys).filter(([id]) => id !== "litellm"));
-    await writeFileAtomic(join(this.dir, "local-keys.json"), JSON.stringify(secrets));
+    const { litellm: _gateway, ...custom } = this.settings.custom;
+    this.stamp = await this.opts.settings.put({ ...this.settings, custom }, this.stamp);
   }
 }
 

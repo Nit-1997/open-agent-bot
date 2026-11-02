@@ -40,7 +40,7 @@ const subtotal = () => screen.getByTestId("cart-subtotal").textContent;
 
 describe("CartCard", () => {
   it("shows the best-value store's items like a store cart, with a hand-off link", () => {
-    const { container } = render(<CartCard toolCallId="c1" widget={cart} />);
+    const { container } = render(<CartCard toolCallId="c1" widget={cart} onEdit={() => {}} />);
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(["Target (Shipt)$4.37Best value", "Safeway (Shipt)$6.50"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -57,7 +57,7 @@ describe("CartCard", () => {
   });
 
   it("updates the subtotal as quantities change or items are removed", () => {
-    render(<CartCard toolCallId="c2" widget={cart} />);
+    render(<CartCard toolCallId="c2" widget={cart} onEdit={() => {}} />);
     const beans = screen.getByRole("listitem", { name: "black beans" });
     fireEvent.click(within(beans).getByRole("button", { name: "Increase quantity" }));
     expect(within(beans).getByText("3")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("CartCard", () => {
   });
 
   it("swaps an item for another match from the same store", () => {
-    render(<CartCard toolCallId="c3" widget={cart} />);
+    render(<CartCard toolCallId="c3" widget={cart} onEdit={() => {}} />);
     const rice = screen.getByRole("listitem", { name: "rice" });
     fireEvent.click(within(rice).getByRole("button", { name: "Swap" }));
     fireEvent.click(within(rice).getByRole("button", { name: /Instant Rice 14oz/ }));
@@ -78,7 +78,7 @@ describe("CartCard", () => {
   });
 
   it("switches to another store's cart", () => {
-    render(<CartCard toolCallId="c4" widget={cart} />);
+    render(<CartCard toolCallId="c4" widget={cart} onEdit={() => {}} />);
     fireEvent.click(screen.getByRole("tab", { name: /Safeway/ }));
     expect(screen.getByRole("link", { name: "Signature Rice 2 lb" })).toBeInTheDocument();
     expect(subtotal()).toBe("$3.50");
@@ -124,7 +124,7 @@ describe("CartCard match labels", () => {
 
 describe("CartCard edits", () => {
   it("treats the list as one cart: quantities and removals carry across store tabs", () => {
-    render(<CartCard toolCallId="c5" widget={cart} />);
+    render(<CartCard toolCallId="c5" widget={cart} onEdit={() => {}} />);
     fireEvent.click(within(screen.getByRole("listitem", { name: "rice" })).getByRole("button", { name: "Increase quantity" }));
     fireEvent.click(screen.getByRole("tab", { name: /Safeway/ }));
     expect(within(screen.getByRole("listitem", { name: "rice" })).getByText("2")).toBeInTheDocument();
@@ -171,5 +171,82 @@ describe("CartCard currency", () => {
     render(<CartCard toolCallId="inr" widget={inr} locale="en-IN" />);
     expect(screen.getAllByRole("tab")[0].textContent).toContain("₹350.00");
     expect(screen.getByTestId("cart-subtotal").textContent).toBe("₹350.00");
+  });
+});
+
+describe("CartCard without edits", () => {
+  it("is read-only: no swap or remove, steppers disabled, store tabs still switch, unsafe links render as text", () => {
+    const unsafe = {
+      ...cart,
+      stores: cart.stores.map((st, n) =>
+        n === 0
+          ? {
+              ...st,
+              items: st.items.map((i, k) => (k === 0 ? { ...i, picks: i.picks.map((p) => ({ ...p, url: "javascript:alert(1)" })) } : i)),
+            }
+          : st,
+      ),
+    };
+    const { container } = render(<CartCard toolCallId="ro" widget={unsafe} />);
+    expect(screen.queryByRole("button", { name: "Swap" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    for (const b of screen.getAllByRole("button", { name: /quantity/ })) expect(b).toBeDisabled();
+    expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
+    fireEvent.click(screen.getAllByRole("tab")[1]);
+    expect(screen.getAllByRole("tab")[1]).toHaveAttribute("aria-selected", "true");
+  });
+});
+
+describe("CartCard from an earlier session", () => {
+  const now = new Date("2026-11-05T12:00:00Z");
+  const note = (tc: string) => document.getElementById(`cart-${tc}-locked-note`)?.textContent;
+
+  it("is live with edits: steppers, swap and remove enabled, and no dated note", () => {
+    render(<CartCard toolCallId="live" widget={cart} onEdit={() => {}} agentName="Sage" now={now} />);
+    const rice = screen.getByRole("listitem", { name: "rice" });
+    expect(within(rice).getByRole("button", { name: "Increase quantity" })).toBeEnabled();
+    expect(within(rice).getByRole("button", { name: "Swap" })).toBeEnabled();
+    expect(within(rice).getByRole("button", { name: "Remove" })).toBeEnabled();
+    expect(note("live")).toBeUndefined();
+  });
+
+  it("is locked and dated: steppers disabled, no swap, remove or alternatives, store tabs still switch", () => {
+    render(<CartCard toolCallId="old" widget={cart} lockedAt="2026-11-01T12:00:00Z" agentName="Sage" now={now} />);
+    expect(note("old")).toBe("Prices from Nov 1 · ask Sage to refresh");
+    for (const b of screen.getAllByRole("button", { name: /quantity/ })) expect(b).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Swap" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.getByText("2 items")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab")[1]);
+    expect(screen.getAllByRole("tab")[1]).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("says the prices may be out of date when the date is unknown or invalid", () => {
+    const { rerender } = render(<CartCard toolCallId="nodate" widget={cart} lockedAt={null} agentName="Sage" now={now} />);
+    expect(note("nodate")).toBe("Prices may be out of date · ask Sage to refresh");
+    rerender(<CartCard toolCallId="nodate" widget={cart} lockedAt="yesterday" agentName="Sage" now={now} />);
+    expect(note("nodate")).toBe("Prices may be out of date · ask Sage to refresh");
+  });
+
+  it("keeps a replaced card's header and gives it no dated note", () => {
+    render(<CartCard toolCallId="gone" widget={cart} stale agentName="Sage" now={now} />);
+    expect(screen.getByText("Updated cart below")).toBeInTheDocument();
+    expect(note("gone")).toBeUndefined();
+  });
+
+  it("renders unsafe pick and hand-off links as text when locked", () => {
+    const unsafe: Cart = {
+      kind: "cart",
+      stores: [
+        {
+          ...cart.stores[1],
+          url: "javascript:alert(1)",
+          items: [{ query: "rice", qty: 1, picks: [{ ...pick("Signature Rice 2 lb", 3.5), url: "javascript:alert(2)" }] }],
+        },
+      ],
+    };
+    const { container } = render(<CartCard toolCallId="js" widget={unsafe} lockedAt="2026-11-01T12:00:00Z" agentName="Sage" now={now} />);
+    expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
+    expect(screen.getByText("Signature Rice 2 lb")).toBeInTheDocument();
   });
 });

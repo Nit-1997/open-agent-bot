@@ -15,8 +15,8 @@ import {
 
 describe("slideOrder", () => {
   it("asks for the model just before the summary, or first when nothing is set up", () => {
-    expect(slideOrder({ modelFirst: false, showJev: true })).toEqual(["you", "travel", "shopping", "jev", "model", "summary"]);
-    expect(slideOrder({ modelFirst: true, showJev: false })).toEqual(["model", "you", "travel", "shopping", "summary"]);
+    expect(slideOrder({ modelFirst: false, showJev: true })).toEqual(["agent", "you", "travel", "shopping", "jev", "model", "summary"]);
+    expect(slideOrder({ modelFirst: true, showJev: false })).toEqual(["agent", "model", "you", "travel", "shopping", "summary"]);
   });
 });
 
@@ -70,6 +70,7 @@ describe("summary and starters", () => {
   it("writes one line per section, says when one was skipped, and shows Jev only when asked about", () => {
     const lines = summaryLines({ ...family, skipped: ["travel"] }, { jev: "OpenRouter", modelLabel: "DeepSeek" });
     expect(lines.map((l) => `${l.label}: ${l.text}`)).toEqual([
+      "Your agent: Juno · warm · mist look",
       "You: Nitin · San Francisco, CA",
       "Household: partner, kids 4–8 · vegetarian · nut allergy",
       "Travel: skipped",
@@ -82,7 +83,7 @@ describe("summary and starters", () => {
   });
 
   it("never shows the street address of a picked place in the summary", () => {
-    expect(summaryLines(family)[0].text).not.toContain("California St");
+    expect(summaryLines(family)[1].text).not.toContain("California St");
   });
 
   it("builds starters from the answers", () => {

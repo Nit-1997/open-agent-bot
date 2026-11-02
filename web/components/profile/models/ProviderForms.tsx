@@ -6,14 +6,16 @@ import { input, solid } from "./styles";
 
 type LocalInput = { kind: string; baseUrl: string; apiKey?: string; label?: string };
 
-export function KeyForm({ id, p, busy, onSubmit }: { id: string; p: ProviderView; busy: boolean; onSubmit: (key: string) => void }) {
+type Submit<T> = (value: T) => Promise<boolean>;
+
+export function KeyForm({ id, p, busy, onSubmit }: { id: string; p: ProviderView; busy: boolean; onSubmit: Submit<string> }) {
   const [key, setKey] = useState("");
   return (
     <form
       id={`${id}-key-form`}
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit(key);
+        void onSubmit(key).then((saved) => saved && setKey(""));
       }}
       className="mt-3 flex gap-2"
     >
@@ -34,17 +36,7 @@ export function KeyForm({ id, p, busy, onSubmit }: { id: string; p: ProviderView
   );
 }
 
-export function ConnectForm({
-  id,
-  p,
-  busy,
-  onSubmit,
-}: {
-  id: string;
-  p: ProviderView;
-  busy: boolean;
-  onSubmit: (input: LocalInput) => void;
-}) {
+export function ConnectForm({ id, p, busy, onSubmit }: { id: string; p: ProviderView; busy: boolean; onSubmit: Submit<LocalInput> }) {
   const [url, setUrl] = useState(p.defaultBaseUrl ?? "");
   const [serverKey, setServerKey] = useState("");
   const [name, setName] = useState("");
@@ -53,12 +45,12 @@ export function ConnectForm({
       id={`${id}-connect-form`}
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({
+        void onSubmit({
           kind: p.id,
           baseUrl: url,
           ...(serverKey.trim() && { apiKey: serverKey }),
           ...(name.trim() && { label: name }),
-        });
+        }).then((saved) => saved && setServerKey(""));
       }}
       className="mt-3 space-y-2"
     >
