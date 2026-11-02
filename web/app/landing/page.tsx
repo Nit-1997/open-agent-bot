@@ -8,15 +8,14 @@ export const metadata: Metadata = {
 };
 
 const GLASS = "border border-white/60 bg-white/55 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-xl";
-const PILL_BUTTON = "inline-flex items-center gap-2.5 rounded-full bg-[#111] font-medium text-white transition hover:bg-[#111]/85";
 const LABEL = "font-mono text-[11px] uppercase tracking-[0.14em] text-[#888]";
 
-const HERO_BACKGROUND = [
-  "radial-gradient(60% 45% at 20% 85%, rgba(120,150,230,.45), transparent 70%)",
-  "radial-gradient(55% 40% at 85% 90%, rgba(150,215,190,.5), transparent 70%)",
-  "radial-gradient(40% 30% at 50% 100%, rgba(255,255,255,.9), transparent 70%)",
-  "linear-gradient(180deg, #F4F3F0 0%, #E9EEF8 55%, #DCE6F7 100%)",
-].join(", ");
+const DARK_GLASS = "border border-white/[0.12] bg-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl";
+const LIGHT_PILL = "inline-flex items-center gap-2.5 rounded-full bg-white font-medium text-[#111] transition hover:bg-white/85";
+
+const HERO_BACKGROUND =
+  "linear-gradient(180deg, rgba(8,12,28,.35) 0%, rgba(8,12,28,.15) 45%, rgba(8,12,28,.45) 100%), url(/landing/night-sky.jpg) center / cover no-repeat, #1d2540";
+const SHOWCASE_BACKGROUND = "linear-gradient(180deg, #C5D0F5 0%, #DAE2FA 40%, #EBF0FC 70%, #F2F4FC 100%)";
 
 const REASONS = [
   { title: "See every step", body: "Searches, pages and tools, live." },
@@ -30,47 +29,69 @@ const MODELS = ["ChatGPT", "OpenAI", "Anthropic", "OpenRouter", "Ollama"];
 export default function LandingPage() {
   return (
     <div id="landing" className="min-h-dvh bg-[#FAF9F7] font-sans text-[#111]">
-      <header id="landing-hero" className="relative overflow-hidden pb-24" style={{ background: HERO_BACKGROUND }}>
+      <header
+        id="landing-hero"
+        className="relative flex min-h-dvh flex-col overflow-hidden text-white"
+        style={{ background: HERO_BACKGROUND }}
+      >
         <nav
           id="landing-nav"
-          className={`absolute top-4 left-1/2 z-10 flex h-14 -translate-x-1/2 items-center gap-5 rounded-full pr-2 pl-6 text-sm sm:gap-7 ${GLASS}`}
+          className={`absolute top-4 left-1/2 z-10 flex h-14 -translate-x-1/2 items-center gap-5 rounded-full pr-2 pl-6 text-sm sm:gap-7 ${DARK_GLASS}`}
         >
           <Link id="landing-nav-logo" href="/" className="font-display text-[22px] whitespace-nowrap">
             Open Agent
           </Link>
-          <a id="landing-nav-how" href="#landing-why" className="hidden whitespace-nowrap text-[#555] hover:text-[#111] sm:inline">
+          <a id="landing-nav-how" href="#landing-demo" className="hidden whitespace-nowrap text-white/70 hover:text-white sm:inline">
             How it works
           </a>
-          <Link id="landing-nav-signin" href="/login" className={`${PILL_BUTTON} h-[38px] px-[18px] text-sm`}>
+          <Link id="landing-nav-signin" href="/login" className={`${LIGHT_PILL} h-[38px] px-[18px] text-sm`}>
             Sign in
           </Link>
         </nav>
 
-        <div id="landing-hero-inner" className="flex flex-col items-center px-6 pt-40 text-center">
-          <p id="landing-hero-label" className={LABEL}>
+        <div id="landing-hero-inner" className="flex flex-1 flex-col items-center justify-center px-6 pt-20 pb-24 text-center">
+          <p id="landing-hero-label" className="font-mono text-[11px] tracking-[0.14em] text-white/55 uppercase">
             Private beta
           </p>
           <h1
             id="landing-hero-title"
-            className="mt-5 mb-9 max-w-[860px] font-display text-[46px] leading-[1.04] sm:text-[64px] md:text-[76px]"
+            className="mt-5 mb-10 max-w-[860px] font-display text-[46px] leading-[1.04] sm:text-[64px] md:text-[76px]"
           >
             A personal agent you can <i id="landing-hero-title-em">see</i> think.
           </h1>
-          <Link id="landing-hero-cta" href="/request-access" className={`${PILL_BUTTON} h-[52px] px-[30px] text-base`}>
+          <Link id="landing-hero-cta" href="/request-access" className={`${LIGHT_PILL} h-[52px] px-[30px] text-base`}>
             Request beta access{" "}
             <span id="landing-hero-cta-arrow" aria-hidden="true">
               →
             </span>
           </Link>
+        </div>
 
-          <div id="landing-showcase" className={`mt-16 w-full max-w-[880px] rounded-[28px] p-3.5 ${GLASS}`}>
-            <LiveRun />
-          </div>
-          <p id="landing-showcase-caption" className="mt-4 text-[13px] text-[#777]">
-            Replayed from a real Open Agent run. Text lightly trimmed.
-          </p>
+        <div
+          id="landing-hero-notch"
+          aria-hidden="true"
+          className="absolute bottom-0 left-1/2 flex h-10 w-[320px] -translate-x-1/2 items-center justify-center rounded-t-[2rem] bg-[#FAF9F7] md:w-[400px]"
+        >
+          <span id="landing-hero-notch-bar" className="h-1 w-12 rounded-full bg-[#111]/15" />
         </div>
       </header>
+
+      <section id="landing-demo" className="mx-auto max-w-[1040px] px-6 pt-20 text-center">
+        <p id="landing-demo-label" className={LABEL}>
+          Watch it work
+        </p>
+        <h2 id="landing-demo-title" className="mt-3 font-display text-[40px] leading-[1.1] sm:text-[48px]">
+          Every source. Every claim.
+        </h2>
+        <div id="landing-demo-frame" className="mt-12 rounded-[28px] p-4 sm:p-10" style={{ background: SHOWCASE_BACKGROUND }}>
+          <div id="landing-showcase" className={`mx-auto max-w-[880px] rounded-[24px] p-3 ${GLASS}`}>
+            <LiveRun />
+          </div>
+        </div>
+        <p id="landing-showcase-caption" className="mt-4 text-[13px] text-[#777]">
+          Replayed from a real Open Agent run. Text lightly trimmed.
+        </p>
+      </section>
 
       <section id="landing-why" className="mx-auto max-w-[960px] px-6 py-28 text-center">
         <p id="landing-why-label" className={LABEL}>
@@ -117,19 +138,19 @@ export default function LandingPage() {
 
       <section
         id="landing-cta"
-        className="mx-6 mb-6 rounded-[28px] px-6 py-28 text-center"
-        style={{ background: "linear-gradient(180deg, #C5D0F5 0%, #DAE2FA 40%, #EBF0FC 70%, #F2F4FC 100%)" }}
+        className="mx-6 mb-6 overflow-hidden rounded-[28px] px-6 py-28 text-center text-white"
+        style={{ background: HERO_BACKGROUND }}
       >
-        <p id="landing-cta-label" className={LABEL}>
+        <p id="landing-cta-label" className="font-mono text-[11px] tracking-[0.14em] text-white/55 uppercase">
           Invite only
         </p>
         <h2 id="landing-cta-title" className="mt-3 mb-2.5 font-display text-[44px] leading-[1.1] sm:text-[58px]">
           Get your own agent.
         </h2>
-        <p id="landing-cta-body" className="mb-8 text-[#555]">
+        <p id="landing-cta-body" className="mb-8 text-white/70">
           Tell us who you are. We&apos;ll send an invite.
         </p>
-        <Link id="landing-cta-button" href="/request-access" className={`${PILL_BUTTON} h-[52px] px-[30px] text-base`}>
+        <Link id="landing-cta-button" href="/request-access" className={`${LIGHT_PILL} h-[52px] px-[30px] text-base`}>
           Request beta access{" "}
           <span id="landing-cta-button-arrow" aria-hidden="true">
             →
