@@ -7,8 +7,12 @@ import type { PiSession } from "../pi/createPiSession.js";
 import type { AgentPersona } from "../../../shared/profile.js";
 import type { UserContext } from "../prompt/userContext.js";
 import type { ActiveCart } from "../shop/cart.js";
+import type { EarlierCards } from "../workspace/earlier.js";
+import type { WorkspaceStore } from "../workspace/store.js";
 
 export type HistoryMessage = { role: "user" | "assistant"; text: string };
+
+export type SessionSeed = { history?: HistoryMessage[]; earlier?: EarlierCards };
 
 export type SessionOwner = { user: AuthUser; chatId: string };
 
@@ -24,6 +28,8 @@ export type SessionEntry = {
   setModel?: (id: string) => Promise<void>;
   frames?: FrameBus;
   cart?: ActiveCart;
+  workspace: WorkspaceStore;
+  setEditsNote?: (note: string | undefined) => void;
   turnStats?: () => { jevCalls: number; jevCostUsd: number };
   setOpenReport?: (note: string | undefined) => void;
   openReport?: OpenReport;
@@ -33,7 +39,7 @@ export type CreateSession = (
   owner: SessionOwner,
   ctx: UserContext | null,
   persona: AgentPersona,
-  history?: HistoryMessage[],
+  seed?: SessionSeed,
 ) => Promise<SessionEntry>;
 
 export class SessionCapacityError extends Error {
@@ -86,7 +92,7 @@ export class SessionStore {
     return freed;
   }
 
-  getOrCreate(owner: SessionOwner, ctx: UserContext | null, persona: AgentPersona, history?: HistoryMessage[]): Promise<SessionEntry> {
+  getOrCreate(owner: SessionOwner, ctx: UserContext | null, persona: AgentPersona, seed?: SessionSeed): Promise<SessionEntry> {
     const key = sessionKey(owner);
     const existing = this.entries.get(key);
     if (existing && !(existing.retired && !existing.busy)) {
@@ -105,7 +111,7 @@ export class SessionStore {
     const p = (async () => {
       await stale;
       await freed;
-      const e = await this.create(owner, ctx, persona, history);
+      const e = await this.create(owner, ctx, persona, seed);
       e.lastUsed = this.now();
       this.entries.set(key, e);
       return e;

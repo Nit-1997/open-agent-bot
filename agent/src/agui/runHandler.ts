@@ -15,10 +15,12 @@ import {
   SessionCapacityError,
   type SessionEntry,
   type SessionOwner,
+  type SessionSeed,
   type SessionStore,
 } from "../session/sessionStore.js";
-import { applyEntityEdits } from "../workspace/edits.js";
-import type { WorkspaceStore } from "../workspace/store.js";
+import type { WorkspaceEdits } from "../../../shared/workspace.js";
+import { earlierCards } from "../workspace/earlier.js";
+import { applyEntityEdits, unappliedNote } from "../workspace/edits.js";
 import { custom, runError, runFinished, runStarted } from "./events.js";
 import { historyFromStored, messageText, readOpenReport, readUserContext, readWorkspaceEdits } from "./input.js";
 import { createStatsCollector, type StatsCollector, type Usage } from "./stats.js";
@@ -35,7 +37,6 @@ export type RunContext = {
   chats: Pick<ChatRepo, "claim" | "touch">;
   messages: MessageRepo;
   profiles?: ProfileStore;
-  workspace?: WorkspaceStore;
   openReport?: (id: string, cached?: OpenReport) => Promise<OpenReport | null>;
   timeLimitMs: number;
 };
@@ -124,10 +125,20 @@ async function openReportFor(ctx: RunContext, id: string | null, cached: OpenRep
   });
 }
 
-async function seedHistory(ctx: RunContext, chatId: string): Promise<HistoryMessage[] | undefined> {
+async function seedHistory(ctx: RunContext, chatId: string): Promise<SessionSeed> {
   const stored = await ctx.messages.history(chatId);
   const history = historyFromStored(stored.items);
-  return history.length ? history : undefined;
+  return { ...(history.length > 0 && { history }), earlier: earlierCards(stored.items) };
+}
+
+async function applyEdits(entry: SessionEntry, edits: WorkspaceEdits | null): Promise<string | undefined> {
+  if (!edits) return undefined;
+  const missed: WorkspaceEdits = await applyEntityEdits(entry.workspace, edits);
+  if (edits.cart) {
+    if (entry.cart && !entry.cart.empty) entry.cart.applyEdits(edits.cart);
+    else missed.cart = edits.cart;
+  }
+  return unappliedNote(missed);
 }
 
 export async function* handleRun(
@@ -160,8 +171,8 @@ export async function* handleRun(
 
   let made: { entry: SessionEntry; history?: HistoryMessage[] } | { error: unknown };
   try {
-    const history = store.get(owner) ? undefined : await seedHistory(ctx, threadId);
-    made = { entry: await store.getOrCreate(owner, userContext, persona, history), history };
+    const seed = store.get(owner) ? undefined : await seedHistory(ctx, threadId);
+    made = { entry: await store.getOrCreate(owner, userContext, persona, seed), history: seed?.history };
   } catch (error) {
     made = { error };
   }
@@ -272,12 +283,11 @@ async function* runTurn({ input, entry, signal, ctx, last, history, userContext,
     }
   }
 
-  const edits = readWorkspaceEdits(input);
-  if (edits?.cart) entry.cart?.applyEdits(edits.cart);
-  if (edits && ctx.workspace) await applyEntityEdits(ctx.workspace, edits);
+  const editsNote = await applyEdits(entry, readWorkspaceEdits(input));
+  entry.setEditsNote?.(editsNote);
   entry.evidence?.add(messageText(last));
   for (const m of history ?? []) entry.evidence?.add(m.text);
-  if (ctx.workspace) entry.evidence?.add(await ctx.workspace.summary());
+  entry.evidence?.add(await entry.workspace.summary());
   const statsEvent = (): BaseEvent => {
     const turn = entry.turnStats?.();
     return custom("run_stats", stats.snapshot(turn));

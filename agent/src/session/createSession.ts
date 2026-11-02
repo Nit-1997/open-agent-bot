@@ -1,4 +1,5 @@
 import type { Model } from "@earendil-works/pi-ai";
+import { isPlanKind } from "../../../shared/workspace.js";
 import type { ArtifactStore } from "../artifacts/store.js";
 import { FrameBus } from "../browser/frames.js";
 import type { BrowserPool } from "../browser/pool.js";
@@ -9,6 +10,7 @@ import { type Judge, scopeJudge } from "../judge/index.js";
 import { log } from "../lib/log.js";
 import { createPiSession } from "../pi/createPiSession.js";
 import { buildSystemPrompt } from "../prompt/systemPrompt.js";
+import type { ActiveCart } from "../shop/cart.js";
 import type { ProviderHub } from "../providers/hub.js";
 import type { UserHubs } from "../providers/hubs.js";
 import { loadSkillCatalog, skillsDir } from "../skills/catalog.js";
@@ -16,7 +18,8 @@ import { TurnBudget } from "../tools/budget.js";
 import { buildTools, PER_REPLY_LIMITS } from "../tools/index.js";
 import { completeWith } from "../workflows/llm.js";
 import { workspaceCart, workspaceNote } from "../workspace/cart.js";
-import { SupabaseWorkspaceStore } from "../workspace/store.js";
+import { type EarlierCards, earlierNote } from "../workspace/earlier.js";
+import { MemoryWorkspaceStore, type WorkspaceStore } from "../workspace/store.js";
 import { type CreateSession, sessionKey } from "./sessionStore.js";
 
 type SessionDeps = {
@@ -47,19 +50,27 @@ export function joinNotes(...notes: (string | undefined)[]): string | undefined 
   return present.length ? present.join("\n\n") : undefined;
 }
 
+type NoteParts = { workspace: WorkspaceStore; cart: ActiveCart; earlier?: EarlierCards; edits?: string; openReport?: string };
+
+export async function sessionNote({ workspace, cart, earlier, edits, openReport }: NoteParts): Promise<string | undefined> {
+  const plansLive = (await workspace.list()).some((e) => isPlanKind(e.kind));
+  return joinNotes(await workspaceNote(workspace), earlierNote(earlier, { cartLive: !cart.empty, plansLive }), edits, openReport);
+}
+
 export function sessionFactory(deps: SessionDeps): CreateSession {
   const { cfg, artifacts, pool } = deps;
-  return async (owner, userContext, persona, history) => {
+  return async (owner, userContext, persona, seed) => {
     const { user, chatId } = owner;
     const key = sessionKey(owner);
     const hub = await deps.hubs.get(user);
     const repos = deps.repos(user.id);
-    const workspace = new SupabaseWorkspaceStore(repos.workspace, chatId);
+    const workspace = new MemoryWorkspaceStore();
     const budget = new TurnBudget(PER_REPLY_LIMITS);
     const evidence = new Evidence();
     const frames = new FrameBus();
     const cart = await workspaceCart(workspace);
     let openReport: string | undefined;
+    let editsNote: string | undefined;
     let current = pickModel(hub, userContext?.model, userContext?.profile?.defaultModel);
     const skills = loadSkillCatalog(skillsDir(), { codemode: hasCap(cfg, modelRef(current), "codemode") });
     const turnJudge = scopeJudge(await deps.judgeFor(hub)());
@@ -86,8 +97,8 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       skillsDir: skillsDir(),
       codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
       onCodemodeOff: (reason: string) => log.info(`[codemode] user=${user.id} thread=${chatId} off for this chat: ${reason}`),
-      history,
-      contextNote: async () => joinNotes(await workspaceNote(workspace), openReport),
+      history: seed?.history,
+      contextNote: () => sessionNote({ workspace, cart, earlier: seed?.earlier, edits: editsNote, openReport }),
     });
     return {
       session: handle.session,
@@ -104,6 +115,10 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       evidence,
       frames,
       cart,
+      workspace,
+      setEditsNote: (note) => {
+        editsNote = note;
+      },
       setOpenReport: (note) => {
         openReport = note;
       },

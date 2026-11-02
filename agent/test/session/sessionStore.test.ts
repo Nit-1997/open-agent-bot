@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SessionCapacityError, type SessionEntry, type SessionOwner, SessionStore } from "../../src/session/sessionStore.js";
 import { DEFAULT_AGENT } from "../../../shared/profile.js";
+import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
 import { ALICE, BOB } from "../fixtures/users.js";
 
 const t1: SessionOwner = { user: ALICE, chatId: "t1" };
@@ -8,7 +9,13 @@ const t2: SessionOwner = { user: ALICE, chatId: "t2" };
 const at = (user = ALICE, chatId = "c") => ({ user, chatId });
 
 function entry(): SessionEntry {
-  return { session: {} as SessionEntry["session"], busy: false, lastUsed: 0, dispose: vi.fn(async () => {}) };
+  return {
+    session: {} as SessionEntry["session"],
+    busy: false,
+    lastUsed: 0,
+    dispose: vi.fn(async () => {}),
+    workspace: new MemoryWorkspaceStore(),
+  };
 }
 
 describe("SessionStore", () => {
@@ -22,6 +29,17 @@ describe("SessionStore", () => {
     finish(e);
     await Promise.all([done, creating]);
     expect(e.dispose).toHaveBeenCalled();
+  });
+
+  it("passes the seed to create for a new session and not for an existing one", async () => {
+    const create = vi.fn(async () => entry());
+    const store = new SessionStore({ idleMs: 1000, create });
+    const seed = { history: [{ role: "user" as const, text: "hi" }], earlier: { plans: [] } };
+    const first = await store.getOrCreate(t1, null, DEFAULT_AGENT, seed);
+    const again = await store.getOrCreate(t1, null, DEFAULT_AGENT, { earlier: { plans: [] } });
+    expect(again).toBe(first);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith(t1, null, DEFAULT_AGENT, seed);
   });
 
   it("creates one session when the same chat is opened twice at once, even while making room", async () => {

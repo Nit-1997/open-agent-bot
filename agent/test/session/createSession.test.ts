@@ -1,5 +1,18 @@
-import { describe, expect, it } from "vitest";
-import { defaultModelRef, joinNotes, pickModel } from "../../src/session/createSession.js";
+import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_AGENT } from "../../../shared/profile.js";
+import { defaultModelRef, joinNotes, pickModel, sessionFactory } from "../../src/session/createSession.js";
+import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
+import { testConfig } from "../fixtures/config.js";
+import { ALICE, CHAT_1 } from "../fixtures/users.js";
+
+const piOpts = vi.hoisted(() => [] as { contextNote?: () => Promise<string | undefined>; history?: unknown }[]);
+
+vi.mock("../../src/pi/createPiSession.js", () => ({
+  createPiSession: async (opts: (typeof piOpts)[number]) => {
+    piOpts.push(opts);
+    return { session: {}, setModel: async () => {}, dispose: async () => {} };
+  },
+}));
 
 const model = (provider: string, id: string) => ({ provider, id }) as never;
 
@@ -45,5 +58,43 @@ describe("joinNotes", () => {
     expect(joinNotes()).toBeUndefined();
     expect(joinNotes(undefined, undefined)).toBeUndefined();
     expect(joinNotes("", undefined)).toBeUndefined();
+  });
+});
+
+describe("sessionFactory", () => {
+  it("keeps the session's plans in a memory store on the entry and adds the earlier cards to the note", async () => {
+    const m = model("openai", "gpt");
+    const hub = { resolve: () => m, runtime: {}, secret: () => undefined };
+    const create = sessionFactory({
+      cfg: testConfig(),
+      hubs: { get: async () => hub } as never,
+      repos: () => ({}) as never,
+      artifacts: { sink: () => ({}) } as never,
+      pool: { close: async () => {} } as never,
+      judgeFor: () => async () => ({ available: false }) as never,
+    });
+    const card = {
+      kind: "plan",
+      entity: "event",
+      id: "main",
+      version: 1,
+      value: { title: "Party", guests: 12 },
+    } as const;
+    const ctx = { timeZone: "UTC", locale: "en-US", localTime: "2026-11-01T10:00", model: "openai/gpt" };
+    const entry = await create({ user: ALICE, chatId: CHAT_1 }, ctx, DEFAULT_AGENT, {
+      history: [{ role: "user", text: "plan a party" }],
+      earlier: { plans: [{ at: "2026-11-01T10:00:00Z", card }] },
+    });
+    expect(entry.workspace).toBeInstanceOf(MemoryWorkspaceStore);
+    expect(entry.cart?.empty).toBe(true);
+    const opts = piOpts.at(-1)!;
+    expect(opts.history).toEqual([{ role: "user", text: "plan a party" }]);
+    expect(await opts.contextNote?.()).toContain("event main (shown 2026-11-01): Party, 12 guests");
+    entry.setEditsNote?.("<unapplied_edits>x</unapplied_edits>");
+    expect(await opts.contextNote?.()).toContain("<unapplied_edits>x</unapplied_edits>");
+    await entry.workspace.put("event", "main", { title: "Party", guests: 16 });
+    const note = await opts.contextNote?.();
+    expect(note).toContain("<workspace>");
+    expect(note).not.toContain("<earlier_cards>");
   });
 });

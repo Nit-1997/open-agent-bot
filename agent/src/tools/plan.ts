@@ -17,7 +17,7 @@ import { fail, ok, type ToolResult } from "./result.js";
 const DEFAULT_ID = "main";
 
 const DESCRIPTION =
-  'The chat\'s saved plan state: events/parties, trips and shortlists (plus the shopping cart, read-only here). Record every trip, event or shortlist you plan with action "set" (kind event: {title, date?, guests, budget?, currency?, location?, theme?, menu?, timeline?, notes?}; trip: {destination, start, end, travelers, budget?, stays, days}; shortlist: {title, items}). The workspace summary at the top of each turn lists what is saved. For follow-ups that change a detail ("make it 16 kids", "move it to the 20th") use action "patch" with ops like [{"op":"replace","path":"/guests","value":16}] (op: add, replace or remove; JSON-pointer path), then call shop with only the items whose quantities changed. Never rebuild the plan or re-search unchanged items. "get" reads an entity back. set and patch show a plan card.';
+  'This chat\'s plans for the current session: events/parties, trips and shortlists (plus the shopping cart, read-only here). Record every trip, event or shortlist you plan with action "set" (kind event: {title, date?, guests, budget?, currency?, location?, theme?, menu?, timeline?, notes?}; trip: {destination, start, end, travelers, budget?, stays, days}; shortlist: {title, items}). The workspace note at the top of each turn lists the current plans; they last for this session only and aren\'t saved anywhere else. For follow-ups that change a detail ("make it 16 kids", "move it to the 20th") use action "patch" with ops like [{"op":"replace","path":"/guests","value":16}] (op: add, replace or remove; JSON-pointer path), then call shop with only the items whose quantities changed. Never rebuild the plan or re-search unchanged items. "get" reads an entity back. set and patch show a plan card.';
 
 const looseJson = (v: unknown): unknown => {
   if (typeof v !== "string") return v;
@@ -57,22 +57,22 @@ const describe = (kind: EntityKind, id: string, version: number, value: unknown)
 async function getEntity({ store, kind, id }: Target, byId: boolean): Promise<ToolResult> {
   if (byId) {
     const found = await store.get(kind, id);
-    return found ? ok(describe(kind, id, found.version, found.value)) : fail(`No ${kind} "${id}" is saved in this chat.`);
+    return found ? ok(describe(kind, id, found.version, found.value)) : fail(`No ${kind} "${id}" in this session.`);
   }
   const all = await store.list(kind);
-  return all.length ? ok(all.map((e) => describe(kind, e.id, e.version, e.value)).join("\n")) : fail(`No ${kind} is saved in this chat.`);
+  return all.length ? ok(all.map((e) => describe(kind, e.id, e.version, e.value)).join("\n")) : fail(`No ${kind} in this session yet.`);
 }
 
 async function setEntity({ store, kind, id }: Target, raw: unknown): Promise<ToolResult> {
   const value = looseJson(raw);
   const valid = validateEntity(kind, value);
   if (!valid.ok) return fail(`Invalid ${kind}: ${valid.errors.join("; ")}`);
-  return planResult(kind, id, await store.put(kind, id, value), value, "Saved");
+  return planResult(kind, id, await store.put(kind, id, value), value, "Set");
 }
 
 async function patchEntity({ store, kind, id }: Target, rawOps: unknown): Promise<ToolResult> {
   const current = await store.get(kind, id);
-  if (!current) return fail(`No ${kind} "${id}" is saved yet; use set first.`);
+  if (!current) return fail(`No ${kind} "${id}" in this session yet; use set first.`);
   const ops = readOps(rawOps);
   if (typeof ops === "string") return fail(ops);
   const patched = applyPatch(current.value, ops);

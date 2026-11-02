@@ -30,7 +30,6 @@ import { LoginFlows } from "./providers/logins.js";
 import { sessionFactory } from "./session/createSession.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { registry } from "./sources/index.js";
-import { SupabaseWorkspaceStore } from "./workspace/store.js";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 
@@ -139,7 +138,6 @@ const app = createApp({
       chats: r.chats,
       messages: r.messages,
       profiles: profiles(user.id),
-      workspace: new SupabaseWorkspaceStore(r.workspace, chatId),
       openReport: (id, cached) => loadOpenReport(artifacts, r, chatId, id, cached),
       timeLimitMs: cfg.runTimeLimitSeconds * 1000,
     };

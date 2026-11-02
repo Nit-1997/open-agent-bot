@@ -19,6 +19,7 @@ describe("plan tool", () => {
     expect(r.isError).toBeUndefined();
     expect(await store.get("event", "main")).toMatchObject({ version: 1, value: party });
     expect(r.details.widget).toMatchObject({ kind: "plan", entity: "event", id: "main", version: 1, value: party });
+    expect(text(r)).toMatch(/^Set event "main" \(version 1\)/);
   });
 
   it("accepts the value as a JSON string", async () => {
@@ -74,7 +75,7 @@ describe("plan tool", () => {
     const { run } = setup();
     const r = await run({ action: "patch", kind: "trip", ops: [{ op: "replace", path: "/travelers", value: 3 }] });
     expect(r.isError).toBe(true);
-    expect(text(r)).toContain("set first");
+    expect(text(r)).toBe('No trip "main" in this session yet; use set first.');
   });
 
   it("gets one entity or all of a kind", async () => {
@@ -83,7 +84,8 @@ describe("plan tool", () => {
     await run({ action: "set", kind: "event", id: "b", value: { ...party, guests: 3 } });
     expect(text(await run({ action: "get", kind: "event", id: "b" }))).toContain('"guests":3');
     expect(text(await run({ action: "get", kind: "event" }))).toContain('event "a"');
-    expect((await run({ action: "get", kind: "trip" })).isError).toBe(true);
+    expect(text(await run({ action: "get", kind: "trip" }))).toBe("No trip in this session yet.");
+    expect(text(await run({ action: "get", kind: "event", id: "zz" }))).toBe('No event "zz" in this session.');
   });
 
   it("reads the cart but never writes it", async () => {
@@ -114,6 +116,9 @@ describe("plan tool", () => {
     const description = planTool({ store }).description;
     expect(description).toContain("make it 16 kids");
     expect(description).toContain("Never rebuild the plan or re-search unchanged items");
+    expect(description).toMatch(/^This chat's plans for the current session:/);
+    expect(description).toContain("they last for this session only and aren't saved anywhere else.");
+    expect(description).not.toContain("saved plan state");
   });
 });
 

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { MessagePart } from "../../../shared/chats.js";
+import type { Cart } from "../../../shared/widgets.js";
 import type { Tile } from "../../src/shop/extract.js";
 import type { Store } from "../../src/shop/stores.js";
 import { type Job, type JobResult, shopTool } from "../../src/tools/shop.js";
 import { planTool } from "../../src/tools/plan.js";
 import { workspaceCart, workspaceNote } from "../../src/workspace/cart.js";
+import { earlierCards, earlierNote } from "../../src/workspace/earlier.js";
 import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
 
 const target: Store = {
@@ -39,8 +42,10 @@ async function setup() {
   const plan = planTool({ store });
   const callShop = (p: object) => shop.execute("c", p as never, undefined, undefined, {} as never);
   const callPlan = (p: object) => plan.execute("c", p as never, undefined, undefined, {} as never);
-  return { store, searches, callShop, callPlan };
+  return { store, cart, searches, callShop, callPlan };
 }
+
+const part = (widget: Cart): MessagePart => ({ type: "tool", id: "c-widget", name: "show_widget", args: JSON.stringify({ widget }) });
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
@@ -97,18 +102,28 @@ describe("party follow-up: make it 16 kids", () => {
     expect(await workspaceNote(new MemoryWorkspaceStore())).toBeUndefined();
   });
 
-  it("reloads the cart from the workspace into a new session", async () => {
+  it("a new session starts with an empty cart and an earlier-cards note", async () => {
     const { store, callShop } = await setup();
     await callShop({ stores: ["target"], items: [{ query: "pizza", qty: 3 }] });
     await settle();
-    const revived = await workspaceCart(store);
-    expect(revived.items).toEqual([{ query: "pizza", qty: 3 }]);
-    expect(revived.stores).toEqual(["target"]);
-    expect(revived.view()[0].items[0].picks[0].title).toBe("pizza");
+    const card: Cart = {
+      kind: "cart",
+      stores: [{ name: "Target", total: 15, url: "https://www.target.com/", missing: [], items: [{ query: "pizza", qty: 3, picks: [] }] }],
+    };
+    const fresh = new MemoryWorkspaceStore();
+    const cart = await workspaceCart(fresh);
+    expect(cart.empty).toBe(true);
+    expect(await workspaceNote(fresh)).toBeUndefined();
+    expect((await store.get("cart", "main"))?.value).toBeDefined();
+    const earlier = earlierCards([
+      { role: "assistant", content: "", status: "complete", createdAt: "2026-11-01T15:10:00Z", parts: [part(card)] },
+    ]);
+    const note = earlierNote(earlier, { cartLive: !cart.empty, plansLive: false });
+    expect(note).toContain("cart (shown 2026-11-01): pizza ×3 at Target; best $15.00 at Target");
   });
 
-  it("persists UI edits to the cart", async () => {
-    const { store, callShop } = await setup();
+  it("applies UI edits to the session cart", async () => {
+    const { store, cart, callShop } = await setup();
     await callShop({
       stores: ["target"],
       items: [
@@ -116,9 +131,9 @@ describe("party follow-up: make it 16 kids", () => {
         { query: "cake", qty: 1 },
       ],
     });
+    cart.applyEdits({ removed: ["cake"], qty: { pizza: 5 } });
     await settle();
-    (await workspaceCart(store)).applyEdits({ removed: ["cake"], qty: { pizza: 5 } });
-    await settle();
+    expect(cart.items).toEqual([{ query: "pizza", qty: 5 }]);
     expect(((await store.get("cart", "main"))!.value as { items: unknown }).items).toEqual([{ query: "pizza", qty: 5 }]);
   });
 });

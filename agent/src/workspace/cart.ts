@@ -21,6 +21,6 @@ export async function workspaceCart(store: WorkspaceStore): Promise<ActiveCart> 
 export const workspaceNote = async (store: WorkspaceStore): Promise<string | undefined> => {
   const summary = await store.summary();
   return summary
-    ? `<workspace>\nSaved plan state for this chat (the user can edit it in the cards; trust it over earlier messages):\n${summary}\n</workspace>`
+    ? `<workspace>\nThis chat's working state for this session (the user can edit the latest cards; trust it over earlier messages):\n${summary}\n</workspace>`
     : undefined;
 };

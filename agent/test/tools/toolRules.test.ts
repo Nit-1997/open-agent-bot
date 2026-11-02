@@ -27,6 +27,9 @@ describe("tool descriptions", () => {
     expect(desc(all, "stays")).toContain("Don't browse booking sites");
     expect(desc(all, "shop")).toContain("pass only the new items");
     expect(desc(all, "shop").match(/pass only the new items|pass just the new items/g)).toHaveLength(1);
+    expect(desc(all, "shop")).toContain(
+      "To re-price the whole cart, or to continue a cart from an earlier card, pass new_cart with its items and stores.",
+    );
     expect(desc(all, "flights").match(/rideshare/g)).toHaveLength(1);
     expect(desc(all, "show_ui")).toContain("one card per item");
     expect(desc(all, "ask_user")).toContain("don't search until they answer");

@@ -21,7 +21,6 @@ import { ProviderHub } from "../../src/providers/hub.js";
 import { UserHubs } from "../../src/providers/hubs.js";
 import { LoginFlows } from "../../src/providers/logins.js";
 import { SessionStore } from "../../src/session/sessionStore.js";
-import { SupabaseWorkspaceStore } from "../../src/workspace/store.js";
 import { TEST_KEY_B64, TEST_SECRET } from "./config.js";
 import { fakeFetch } from "./fakeFetch.js";
 import { MemoryDb } from "./memoryRepos.js";
@@ -243,14 +242,13 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
     limiter,
     gate: new ConcurrencyGate(RUN_CONCURRENCY),
     store,
-    runContext: (user, chatId) => {
+    runContext: (user) => {
       const r = repos(user.id);
       return {
         user,
         chats: r.chats,
         messages: r.messages,
         profiles: profiles(user.id),
-        workspace: new SupabaseWorkspaceStore(r.workspace, chatId),
         timeLimitMs: 60_000,
       };
     },

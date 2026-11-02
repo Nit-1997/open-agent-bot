@@ -16,6 +16,7 @@ import { MemoryProfileStore } from "../../src/profile/store.js";
 import { type AgentPersona, DEFAULT_AGENT, emptyProfile } from "../../../shared/profile.js";
 import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
+import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
 import type { PiEvent } from "../../src/agui/translate.js";
 import { Evidence } from "../../src/grounding/evidence.js";
 import type { UserContext } from "../../src/prompt/userContext.js";
@@ -51,6 +52,7 @@ function setup(
         busy: false,
         lastUsed: 0,
         dispose: async () => {},
+        workspace: new MemoryWorkspaceStore(),
         onRunStart: () => runStarts.count++,
         evidence,
         setModel,
@@ -627,9 +629,9 @@ describe("chat ownership and persistence", () => {
     ]);
     const store = new SessionStore({
       idleMs: 60000,
-      create: async (_o, _c, _p, history): Promise<SessionEntry> => {
-        seen.push(history);
-        return { session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {} };
+      create: async (_o, _c, _p, seed): Promise<SessionEntry> => {
+        seen.push(seed?.history);
+        return { session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {}, workspace: new MemoryWorkspaceStore() };
       },
     });
     const forged = [
@@ -677,7 +679,13 @@ describe("chat ownership and persistence", () => {
     const store = new SessionStore({
       idleMs: 60000,
       limits: { total: 0 },
-      create: async (): Promise<SessionEntry> => ({ session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {} }),
+      create: async (): Promise<SessionEntry> => ({
+        session: fakeSession(say),
+        busy: false,
+        lastUsed: 0,
+        dispose: async () => {},
+        workspace: new MemoryWorkspaceStore(),
+      }),
     });
     const out = await collect(run(input(), store, new AbortController().signal));
     expect(out.at(-1)).toMatchObject({ type: EventType.RUN_ERROR, code: "BUSY" });
@@ -690,7 +698,7 @@ describe("persona", () => {
       idleMs: 60000,
       create: async (_o, _c, persona): Promise<SessionEntry> => {
         personas.push(persona);
-        return { session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {} };
+        return { session: fakeSession(say), busy: false, lastUsed: 0, dispose: async () => {}, workspace: new MemoryWorkspaceStore() };
       },
     });
 
