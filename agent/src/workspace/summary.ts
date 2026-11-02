@@ -7,7 +7,11 @@ export type StoredEntity = { kind: EntityKind; id: string; value: unknown };
 
 export const SUMMARY_LIMIT = 600;
 
-const money = (n: number, currency?: string) => formatMoney(n, currency).replace(/\.00$/, "");
+export const money = (n: number, currency?: string) => formatMoney(n, currency).replace(/\.00$/, "");
+
+export const clip = (text: string) => (text.length > SUMMARY_LIMIT ? `${text.slice(0, SUMMARY_LIMIT - 1).trimEnd()}…` : text);
+
+export const oneLine = (text: string) => text.replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
 
 function cartDetail(c: CartEntity): string {
   const view = ActiveCart.from(c).view();
@@ -60,9 +64,8 @@ export function entityDetail(e: StoredEntity): string {
   }
 }
 
-const line = (e: StoredEntity): string => (e.kind === "cart" ? `cart: ${entityDetail(e)}` : `${e.kind} ${e.id}: ${entityDetail(e)}`);
+const line = (e: StoredEntity): string => oneLine(e.kind === "cart" ? `cart: ${entityDetail(e)}` : `${e.kind} ${e.id}: ${entityDetail(e)}`);
 
 export function summarize(entities: StoredEntity[]): string {
-  const text = entities.map(line).join("; ");
-  return text.length > SUMMARY_LIMIT ? `${text.slice(0, SUMMARY_LIMIT - 1).trimEnd()}…` : text;
+  return clip(entities.map(line).join("; "));
 }

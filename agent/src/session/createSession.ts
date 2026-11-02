@@ -19,7 +19,7 @@ import { buildTools, PER_REPLY_LIMITS } from "../tools/index.js";
 import { completeWith } from "../workflows/llm.js";
 import { workspaceCart, workspaceNote } from "../workspace/cart.js";
 import { type EarlierCards, earlierNote } from "../workspace/earlier.js";
-import { MemoryWorkspaceStore, type WorkspaceStore } from "../workspace/store.js";
+import { WorkspaceStore } from "../workspace/store.js";
 import { type CreateSession, sessionKey } from "./sessionStore.js";
 
 type SessionDeps = {
@@ -50,11 +50,23 @@ export function joinNotes(...notes: (string | undefined)[]): string | undefined 
   return present.length ? present.join("\n\n") : undefined;
 }
 
-type NoteParts = { workspace: WorkspaceStore; cart: ActiveCart; earlier?: EarlierCards; edits?: string; openReport?: string };
+type NoteParts = {
+  workspace: WorkspaceStore;
+  cart: ActiveCart;
+  earlier?: EarlierCards;
+  edits?: string;
+  openReport?: string;
+  timeZone?: string;
+};
 
-export async function sessionNote({ workspace, cart, earlier, edits, openReport }: NoteParts): Promise<string | undefined> {
-  const plansLive = (await workspace.list()).some((e) => isPlanKind(e.kind));
-  return joinNotes(await workspaceNote(workspace), earlierNote(earlier, { cartLive: !cart.empty, plansLive }), edits, openReport);
+export async function sessionNote({ workspace, cart, earlier, edits, openReport, timeZone }: NoteParts): Promise<string | undefined> {
+  const held = await workspace.list();
+  const live = {
+    cartLive: !cart.empty || held.some((e) => e.kind === "cart"),
+    plansLive: held.some((e) => isPlanKind(e.kind)),
+    timeZone,
+  };
+  return joinNotes(await workspaceNote(workspace), earlierNote(earlier, live), edits, openReport);
 }
 
 export function sessionFactory(deps: SessionDeps): CreateSession {
@@ -64,11 +76,11 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
     const key = sessionKey(owner);
     const hub = await deps.hubs.get(user);
     const repos = deps.repos(user.id);
-    const workspace = new MemoryWorkspaceStore();
+    const workspace = new WorkspaceStore();
     const budget = new TurnBudget(PER_REPLY_LIMITS);
     const evidence = new Evidence();
     const frames = new FrameBus();
-    const cart = await workspaceCart(workspace);
+    const cart = workspaceCart(workspace);
     let openReport: string | undefined;
     let editsNote: string | undefined;
     let current = pickModel(hub, userContext?.model, userContext?.profile?.defaultModel);
@@ -98,7 +110,8 @@ export function sessionFactory(deps: SessionDeps): CreateSession {
       codemode: (m: Model<any>) => hasCap(cfg, modelRef(m), "codemode"),
       onCodemodeOff: (reason: string) => log.info(`[codemode] user=${user.id} thread=${chatId} off for this chat: ${reason}`),
       history: seed?.history,
-      contextNote: () => sessionNote({ workspace, cart, earlier: seed?.earlier, edits: editsNote, openReport }),
+      contextNote: () =>
+        sessionNote({ workspace, cart, earlier: seed?.earlier, edits: editsNote, openReport, timeZone: userContext?.timeZone }),
     });
     return {
       session: handle.session,

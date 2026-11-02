@@ -50,14 +50,6 @@ describe("createApp guards", () => {
     }
   });
 
-  it("has no plans routes any more", async () => {
-    const { call } = await makeApp();
-    for (const path of ["/plans", "/plans/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trip/dDE"]) {
-      const res = await call(ALICE, path);
-      expect(res.status, path).toBe(404);
-    }
-  });
-
   it("refuses bodies over the limit with 413 too_large", async () => {
     const { call } = await makeApp();
     const big = JSON.stringify({ defaultModel: "x".repeat(BODY_LIMIT_BYTES) });

@@ -1,18 +1,12 @@
 import type { EntityKind } from "../../../shared/workspace.js";
-import { VersionConflict } from "./conflict.js";
+import { VersionConflict, WorkspaceFull } from "./conflict.js";
 import { summarize } from "./summary.js";
 
 export type VersionedEntity = { kind: EntityKind; id: string; value: unknown; version: number; updatedAt: number };
 
-export interface WorkspaceStore {
-  get(kind: EntityKind, id: string): Promise<VersionedEntity | undefined>;
-  list(kind?: EntityKind): Promise<VersionedEntity[]>;
-  put(kind: EntityKind, id: string, value: unknown, expectedVersion?: number): Promise<number>;
-  remove(kind: EntityKind, id: string): Promise<boolean>;
-  summary(): Promise<string>;
-}
+export const MAX_ENTITIES = 50;
 
-export class MemoryWorkspaceStore implements WorkspaceStore {
+export class WorkspaceStore {
   private readonly rows = new Map<string, VersionedEntity>();
   private tick = 0;
 
@@ -36,13 +30,10 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
     const current = this.rows.get(this.key(kind, id));
     if (expectedVersion !== undefined && (current?.version ?? 0) !== expectedVersion)
       throw new VersionConflict(kind, id, expectedVersion, current?.version ?? 0);
+    if (!current && kind !== "cart" && this.rows.size >= MAX_ENTITIES) throw new WorkspaceFull(MAX_ENTITIES);
     const version = (current?.version ?? 0) + 1;
     this.rows.set(this.key(kind, id), { kind, id, value: structuredClone(value), version, updatedAt: this.now() });
     return version;
-  }
-
-  async remove(kind: EntityKind, id: string) {
-    return this.rows.delete(this.key(kind, id));
   }
 
   async summary() {

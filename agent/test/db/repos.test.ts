@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminRepo } from "../../src/db/admin.js";
 import { createServiceClient } from "../../src/db/client.js";
 import { forUser } from "../../src/db/users.js";
+import { earlierCards } from "../../src/workspace/earlier.js";
 import { ALICE, CHAT_1 } from "../fixtures/users.js";
 
 type Reply = { status?: number; body?: unknown; headers?: Record<string, string> } | Error;
@@ -189,6 +190,18 @@ describe("user repos against PostgREST", () => {
     ]);
     expect(await forUser(s.db, ALICE.id).chats.page(9)).toEqual({ items: [], total: 21 });
     expect(s.calls[1].method).toBe("HEAD");
+  });
+
+  it("reads the earlier cards past malformed parts", async () => {
+    const cart = {
+      kind: "cart",
+      stores: [{ name: "Target", total: 5, url: "https://www.target.com/", missing: [], items: [{ query: "salsa", qty: 1, picks: [] }] }],
+    };
+    const card = [{ type: "tool", id: "w-widget", name: "show_widget", args: JSON.stringify({ widget: cart }) }];
+    const row = (parts: unknown) => ({ role: "assistant", content: "", status: "complete", created_at: "2026-11-01T00:00:00Z", parts });
+    const s = stub([{ body: [row({ type: "text" }), row("x"), row(null), row(card), row(7)], headers: { "content-range": "0-4/5" } }]);
+    const { items } = await forUser(s.db, ALICE.id).messages.history(CHAT_1);
+    expect(earlierCards(items).cart?.card.stores[0].name).toBe("Target");
   });
 
   it("saves message parts and reads them back, dropping malformed ones", async () => {

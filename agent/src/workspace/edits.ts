@@ -1,12 +1,13 @@
 import { type CartEdits, type EntityKind, type PlanEdits, validateEntity, type WorkspaceEdits } from "../../../shared/workspace.js";
-import { SUMMARY_LIMIT } from "./summary.js";
+import { clip, oneLine } from "./summary.js";
 import type { WorkspaceStore } from "./store.js";
 
 async function patchLatest(store: WorkspaceStore, kind: EntityKind, fields: object): Promise<boolean> {
   const latest = (await store.list(kind)).at(-1);
   if (!latest) return false;
   const value = { ...(latest.value as object), ...fields };
-  if (validateEntity(kind, value).ok) await store.put(kind, latest.id, value, latest.version);
+  if (!validateEntity(kind, value).ok) return false;
+  await store.put(kind, latest.id, value, latest.version);
   return true;
 }
 
@@ -37,10 +38,9 @@ export function unappliedNote(edits: WorkspaceEdits): string | undefined {
     ...(edits.cart ? cartChanges(edits.cart) : []),
     ...(edits.event ? [`${fields(edits.event)} on the event card`] : []),
     ...(edits.trip ? [`${fields(edits.trip)} on the trip card`] : []),
-  ];
+  ].map(oneLine);
   if (!changes.length) return undefined;
-  const text = changes.join("; ");
-  const list = text.length > SUMMARY_LIMIT ? `${text.slice(0, SUMMARY_LIMIT - 1).trimEnd()}…` : text;
+  const list = clip(changes.join("; "));
   const asks = [
     ...(edits.cart ? ["If the user wants that cart, search again with these changes."] : []),
     ...(edits.event || edits.trip ? ["If the user wants that plan, set it again with these changes."] : []),

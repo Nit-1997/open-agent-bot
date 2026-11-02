@@ -6,7 +6,7 @@ import { loadOpenReport, OPEN_REPORT_CHARS, openReportNote } from "../../src/art
 import { ArtifactStore } from "../../src/artifacts/store.js";
 import { Evidence } from "../../src/grounding/evidence.js";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
-import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
+import { WorkspaceStore } from "../../src/workspace/store.js";
 import { MemoryDb } from "../fixtures/memoryRepos.js";
 import { ALICE, BOB, CHAT_1, CHAT_2 } from "../fixtures/users.js";
 import { ev, fakeSession } from "./fakeSession.js";
@@ -120,7 +120,7 @@ describe("the open report in a run", () => {
         busy: false,
         lastUsed: 0,
         dispose: async () => {},
-        workspace: new MemoryWorkspaceStore(),
+        workspace: new WorkspaceStore(),
         setOpenReport: (n) => notes.push(n),
         evidence,
       }),

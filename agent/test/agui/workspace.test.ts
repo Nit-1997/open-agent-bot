@@ -1,5 +1,5 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { MessagePart } from "../../../shared/chats.js";
 import { parseWorkspaceEdits } from "../../../shared/workspace.js";
 import { historyFromStored, readWorkspaceEdits } from "../../src/agui/input.js";
@@ -8,7 +8,7 @@ import { Evidence } from "../../src/grounding/evidence.js";
 import { sessionNote } from "../../src/session/createSession.js";
 import { type SessionEntry, type SessionSeed, SessionStore } from "../../src/session/sessionStore.js";
 import { workspaceCart } from "../../src/workspace/cart.js";
-import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
+import { WorkspaceStore } from "../../src/workspace/store.js";
 import { MemoryDb } from "../fixtures/memoryRepos.js";
 import { ALICE, CHAT_1 } from "../fixtures/users.js";
 import { ev, fakeSession, type Script } from "./fakeSession.js";
@@ -55,8 +55,8 @@ function setup(opts: { evidence?: Evidence } = {}) {
     idleMs: 60000,
     create: async (owner, _ctx, _persona, seed): Promise<SessionEntry> => {
       created.push({ chatId: owner.chatId, seed });
-      const workspace = new MemoryWorkspaceStore();
-      const cart = await workspaceCart(workspace);
+      const workspace = new WorkspaceStore();
+      const cart = workspaceCart(workspace);
       let edits: string | undefined;
       const entry: SessionEntry = {
         session,
@@ -144,12 +144,13 @@ describe("a new session for an existing chat", () => {
         parts: [widgetPart("t1", cartCard), { type: "text", text: "Here's your cart." }],
       },
     ]);
-    const shown = db.messages.at(-1)!.createdAt.slice(0, 10);
+    const day = { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" } as const;
+    const shown = new Intl.DateTimeFormat("en-US", day).format(new Date(db.messages.at(-1)!.createdAt));
     await run(input({ messages: [msg("m2", "user", "is that still the price?")] }));
     expect(created[0].seed?.earlier?.cart?.card.stores[0].name).toBe("Trader Joe's");
     expect(entries[0].cart?.empty).toBe(true);
     expect(notes[0]).toContain("<earlier_cards>");
-    expect(notes[0]).toContain(`cart (shown ${shown}): corn tortillas ×2, avocados ×6 at Trader Joe's; best $18.40 at Trader Joe's`);
+    expect(notes[0]).toContain(`cart (shown ${shown} UTC): corn tortillas ×2, avocados ×6 at Trader Joe's; best $18.40 at Trader Joe's`);
   });
 
   it("gets the earlier-cards note even when the chat holds only cards", async () => {
@@ -209,8 +210,21 @@ describe("a new session for an existing chat", () => {
     ]);
   });
 
-  it("has no workspace on the run context", () => {
-    expectTypeOf<RunContext>().not.toHaveProperty("workspace");
+  it("stops showing the earlier cart once this session has had a cart, even after it is emptied", async () => {
+    const { repos, entries, notes, run } = setup();
+    await repos.chats.claim(CHAT_1, {});
+    await repos.messages.append(CHAT_1, "r0", [
+      { role: "assistant", content: "", status: "complete", parts: [widgetPart("t1", cartCard)] },
+    ]);
+    await run(input());
+    expect(notes[0]).toContain("cart (shown");
+    const cart = entries[0].cart!;
+    cart.start(["target"], [{ query: "salsa", qty: 1 }]);
+    cart.save();
+    await run(input({ runId: "r2", context: edits({ cart: { removed: ["salsa"] } }) }));
+    expect(cart.empty).toBe(true);
+    expect(notes[1]).not.toContain("cart (shown");
+    expect(notes[1]).not.toContain("<unapplied_edits>");
   });
 });
 

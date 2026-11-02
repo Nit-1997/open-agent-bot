@@ -1,7 +1,6 @@
 import type { StoredMessage } from "../../../shared/chats.js";
 import { type Cart, type Plan, validateWidget } from "../../../shared/widgets.js";
-import { formatMoney } from "../shop/currency.js";
-import { entityDetail, SUMMARY_LIMIT } from "./summary.js";
+import { clip, entityDetail, money, oneLine } from "./summary.js";
 
 export type EarlierCards = {
   cart?: { at: string; card: Cart };
@@ -41,28 +40,41 @@ export function earlierCards(rows: readonly StoredMessage[]): EarlierCards {
   return { ...(cart && { cart }), plans: [...plans.values()].reverse().slice(0, PLAN_LINES) };
 }
 
-const day = (iso: string) => iso.slice(0, 10);
+const DAY = { month: "short", day: "numeric", year: "numeric" } as const;
+
+function shownOn(iso: string, timeZone?: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "an unknown date";
+  try {
+    if (timeZone) return new Intl.DateTimeFormat("en-US", { ...DAY, timeZone }).format(at);
+  } catch {}
+  return `${new Intl.DateTimeFormat("en-US", { ...DAY, timeZone: "UTC" }).format(at)} UTC`;
+}
+
 const qty = (n: number) => (n === 1 ? "" : ` ×${n}`);
 
-function cartLine({ at, card }: NonNullable<EarlierCards["cart"]>): string {
+function cartLine({ at, card }: NonNullable<EarlierCards["cart"]>, timeZone?: string): string {
   const items = card.stores[0].items.map((i) => `${i.query}${qty(i.qty)}`).join(", ");
   const names = card.stores.map((s) => s.name).join(", ");
   const complete = card.stores.filter((s) => !s.missing.length);
   const best = (complete.length ? complete : card.stores).reduce((a, b) => (b.total < a.total ? b : a));
-  return `cart (shown ${day(at)}): ${items} at ${names}; best ${formatMoney(best.total, best.currency)} at ${best.name}`;
+  return `cart (shown ${shownOn(at, timeZone)}): ${items} at ${names}; best ${money(best.total, best.currency)} at ${best.name}`;
 }
 
-const planLine = ({ at, card }: EarlierCards["plans"][number]) =>
-  `${card.entity} ${card.id} (shown ${day(at)}): ${entityDetail({ kind: card.entity, id: card.id, value: card.value })}`;
+const planLine = ({ at, card }: EarlierCards["plans"][number], timeZone?: string) =>
+  `${card.entity} ${card.id} (shown ${shownOn(at, timeZone)}): ${entityDetail({ kind: card.entity, id: card.id, value: card.value })}`;
 
 const EARLIER_HEAD =
   "Cards shown earlier in this chat. They are read-only and nothing from them is live in this session. Prices and availability are from the date shown and may have changed. If the user wants to continue one, search again (shop with new_cart, the items and the stores) or set the plan again; don't quote these totals as current.";
 
-export function earlierNote(cards: EarlierCards | undefined, live: { cartLive: boolean; plansLive: boolean }): string | undefined {
+type NoteOptions = { cartLive: boolean; plansLive: boolean; timeZone?: string };
+
+export function earlierNote(cards: EarlierCards | undefined, { cartLive, plansLive, timeZone }: NoteOptions): string | undefined {
   if (!cards) return undefined;
-  const lines = [...(cards.cart && !live.cartLive ? [cartLine(cards.cart)] : []), ...(live.plansLive ? [] : cards.plans.map(planLine))];
+  const lines = [
+    ...(cards.cart && !cartLive ? [cartLine(cards.cart, timeZone)] : []),
+    ...(plansLive ? [] : cards.plans.map((p) => planLine(p, timeZone))),
+  ];
   if (!lines.length) return undefined;
-  const text = lines.join("\n");
-  const body = text.length > SUMMARY_LIMIT ? `${text.slice(0, SUMMARY_LIMIT - 1).trimEnd()}…` : text;
-  return `<earlier_cards>\n${EARLIER_HEAD}\n${body}\n</earlier_cards>`;
+  return `<earlier_cards>\n${EARLIER_HEAD}\n${clip(lines.map(oneLine).join("\n"))}\n</earlier_cards>`;
 }

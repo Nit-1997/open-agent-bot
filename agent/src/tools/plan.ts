@@ -10,7 +10,7 @@ import {
   type PatchOp,
   validateEntity,
 } from "../../../shared/workspace.js";
-import { VersionConflict } from "../workspace/conflict.js";
+import { VersionConflict, WorkspaceFull } from "../workspace/conflict.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import { fail, ok, type ToolResult } from "./result.js";
 
@@ -67,7 +67,12 @@ async function setEntity({ store, kind, id }: Target, raw: unknown): Promise<Too
   const value = looseJson(raw);
   const valid = validateEntity(kind, value);
   if (!valid.ok) return fail(`Invalid ${kind}: ${valid.errors.join("; ")}`);
-  return planResult(kind, id, await store.put(kind, id, value), value, "Set");
+  try {
+    return planResult(kind, id, await store.put(kind, id, value), value, "Set");
+  } catch (err) {
+    if (err instanceof WorkspaceFull) return fail(err.message);
+    throw err;
+  }
 }
 
 async function patchEntity({ store, kind, id }: Target, rawOps: unknown): Promise<ToolResult> {

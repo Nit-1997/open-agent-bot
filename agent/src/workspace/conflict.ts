@@ -8,3 +8,9 @@ export class VersionConflict extends Error {
     super(`${kind} ${id} is at version ${actual}, not ${expected}`);
   }
 }
+
+export class WorkspaceFull extends Error {
+  constructor(readonly limit: number) {
+    super(`This session already holds ${limit} plans. Update one of them instead of adding another.`);
+  }
+}

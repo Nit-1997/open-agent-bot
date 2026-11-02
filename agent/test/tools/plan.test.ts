@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch } from "../../../shared/workspace.js";
 import { planTool } from "../../src/tools/plan.js";
-import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
+import { WorkspaceStore } from "../../src/workspace/store.js";
 
 function setup() {
-  const store = new MemoryWorkspaceStore();
+  const store = new WorkspaceStore();
   const tool = planTool({ store });
   const run = async (params: Record<string, unknown>) => tool.execute("c", params as never, undefined, undefined, {} as never);
   return { store, run };
@@ -134,5 +134,14 @@ describe("applyPatch", () => {
     expect(applyPatch({}, [{ op: "add", path: "/__proto__/x", value: 1 }]).ok).toBe(false);
     expect(applyPatch({}, [{ op: "add", path: "x", value: 1 }]).ok).toBe(false);
     expect(applyPatch([1], [{ op: "replace", path: "/5", value: 1 }]).ok).toBe(false);
+  });
+
+  it("refuses a new plan once the session holds 50", async () => {
+    const { store, run } = setup();
+    for (let i = 0; i < 50; i++) await store.put("event", `e${i}`, party);
+    const r = await run({ action: "set", kind: "event", id: "e50", value: party });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toBe("This session already holds 50 plans. Update one of them instead of adding another.");
+    expect((await run({ action: "set", kind: "event", id: "e1", value: party })).isError).toBeUndefined();
   });
 });

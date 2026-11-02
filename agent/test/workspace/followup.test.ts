@@ -7,7 +7,7 @@ import { type Job, type JobResult, shopTool } from "../../src/tools/shop.js";
 import { planTool } from "../../src/tools/plan.js";
 import { workspaceCart, workspaceNote } from "../../src/workspace/cart.js";
 import { earlierCards, earlierNote } from "../../src/workspace/earlier.js";
-import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
+import { WorkspaceStore } from "../../src/workspace/store.js";
 
 const target: Store = {
   id: "target",
@@ -24,13 +24,13 @@ const tile = (title: string, price: number): Tile => ({
 });
 
 async function setup() {
-  const store = new MemoryWorkspaceStore();
+  const store = new WorkspaceStore();
   const searches: string[][] = [];
   const search = async (jobs: Job[]): Promise<JobResult[]> => {
     searches.push(jobs.map((j) => j.item.query));
     return jobs.map((j) => ({ store: j.store, item: j.item, tiles: [tile(j.item.query, 5)] }));
   };
-  const cart = await workspaceCart(store);
+  const cart = workspaceCart(store);
   const shop = shopTool({
     pool: {} as never,
     threadId: "t",
@@ -99,7 +99,7 @@ describe("party follow-up: make it 16 kids", () => {
     expect(note).toMatch(/^<workspace>\n/);
     expect(note).toContain("16 guests");
     expect(note).toContain("cart: 1 item at Target");
-    expect(await workspaceNote(new MemoryWorkspaceStore())).toBeUndefined();
+    expect(await workspaceNote(new WorkspaceStore())).toBeUndefined();
   });
 
   it("a new session starts with an empty cart and an earlier-cards note", async () => {
@@ -110,8 +110,8 @@ describe("party follow-up: make it 16 kids", () => {
       kind: "cart",
       stores: [{ name: "Target", total: 15, url: "https://www.target.com/", missing: [], items: [{ query: "pizza", qty: 3, picks: [] }] }],
     };
-    const fresh = new MemoryWorkspaceStore();
-    const cart = await workspaceCart(fresh);
+    const fresh = new WorkspaceStore();
+    const cart = workspaceCart(fresh);
     expect(cart.empty).toBe(true);
     expect(await workspaceNote(fresh)).toBeUndefined();
     expect((await store.get("cart", "main"))?.value).toBeDefined();
@@ -119,7 +119,7 @@ describe("party follow-up: make it 16 kids", () => {
       { role: "assistant", content: "", status: "complete", createdAt: "2026-11-01T15:10:00Z", parts: [part(card)] },
     ]);
     const note = earlierNote(earlier, { cartLive: !cart.empty, plansLive: false });
-    expect(note).toContain("cart (shown 2026-11-01): pizza ×3 at Target; best $15.00 at Target");
+    expect(note).toContain("cart (shown Nov 1, 2026 UTC): pizza ×3 at Target; best $15 at Target");
   });
 
   it("applies UI edits to the session cart", async () => {

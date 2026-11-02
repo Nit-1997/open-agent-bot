@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_AGENT } from "../../../shared/profile.js";
 import { defaultModelRef, joinNotes, pickModel, sessionFactory } from "../../src/session/createSession.js";
-import { MemoryWorkspaceStore } from "../../src/workspace/store.js";
+import { WorkspaceStore } from "../../src/workspace/store.js";
 import { testConfig } from "../fixtures/config.js";
 import { ALICE, CHAT_1 } from "../fixtures/users.js";
 
@@ -85,11 +85,11 @@ describe("sessionFactory", () => {
       history: [{ role: "user", text: "plan a party" }],
       earlier: { plans: [{ at: "2026-11-01T10:00:00Z", card }] },
     });
-    expect(entry.workspace).toBeInstanceOf(MemoryWorkspaceStore);
+    expect(entry.workspace).toBeInstanceOf(WorkspaceStore);
     expect(entry.cart?.empty).toBe(true);
     const opts = piOpts.at(-1)!;
     expect(opts.history).toEqual([{ role: "user", text: "plan a party" }]);
-    expect(await opts.contextNote?.()).toContain("event main (shown 2026-11-01): Party, 12 guests");
+    expect(await opts.contextNote?.()).toContain("event main (shown Nov 1, 2026): Party, 12 guests");
     entry.setEditsNote?.("<unapplied_edits>x</unapplied_edits>");
     expect(await opts.contextNote?.()).toContain("<unapplied_edits>x</unapplied_edits>");
     await entry.workspace.put("event", "main", { title: "Party", guests: 16 });
