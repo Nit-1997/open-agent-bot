@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import { expectContrast, expectNoHorizontalScroll } from "./support/a11y";
 import { mockReportRun } from "./support/reportRun";
@@ -151,7 +152,9 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     await expect(page.locator("#report-detail-frame")).toHaveAttribute("sandbox", /allow-scripts/);
     const download = page.waitForEvent("download");
     await page.locator("#report-detail-pdf").click();
-    await download;
+    const pdf = await readFile((await (await download).path()) as string);
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
     await page.locator("#report-detail-from").click();
     await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}\\?report=${BIG_SUR_REPORT.id}$`));
     const card = `#chat-pane-${s.bigSur}-artifact-card-${BIG_SUR_REPORT.toolCallId}`;
@@ -400,11 +403,14 @@ test("tablet: rail plus an overlay sidebar @tablet", async ({ page }) => {
     await card1.click();
     await expect(panel).toHaveAttribute("role", "dialog");
     await expect(page.locator(`${pane}-report-panel-title`)).toBeFocused();
+    await expect(page.locator(`${pane}-report-panel-frame`)).toBeVisible();
+    await expect(page.locator(`${pane}-report-panel-position`)).toHaveText(/1 of 2/);
     await page.locator(`${pane}-report-panel-close`).focus();
     await page.keyboard.press("Tab");
-    await expect(page.locator(`${pane}-report-panel-frame`)).toBeFocused();
+    await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe(`${pane.slice(1)}-report-panel-frame`);
     for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
     expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    await page.locator(`${pane}-report-panel-title`).focus();
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
     await expect(card1).toBeFocused();
