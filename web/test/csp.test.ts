@@ -18,6 +18,11 @@ describe("contentSecurityPolicy", () => {
     expect(d.get("default-src")).toEqual(["'self'"]);
   });
 
+  it("adds extra frame origins only when asked", () => {
+    const d = directives(contentSecurityPolicy("abc", SUPABASE, false, ["https://www.youtube-nocookie.com"]));
+    expect(d.get("frame-src")).toEqual(["'self'", "https://www.youtube-nocookie.com"]);
+  });
+
   it("allows scripts only by nonce and never eval outside development", () => {
     expect(directives(contentSecurityPolicy("abc", SUPABASE, false)).get("script-src")).toEqual([
       "'self'",

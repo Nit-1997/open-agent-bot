@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LiveRun } from "@/components/landing/LiveRun";
+import { TabletVideo } from "@/components/landing/TabletVideo";
 
 export const metadata: Metadata = {
   title: "Open Agent · A personal agent you can see think",
@@ -49,22 +50,28 @@ export default function LandingPage() {
           </Link>
         </nav>
 
-        <div id="landing-hero-inner" className="flex flex-1 flex-col items-center justify-center px-6 pt-20 pb-24 text-center">
-          <p id="landing-hero-label" className="font-mono text-[11px] tracking-[0.14em] text-white/55 uppercase">
-            Private beta
-          </p>
-          <h1
-            id="landing-hero-title"
-            className="mt-5 mb-10 max-w-[860px] font-display text-[46px] leading-[1.04] sm:text-[64px] md:text-[76px]"
-          >
-            A personal agent you can <i id="landing-hero-title-em">see</i> think.
-          </h1>
-          <Link id="landing-hero-cta" href="/request-access" className={`${LIGHT_PILL} h-[52px] px-[30px] text-base`}>
-            Request beta access{" "}
-            <span id="landing-hero-cta-arrow" aria-hidden="true">
-              →
-            </span>
-          </Link>
+        <div
+          id="landing-hero-inner"
+          className="mx-auto grid w-full max-w-[1120px] flex-1 items-center gap-14 px-6 pt-28 pb-24 text-center lg:grid-cols-[1fr_1fr] lg:px-12 lg:text-left"
+        >
+          <div id="landing-hero-copy" className="flex flex-col items-center lg:items-start">
+            <p id="landing-hero-label" className="font-mono text-[11px] tracking-[0.14em] text-white/55 uppercase">
+              Private beta
+            </p>
+            <h1
+              id="landing-hero-title"
+              className="mt-5 mb-10 max-w-[620px] font-display text-[46px] leading-[1.04] sm:text-[64px] lg:text-[76px]"
+            >
+              A personal agent you can <i id="landing-hero-title-em">see</i> think.
+            </h1>
+            <Link id="landing-hero-cta" href="/request-access" className={`${LIGHT_PILL} h-[52px] px-[30px] text-base`}>
+              Request beta access{" "}
+              <span id="landing-hero-cta-arrow" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          </div>
+          <TabletVideo />
         </div>
 
         <div

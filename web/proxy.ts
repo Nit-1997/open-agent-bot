@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { artifactErrorPage, isFramedReport } from "@/lib/artifactFrame";
 import { safeNext } from "@/lib/auth";
+import { YOUTUBE_EMBED_ORIGIN } from "@/lib/youtube";
 import { contentSecurityPolicy, newNonce } from "@/lib/csp";
 import { appOrigin, supabaseEnv } from "@/lib/env";
 import { decideRoute, type RouteDecision } from "@/lib/routeRules";
@@ -43,7 +44,8 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const page = !pathname.startsWith("/api/");
   const nonce = newNonce();
-  const csp = contentSecurityPolicy(nonce, supabaseEnv().url, process.env.NODE_ENV === "development");
+  const dev = process.env.NODE_ENV === "development";
+  const csp = contentSecurityPolicy(nonce, supabaseEnv().url, dev);
   const forwardHeaders = new Headers(request.headers);
   if (page) {
     forwardHeaders.set("x-nonce", nonce);
@@ -51,13 +53,19 @@ export async function proxy(request: NextRequest) {
   }
 
   const { response, session } = await updateSession(request, forwardHeaders);
-  const result = await respond(request, decideRoute(pathname, session), response, forwardHeaders);
+  const decision = decideRoute(pathname, session);
+  const result = await respond(request, decision, response, forwardHeaders);
   if (result !== response) {
     for (const cookie of response.cookies.getAll()) result.cookies.set(cookie);
     const cacheControl = response.headers.get("cache-control");
     if (cacheControl) result.headers.set("cache-control", cacheControl);
   }
-  if (page) result.headers.set("content-security-policy", csp);
+  const landing = decision.kind === "landing" || pathname === LANDING_PATH;
+  if (page)
+    result.headers.set(
+      "content-security-policy",
+      landing ? contentSecurityPolicy(nonce, supabaseEnv().url, dev, [YOUTUBE_EMBED_ORIGIN]) : csp,
+    );
   return result;
 }
 
