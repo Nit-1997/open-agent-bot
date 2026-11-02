@@ -501,3 +501,34 @@ Corrected:
 - Removal list additions: `agent/test/fixtures/app.ts` (its own `SupabaseWorkspaceStore` in `runContext`), the `workspace_entities` entry in `agent/test/db/imports.test.ts`'s allowed tables, `README.md` line 90 ("seeds … plans"), `MobileTabs`'s `SquareCheckBig` → `Search` import, `ENTITY_ID_MAX` being used only by `entityIdFromKey`, and the `scope=plans` search tests that stay. `ShellOverlays`, `AccountSheet`, `MobileDrawer`, the system prompt, skills, rate-limit keys and `cleanup-e2e.mjs` were checked and need no change.
 - Follow-up migration: verified against the live schema. The redundant `drop index` statements were removed (the table drop takes its indexes, foreign keys and check constraints), and the facts now say RLS is enabled with no policies rather than just "no policies".
 - `seedHistory` is wired to return `earlier` even when the text history is empty, so a chat whose rows hold only cards still gets the note.
+
+## Build notes (2026-11-02)
+
+What the build changed or settled, and why. Built in the order above, one commit per stage.
+
+### Deviations
+
+- **The 600-character cap applies to the card lines, not the header.** `earlierNote` caps the lines under the fixed header at `SUMMARY_LIMIT` (600), the same way the `<workspace>` note caps its summary and not its wrapper. The fixed header alone is about 340 characters, so a cap on the whole note would leave room for little more than the cart line. `<unapplied_edits>` caps its list of changes the same way.
+- **`<unapplied_edits>` wording by kind.** The sentence after the list is "If the user wants that cart, search again with these changes." for cart edits and "If the user wants that plan, set it again with these changes." for event or trip edits (both when both arrive). A pick change reads `<store> <item> → "<title>"`, keyed by the store name the card sends.
+- **`sessionNote` is exported from `createSession.ts`.** It builds the context note (`<workspace>`, `<earlier_cards>`, `<unapplied_edits>`, open report) from the session's store, cart, seed and notes, so the run-handler tests use the real wiring rather than a copy. `plansLive` is true while the session's store holds any event, trip or shortlist.
+- **The seed is always present for a new session.** `seedHistory` returns `{ history?, earlier }`; a brand-new chat gets `earlier: { plans: [] }`, which produces no note.
+- **`PlanCard` takes `locale`.** `cardDate` needs it for the dated line; `WidgetRenderer` already had it.
+- **Card lock tests live in `web/test/chat/cardLock.test.tsx`,** not `components.test.tsx`. They mock `useAgent` with a real `@ag-ui/client` `AbstractAgent` created per mount (as CopilotKit 1.83 does), so `addMessages` and a remount behave like the app. The `cardDate` test is the new `web/test/lib/dates.test.ts` (there was no dates test).
+- **`/plans` not-found in unit tests.** jsdom can't run Next's routing, so `web/test/shell/chrome.test.tsx` checks that `parseRoute` rejects `/plans…`, that no `app/(app)/plans` or `app/api/plans` exists, that the catch-all page calls `notFound()`, and that the shell's not-found page renders `#shell-not-found-title`. E2E step 8 checks the real page.
+- **`focus.test.tsx`** goes to `/chats`, not `/reports`: the test starts on `/reports`, so going there again isn't a route change and wouldn't drop the focus request.
+- **`parseRoute`** destructures `[head, a, b, ...rest]` now that no route uses a fourth segment; every path it accepted before (other than `/plans…`) is still accepted.
+- **E2E seed.** `chat_messages` is inserted with `defaultToNull: false` so only the cart reply sets `created_at` (`ago(0, 3)`). The card part ids are `call-e2eCart001-widget` and `call-e2eTrip001-widget` (`CART_CARD_ID`, `TRIP_CARD_ID`). `Seeded` gained `cartChat` and lost `tripChat`; `SEED.plans` is gone. Step 13 also checks the cart card's box fits 390 px and its note reads "ask Milo to refresh" (the agent is renamed in step 9).
+
+### Results
+
+- Agent: `npm test` 1029 passed, 36 skipped; `npm run test:supabase` 31 passed; typecheck, lint and build clean. `grep -rn "workspace_entities\|workspace_put\|workspace_counts" agent/src web shared` matches only `agent/src/db/database.types.ts`, and `test/db/imports.test.ts` enforces it.
+- Web: 441 tests in 50 files; `tsc --noEmit`, `eslint .` and `npm run build` clean. The build lists no `/plans` or `/api/plans` routes.
+- Stack: rebuilt with `docker compose --env-file deploy-config/.env-nextjs --profile local up -d --build`; agent, renderer and web healthy.
+- E2E: `npx playwright test` 3/3 (desktop, tablet, phone), three runs in a row. The Supabase auth user count is 3 afterwards.
+- Database: no DDL. `workspace_entities` still holds its 6 rows and is never read. Security advisors: unchanged (eight INFO `rls_enabled_no_policy` rows, including `workspace_entities`, and the two auth WARNs). Performance advisors: only INFO `unused_index` on `chats_title_trgm_idx`, `artifacts_title_trgm_idx` and `provider_credentials_key_version_idx`.
+
+### Not done
+
+- The follow-up migration that drops `workspace_entities`, `workspace_put` and `workspace_counts` waits for the owner's confirmation, as specified.
+- The architecture explainer page in `~/Downloads` is not touched; "Architecture explainer notes" has the replacement text.
+- No live-model check of `<earlier_cards>` or `<unapplied_edits>` (covered by unit tests only).

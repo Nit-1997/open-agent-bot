@@ -83,14 +83,14 @@ supabase/
 web/
   proxy.ts             session refresh, route rules and the nonce CSP on every request
   app/                 login, request-access, auth confirm/callback/signout, admin
-  app/(app)/           the shell routes: /, /chats, /chats/[id], /reports, /reports/[id], /plans,
-                       /plans/[chatId]/[kind]/[key], /search; one layout keeps the shell and chats mounted
+  app/(app)/           the shell routes: /, /chats, /chats/[id], /reports, /reports/[id],
+                       /search; one layout keeps the shell and chats mounted
   app/api/             thin proxies to the agent with the user's token (lib/agentServer.ts)
   components/shell/    app shell: rail, sidebar, phone top bar, tabs and drawer, account menu and sheet,
                        overlays (focus trap, Escape, inert background), ShellProvider (chat controller)
   components/agent/    the agent's orb, name, look and tone pickers
   components/chat/     chat host and panes (one per running thread), session, turns, chat list
-  components/reports/, components/plans/, components/search/   the section views
+  components/reports/, components/search/   the section views
   components/widgets/  one component per widget kind
   components/profile/  onboarding slides (onboarding/, sections shared with the drawer),
                        profile drawer, model management
