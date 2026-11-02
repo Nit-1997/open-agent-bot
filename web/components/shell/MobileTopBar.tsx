@@ -37,7 +37,7 @@ export function MobileTopBar() {
       </button>
       {onChat ? (
         <div id="mobile-topbar-agent" className="flex flex-col items-center gap-0.5">
-          <AgentOrb id="mobile-topbar-orb" look={persona.look} size={26} />
+          <AgentOrb id="mobile-topbar-orb" look={persona.look} name={persona.name} size={26} />
           <span id="mobile-topbar-name" className="max-w-[50vw] truncate text-[12px] font-semibold text-text-primary">
             <bdi id="mobile-topbar-name-bdi">{persona.name}</bdi>
           </span>

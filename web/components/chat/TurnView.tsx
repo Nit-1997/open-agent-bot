@@ -73,7 +73,7 @@ export function TurnView(props: {
         </div>
       )}
       <div id={`${id}-agent-row`} className="mt-3 flex gap-3 sm:mt-5">
-        <AgentOrb id={`${id}-orb`} look={props.persona.look} size={28} className="mt-0.5 hidden sm:inline-block" />
+        <AgentOrb id={`${id}-orb`} look={props.persona.look} name={props.persona.name} size={28} className="mt-0.5 hidden sm:inline-flex" />
         <div id={`${id}-agent`} className="min-w-0 flex-1">
           <ActivitySteps
             id={`${id}-steps`}

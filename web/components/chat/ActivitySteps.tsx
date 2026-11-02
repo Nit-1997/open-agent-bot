@@ -41,7 +41,11 @@ export function ActivitySteps(props: { id: string; steps: Step[]; running: boole
         onClick={() => setOpen((o) => !o)}
         className="group flex max-w-full items-center gap-2.5 rounded-full py-1 pr-2 text-sm text-text-muted transition enabled:hover:text-text-primary"
       >
-        <span id={`${id}-orb`} aria-hidden="true" className={`orb h-4 w-4 shrink-0 ${running ? "animate-breathe" : "opacity-60"}`} />
+        <span
+          id={`${id}-orb`}
+          aria-hidden="true"
+          className={`h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] ${running ? "animate-spin border-mist-500 border-t-transparent" : "border-text-faint opacity-60"}`}
+        />
         <span id={`${id}-headline`} role="status" aria-live="polite" className={`truncate ${running ? "shimmer-text font-medium" : ""}`}>
           {headline}
         </span>

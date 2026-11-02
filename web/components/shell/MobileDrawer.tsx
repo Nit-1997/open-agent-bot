@@ -22,7 +22,7 @@ export function MobileDrawer() {
       panelClassName="gap-4 border-r border-surface-accent bg-sidebar px-3.5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-[calc(18px+env(safe-area-inset-top))]"
     >
       <div id="mobile-drawer-header" className="flex items-center gap-2.5 px-1.5 pb-2 pt-1">
-        <AgentOrb id="mobile-drawer-orb" look={persona.look} size={40} />
+        <AgentOrb id="mobile-drawer-orb" look={persona.look} name={persona.name} size={40} />
         <div id="mobile-drawer-who" className="flex min-w-0 flex-col gap-0.5">
           <span id="mobile-drawer-name" className="truncate font-display text-[22px] leading-none text-text-primary">
             <bdi id="mobile-drawer-name-bdi">{persona.name}</bdi>

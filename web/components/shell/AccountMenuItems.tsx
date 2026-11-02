@@ -43,7 +43,7 @@ export function AccountMenuItems(props: { id: string; variant: "menu" | "sheet";
           Profile & settings
         </button>
         <button id={`${id}-agent`} type="button" role={role} onClick={() => go("profile", "agent")} className={cls}>
-          <AgentOrb id={`${id}-agent-orb`} look={persona.look} size={22} className="-mx-0.5" />
+          <AgentOrb id={`${id}-agent-orb`} look={persona.look} name={persona.name} size={22} className="-mx-0.5" />
           <span id={`${id}-agent-text`}>
             <bdi id={`${id}-agent-name`}>{persona.name}</bdi>, your agent
           </span>
