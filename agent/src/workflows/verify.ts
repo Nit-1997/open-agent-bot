@@ -199,13 +199,32 @@ export async function verifyReport(
 
   const claims = flat.map((c, i): ClaimResult => ({ text: c.text, url: c.url, verdict: verdicts.get(i) ?? "unchecked" }));
   const count = (v: Verdict) => claims.filter((c) => c.verdict === v).length;
+  const flagged = count("unsupported") - removed;
+  const unchecked = count("unchecked");
   return {
-    html: out,
+    html: withKey(out, flagged, unchecked),
     claims,
     total: claims.length,
     supported: count("supported"),
-    flagged: count("unsupported") - removed,
+    flagged,
     removed,
-    unchecked: count("unchecked"),
+    unchecked,
   };
+}
+
+function withKey(html: string, flagged: number, unchecked: number): string {
+  const lines = [
+    flagged &&
+      (flagged === 1
+        ? `<p><span class="unverified">Marked like this</span>: 1 claim couldn't be confirmed by the source it cites. Check it before relying on it.</p>`
+        : `<p><span class="unverified">Marked like this</span>: ${flagged} claims couldn't be confirmed by the sources they cite. Check them before relying on them.</p>`),
+    unchecked &&
+      `<p><span class="unchecked">Underlined like this</span>: ${unchecked === 1 ? "1 claim wasn't" : `${unchecked} claims weren't`} checked against a source.</p>`,
+  ].filter(Boolean);
+  if (!lines.length) return html;
+  const key = `<aside class="verify-key" aria-label="About the highlighted claims">${lines.join("")}</aside>`;
+  const after = ["</header>", "</h1>"].map((t) => ({ t, at: html.indexOf(t) })).find((m) => m.at >= 0);
+  if (!after) return key + html;
+  const cut = after.at + after.t.length;
+  return html.slice(0, cut) + key + html.slice(cut);
 }
