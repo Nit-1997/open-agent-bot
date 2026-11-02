@@ -7,6 +7,14 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.mi
 type AxeResult = { violations: Array<{ id: string; nodes: Array<{ target: string[]; failureSummary?: string }> }> };
 
 export async function expectContrast(page: Page, label: string): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Number.POSITIVE_INFINITY)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   await page.addScriptTag({ content: AXE });
   const result = await page.evaluate(
     async () =>

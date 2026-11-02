@@ -330,6 +330,7 @@ test("desktop: first run, sidebar, chats, search, reports, saved cards, account 
       for (const path of ["/", "/search?q=big", "/reports", `/chats/${s.cartChat}`]) {
         await page.goto(path);
         await page.locator("#shell-main").waitFor();
+        if (path.startsWith("/chats/")) await page.locator(`[id$='-cart-${CART_CARD_ID}-locked-note']`).waitFor();
         await page.waitForTimeout(400);
         await expectContrast(page, `${path} (${dark ? "dark" : "light"})`);
       }
