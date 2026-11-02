@@ -294,7 +294,7 @@ html.dark .orb[data-look="dusk"] {
   }
 }
 
-.report-card-pressed {
+.report-card-current {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mist-500) 18%, transparent);
 }
 

@@ -12,11 +12,11 @@ export function ReportCard(props: {
   toolCallId: string;
   title: string;
   result: string | undefined;
-  pressed: boolean;
+  current: boolean;
   hint: "right" | "tap";
   onOpen: (reportId: string, toolCallId: string) => void;
 }) {
-  const { title, result, pressed, hint } = props;
+  const { title, result, current, hint } = props;
   const id = widgetId("artifact-card", props.toolCallId, props.idPrefix);
   const width = hint === "tap" ? "w-full sm:w-[320px]" : "w-[320px] max-w-full";
   const tall = hint === "tap";
@@ -57,11 +57,11 @@ export function ReportCard(props: {
     <button
       id={id}
       type="button"
-      aria-pressed={pressed}
+      aria-current={current ? "true" : undefined}
       aria-label={`Open report: ${title}`}
       onClick={() => props.onOpen(reportId, props.toolCallId)}
       className={`my-2 block overflow-hidden rounded-2xl border bg-surface p-0 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mist-500 ${width} ${
-        pressed ? "report-card-pressed border-mist-500" : "border-surface-accent hover:border-border"
+        current ? "report-card-current border-mist-500" : "border-surface-accent hover:border-border"
       }`}
     >
       <ReportThumb id={`${id}-thumb`} reportId={reportId} tall={tall} />

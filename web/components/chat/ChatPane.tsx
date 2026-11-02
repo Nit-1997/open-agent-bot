@@ -7,27 +7,27 @@ import { PanelSeparator } from "@/components/reports/PanelSeparator";
 import { type PanelPlacement, ReportPanel } from "@/components/reports/ReportPanel";
 import { useShell } from "@/components/shell/ShellProvider";
 import { ListState } from "@/components/ui/ListState";
-import { widgetId } from "@/components/widgets/widgetId";
 import { ApiError } from "@/lib/api";
 import { chatIndex } from "@/lib/chatIndex";
 import { chatsApi, toHistory } from "@/lib/chats";
 import { errorMessage } from "@/lib/errors";
 import { isolate, rememberLine } from "@/lib/persona";
-import type { ReportRef } from "@/lib/reportRefs";
-import { shouldAutoOpen } from "@/lib/shell/autoOpen";
+import { type ReportRef, sameReports } from "@/lib/reportRefs";
 import { type Breakpoint, useBreakpoint } from "@/lib/shell/breakpoints";
 import { composerInputId, paneId } from "@/lib/shell/chatController";
 import { clampPanel, SEPARATOR_PX } from "@/lib/shell/panelWidth";
+import { useReportAutoOpen } from "@/lib/shell/useReportAutoOpen";
+import { useReportFocusReturn } from "@/lib/shell/useReportFocusReturn";
 import { threadAgentId, useThreadContext } from "@/lib/useThreadContext";
 import { getUserContext, withChat } from "@/lib/userContext";
 import { ChatHeader } from "./ChatHeader";
 import { ChatMissing } from "./ChatMissing";
-import { ChatSession, type ReportReady } from "./ChatSession";
+import { ChatSession } from "./ChatSession";
 
 export const RUNTIME_AGENT_ID = "openagent";
 export const REPORT_PLACEHOLDER = "Ask about this report…";
 
-const PLACEMENT: Record<Breakpoint, PanelPlacement> = { desktop: "inline", tablet: "overlay", phone: "screen" };
+const PANEL_PLACEMENT: Record<Breakpoint, PanelPlacement> = { desktop: "inline", tablet: "overlay", phone: "screen" };
 
 function usePaneWidth(): [(el: HTMLElement | null) => void, number] {
   const [available, setAvailable] = useState(0);
@@ -76,10 +76,8 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
   useHistoryLoader(threadId, thread?.status ?? "", thread?.attempt ?? 0);
 
   const [reports, setReports] = useState<ReportRef[]>([]);
-  const [status, setStatus] = useState("");
   const [sectionRef, available] = usePaneWidth();
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const focusTitle = useRef(false);
   const [restored] = useState(() => panel?.reportId ?? null);
   const openTitle = panel ? (reports.find((r) => r.reportId === panel.reportId)?.title ?? "") : "";
   useThreadContext(
@@ -89,23 +87,13 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
   );
 
   const activeRef = useRef(active);
-  const visibleRef = useRef(visible);
-  const breakpointRef = useRef(breakpoint);
-  const overlayRef = useRef(overlay);
-  const chatsRef = useRef(shell.chats);
-  const reportsRef = useRef(reports);
   const draftRef = useRef(thread?.status === "draft");
   useEffect(() => {
     draftRef.current = thread?.status === "draft";
   }, [thread?.status]);
   useEffect(() => {
     activeRef.current = active;
-    visibleRef.current = visible;
-    breakpointRef.current = breakpoint;
-    overlayRef.current = overlay;
-    chatsRef.current = shell.chats;
-    reportsRef.current = reports;
-  });
+  }, [active]);
   useEffect(() => {
     if (active && visible && takeFocusRequest("composer")) document.getElementById(composerId)?.focus();
   }, [active, visible, composerId, takeFocusRequest]);
@@ -121,75 +109,38 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
     [dispatch, threadId],
   );
   const onRunEnd = useCallback(() => void chatIndex.refresh(), []);
+  const onReports = useCallback((next: ReportRef[]) => setReports((prev) => (sameReports(prev, next) ? prev : next)), []);
   const onModel = useCallback((model: string) => dispatch({ type: "model", id: threadId, model }), [dispatch, threadId]);
   const openProfile = useCallback(() => open("profile"), [open]);
   const manageModels = useCallback(() => open("models"), [open]);
 
+  const showPanel = !!panel && (thread?.status === "ready" || thread?.status === "draft");
+  const shownId = showPanel ? panel.reportId : null;
+  const focusTitleNext = useReportFocusReturn({ shownId, paneId: id, composerId, active, visible, reports, titleRef });
   const openReport = report.open;
   const closeReport = report.close;
+  const openId = panel?.reportId;
   const onOpenReport = useCallback(
     (reportId: string) => {
-      if (chatsRef.current.panels[threadId]?.reportId === reportId) return;
-      focusTitle.current = true;
+      if (openId === reportId) return;
+      focusTitleNext();
       openReport(threadId, reportId, "user");
     },
-    [openReport, threadId],
+    [openReport, threadId, focusTitleNext, openId],
   );
   const onSwap = useCallback((reportId: string) => openReport(threadId, reportId, "user"), [openReport, threadId]);
   const onClose = useCallback(() => closeReport(threadId), [closeReport, threadId]);
-  const onReportReady = useCallback(
-    (r: ReportReady) => {
-      const state = chatsRef.current;
-      const flags = state.threads[threadId]?.runFlags;
-      const shown = activeRef.current && visibleRef.current;
-      const auto = shouldAutoOpen({
-        tool: r.tool,
-        reportId: r.reportId,
-        active: activeRef.current,
-        visible: visibleRef.current,
-        breakpoint: breakpointRef.current,
-        overlay: overlayRef.current,
-        dismissed: !!flags?.dismissed,
-        picked: !!flags?.picked,
-        panelOpen: !!state.panels[threadId],
-      });
-      if (auto) {
-        openReport(threadId, r.reportId, "auto");
-        setStatus(`Opened “${r.title}” on the right.`);
-      } else if (shown) setStatus(`Report ready: “${r.title}”.`);
-    },
-    [openReport, threadId],
-  );
-
-  const showPanel = !!panel && (thread?.status === "ready" || thread?.status === "draft");
-  const shownId = showPanel ? panel.reportId : null;
-  const lastShown = useRef<string | null>(null);
-  useEffect(() => {
-    const prev = lastShown.current;
-    if (prev === shownId) return;
-    lastShown.current = shownId;
-    if (shownId && focusTitle.current) {
-      focusTitle.current = false;
-      requestAnimationFrame(() => titleRef.current?.focus({ preventScroll: true }));
-    }
-    if (!prev || shownId || !activeRef.current || !visibleRef.current) return;
-    requestAnimationFrame(() => {
-      const current = document.activeElement;
-      if (current && current !== document.body) return;
-      const ref = reportsRef.current.find((r) => r.reportId === prev);
-      const card = ref && document.getElementById(widgetId("artifact-card", ref.toolCallId, id));
-      (card ?? document.getElementById(composerId))?.focus();
-    });
-  });
+  const { onReportReady, status } = useReportAutoOpen(threadId, { active, visible, breakpoint, overlay });
 
   if (!thread) return null;
   const phone = breakpoint === "phone";
   const emptyDraft = thread.status === "draft" && !thread.used;
   const showHeader = !phone && !emptyDraft;
-  const placement = PLACEMENT[breakpoint];
+  const placement = PANEL_PLACEMENT[breakpoint];
   const inline = showPanel && placement === "inline";
   const panelId = `${id}-report-panel`;
   const backdropId = `${id}-report-backdrop`;
+  const statusId = `${id}-report-status`;
 
   return (
     <section
@@ -254,7 +205,7 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
               openReportId={panel?.reportId ?? null}
               reportHint={breakpoint === "desktop" ? "right" : "tap"}
               onOpenReport={onOpenReport}
-              onReports={setReports}
+              onReports={onReports}
               onReportReady={onReportReady}
             />
           </>
@@ -280,7 +231,6 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
       {showPanel ? (
         <ReportPanel
           id={panelId}
-          threadId={threadId}
           chatId={threadId}
           reportId={panel.reportId}
           reports={reports}
@@ -290,12 +240,13 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
           guardFocus={panel.how !== "user" || restored === panel.reportId}
           composerId={composerId}
           backdropId={backdropId}
+          statusId={statusId}
           titleRef={titleRef}
           onOpen={onSwap}
           onClose={onClose}
         />
       ) : null}
-      <p id={`${id}-report-status`} role="status" className="sr-only">
+      <p id={statusId} role="status" className="sr-only">
         {status}
       </p>
     </section>

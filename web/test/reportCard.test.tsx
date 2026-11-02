@@ -5,16 +5,17 @@ import { expectUniqueIds } from "./support/ids";
 
 const result = "artifact abcdefghijkl created: Diwali plan";
 const card = (over: Partial<Parameters<typeof ReportCard>[0]> = {}) => (
-  <ReportCard idPrefix="chat-pane-x" toolCallId="tc1" title="Diwali plan" result={result} pressed={false} hint="right" onOpen={() => {}} {...over} />
+  <ReportCard idPrefix="chat-pane-x" toolCallId="tc1" title="Diwali plan" result={result} current={false} hint="right" onOpen={() => {}} {...over} />
 );
 
 describe("ReportCard", () => {
-  it("is a pressable button named after the report, with a decorative thumbnail", () => {
+  it("is a button named after the report, with a decorative thumbnail", () => {
     const onOpen = vi.fn();
     const { container } = render(card({ onOpen }));
     const button = screen.getByRole("button", { name: "Open report: Diwali plan" });
     expect(button.id).toBe("chat-pane-x-artifact-card-tc1");
-    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button).not.toHaveAttribute("aria-current");
+    expect(button).not.toHaveAttribute("aria-pressed");
     expect(document.getElementById("chat-pane-x-artifact-card-tc1-title")).toHaveTextContent("Diwali plan");
     expect(document.getElementById("chat-pane-x-artifact-card-tc1-hint")).toHaveTextContent("Report · open on the right");
     const img = document.getElementById("chat-pane-x-artifact-card-tc1-thumb-img")!;
@@ -27,9 +28,9 @@ describe("ReportCard", () => {
     expectUniqueIds(container);
   });
 
-  it("follows the open report with aria-pressed and says tap to read on smaller screens", () => {
-    render(card({ pressed: true, hint: "tap" }));
-    expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+  it("follows the open report with aria-current and says tap to read on smaller screens", () => {
+    render(card({ current: true, hint: "tap" }));
+    expect(screen.getByRole("button")).toHaveAttribute("aria-current", "true");
     expect(screen.getByText("Report · tap to read")).toBeInTheDocument();
   });
 

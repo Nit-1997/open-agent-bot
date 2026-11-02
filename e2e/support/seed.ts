@@ -67,7 +67,7 @@ function ageOf(i: number): number {
 const BIG_SUR_REPLY =
   "Here's a two-night plan from San Luis Obispo: Highway 1 north on Saturday morning, a cabin near Pfeiffer Big Sur, sunset at McWay Falls and vegetarian dinners.";
 
-const FOCUS_THIEF = `<button id="grab" tabindex="0">Focus me</button><script>window.addEventListener("load",()=>{window.focus();document.getElementById("grab").focus();});</script>`;
+const FOCUS_THIEF = `<button id="grab" tabindex="0">Focus me</button><script>const grab=()=>{window.focus();document.getElementById("grab").focus();};window.addEventListener("load",()=>{grab();setTimeout(grab,4500);});</script>`;
 
 const reportHtml = (title: string, extra = "") =>
   `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:sans-serif;padding:24px"><h1>${title}</h1><p>A one-page guide made for the end-to-end demo.</p>${extra}</body></html>`;

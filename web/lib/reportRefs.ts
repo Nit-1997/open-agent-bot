@@ -26,3 +26,9 @@ export function reportsIn(turns: readonly Turn[]): ReportRef[] {
     }
   return out;
 }
+
+export function sameReports(a: readonly ReportRef[], b: readonly ReportRef[]): boolean {
+  return (
+    a.length === b.length && a.every((r, i) => r.reportId === b[i].reportId && r.toolCallId === b[i].toolCallId && r.title === b[i].title)
+  );
+}

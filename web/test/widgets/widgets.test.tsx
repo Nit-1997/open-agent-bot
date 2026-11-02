@@ -249,7 +249,7 @@ describe("widgets", () => {
           toolCallId="tc-report"
           title="Guide"
           result="artifact abcdefghijkl created"
-          pressed={false}
+          current={false}
           hint="right"
           onOpen={() => {}}
         />

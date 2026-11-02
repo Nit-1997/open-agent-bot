@@ -106,7 +106,7 @@ export function ShellProvider(props: {
 
   useLayoutEffect(() => {
     chatsRef.current = chats;
-  });
+  }, [chats]);
 
   const activeThread = chats.threads[chats.activeId];
   const reportInline =
@@ -174,7 +174,7 @@ export function ShellProvider(props: {
     if (!writes || (existing?.reportId === reportId && urlReport() === reportId)) return;
     const href = hrefFor({ section: "chat", chatId: threadId, report: reportId });
     if (push) window.history.pushState({ oaReport: reportId }, "", href);
-    else window.history.replaceState(null, "", href);
+    else window.history.replaceState(existing?.pushed ? { oaReport: reportId } : null, "", href);
   }, []);
 
   const closeReport = useCallback((threadId: string) => {

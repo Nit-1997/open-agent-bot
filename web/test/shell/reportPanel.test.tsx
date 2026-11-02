@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShellFrame } from "@/components/shell/ShellFrame";
+import { focusables } from "@/lib/shell/useFocusTrap";
 import { chatIndex } from "@/lib/chatIndex";
 import { copilot } from "../support/copilot";
 import { expectUniqueIds } from "../support/ids";
@@ -129,8 +130,9 @@ describe("report panel on desktop", () => {
     expect($(`${panelId()}-position`)).toHaveTextContent("Report · 1 of 2 in this chat");
     expect($(`${panelId()}-prev`)).toHaveAttribute("aria-disabled", "true");
     expect($(`${panelId()}-next`)).toHaveAttribute("aria-disabled", "false");
-    expect(card(R1)).toHaveAttribute("aria-pressed", "true");
-    expect(card(R2)).toHaveAttribute("aria-pressed", "false");
+    expect(card(R1)).toHaveAttribute("aria-current", "true");
+    expect(card(R2)).not.toHaveAttribute("aria-current");
+    expect(card(R1)).not.toHaveAttribute("aria-pressed");
     expect($(`${panelId()}-frame`)).toHaveAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
     expect($(`${panelId()}-pdf`)).toHaveAttribute("href", `/api/artifacts/${R1}?format=pdf`);
     expect($(`${panelId()}-pdf`)).toHaveAttribute("download");
@@ -149,7 +151,7 @@ describe("report panel on desktop", () => {
     expect(window.location.search).toBe(`?report=${R1}`);
     await act(async () => fireEvent.click($(`${panelId()}-next`)!));
     await waitFor(() => expect($(`${panelId()}-position`)).toHaveTextContent("Report · 2 of 2 in this chat"));
-    expect(card(R2)).toHaveAttribute("aria-pressed", "true");
+    expect(card(R2)).toHaveAttribute("aria-current", "true");
     expect(window.location.search).toBe(`?report=${R2}`);
     expect(window.history.length).toBe(length);
     expect($(`${panelId()}-next`)).toHaveAttribute("aria-disabled", "true");
@@ -332,10 +334,13 @@ describe("tablet overlay", () => {
     expect($("rail")).toHaveAttribute("inert");
     expect($(`${pane()}-column`)).toHaveAttribute("inert");
     expect($(`${pane()}-report-backdrop`)).not.toHaveAttribute("inert");
+    expect($(`${pane()}-report-status`)).not.toHaveAttribute("inert");
     expect($(`${pane()}-report-separator`)).toBeNull();
+    expect(focusables(panel).slice(-3)).toEqual([$(`${panelId()}-close`), $(`${panelId()}-frame`), $(`${panelId()}-focus-wrap`)]);
     $(`${panelId()}-close`)!.focus();
-    fireEvent.keyDown(document, { key: "Tab" });
-    expect(panel.contains(document.activeElement)).toBe(true);
+    expect(fireEvent.keyDown(document, { key: "Tab" })).toBe(true);
+    $(`${panelId()}-focus-wrap`)!.focus();
+    expect(document.activeElement).toBe(focusables(panel)[0]);
     $(`${panelId()}-pdf`)!.focus();
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
     expect(panel.contains(document.activeElement)).toBe(true);
@@ -411,6 +416,37 @@ describe("phone viewer", () => {
     expect(back).not.toHaveBeenCalled();
     expect($(panelId())).toBeNull();
     expect(window.location.search).toBe("");
+  });
+
+  it("treats an entry reached by Forward as pushed, so Back leaves no duplicate entry", async () => {
+    mockViewport(390);
+    renderShell(<ShellFrame>{null}</ShellFrame>);
+    await openChat();
+    await clickCard(R1);
+    const length = window.history.length;
+    await act(async () => window.history.back());
+    await waitFor(() => expect($(panelId())).toBeNull());
+    await act(async () => window.history.forward());
+    await waitFor(() => expect($(panelId())).not.toBeNull());
+    expect(window.location.search).toBe(`?report=${R1}`);
+    const back = vi.spyOn(window.history, "back");
+    const replace = vi.mocked(window.history.replaceState);
+    replace.mockClear();
+    await act(async () => fireEvent.click($(`${panelId()}-back`)!));
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+    await waitFor(() => expect($(panelId())).toBeNull());
+    expect(window.location.search).toBe("");
+    expect(window.history.length).toBe(length);
+  });
+
+  it("keeps a swap on the phone pushed, so Back after Next still pops the viewer", async () => {
+    mockViewport(390);
+    renderShell(<ShellFrame>{null}</ShellFrame>);
+    await openChat();
+    await clickCard(R1);
+    await act(async () => fireEvent.click($(`${panelId()}-next`) ?? card(R2)));
+    expect(window.history.state?.oaReport).toBe(window.location.search.slice("?report=".length));
   });
 });
 
@@ -526,6 +562,40 @@ describe("auto-open", () => {
 });
 
 describe("URL sync", () => {
+  it("ignores a stale route that lags behind two quick opens", async () => {
+    renderShell(<ShellFrame>{null}</ShellFrame>);
+    await openChat();
+    await clickCard(R1);
+    await act(async () => fireEvent.click($(`${panelId()}-next`)!));
+    expect(window.location.search).toBe(`?report=${R2}`);
+    await act(async () => nav.go(`/chats/${A}?report=${R1}`));
+    await flush();
+    expect($(`${panelId()}-position`)).toHaveTextContent("2 of 2");
+    expect(window.location.search).toBe(`?report=${R2}`);
+  });
+
+  it("closes on Back whether Next's route update lands before or after its own popstate handler", async () => {
+    mockViewport(390);
+    renderShell(<ShellFrame>{null}</ShellFrame>);
+    await openChat();
+    for (const late of [false, true]) {
+      await clickCard(R1);
+      const go = nav.go.bind(nav);
+      const pending: string[] = [];
+      if (late) nav.go = (href: string) => void pending.push(href);
+      try {
+        await act(async () => window.history.back());
+        await waitFor(() => expect($(panelId())).toBeNull());
+      } finally {
+        nav.go = go;
+      }
+      for (const href of pending) await act(async () => nav.go(href));
+      await flush();
+      expect($(panelId())).toBeNull();
+      expect(window.location.search).toBe("");
+    }
+  });
+
   it("restores a remembered panel on desktop by replace, closes it on a phone arrival, and lets Back swap", async () => {
     const vp = mockViewport(1440);
     renderShell(<ShellFrame>{null}</ShellFrame>);
@@ -557,6 +627,32 @@ describe("focus guard", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(document.activeElement).toBe($(`${pane()}-composer-input`));
+  });
+
+  it("keeps guarding after the first seconds, until the user interacts", async () => {
+    renderShell(<ShellFrame>{null}</ShellFrame>);
+    await go(`/chats/${A}?report=${R1}`);
+    const frame = (await waitFor(() => $(`${panelId()}-frame`)!)) as HTMLIFrameElement;
+    vi.useFakeTimers();
+    try {
+      fireEvent.load(frame);
+      await act(async () => vi.advanceTimersByTime(10_000));
+      frame.focus();
+      await act(async () => {
+        window.dispatchEvent(new Event("blur"));
+        vi.advanceTimersByTime(1);
+      });
+      expect(document.activeElement).toBe($(`${pane()}-composer-input`));
+      fireEvent.keyDown($(`${panelId()}-close`)!, { key: "Tab" });
+      frame.focus();
+      await act(async () => {
+        window.dispatchEvent(new Event("blur"));
+        vi.advanceTimersByTime(1);
+      });
+      expect(document.activeElement).toBe(frame);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("leaves focus alone after a pointerdown in the panel", async () => {

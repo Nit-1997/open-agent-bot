@@ -9,7 +9,6 @@ export function ArtifactFrame({
   id: string;
   artifactId: string;
   title: string;
-  lazy?: boolean;
   className: string;
   onLoad?: () => void;
   ref?: Ref<HTMLIFrameElement>;
@@ -21,7 +20,6 @@ export function ArtifactFrame({
       title={props.title}
       sandbox={ARTIFACT_SANDBOX}
       src={reportHtmlHref(props.artifactId)}
-      loading={props.lazy ? "lazy" : undefined}
       onLoad={props.onLoad}
       className={props.className}
     />

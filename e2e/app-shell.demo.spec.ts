@@ -173,7 +173,7 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     await expect(page.locator(`${panel}-position`)).toHaveText(/report · 1 of 2 in this chat/i);
     await expect(page.locator("#sidebar")).toHaveCount(0);
     await expect(page.locator("#rail-new-chat")).toBeVisible();
-    await expect(page.locator(card1)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(card1)).toHaveAttribute("aria-current", "true");
     await expect(page.locator(`${panel}-frame`)).toHaveAttribute("sandbox", /allow-scripts/);
     await expect(input).toHaveAttribute("placeholder", REPORT_PLACEHOLDER);
 
@@ -185,7 +185,7 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     const length = await historyLength(page);
     await page.locator(`${panel}-next`).click();
     await expect(page.locator(`${panel}-position`)).toHaveText(/report · 2 of 2 in this chat/i);
-    await expect(page.locator(card2)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(card2)).toHaveAttribute("aria-current", "true");
     await expect(page).toHaveURL(new RegExp(`\\?report=${SECOND_REPORT.id}$`));
     expect(await historyLength(page)).toBe(length);
 
@@ -209,13 +209,17 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     const width = await page.locator(panel).evaluate((el) => el.getBoundingClientRect().width);
     const stored = await page.evaluate(() => localStorage.getItem("oa.reportPanel"));
 
+    await page.mouse.move(1, 1);
     await page.reload();
     await expect(page.locator(`${panel}-position`)).toHaveText(/report · 2 of 2 in this chat/i);
     await expect(page.locator(`${panel}-frame`)).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem("oa.reportPanel"))).toBe(stored);
     expect(Math.abs((await page.locator(panel).evaluate((el) => el.getBoundingClientRect().width)) - width)).toBeLessThanOrEqual(1);
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(6000);
     await expect(input).toBeFocused();
+    await page.keyboard.type("still mine");
+    await expect(input).toHaveValue("still mine");
+    await input.fill("");
 
     const frame = page.locator(`${panel}-frame`);
     await frame.evaluate((el) => el.setAttribute("data-e2e-mark", "same-frame"));
@@ -264,7 +268,7 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     const context = run.body()?.context ?? [];
     const open = context.find((c) => c.description === "open_report");
     expect(open?.value).toContain(BIG_SUR_REPORT.id);
-    await expect(page.locator(card3)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(card3)).toHaveAttribute("aria-current", "true");
     await expect(page).toHaveURL(new RegExp(`\\?report=${LIVE_REPORT.id}$`));
     expect(await historyLength(page)).toBe(before);
     await expect(page.locator(`${pane}-report-status`)).toHaveText(`Opened “${LIVE_REPORT.title}” on the right.`);
@@ -396,6 +400,9 @@ test("tablet: rail plus an overlay sidebar @tablet", async ({ page }) => {
     await card1.click();
     await expect(panel).toHaveAttribute("role", "dialog");
     await expect(page.locator(`${pane}-report-panel-title`)).toBeFocused();
+    await page.locator(`${pane}-report-panel-close`).focus();
+    await page.keyboard.press("Tab");
+    await expect(page.locator(`${pane}-report-panel-frame`)).toBeFocused();
     for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
     expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     await page.keyboard.press("Escape");
@@ -475,6 +482,18 @@ test("phone: top bar, tabs, drawer and account sheet @phone", async ({ page }) =
     await page.goBack();
     await expect(panel).toHaveCount(0);
     await expect(page).toHaveURL(chatUrl);
+    const length = await historyLength(page);
+    await page.goForward();
+    await expect(panel).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`\\?report=${BIG_SUR_REPORT.id}$`));
+    await page.locator(`${pane}-report-panel-back`).click();
+    await expect(panel).toHaveCount(0);
+    await expect(page).toHaveURL(chatUrl);
+    expect(await historyLength(page)).toBe(length);
+    await page.goBack();
+    await expect(page).not.toHaveURL(chatUrl);
+    await page.goto(`/chats/${s.bigSur}`);
+    await expect(card1).toBeVisible();
   });
 
   await test.step("14. Sign out from the account sheet", async () => {

@@ -109,7 +109,7 @@ export function TurnView(props: {
                   toolCallId={item.id}
                   title={item.title}
                   result={item.result}
-                  pressed={!!props.openReportId && parseArtifactId(item.result) === props.openReportId}
+                  current={!!props.openReportId && parseArtifactId(item.result) === props.openReportId}
                   hint={props.reportHint ?? "right"}
                   onOpen={(reportId, toolCallId) => props.onOpenReport?.(reportId, toolCallId)}
                 />

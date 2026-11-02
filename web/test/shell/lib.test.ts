@@ -204,4 +204,17 @@ describe("chatController", () => {
     expect(s.panels.t0).toBeUndefined();
     expect(s.panels[`t${MAX_PANELS + 4}`]).toBeDefined();
   });
+
+  it("evicts exactly the least recently opened panel at the cap, and a swap counts as recent", () => {
+    let s = initialChatState("d0");
+    for (let i = 0; i < MAX_PANELS; i++) s = chatReducer(s, { type: "openReport", id: `t${i}`, reportId: `r${i}`, how: "url" });
+    expect(Object.keys(s.panels)).toHaveLength(MAX_PANELS);
+    s = chatReducer(s, { type: "openReport", id: "t0", reportId: "swapped", how: "user" });
+    expect(Object.keys(s.panels)).toHaveLength(MAX_PANELS);
+    s = chatReducer(s, { type: "openReport", id: "new", reportId: "rn", how: "url" });
+    expect(Object.keys(s.panels)).toHaveLength(MAX_PANELS);
+    expect(s.panels.t1).toBeUndefined();
+    expect(s.panels.t0).toEqual({ reportId: "swapped", how: "user", pushed: false });
+    expect(Object.keys(s.panels).at(-1)).toBe("new");
+  });
 });
