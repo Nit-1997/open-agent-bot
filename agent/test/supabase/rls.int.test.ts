@@ -131,10 +131,6 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
     const idx = await managementQuery<{ indexname: string }>(
       "select indexname from pg_indexes where schemaname = 'public' and indexname in ('chats_title_trgm_idx', 'chat_messages_content_trgm_idx', 'artifacts_title_trgm_idx') order by indexname",
     );
-    expect(idx.map((i) => i.indexname)).toEqual([
-      "artifacts_title_trgm_idx",
-      "chat_messages_content_trgm_idx",
-      "chats_title_trgm_idx",
-    ]);
+    expect(idx.map((i) => i.indexname)).toEqual(["artifacts_title_trgm_idx", "chat_messages_content_trgm_idx", "chats_title_trgm_idx"]);
   });
 });

@@ -54,6 +54,7 @@ jobs:
       - name: Compose starts from a fresh clone with no env files
         run: |
           ls deploy-config/.env-* 2>/dev/null && exit 1
+          touch deploy-config/.env-agent deploy-config/.env-renderer deploy-config/.env-nextjs
           docker compose config --quiet
           docker compose --profile litellm --profile ollama config --quiet
           sh deploy-config/searxng/entrypoint.sh true
