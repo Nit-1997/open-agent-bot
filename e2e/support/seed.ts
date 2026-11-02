@@ -6,6 +6,8 @@ export const BIG_SUR = "Weekend in Big Sur for two";
 export const SEED = { chats: 24, reports: 13, plans: { cart: 1, trip: 1, event: 1, shortlist: 1 } } as const;
 export const TRIP_ID = "big-sur/weekend";
 export const BIG_SUR_REPORT = { id: "e2eReport001", title: "Big Sur weekend plan", toolCallId: "call-e2eReport001" } as const;
+export const SECOND_REPORT = { id: "e2eReport002", title: "Big Sur campgrounds", toolCallId: "call-e2eReport002" } as const;
+export const LIVE_REPORT = { id: "e2eReport003", title: "Packing list", toolCallId: "call-e2eReport003" } as const;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -65,8 +67,18 @@ function ageOf(i: number): number {
 const BIG_SUR_REPLY =
   "Here's a two-night plan from San Luis Obispo: Highway 1 north on Saturday morning, a cabin near Pfeiffer Big Sur, sunset at McWay Falls and vegetarian dinners.";
 
-const reportHtml = (title: string) =>
-  `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:sans-serif;padding:24px"><h1>${title}</h1><p>A one-page guide made for the end-to-end demo.</p></body></html>`;
+const FOCUS_THIEF = `<button id="grab" tabindex="0">Focus me</button><script>window.addEventListener("load",()=>{window.focus();document.getElementById("grab").focus();});</script>`;
+
+const reportHtml = (title: string, extra = "") =>
+  `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:sans-serif;padding:24px"><h1>${title}</h1><p>A one-page guide made for the end-to-end demo.</p>${extra}</body></html>`;
+
+const seedPart = (r: { id: string; title: string; toolCallId: string }) => ({
+  type: "tool",
+  id: r.toolCallId,
+  name: "create_artifact",
+  args: JSON.stringify({ title: r.title }),
+  result: `artifact ${r.id} created: ${r.title}`,
+});
 
 export type Seeded = { chats: Array<{ id: string; title: string }>; bigSur: string; reports: string[]; tripChat: string; otherChat: string };
 
@@ -89,29 +101,22 @@ export async function seed(demoEmail: string, otherEmail: string): Promise<Seede
       content: i === 0 ? BIG_SUR_REPLY : `Here is what I found for ${c.title.toLowerCase()}.`,
       status: "complete",
       ...(i === 0 && {
-        parts: [
-          {
-            type: "tool",
-            id: BIG_SUR_REPORT.toolCallId,
-            name: "create_artifact",
-            args: JSON.stringify({ title: BIG_SUR_REPORT.title }),
-            result: `artifact ${BIG_SUR_REPORT.id} created: ${BIG_SUR_REPORT.title}`,
-          },
-          { type: "text", text: BIG_SUR_REPLY },
-        ],
+        parts: [seedPart(BIG_SUR_REPORT), seedPart(SECOND_REPORT), { type: "text", text: BIG_SUR_REPLY }],
       }),
     },
   ]);
   await must("messages", db.from("chat_messages").insert(messages));
 
+  const bigSurReports = [BIG_SUR_REPORT, SECOND_REPORT, LIVE_REPORT];
   const reports = Array.from({ length: SEED.reports }, (_, i) => ({
-    id: i === 0 ? BIG_SUR_REPORT.id : `e2eReport${String(i + 1).padStart(3, "0")}`,
-    title: i === 0 ? BIG_SUR_REPORT.title : `Guide ${i + 1}: ${TITLES[(i + 3) % TITLES.length]}`,
-    chat: i === 0 ? bigSur : i % 3 === 0 ? null : chats[i % chats.length].id,
+    id: bigSurReports[i]?.id ?? `e2eReport${String(i + 1).padStart(3, "0")}`,
+    title: bigSurReports[i]?.title ?? `Guide ${i + 1}: ${TITLES[(i + 3) % TITLES.length]}`,
+    chat: i < bigSurReports.length ? bigSur : i % 3 === 0 ? null : chats[i % chats.length].id,
     at: ago(i),
+    html: reportHtml(bigSurReports[i]?.title ?? `Guide ${i + 1}: ${TITLES[(i + 3) % TITLES.length]}`, i === 1 ? FOCUS_THIEF : ""),
   }));
   for (const r of reports) {
-    const html = reportHtml(r.title);
+    const html = r.html;
     const { error } = await db.storage.from("artifacts").upload(`${user}/${r.id}.html`, html, { contentType: "text/html", upsert: true });
     if (error) throw new Error(`seed upload: ${error.message}`);
   }
@@ -124,7 +129,7 @@ export async function seed(demoEmail: string, otherEmail: string): Promise<Seede
         chat_id: r.chat,
         title: r.title,
         html_path: `${user}/${r.id}.html`,
-        size_bytes: Buffer.byteLength(reportHtml(r.title)),
+        size_bytes: Buffer.byteLength(r.html),
         created_at: r.at,
       })),
     ),

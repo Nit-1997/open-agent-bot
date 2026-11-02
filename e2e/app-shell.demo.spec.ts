@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { expectContrast, expectNoHorizontalScroll } from "./support/a11y";
-import { BIG_SUR, BIG_SUR_REPORT, SEED, TRIP_ID } from "./support/seed";
+import { mockReportRun } from "./support/reportRun";
+import { BIG_SUR, BIG_SUR_REPORT, LIVE_REPORT, SECOND_REPORT, SEED, TRIP_ID } from "./support/seed";
 import { seeded } from "./support/state";
 
 function entityKey(id: string): string {
@@ -14,6 +15,11 @@ const setTheme = async (page: Page, dark: boolean) => {
   if ((await item.getAttribute("aria-checked")) !== String(dark)) await item.click();
   await page.keyboard.press("Escape");
 };
+
+const REPORT_PLACEHOLDER = "Ask about this report…";
+const thumbLoaded = (page: Page, sel: string) =>
+  page.locator(sel).evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0).catch(() => false);
+const historyLength = (page: Page) => page.evaluate(() => window.history.length);
 
 test.describe.configure({ mode: "serial" });
 
@@ -147,11 +153,126 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     await page.locator("#report-detail-pdf").click();
     await download;
     await page.locator("#report-detail-from").click();
-    await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}$`));
+    await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}\\?report=${BIG_SUR_REPORT.id}$`));
     const card = `#chat-pane-${s.bigSur}-artifact-card-${BIG_SUR_REPORT.toolCallId}`;
     await expect(page.locator(card)).toBeVisible();
     await page.reload();
     await expect(page.locator(`${card}-title`)).toHaveText(BIG_SUR_REPORT.title);
+  });
+
+  await test.step("6b. The report panel: open, swap, resize, reload, close", async () => {
+    const pane = `#chat-pane-${s.bigSur}`;
+    const panel = `${pane}-report-panel`;
+    const card1 = `${pane}-artifact-card-${BIG_SUR_REPORT.toolCallId}`;
+    const card2 = `${pane}-artifact-card-${SECOND_REPORT.toolCallId}`;
+    const card3 = `${pane}-artifact-card-${LIVE_REPORT.toolCallId}`;
+    const sep = page.locator(`${pane}-report-separator`);
+    const input = page.locator(`${pane}-composer-input`);
+    const now = async () => Number(await sep.getAttribute("aria-valuenow"));
+
+    await expect(page.locator(`${panel}-position`)).toHaveText(/report · 1 of 2 in this chat/i);
+    await expect(page.locator("#sidebar")).toHaveCount(0);
+    await expect(page.locator("#rail-new-chat")).toBeVisible();
+    await expect(page.locator(card1)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(`${panel}-frame`)).toHaveAttribute("sandbox", /allow-scripts/);
+    await expect(input).toHaveAttribute("placeholder", REPORT_PLACEHOLDER);
+
+    for (const c of [card1, card2]) {
+      await page.locator(c).scrollIntoViewIfNeeded();
+      await expect.poll(() => thumbLoaded(page, `${c}-thumb-img`), { timeout: 60_000 }).toBe(true);
+    }
+
+    const length = await historyLength(page);
+    await page.locator(`${panel}-next`).click();
+    await expect(page.locator(`${panel}-position`)).toHaveText(/report · 2 of 2 in this chat/i);
+    await expect(page.locator(card2)).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(new RegExp(`\\?report=${SECOND_REPORT.id}$`));
+    expect(await historyLength(page)).toBe(length);
+
+    await sep.focus();
+    const start = await now();
+    for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowLeft");
+    expect(await now()).toBe(start + 6);
+    await page.keyboard.press("End");
+    expect(await now()).toBe(Number(await sep.getAttribute("aria-valuemax")));
+    await page.keyboard.press("Home");
+    expect(await now()).toBe(Number(await sep.getAttribute("aria-valuemin")));
+    const grip = await page.locator(`${pane}-report-separator-grip`).boundingBox();
+    const area = await page.locator(pane).boundingBox();
+    if (!grip || !area) throw new Error("no separator box");
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(area.x + area.width / 2, grip.y + grip.height / 2, { steps: 12 });
+    await page.mouse.up();
+    await expect.poll(now).toBeGreaterThanOrEqual(48);
+    expect(await now()).toBeLessThanOrEqual(52);
+    const width = await page.locator(panel).evaluate((el) => el.getBoundingClientRect().width);
+    const stored = await page.evaluate(() => localStorage.getItem("oa.reportPanel"));
+
+    await page.reload();
+    await expect(page.locator(`${panel}-position`)).toHaveText(/report · 2 of 2 in this chat/i);
+    await expect(page.locator(`${panel}-frame`)).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("oa.reportPanel"))).toBe(stored);
+    expect(Math.abs((await page.locator(panel).evaluate((el) => el.getBoundingClientRect().width)) - width)).toBeLessThanOrEqual(1);
+    await page.waitForTimeout(1500);
+    await expect(input).toBeFocused();
+
+    const frame = page.locator(`${panel}-frame`);
+    await frame.evaluate((el) => el.setAttribute("data-e2e-mark", "same-frame"));
+    const requests: string[] = [];
+    const onRequest = (r: { url(): string }) => {
+      if (r.url().includes("/api/artifacts/")) requests.push(r.url());
+    };
+    page.on("request", onRequest);
+    await page.locator("#rail-reports").click();
+    await expect(page).toHaveURL(/\/reports$/);
+    await page.locator("#rail-chats").click();
+    await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}\\?report=${SECOND_REPORT.id}$`));
+    await expect(frame).toHaveAttribute("data-e2e-mark", "same-frame");
+    page.off("request", onRequest);
+    expect(requests).toEqual([]);
+
+    await page.locator(`${panel}-close`).click();
+    await expect(page.locator(card2)).toBeFocused();
+    await expect(page.locator("#sidebar")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}$`));
+    await expect(input).not.toHaveAttribute("placeholder", REPORT_PLACEHOLDER);
+
+    await page.reload();
+    await expect(page.locator(card1)).toBeVisible();
+    await expect(page.locator(panel)).toHaveCount(0);
+    await page.locator(`#chat-list-sidebar-row-${s.chats[1].id}`).click();
+    await expect(page).toHaveURL(new RegExp(`/chats/${s.chats[1].id}$`));
+    await page.locator(`#chat-list-sidebar-row-${s.bigSur}`).click();
+    await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}$`));
+    await expect(page.locator(panel)).toHaveCount(0);
+
+    await page.locator(card1).click();
+    await expect(page.locator(`${panel}-frame`)).toBeVisible();
+    for (const dark of [false, true]) {
+      await setTheme(page, dark);
+      await page.waitForTimeout(400);
+      await expectContrast(page, `report panel (${dark ? "dark" : "light"})`);
+    }
+
+    const run = await mockReportRun(page);
+    const before = await historyLength(page);
+    await input.focus();
+    await input.fill("Make a packing list as a report.");
+    await input.press("Enter");
+    await expect(page.locator(`${panel}-position`)).toHaveText(/report · 3 of 3 in this chat/i, { timeout: 30_000 });
+    const context = run.body()?.context ?? [];
+    const open = context.find((c) => c.description === "open_report");
+    expect(open?.value).toContain(BIG_SUR_REPORT.id);
+    await expect(page.locator(card3)).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(new RegExp(`\\?report=${LIVE_REPORT.id}$`));
+    expect(await historyLength(page)).toBe(before);
+    await expect(page.locator(`${pane}-report-status`)).toHaveText(`Opened “${LIVE_REPORT.title}” on the right.`);
+    await expect(input).toBeFocused();
+    await page.waitForTimeout(1500);
+    await expect(input).toBeFocused();
+    await page.locator(`${panel}-close`).click();
+    await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}$`));
   });
 
   await test.step("7. Plans: counts, the trip filter and a read-only trip", async () => {
@@ -264,6 +385,26 @@ test("tablet: rail plus an overlay sidebar @tablet", async ({ page }) => {
     await expect(panel).toHaveCount(0);
     await expect(page.locator("#rail-sidebar-toggle")).toBeFocused();
   });
+
+  await test.step("12b. The report overlay", async () => {
+    const s = seeded();
+    const pane = `#chat-pane-${s.bigSur}`;
+    const panel = page.locator(`${pane}-report-panel`);
+    const card1 = page.locator(`${pane}-artifact-card-${BIG_SUR_REPORT.toolCallId}`);
+    await page.goto(`/chats/${s.bigSur}`);
+    await expect(card1).toContainText("Report · tap to read");
+    await card1.click();
+    await expect(panel).toHaveAttribute("role", "dialog");
+    await expect(page.locator(`${pane}-report-panel-title`)).toBeFocused();
+    for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
+    expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(card1).toBeFocused();
+    await page.goto(`/chats/${s.bigSur}?report=${BIG_SUR_REPORT.id}`);
+    await expect(panel).toHaveAttribute("role", "dialog");
+    await expect(page.locator(`${pane}-report-panel-frame`)).toBeVisible();
+  });
 });
 
 test("phone: top bar, tabs, drawer and account sheet @phone", async ({ page }) => {
@@ -298,6 +439,45 @@ test("phone: top bar, tabs, drawer and account sheet @phone", async ({ page }) =
     await page.keyboard.press("Escape");
     await expect(page.locator("#search-results")).toBeVisible();
     await expectNoHorizontalScroll(page, "/search");
+  });
+
+  await test.step("13b. The full-screen report viewer", async () => {
+    const s = seeded();
+    const pane = `#chat-pane-${s.bigSur}`;
+    const panel = page.locator(`${pane}-report-panel`);
+    const card1 = page.locator(`${pane}-artifact-card-${BIG_SUR_REPORT.toolCallId}`);
+    const chatUrl = new RegExp(`/chats/${s.bigSur}$`);
+    await page.goto(`/chats/${s.bigSur}`);
+    await card1.click();
+    await expect(panel).toHaveAttribute("role", "dialog");
+    await expect(page).toHaveURL(new RegExp(`\\?report=${BIG_SUR_REPORT.id}$`));
+    const box = await panel.boundingBox();
+    const tabs = await page.locator("#mobile-tabs").boundingBox();
+    expect(box && tabs && box.y + box.height >= tabs.y + tabs.height).toBe(true);
+    expect(await page.evaluate(() => {
+      const tabs = document.getElementById("mobile-tabs")!.getBoundingClientRect();
+      const top = document.elementFromPoint(tabs.x + tabs.width / 2, tabs.y + tabs.height / 2);
+      return !!top?.closest("[id$='-report-panel']");
+    })).toBe(true);
+    await expect(page.locator(`${pane}-report-panel-pdf`)).toHaveAttribute("href", /format=pdf/);
+    await expect(page.locator(`${pane}-report-panel-prev`)).toHaveCount(0);
+    await expectNoHorizontalScroll(page, "report viewer");
+    for (const dark of [false, true]) {
+      await page.evaluate((d) => document.documentElement.classList.toggle("dark", d), dark);
+      await page.waitForTimeout(300);
+      await expectContrast(page, `report viewer (${dark ? "dark" : "light"})`);
+    }
+    await page.locator(`${pane}-report-panel-back`).click();
+    await expect(panel).toHaveCount(0);
+    await expect(page).toHaveURL(chatUrl);
+    await card1.click();
+    await expect(panel).toBeVisible();
+    await page.goBack();
+    await expect(panel).toHaveCount(0);
+    await expect(page).toHaveURL(chatUrl);
+  });
+
+  await test.step("14. Sign out from the account sheet", async () => {
     await page.locator("#mobile-tabs-you").click();
     await expect(page.locator("#account-sheet-panel")).toBeVisible();
     await page.locator("#account-sheet-signout").click();
