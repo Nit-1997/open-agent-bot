@@ -1,7 +1,7 @@
-export function shortDate(iso: string, now: Date = new Date()): string {
+export function shortDate(iso: string, now: Date = new Date(), locale?: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "unknown date";
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     ...(d.getFullYear() !== now.getFullYear() && { year: "numeric" }),
@@ -26,9 +26,5 @@ export function cardDate(iso: string | null | undefined, locale?: string, now: D
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
-  return d.toLocaleDateString(locale, {
-    month: "short",
-    day: "numeric",
-    ...(d.getFullYear() !== now.getFullYear() && { year: "numeric" }),
-  });
+  return shortDate(iso, now, locale);
 }

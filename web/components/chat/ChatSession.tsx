@@ -89,8 +89,8 @@ export function ChatSession(props: ChatSessionProps) {
     const latest = new Map<string, string>();
     for (const t of turns)
       for (const it of t.items) {
-        const w = it.kind === "widget" ? (it.widget as { kind?: string; entity?: string; id?: string } | null) : null;
-        if (w?.kind === "plan") latest.set(`${w.entity}:${w.id}`, it.id);
+        const w = it.kind === "widget" ? (it.widget as { kind?: string; entity?: string } | null) : null;
+        if (w?.kind === "plan") latest.set(w.entity ?? "", it.id);
       }
     return new Set(latest.values());
   }, [turns]);

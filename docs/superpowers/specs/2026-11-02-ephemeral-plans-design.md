@@ -76,7 +76,7 @@ The Plans section goes away, and the agent stops writing plan entities to the da
 | Where plan state lives | `SessionEntry.workspace` (a `MemoryWorkspaceStore`) and `SessionEntry.cart` (`ActiveCart`), both created by `sessionFactory`. `RunContext.workspace` is removed. |
 | New session | No rebuild. The model gets a read-only `<earlier_cards>` note built from the newest cart card and the newest plan cards in the loaded transcript, each with its date. |
 | Edits that can't apply | If a run brings cart edits and the session's cart is empty, or event/trip edits and the session holds no entity of that kind, the model gets a one-turn note listing them. |
-| Live vs locked | A card is live only if it arrived by a run streamed into **this mounted pane** and is the newest of its kind (cart) or of its `entity:id` (plan). Everything from history is locked, reusing the cards' existing `locked` state. |
+| Live vs locked | A card is live only if it arrived by a run streamed into **this mounted pane** and is the newest of its kind (cart, or plan `entity`: event, trip, shortlist). Everything from history is locked, reusing the cards' existing `locked` state. |
 | Refresh | No chip and no new `shop` mode. The dated line tells the user to ask. `shop`'s description gains one sentence on re-pricing with `new_cart`. |
 | `database.types.ts` | Unchanged. It is generated from the live schema, where the table and functions still exist. The follow-up migration's PR regenerates it. |
 | RLS integration checks on the table | Kept until the drop. They assert the security posture of objects that still exist. |
@@ -185,15 +185,17 @@ Unparsable or invalid cards are skipped. This note is a hint, not state, so fall
 ```
 <earlier_cards>
 Cards shown earlier in this chat. They are read-only and nothing from them is live in this session. Prices and availability are from the date shown and may have changed. If the user wants to continue one, search again (shop with new_cart, the items and the stores) or set the plan again; don't quote these totals as current.
-cart (shown 2026-11-01): corn tortillas ×2, black beans ×4, avocados ×6 at Trader Joe's; best $18.40 at Trader Joe's
-trip big-sur/weekend (shown 2026-11-01): Big Sur, 2026-11-14 to 2026-11-16, 2 travelers, budget $900, 1 stays shortlisted, 2 days planned
+cart (shown Nov 1, 2026): corn tortillas ×2, black beans ×4, avocados ×6 at Trader Joe's; best $18.40 at Trader Joe's
+trip big-sur/weekend (shown Nov 1, 2026): Big Sur, 2026-11-14 to 2026-11-16, 2 travelers, budget $900, 1 stays shortlisted, 2 days planned
 </earlier_cards>
 ```
 
 - Cart line: the first store's items as `query ×qty` (×1 omitted), the store names in card order, and the lowest `total` among stores with no `missing` items, else the lowest total, formatted with that store's `currency`.
 - Plan lines reuse `entityDetail` from `workspace/summary.ts`.
 - The whole note is capped at 600 characters, like the workspace summary; the cart line goes first.
-- The cart line is shown only while the session's cart is empty (`cartLive` false). Plan lines are shown only while the session's workspace holds no event, trip or shortlist. Once the session has its own state of that kind, the `<workspace>` note describes it instead.
+- Dates are in the user's time zone (`userContext.timeZone`), the same day the card's dated line shows; without one they read "Nov 1, 2026 UTC". Totals use the `<workspace>` money format (`$18.40`, `$900`).
+- Every line of `<workspace>`, `<earlier_cards>` and `<unapplied_edits>` goes through `oneLine` (strip `<` and `>`, collapse whitespace), so model- or client-written text can't close a tag or add lines.
+- The cart line is shown only until the session has had a cart of its own (`cartLive`: the cart is not empty or the store holds a cart), so emptying this session's cart doesn't bring back yesterday's. Plan lines are shown only while the session's workspace holds no event, trip or shortlist. Once the session has its own state of that kind, the `<workspace>` note describes it instead.
 
 Wiring:
 
@@ -227,7 +229,7 @@ This is the only piece of the old rebuild that stays, and it needs no new storag
 In a chat pane, a cart or plan card is **live** only when both hold:
 
 1. **It arrived in this mounted pane.** `ChatSession` adds the tool-call id to `arrived: Set<string>` (state) in its existing `onToolCallStartEvent` handler when `event.toolCallName === "show_widget"`. Cards from `props.history` are never in `arrived`. (In CopilotKit 1.83 a remounted pane gets a fresh agent, so history is the only other source of cards.)
-2. **It is the newest of its kind in the pane.** For carts this is the existing `latestCart`; for plans the existing `latestPlans` (newest per `entity:id`).
+2. **It is the newest of its kind in the pane.** For carts this is the existing `latestCart`; for plans `latestPlans` (newest per `entity`, so one event card and one trip card at most). Card edits reach the agent keyed by kind and patch the newest entity of that kind, so two live event cards would let one card edit the other's plan.
 
 Every other cart or plan card is **locked**, through the cards' existing `locked = stale || !onEdit`:
 
@@ -318,6 +320,8 @@ New elements derive from the card's root id (`widgetId(kind, toolCallId, idPrefi
 | Case | Behaviour |
 |---|---|
 | The user emptied the cart, then the session was swept | `<earlier_cards>` describes the last cart card with its date. The model treats it as history; it is not live. |
+| The user empties the cart within a session | No earlier cart line: the session has had its own cart. |
+| The same chat in two browser tabs | Both tabs share one agent session. Only the tab that ran shows a live card; the other tab's copy came from history and is locked. If both ran, each tab's newest card is live and edits from either apply to the one session cart or plan, by item query or kind. Not prevented. |
 | The newest card is older than the 200-row window, or the 500,000-character fallback dropped the cards | No `<earlier_cards>` line for it. The user re-asks. |
 | The reply holding the newest card failed to save (`not_saved` banner shown) | `<earlier_cards>` shows the previous card. The user saw "This reply wasn't saved". |
 | Persona change mid-run (`retireUser` marks the busy entry retired) | The run finishes on the old session; the next run creates a new session with `<earlier_cards>`. |
@@ -390,7 +394,7 @@ Replacement text for the explainer page, for the owner to apply separately:
   - a `show_widget` cart streamed by a run → live (enabled controls); the history cart becomes replaced;
   - a second streamed cart → the first is replaced, the second live;
   - unmount and remount with history → the formerly live card is locked and dated;
-  - plan cards: history plan locked; a streamed plan for the same `entity:id` live; a different `id` keeps its own state.
+  - plan cards: history plans locked; only the newest plan card of each `entity` is live, so a streamed event with another `id` replaces the earlier event card; a trip card stays live beside it.
 - `test/shell/*`: Rail has no `rail-plans`; `MobileTabs` renders Chat, Search, Reports, You, and `mobile-tabs-search` gets `aria-current="page"` on `/search`; navigating to `/plans` renders `shell-not-found-title`.
 - `test/auth/safeNext.test.ts` and `test/api/routes.test.ts`: as in the removal list.
 

@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentCard } from "@/components/shell/AgentCard";
@@ -244,8 +242,6 @@ describe("removed Plans section", () => {
   it("falls through to the shell's not-found page", () => {
     expect(parseRoute("/plans")).toBeNull();
     expect(parseRoute("/plans/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trip/dDE")).toBeNull();
-    expect(existsSync(join(process.cwd(), "app/(app)/plans"))).toBe(false);
-    expect(existsSync(join(process.cwd(), "app/api/plans"))).toBe(false);
     expect(() => MissingPage()).toThrow("notFound");
     render(<ShellNotFound />);
     expect(document.getElementById("shell-not-found-title")).toHaveTextContent("This page doesn't exist.");

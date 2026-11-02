@@ -58,8 +58,6 @@ export function toHistory(chatId: string, items: StoredMessage[]): HistoryMessag
   });
 }
 
-const DATED_CARDS: ReadonlySet<string> = new Set(["cart", "plan"]);
-
 function widgetKind(args: string): string | undefined {
   try {
     const kind = (JSON.parse(args) as { widget?: { kind?: unknown } } | null)?.widget?.kind;
@@ -73,7 +71,7 @@ export function cardDates(items: StoredMessage[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const m of items)
     for (const p of m.parts ?? [])
-      if (p.type === "tool" && p.name === "show_widget" && DATED_CARDS.has(widgetKind(p.args) ?? "")) out[p.id] = m.createdAt;
+      if (p.type === "tool" && p.name === "show_widget" && ["cart", "plan"].includes(widgetKind(p.args) ?? "")) out[p.id] = m.createdAt;
   return out;
 }
 

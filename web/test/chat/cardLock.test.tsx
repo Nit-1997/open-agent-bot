@@ -44,6 +44,14 @@ const plan = (id: string, guests: number) => ({
   value: { title: `Party ${id}`, guests },
 });
 
+const trip = {
+  kind: "plan",
+  entity: "trip",
+  id: "main",
+  version: 1,
+  value: { destination: "Tahoe", start: "2026-12-01", end: "2026-12-04", travelers: 2, stays: [], days: [] },
+};
+
 const card = (n: string, widget: object): Message[] => [
   {
     id: `a-${n}`,
@@ -137,18 +145,26 @@ describe("cards in a chat pane", () => {
     expect(el("lock-cart-h1-widget-locked-note")).not.toBeNull();
   });
 
-  it("locks history plans, makes a streamed plan for the same event live and leaves another id as it was", async () => {
+  it("keeps only the newest plan card of each kind live, so an edit can't reach the wrong plan", async () => {
     mount();
     await waitFor(() => expect(el("lock-plan-hp-widget")).not.toBeNull());
-    expect(el("lock-plan-hp-widget-locked-note")?.textContent).toMatch(/^From .+ · ask Sage to update it$/);
-    expect(el("lock-plan-hq-widget-locked-note")).not.toBeNull();
-    await stream("rp", plan("main", 16));
-    await waitFor(() => expect(el("lock-plan-rp-widget")).not.toBeNull());
-    expect(inc("lock-plan-rp-widget")).toBeEnabled();
-    expect(el("lock-plan-rp-widget-locked-note")).toBeNull();
+    expect(el("lock-plan-hq-widget-locked-note")?.textContent).toMatch(/^From .+ · ask Sage to update it$/);
     expect(el("lock-plan-hp-widget-kind")?.textContent).toBe("Updated plan below");
     expect(el("lock-plan-hp-widget-locked-note")).toBeNull();
-    expect(el("lock-plan-hq-widget-locked-note")).not.toBeNull();
-    expect(inc("lock-plan-hq-widget")).toBeDisabled();
+
+    await stream("rp", plan("main", 16));
+    await waitFor(() => expect(inc("lock-plan-rp-widget")).toBeEnabled());
+    expect(el("lock-plan-rp-widget-locked-note")).toBeNull();
+    expect(el("lock-plan-hq-widget-kind")?.textContent).toBe("Updated plan below");
+    expect(el("lock-plan-hq-widget-locked-note")).toBeNull();
+
+    await stream("rq", plan("other", 5));
+    await waitFor(() => expect(inc("lock-plan-rq-widget")).toBeEnabled());
+    expect(inc("lock-plan-rp-widget")).toBeDisabled();
+    expect(el("lock-plan-rp-widget-kind")?.textContent).toBe("Updated plan below");
+
+    await stream("rt", trip);
+    await waitFor(() => expect(inc("lock-plan-rt-widget")).toBeEnabled());
+    expect(inc("lock-plan-rq-widget")).toBeEnabled();
   });
 });
