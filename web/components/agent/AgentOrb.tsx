@@ -15,14 +15,17 @@ const SIZE: Record<OrbSize, string> = {
   112: "h-28 w-28 orb-glow",
 };
 
+const DISPLAY_CLASS = /(^|\s)(hidden|block|inline-block|flex|inline-flex)(\s|$)/;
+
 export function AgentOrb(props: { id: string; look: AgentLook; size: OrbSize; name?: string; breathing?: boolean; className?: string }) {
   const dp = props.name !== undefined;
+  const display = DISPLAY_CLASS.test(props.className ?? "") ? "" : dp ? "inline-flex" : "inline-block";
   return (
     <span
       id={props.id}
       aria-hidden="true"
       data-look={props.look}
-      className={`${dp ? "agent-dp inline-flex items-center justify-center font-semibold leading-none" : "orb inline-block"} shrink-0 ${SIZE[props.size]} ${props.breathing ? "animate-breathe" : ""} ${props.className ?? ""}`}
+      className={`${dp ? "agent-dp items-center justify-center font-semibold leading-none" : "orb"} ${display} shrink-0 ${SIZE[props.size]} ${props.breathing ? "animate-breathe" : ""} ${props.className ?? ""}`}
     >
       {dp ? initials(props.name) : null}
     </span>
