@@ -115,13 +115,12 @@ async function claim(ctx: RunContext, chatId: string, model: string | undefined)
   }
 }
 
-async function openReportFor(ctx: RunContext, id: string | null): Promise<string | undefined> {
-  if (!id || !ctx.openReport) return undefined;
-  const report = await ctx.openReport(id).catch((err) => {
+async function openReportFor(ctx: RunContext, id: string | null): Promise<OpenReport | null> {
+  if (!id || !ctx.openReport) return null;
+  return ctx.openReport(id).catch((err) => {
     log.warn(`[run] user=${ctx.user.id} open report failed`, err);
     return null;
   });
-  return report ? openReportNote(report) : undefined;
 }
 
 async function seedHistory(ctx: RunContext, chatId: string): Promise<HistoryMessage[] | undefined> {
@@ -183,7 +182,9 @@ export async function* handleRun(
   if (signal.aborted) return;
   entry.busy = true;
   entry.lastRunId = runId;
-  entry.setOpenReport?.(await openReportFor(ctx, readOpenReport(input)));
+  const openReport = await openReportFor(ctx, readOpenReport(input));
+  entry.setOpenReport?.(openReport ? openReportNote(openReport) : undefined);
+  if (openReport) entry.evidence?.add(openReport.text);
   const savedPrompt = await persist(
     ctx,
     threadId,

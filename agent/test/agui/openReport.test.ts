@@ -4,6 +4,7 @@ import { readOpenReport } from "../../src/agui/input.js";
 import { handleRun, type RunContext } from "../../src/agui/runHandler.js";
 import { loadOpenReport, OPEN_REPORT_CHARS, openReportNote } from "../../src/artifacts/openReport.js";
 import { ArtifactStore } from "../../src/artifacts/store.js";
+import { Evidence } from "../../src/grounding/evidence.js";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
 import { MemoryDb } from "../fixtures/memoryRepos.js";
 import { ALICE, BOB, CHAT_1, CHAT_2 } from "../fixtures/users.js";
@@ -91,6 +92,7 @@ describe("the open report in a run", () => {
   const setup = () => {
     const db = new MemoryDb();
     const notes: (string | undefined)[] = [];
+    const evidence = new Evidence();
     const session = fakeSession(async (emit) => {
       emit(ev.assistantStart);
       emit(ev.delta("The campground."));
@@ -104,6 +106,7 @@ describe("the open report in a run", () => {
         lastUsed: 0,
         dispose: async () => {},
         setOpenReport: (n) => notes.push(n),
+        evidence,
       }),
     });
     const r = db.forUser(ALICE.id);
@@ -118,14 +121,14 @@ describe("the open report in a run", () => {
         return load!(id);
       },
     });
-    return { db, store, notes, ctx, loads, session };
+    return { db, store, notes, ctx, loads, session, evidence };
   };
   const drain = async (it: AsyncIterable<unknown>) => {
     for await (const _ of it);
   };
 
   it("sets a note with the database title and text, and saves the prompt without it", async () => {
-    const { db, store, notes, ctx, loads, session } = setup();
+    const { db, store, notes, ctx, loads, session, evidence } = setup();
     const loaded = ctx(async (id) => ({ id, title: "Big Sur stays", text: "Riverside Campground at $65." }));
     await drain(
       handleRun(input([ctxEntry({ openReport: { id: "abcdefghijkl", title: "Forged" } })]), loaded, store, new AbortController().signal),
@@ -136,6 +139,8 @@ describe("the open report in a run", () => {
     expect(notes[0]).toContain("Riverside Campground at $65.");
     expect(notes[0]).not.toContain("Forged");
     expect(session.prompts[0]).not.toContain("open_report");
+    expect(evidence.unverified("The campground is $65 a night.")).toEqual([]);
+    expect(evidence.unverified("The lodge is $990 a night.")).not.toEqual([]);
     const saved = (await db.forUser(ALICE.id).messages.history(CHAT_1)).items;
     expect(saved[0]).toMatchObject({ role: "user", content: "what's the cheapest option in this report?" });
   });
