@@ -4,6 +4,7 @@ import { createAuthAdmin } from "./admin/authAdmin.js";
 import { createAdminService, createLiveAdminCheck } from "./admin/service.js";
 import { createApp } from "./app.js";
 import { loadOpenReport } from "./artifacts/openReport.js";
+import { remoteRenderer } from "./artifacts/remoteRenderer.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { ambientProviderEnv } from "./auth/ambientEnv.js";
 import { createGuards } from "./auth/middleware.js";
@@ -58,7 +59,8 @@ const adminRepo = createAdminRepo(db);
 const wrapper = new LocalKeyWrapper(cfg.credentialKeys);
 const repos = (userId: string) => forUser(db, userId);
 const profiles = (userId: string) => new SupabaseProfileStore(repos(userId).profiles);
-const artifacts = new ArtifactStore();
+const renderer = remoteRenderer({ url: cfg.rendererUrl, secret: cfg.rendererSecret });
+const artifacts = new ArtifactStore(renderer.pdf, renderer.thumb);
 const pool = new BrowserPool();
 const limiter = new RateLimiter();
 const jevLimiter = createLimiter(cfg.jevConcurrency);
@@ -167,7 +169,7 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
     server.close();
     void store
       .disposeAll()
-      .then(() => Promise.allSettled([pool.closeAll(), artifacts.close()]))
+      .then(() => pool.closeAll())
       .finally(() => process.exit(0));
   });
 }

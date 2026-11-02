@@ -28,6 +28,7 @@ describe("loadConfig", () => {
       logLevel: "info",
       runTimeLimitSeconds: 280,
       appOrigin: "https://app.localhost",
+      rendererUrl: "http://renderer:8100",
     });
     expect(cfg.credentialKeys.current).toBe(1);
     expect(cfg.accessRequestPepper).toHaveLength(32);
@@ -50,6 +51,7 @@ describe("loadConfig", () => {
       "CREDENTIAL_KEYS",
       "APP_ORIGIN",
       "ACCESS_REQUEST_PEPPER",
+      "RENDERER_SECRET",
     ])
       expect(message).toContain(name);
     expect(message).not.toContain("short-secret-value");
@@ -61,6 +63,10 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...TEST_ENV, RUN_TIME_LIMIT_SECONDS: "10" })).toThrow(/RUN_TIME_LIMIT_SECONDS/);
     expect(() => loadConfig({ ...TEST_ENV, ACCESS_REQUEST_PEPPER: b64(16) })).toThrow(/ACCESS_REQUEST_PEPPER/);
     expect(testConfig({ RUN_TIME_LIMIT_SECONDS: "780" }).runTimeLimitSeconds).toBe(780);
+    expect(() => loadConfig({ ...TEST_ENV, RENDERER_SECRET: "abc" })).toThrow(/RENDERER_SECRET/);
+    expect(() => loadConfig({ ...TEST_ENV, RENDERER_SECRET: TEST_ENV.AGENT_SERVICE_SECRET })).toThrow(/RENDERER_SECRET must differ/);
+    expect(() => loadConfig({ ...TEST_ENV, RENDERER_URL: "ftp://renderer" })).toThrow(/RENDERER_URL/);
+    expect(testConfig({ RENDERER_URL: "http://127.0.0.1:8100/" }).rendererUrl).toBe("http://127.0.0.1:8100");
   });
 
   it("tags Claude Sonnet models from any provider with codemode unless AGENT_MODEL_CAPS says otherwise", () => {

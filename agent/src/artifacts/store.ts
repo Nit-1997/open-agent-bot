@@ -1,7 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { type Browser, type BrowserContext, chromium } from "playwright";
 import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
-import { blockInternalRequests } from "../browser/guard.js";
 import type { UserRepos } from "../db/types.js";
 import { createLimiter, type Limiter } from "../lib/concurrency.js";
 import { UserError } from "../lib/errors.js";
@@ -9,28 +7,33 @@ import { log } from "../lib/log.js";
 
 const RENDER_SLOTS = 2;
 export const MAX_ARTIFACT_BYTES = 5 * 1024 * 1024;
-export const THUMB_VIEWPORT = { width: 800, height: 320 };
-export const THUMB_SCALE = 1.5;
-const THUMB_LOAD_MS = 20_000;
-const THUMB_FONTS_MS = 3_000;
-const THUMB_DEADLINE_MS = 25_000;
-const FONT_URL = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
+const THUMB_DEADLINE_MS = 30_000;
+const PDF_DEADLINE_MS = 35_000;
+const FAILURE_TTL_MS = 10 * 60_000;
+const MAX_FAILURES = 5000;
 
 export type ArtifactOwner = Pick<UserRepos, "userId" | "artifacts" | "storage">;
 export type ArtifactSink = { save(title: string, html: string): Promise<{ id: string }> };
-export type Renderer = (html: string) => Promise<Buffer>;
+export type Renderer = (html: string, signal: AbortSignal) => Promise<Buffer>;
 export type RenderOpts = { beforeRender?: () => void };
+export type ArtifactStoreOptions = { thumbDeadlineMs?: number; pdfDeadlineMs?: number; now?: () => number };
+
+const noPreview = () => new UserError("This report has no preview right now.", "unavailable", { code: "no_preview" });
 
 export class ArtifactStore {
-  private browser?: Promise<Browser>;
   private readonly rendering = new Map<string, Promise<Buffer | null>>();
   private readonly renderSlot = createLimiter(RENDER_SLOTS);
   private readonly userSlots = new Map<string, { run: Limiter; pending: number }>();
+  private readonly thumbFailures = new Map<string, number>();
+  private readonly now: () => number;
 
   constructor(
-    private readonly render: Renderer = (html) => this.renderWithChromium(html),
-    private readonly renderThumb: Renderer = (html) => this.thumbWithChromium(html),
-  ) {}
+    private readonly render: Renderer,
+    private readonly renderThumb: Renderer,
+    private readonly opts: ArtifactStoreOptions = {},
+  ) {
+    this.now = opts.now ?? Date.now;
+  }
 
   sink(owner: ArtifactOwner, chatId: string | null): ArtifactSink {
     return { save: (title, html) => this.save(owner, chatId, title, html) };
@@ -47,7 +50,9 @@ export class ArtifactStore {
       await owner.storage.remove(id, "html").catch(() => log.warn(`[artifacts] orphaned object user=${owner.userId} id=${id}`));
       throw err;
     }
-    this.thumbnail(owner, id).catch((err) => log.warn(`[artifacts] thumbnail failed user=${owner.userId} id=${id}`, err));
+    this.thumbnail(owner, id).catch((err) => {
+      if (!(err instanceof UserError)) log.warn(`[artifacts] thumbnail failed user=${owner.userId} id=${id}`, err);
+    });
     return { id };
   }
 
@@ -74,7 +79,12 @@ export class ArtifactStore {
       pending = (async () => {
         const html = await owner.storage.download(id, "html");
         if (!html) throw new UserError("That report doesn't exist.", "not_found");
-        const pdf = await this.slot(owner.userId, () => this.render(html.toString("utf8")));
+        const pdf = await this.slot(owner.userId, () => this.deadline(this.render, html, this.opts.pdfDeadlineMs ?? PDF_DEADLINE_MS)).catch(
+          (err) => {
+            log.warn(`[artifacts] pdf render failed user=${owner.userId} id=${id}`, err);
+            throw new UserError("The PDF couldn't be made right now. Try again in a minute.", "unavailable", { code: "render_failed" });
+          },
+        );
         await owner.storage.upload(id, "pdf", pdf);
         await owner.artifacts.setPdf(id);
         return pdf;
@@ -90,6 +100,8 @@ export class ArtifactStore {
     const key = `${owner.userId}:${id}:jpg`;
     const inflight = this.rendering.get(key);
     if (inflight) return inflight;
+    const failedAt = this.thumbFailures.get(`${owner.userId}:${id}`);
+    if (failedAt !== undefined && this.now() - failedAt < FAILURE_TTL_MS) return Promise.reject(noPreview());
     const pending = (async () => {
       const meta = await owner.artifacts.get(id);
       if (!meta) return null;
@@ -100,7 +112,13 @@ export class ArtifactStore {
       opts.beforeRender?.();
       const html = await owner.storage.download(id, "html");
       if (!html) return null;
-      const jpg = await this.slot(owner.userId, () => this.renderThumb(html.toString("utf8")));
+      const jpg = await this.slot(owner.userId, () =>
+        this.deadline(this.renderThumb, html, this.opts.thumbDeadlineMs ?? THUMB_DEADLINE_MS),
+      ).catch((err) => {
+        this.failed(`${owner.userId}:${id}`);
+        log.warn(`[artifacts] thumbnail render failed user=${owner.userId} id=${id}`, err);
+        throw noPreview();
+      });
       await owner.storage.upload(id, "jpg", jpg);
       if (!(await owner.artifacts.setThumb(id))) {
         await owner.storage.remove(id, "jpg").catch(() => log.warn(`[artifacts] orphaned thumbnail user=${owner.userId} id=${id}`));
@@ -127,63 +145,27 @@ export class ArtifactStore {
       });
   }
 
-  private async renderWithChromium(html: string): Promise<Buffer> {
-    const context = await (await this.launch()).newContext();
-    await blockInternalRequests(context);
-    try {
-      const page = await context.newPage();
-      await page.setContent(html, { waitUntil: "load", timeout: 20000 });
-      return await page.pdf({ format: "A4", printBackground: true });
-    } finally {
-      await context.close();
-    }
-  }
-
-  private async thumbWithChromium(html: string): Promise<Buffer> {
-    const context = await (await this.launch()).newContext({
-      javaScriptEnabled: false,
-      viewport: THUMB_VIEWPORT,
-      deviceScaleFactor: THUMB_SCALE,
-    });
+  private async deadline(render: Renderer, html: Buffer, ms: number): Promise<Buffer> {
+    const abort = new AbortController();
     let timer: NodeJS.Timeout | undefined;
-    const deadline = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("thumbnail render timed out")), THUMB_DEADLINE_MS);
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        abort.abort();
+        reject(new Error(`render timed out after ${ms} ms`));
+      }, ms);
     });
     try {
-      return await Promise.race([this.shoot(context, html), deadline]);
+      return await Promise.race([render(html.toString("utf8"), abort.signal), expired]);
     } finally {
       clearTimeout(timer);
-      await context.close().catch(() => {});
     }
   }
 
-  private async shoot(context: BrowserContext, html: string): Promise<Buffer> {
-    await blockInternalRequests(context);
-    await context.route("**/*", (route) => (FONT_URL.test(route.request().url()) ? route.fallback() : route.abort("blockedbyclient")));
-    const page = await context.newPage();
-    await page.setContent(html, { waitUntil: "load", timeout: THUMB_LOAD_MS });
-    await Promise.race([
-      page.evaluate(() => document.fonts.ready.then(() => undefined)),
-      new Promise((r) => setTimeout(r, THUMB_FONTS_MS)),
-    ]);
-    return await page.screenshot({ type: "jpeg", quality: 70, clip: { x: 0, y: 0, ...THUMB_VIEWPORT } });
-  }
-
-  private launch(): Promise<Browser> {
-    if (!this.browser) {
-      const launching = chromium.launch();
-      launching.catch(() => {
-        if (this.browser === launching) this.browser = undefined;
-      });
-      this.browser = launching;
-    }
-    return this.browser;
-  }
-
-  async close(): Promise<void> {
-    const browser = this.browser;
-    this.browser = undefined;
-    if (browser) await (await browser).close().catch(() => {});
+  private failed(key: string): void {
+    const now = this.now();
+    for (const [k, at] of this.thumbFailures)
+      if (now - at >= FAILURE_TTL_MS || this.thumbFailures.size >= MAX_FAILURES) this.thumbFailures.delete(k);
+    this.thumbFailures.set(key, now);
   }
 }
 

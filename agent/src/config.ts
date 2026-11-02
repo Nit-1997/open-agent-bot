@@ -22,6 +22,8 @@ export type AgentConfig = {
   appOrigin: string;
   accessRequestPepper: Buffer;
   runTimeLimitSeconds: number;
+  rendererUrl: string;
+  rendererSecret: string;
 };
 
 type ModelCap = "codemode";
@@ -103,6 +105,15 @@ function origin(raw: string): string | undefined {
   }
 }
 
+function httpUrl(raw: string): string | undefined {
+  try {
+    const u = new URL(raw);
+    return /^https?:$/.test(u.protocol) ? u.href.replace(/\/+$/, "") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
   const problems: string[] = [];
   const need = <T>(name: string, parse: (v: string) => T | undefined, why: string): T => {
@@ -136,6 +147,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
   const credentialKeys = need("CREDENTIAL_KEYS", parseCredentialKeys, "is invalid");
   const appOrigin = need("APP_ORIGIN", origin, "must be an https origin with no path or trailing slash");
   const accessRequestPepper = need("ACCESS_REQUEST_PEPPER", decode32, "must be base64 of exactly 32 bytes");
+  const rendererSecret = need("RENDERER_SECRET", (v) => (/^[0-9a-f]{64}$/.test(v) ? v : undefined), "must be 64 hex characters");
+  if (rendererSecret && rendererSecret === serviceSecret) problems.push("RENDERER_SECRET must differ from AGENT_SERVICE_SECRET");
+  const rendererUrl = httpUrl(env.RENDERER_URL?.trim() || "http://renderer:8100");
+  if (!rendererUrl) problems.push("RENDERER_URL must be an http(s) URL");
   const rawLimit = env.RUN_TIME_LIMIT_SECONDS?.trim();
   const runTimeLimitSeconds = rawLimit ? Number(rawLimit) : 280;
   if (!Number.isInteger(runTimeLimitSeconds) || runTimeLimitSeconds < 30 || runTimeLimitSeconds > 3600)
@@ -161,5 +176,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AgentConfig {
     appOrigin,
     accessRequestPepper,
     runTimeLimitSeconds,
+    rendererUrl: rendererUrl as string,
+    rendererSecret,
   };
 }

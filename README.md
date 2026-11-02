@@ -5,7 +5,8 @@ Personal, read-only research and planning agent: chat, widgets, and HTML artifac
 ```
 web (Next.js + CopilotKit) → AG-UI → agent (Node + pi SDK) → model providers you add in the app
                                         ├─ search (SearXNG)
-                                        └─ Chromium (guest-mode browsing, PDF rendering)
+                                        ├─ Chromium (guest-mode browsing)
+                                        └─ renderer (sandboxed Chromium: report thumbnails and PDFs, no secrets)
 ```
 
 - Design: `docs/superpowers/specs/2026-10-27-open-agent-bot-design.md`
@@ -18,6 +19,7 @@ Open Agent is invite-only. Accounts, sessions and every user's data live in one 
 1. Install Docker and Node 22.
 2. Fill in the env files (git-ignored; templates with names only are in `deploy-config/env.examples/`):
    - `deploy-config/.env-agent`: Supabase URL and keys, `AGENT_SERVICE_SECRET` (`openssl rand -hex 32`), `CREDENTIAL_KEYS` (`v1:` + `openssl rand -base64 32`), `ACCESS_REQUEST_PEPPER` (`openssl rand -base64 32`), `APP_ORIGIN=https://app.localhost`.
+   - `deploy-config/.env-renderer`: only `RENDERER_SECRET` (`openssl rand -hex 32`); put the same value in `.env-agent`.
    - `deploy-config/.env-nextjs`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, and the same `AGENT_SERVICE_SECRET`.
    - `deploy-config/env-files/.env-supabase-admin` (owner's machine only): the Management API token, the `admin_scripts` secret key, Google OAuth client, Resend key.
 3. Set up Supabase once: apply `supabase/migrations/` in order, then `set -a; . deploy-config/env-files/.env-supabase-admin; set +a; node supabase/scripts/configure-auth.mjs --apply` and `node supabase/scripts/bootstrap-admin.mjs <your email>`.
@@ -33,7 +35,7 @@ The agent refuses to start if a provider key such as `OPENAI_API_KEY` is set in 
 
 ### Deploy
 
-The web app runs on Vercel (Root Directory `web`, "Include files outside the root directory" on, Production env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, `AGENT_URL=https://<AGENT_HOST>`, `AGENT_SERVICE_SECRET`; nothing for Preview). The agent, SearXNG and Caddy run on EC2: create `deploy-config/.env-agent` (same `CREDENTIAL_KEYS` and pepper as local, `APP_ORIGIN=https://<APP_HOST>`) and `deploy-config/.env-caddy` (`AGENT_HOST`, `ACME_EMAIL`), then `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose up -d --build`. Require IMDSv2 with hop limit 1, open 80/443 only, and set `PROD_ORIGIN`/`SITE_URL` in `.env-supabase-admin` before rerunning `configure-auth.mjs --apply`. Runs end at `RUN_TIME_LIMIT_SECONDS` (default 280) to stay inside Vercel's `maxDuration = 300`. The full checklist is in the design spec's "Rollout and deploy".
+The web app runs on Vercel (Root Directory `web`, "Include files outside the root directory" on, Production env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, `AGENT_URL=https://<AGENT_HOST>`, `AGENT_SERVICE_SECRET`; nothing for Preview). The agent, SearXNG and Caddy run on EC2: create `deploy-config/.env-agent` (same `CREDENTIAL_KEYS` and pepper as local, `APP_ORIGIN=https://<APP_HOST>`, a new `RENDERER_SECRET`), `deploy-config/.env-renderer` (that `RENDERER_SECRET` only) and `deploy-config/.env-caddy` (`AGENT_HOST`, `ACME_EMAIL`), then `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose up -d --build`. Require IMDSv2 with hop limit 1, open 80/443 only, and set `PROD_ORIGIN`/`SITE_URL` in `.env-supabase-admin` before rerunning `configure-auth.mjs --apply`. The renderer runs Chromium with its sandbox, which needs unprivileged user namespaces: Amazon Linux 2023 allows them; on Ubuntu 23.10 or later, check `sysctl kernel.apparmor_restrict_unprivileged_userns` is `0` (or give Docker an AppArmor profile that allows `userns`). If the sandbox can't start, the renderer exits and stays unhealthy, and cards show the plain fallback until it's fixed; the agent keeps working. Runs end at `RUN_TIME_LIMIT_SECONDS` (default 280) to stay inside Vercel's `maxDuration = 300`. The full checklist is in the design spec's "Rollout and deploy".
 
 ### Optional: Ollama in Docker
 
@@ -55,6 +57,8 @@ Agent settings live in `deploy-config/.env-agent` (git-ignored).
 | `ACCESS_REQUEST_PEPPER` | required | Base64 of 32 bytes; hashes visitor IPs |
 | `APP_ORIGIN` | required | The web app's origin, used for email links |
 | `RUN_TIME_LIMIT_SECONDS` | `280` | A run ends cleanly after this long |
+| `RENDERER_SECRET` | required | 64 hex chars shared with the renderer (`deploy-config/.env-renderer`); must differ from `AGENT_SERVICE_SECRET` |
+| `RENDERER_URL` | `http://renderer:8100` | Where the renderer is |
 | `LLM_API_KEY` | unset | Turns on the LiteLLM gateway provider for the admin (with the `litellm` profile) |
 | `LLM_BASE_URL` | `http://llm:4000/v1` | Where the gateway is |
 | `AGENT_MODELS` | all gateway models | Gateway models to offer: `id=Label=note\|id2=Label` |
@@ -108,6 +112,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, how to add a tool, a
 
 - The browser tool works as a guest. Code refuses checkout, cart, payment, login, sign-up and booking steps and hands back the link.
 - Artifacts are served with `Content-Security-Policy: sandbox allow-scripts` and shown in a sandboxed iframe.
+- Thumbnails and PDFs are made by the `renderer` service: a non-root, read-only container with Chromium's sandbox on (Playwright's seccomp profile, `cap_drop: ALL` plus `SYS_CHROOT` for the sandbox), no secrets but `RENDERER_SECRET`, and only the agent can reach it (an internal `render` network); it isn't behind Caddy. Its Chromium resolves only `fonts.googleapis.com` and `fonts.gstatic.com`, aborts every other request, and the report's resource hints, speculation rules and `meta refresh` are stripped first.
 
 ## License
 

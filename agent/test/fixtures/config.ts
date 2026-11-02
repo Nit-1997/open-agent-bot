@@ -11,6 +11,7 @@ export const TEST_ENV: NodeJS.ProcessEnv = {
   CREDENTIAL_KEYS: `v1:${TEST_KEY_B64}`,
   APP_ORIGIN: "https://app.localhost",
   ACCESS_REQUEST_PEPPER: Buffer.alloc(32, 9).toString("base64"),
+  RENDERER_SECRET: "b".repeat(64),
 };
 
 export const testConfig = (extra: NodeJS.ProcessEnv = {}): AgentConfig => loadConfig({ ...TEST_ENV, ...extra });

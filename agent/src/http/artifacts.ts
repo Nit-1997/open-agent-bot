@@ -18,12 +18,12 @@ export function artifactRoutes(deps: { artifacts: ArtifactStore; owner: (userId:
       const userId = c.get("user").id;
       const owner = deps.owner(userId);
       const file = c.req.param("file") ?? "";
-      const beforeRender = () => {
-        const verdict = deps.limiter.take(`renders:${userId}`, LIMITS.renders);
+      const charge = (bucket: "thumbs" | "pdfs") => () => {
+        const verdict = deps.limiter.take(`${bucket}:${userId}`, LIMITS[bucket]);
         if (!verdict.ok) throw rateLimitError(verdict.retryAfter);
       };
       if (file.endsWith(".pdf")) {
-        const out = await deps.artifacts.renderPdf(owner, file.slice(0, -4), { beforeRender });
+        const out = await deps.artifacts.renderPdf(owner, file.slice(0, -4), { beforeRender: charge("pdfs") });
         if (!out) return c.json(notFound, 404);
         return new Response(new Uint8Array(out.pdf), {
           headers: {
@@ -34,7 +34,7 @@ export function artifactRoutes(deps: { artifacts: ArtifactStore; owner: (userId:
         });
       }
       if (file.endsWith(".jpg")) {
-        const jpg = await deps.artifacts.thumbnail(owner, file.slice(0, -4), { beforeRender });
+        const jpg = await deps.artifacts.thumbnail(owner, file.slice(0, -4), { beforeRender: charge("thumbs") });
         if (!jpg) return c.json(notFound, 404);
         return new Response(new Uint8Array(jpg), { headers: { ...PRIVATE, "content-type": "image/jpeg" } });
       }

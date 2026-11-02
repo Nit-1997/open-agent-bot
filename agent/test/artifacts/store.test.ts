@@ -138,16 +138,60 @@ describe("ArtifactStore", () => {
     expect(beforeRender).not.toHaveBeenCalled();
   });
 
-  it("logs a failing eager render and still returns the id", async () => {
+  it("still returns the id when the eager render fails, and serves the failure from cache afterwards", async () => {
     const db = new MemoryDb();
-    const s = store(fakePdf, async () => {
+    const thumb = vi.fn(async () => {
       throw new Error("chromium gone");
     });
+    const s = store(fakePdf, thumb);
     const alice = db.forUser(ALICE.id);
     const { id } = await s.save(alice, null, "Trip", "<p/>");
     expect(id).toMatch(/^[A-Za-z0-9_-]{12}$/);
-    await expect(s.thumbnail(alice, id)).rejects.toThrow("chromium gone");
+    await vi.waitFor(() => expect(thumb).toHaveBeenCalledTimes(1));
+    const beforeRender = vi.fn();
+    await expect(s.thumbnail(alice, id, { beforeRender })).rejects.toMatchObject({ kind: "unavailable", code: "no_preview" });
+    expect(thumb).toHaveBeenCalledTimes(1);
+    expect(beforeRender).not.toHaveBeenCalled();
     expect(db.objects.has(`${ALICE.id}/${id}.jpg`)).toBe(false);
+  });
+
+  it("gives up on a hanging thumbnail at the deadline, frees the user's slot and caches the failure for ten minutes", async () => {
+    const db = new MemoryDb();
+    let now = 1_000_000;
+    const signals: AbortSignal[] = [];
+    const thumb = vi.fn((html: string, signal: AbortSignal) => {
+      signals.push(signal);
+      return html === "hang" ? new Promise<Buffer>(() => {}) : fakeJpg(html);
+    });
+    const s = new ArtifactStore(fakePdf, thumb, { thumbDeadlineMs: 30, now: () => now });
+    const alice = db.forUser(ALICE.id);
+    const seed = async (id: string, html: string) => {
+      await alice.artifacts.insert({ id, chatId: null, title: "T", sizeBytes: 3 });
+      await alice.storage.upload(id, "html", Buffer.from(html));
+    };
+    await seed("hanghanghang", "hang");
+    await seed("finefinefine", "fine");
+    await expect(s.thumbnail(alice, "hanghanghang")).rejects.toMatchObject({ kind: "unavailable", code: "no_preview" });
+    expect(signals[0].aborted).toBe(true);
+    expect((await s.thumbnail(alice, "finefinefine"))?.toString()).toBe("JPG fine");
+    await expect(s.thumbnail(alice, "hanghanghang")).rejects.toMatchObject({ code: "no_preview" });
+    expect(thumb).toHaveBeenCalledTimes(2);
+    now += 10 * 60_000 + 1;
+    await expect(s.thumbnail(alice, "hanghanghang")).rejects.toMatchObject({ code: "no_preview" });
+    expect(thumb).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up on a hanging PDF at the deadline and frees the user's slot", async () => {
+    const db = new MemoryDb();
+    const pdf = vi.fn((html: string) => (html === "hang" ? new Promise<Buffer>(() => {}) : fakePdf(html)));
+    const s = new ArtifactStore(pdf, fakeJpg, { pdfDeadlineMs: 30 });
+    const alice = db.forUser(ALICE.id);
+    await alice.artifacts.insert({ id: "hanghanghang", chatId: null, title: "T", sizeBytes: 3 });
+    await alice.storage.upload("hanghanghang", "html", Buffer.from("hang"));
+    await alice.artifacts.insert({ id: "finefinefine", chatId: null, title: "T", sizeBytes: 3 });
+    await alice.storage.upload("finefinefine", "html", Buffer.from("fine"));
+    await expect(s.renderPdf(alice, "hanghanghang")).rejects.toMatchObject({ kind: "unavailable" });
+    expect((await s.renderPdf(alice, "finefinefine"))?.pdf.toString()).toBe("%PDF fine");
   });
 
   it("removes the uploaded thumbnail when its row is gone by the time it is stored", async () => {

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { LIMITS } from "../../src/lib/rateLimit.js";
 import { makeApp } from "../fixtures/app.js";
 import { ALICE, BOB } from "../fixtures/users.js";
 
@@ -74,24 +75,42 @@ describe("artifact routes", () => {
     expect((await call(BOB, "/artifacts/abcdefghijkl")).status).toBe(404);
   });
 
-  it("charges the renders limit only for requests that start a render", async () => {
+  it("charges thumbnails and PDFs to separate limits, only for requests that start a render", async () => {
     const { call, artifacts, db } = await makeApp();
     const alice = db.forUser(ALICE.id);
     const cached = await artifacts.save(alice, null, "Cached", "<p/>");
     expect((await call(ALICE, `/artifacts/${cached.id}.pdf`)).status).toBe(200);
     expect((await call(ALICE, `/artifacts/${cached.id}.jpg`)).status).toBe(200);
     const ids: string[] = [];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < LIMITS.thumbs.max + 1; i++) {
       const id = `report${String(i).padStart(6, "0")}`;
       await alice.artifacts.insert({ id, chatId: null, title: "T", sizeBytes: 3 });
       await alice.storage.upload(id, "html", Buffer.from("<p/>"));
       ids.push(id);
     }
-    for (const id of ids.slice(0, 39)) expect((await call(ALICE, `/artifacts/${id}.pdf`)).status).toBe(200);
-    expect((await call(ALICE, `/artifacts/${ids[39]}.jpg`)).status).toBe(429);
-    expect((await call(ALICE, `/artifacts/${ids[39]}.pdf`)).status).toBe(429);
+    for (const id of ids.slice(0, LIMITS.pdfs.max - 1)) expect((await call(ALICE, `/artifacts/${id}.pdf`)).status).toBe(200);
+    const pdfLimited = await call(ALICE, `/artifacts/${ids[LIMITS.pdfs.max]}.pdf`);
+    expect(pdfLimited.status).toBe(429);
+    expect(Number(pdfLimited.headers.get("retry-after"))).toBeGreaterThan(0);
+    for (const id of ids.slice(0, LIMITS.thumbs.max)) expect((await call(ALICE, `/artifacts/${id}.jpg`)).status).toBe(200);
+    expect((await call(ALICE, `/artifacts/${ids[LIMITS.thumbs.max]}.jpg`)).status).toBe(429);
     expect((await call(ALICE, `/artifacts/${cached.id}.pdf`)).status).toBe(200);
     expect((await call(ALICE, `/artifacts/${cached.id}.jpg`)).status).toBe(200);
     expect((await call(BOB, `/artifacts/${cached.id}.jpg`)).status).toBe(404);
+  });
+
+  it("answers a thumbnail that failed recently with 503 and no new render", async () => {
+    const renderThumb = vi.fn(async () => {
+      throw new Error("chromium gone");
+    });
+    const { call, db } = await makeApp({ renderThumb });
+    const alice = db.forUser(ALICE.id);
+    await alice.artifacts.insert({ id: "failingthumb", chatId: null, title: "T", sizeBytes: 3 });
+    await alice.storage.upload("failingthumb", "html", Buffer.from("<p/>"));
+    const first = await call(ALICE, "/artifacts/failingthumb.jpg");
+    const second = await call(ALICE, "/artifacts/failingthumb.jpg");
+    expect([first.status, second.status]).toEqual([503, 503]);
+    expect(await second.json()).toMatchObject({ error: "no_preview" });
+    expect(renderThumb).toHaveBeenCalledTimes(1);
   });
 });

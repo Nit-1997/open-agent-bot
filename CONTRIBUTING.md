@@ -65,8 +65,11 @@ agent/src/
   workspace/           per-chat saved plan state (Supabase): store, summary, edits, cart binding
   grounding/           checks prices, ratings and links against tool evidence
   render/              tool data shapes (data.ts) → widget payloads
-  artifacts/           report storage in Supabase Storage, PDF export, and the report kit (reportKit.ts: CSS
-                       components plus the guide the model sees in create_artifact)
+  artifacts/           report storage in Supabase Storage, thumbnail and PDF requests to the renderer
+                       (remoteRenderer.ts), and the report kit (reportKit.ts: CSS components plus the
+                       guide the model sees in create_artifact)
+  renderer/            the separate renderer service (main.ts): sandboxed Chromium for thumbnails and PDFs
+                       with the egress lock-down (chromium.ts, sanitize.ts), behind a shared secret (server.ts)
   lib/                 small shared helpers with no tool dependencies: net.ts (URL guard,
                        safe fetch), retry, fx, concurrency, rate limits, keyed mutex, log redaction
 shared/                schemas used by both agent and web: widgets, workspace edits, the profile and
