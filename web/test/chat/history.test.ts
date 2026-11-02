@@ -1,6 +1,6 @@
 import type { StoredMessage } from "@shared/chats";
 import { describe, expect, it } from "vitest";
-import { STOPPED_MARK, toHistory } from "@/lib/chats";
+import { cardDates, STOPPED_MARK, toHistory } from "@/lib/chats";
 import { buildTurns, type ChatMessage } from "@/lib/turns";
 
 const at = "2026-11-01T00:00:00Z";
@@ -59,5 +59,34 @@ describe("toHistory", () => {
   it("gives every rebuilt message a unique id", () => {
     const ids = toHistory("chat", stored).map((m) => m.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("cardDates", () => {
+  it("maps only cart and plan cards to the date of the row that showed them", () => {
+    const widget = (id: string, w: object) => ({ type: "tool" as const, id, name: "show_widget", args: JSON.stringify({ widget: w }) });
+    const plan = { kind: "plan", entity: "event", id: "main", version: 1, value: { title: "Party", guests: 3 } };
+    const rows: StoredMessage[] = [
+      { role: "user", content: "hi", status: "complete", createdAt: "2026-10-30T10:00:00Z" },
+      {
+        role: "assistant",
+        content: "",
+        status: "complete",
+        createdAt: "2026-10-31T10:00:00Z",
+        parts: [widget("w1", { kind: "cart" }), widget("w2", { kind: "weather_card" }), { type: "text", text: "x" }],
+      },
+      {
+        role: "assistant",
+        content: "",
+        status: "interrupted",
+        createdAt: "2026-11-01T10:00:00Z",
+        parts: [
+          widget("w3", plan),
+          { type: "tool", id: "w4", name: "show_widget", args: "{bad" },
+          { type: "tool", id: "w5", name: "create_artifact", args: JSON.stringify({ widget: { kind: "cart" } }) },
+        ],
+      },
+    ];
+    expect(cardDates(rows)).toEqual({ w1: "2026-10-31T10:00:00Z", w3: "2026-11-01T10:00:00Z" });
   });
 });

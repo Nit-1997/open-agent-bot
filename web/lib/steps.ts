@@ -73,7 +73,7 @@ function wikipediaLabel(args: StepArgs, done: boolean): string {
 }
 
 function planLabel(args: StepArgs, done: boolean): string {
-  const action = args.action === "get" ? verb(done, "Read", "Reading") : verb(done, "Saved", "Saving");
+  const action = args.action === "get" ? verb(done, "Read", "Reading") : verb(done, "Updated", "Updating");
   return `${action} the ${String(args.kind ?? "plan")}`;
 }
 

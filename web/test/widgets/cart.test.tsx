@@ -196,3 +196,57 @@ describe("CartCard without edits", () => {
     expect(screen.getAllByRole("tab")[1]).toHaveAttribute("aria-selected", "true");
   });
 });
+
+describe("CartCard from an earlier session", () => {
+  const now = new Date("2026-11-05T12:00:00Z");
+  const note = (tc: string) => document.getElementById(`cart-${tc}-locked-note`)?.textContent;
+
+  it("is live with edits: steppers, swap and remove enabled, and no dated note", () => {
+    render(<CartCard toolCallId="live" widget={cart} onEdit={() => {}} agentName="Sage" now={now} />);
+    const rice = screen.getByRole("listitem", { name: "rice" });
+    expect(within(rice).getByRole("button", { name: "Increase quantity" })).toBeEnabled();
+    expect(within(rice).getByRole("button", { name: "Swap" })).toBeEnabled();
+    expect(within(rice).getByRole("button", { name: "Remove" })).toBeEnabled();
+    expect(note("live")).toBeUndefined();
+  });
+
+  it("is locked and dated: steppers disabled, no swap, remove or alternatives, store tabs still switch", () => {
+    render(<CartCard toolCallId="old" widget={cart} lockedAt="2026-11-01T12:00:00Z" agentName="Sage" now={now} />);
+    expect(note("old")).toBe("Prices from Nov 1 · ask Sage to refresh");
+    for (const b of screen.getAllByRole("button", { name: /quantity/ })) expect(b).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Swap" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.getByText("2 items")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("tab")[1]);
+    expect(screen.getAllByRole("tab")[1]).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("says the prices may be out of date when the date is unknown or invalid", () => {
+    const { rerender } = render(<CartCard toolCallId="nodate" widget={cart} lockedAt={null} agentName="Sage" now={now} />);
+    expect(note("nodate")).toBe("Prices may be out of date · ask Sage to refresh");
+    rerender(<CartCard toolCallId="nodate" widget={cart} lockedAt="yesterday" agentName="Sage" now={now} />);
+    expect(note("nodate")).toBe("Prices may be out of date · ask Sage to refresh");
+  });
+
+  it("keeps a replaced card's header and gives it no dated note", () => {
+    render(<CartCard toolCallId="gone" widget={cart} stale agentName="Sage" now={now} />);
+    expect(screen.getByText("Updated cart below")).toBeInTheDocument();
+    expect(note("gone")).toBeUndefined();
+  });
+
+  it("renders unsafe pick and hand-off links as text when locked", () => {
+    const unsafe: Cart = {
+      kind: "cart",
+      stores: [
+        {
+          ...cart.stores[1],
+          url: "javascript:alert(1)",
+          items: [{ query: "rice", qty: 1, picks: [{ ...pick("Signature Rice 2 lb", 3.5), url: "javascript:alert(2)" }] }],
+        },
+      ],
+    };
+    const { container } = render(<CartCard toolCallId="js" widget={unsafe} lockedAt="2026-11-01T12:00:00Z" agentName="Sage" now={now} />);
+    expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
+    expect(screen.getByText("Signature Rice 2 lb")).toBeInTheDocument();
+  });
+});

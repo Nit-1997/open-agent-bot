@@ -5,6 +5,7 @@ import type { Cart } from "@shared/widgets";
 import type { CartEdits } from "@shared/workspace";
 import { Info, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { cardDate } from "@/lib/dates";
 import { money as formatMoney } from "@/lib/format";
 import { Picture } from "./CardRow";
 import { widgetId } from "./widgetId";
@@ -21,6 +22,9 @@ export function CartCard({
   locale = "en-US",
   onEdit,
   stale = false,
+  lockedAt,
+  agentName = "the agent",
+  now,
 }: {
   toolCallId: string;
   idPrefix?: string;
@@ -28,9 +32,13 @@ export function CartCard({
   locale?: string;
   onEdit?: (e: CartEdits) => void;
   stale?: boolean;
+  lockedAt?: string | null;
+  agentName?: string;
+  now?: Date;
 }) {
   const id = widgetId("cart", toolCallId, idPrefix);
   const locked = stale || !onEdit;
+  const shownOn = lockedAt === undefined ? undefined : cardDate(lockedAt, locale, now);
   const [active, setActive] = useState(0);
   const [shared, setShared] = useState<Shared>({});
   const [choices, setChoices] = useState<Record<string, Record<string, number>>>({});
@@ -103,6 +111,11 @@ export function CartCard({
           {stale ? "Updated cart below" : `${kept.length} ${kept.length === 1 ? "item" : "items"}`}
         </span>
       </header>
+      {lockedAt !== undefined && (
+        <p id={`${id}-locked-note`} className="mt-1 text-xs text-text-muted">
+          {shownOn ? `Prices from ${shownOn} · ask ${agentName} to refresh` : `Prices may be out of date · ask ${agentName} to refresh`}
+        </p>
+      )}
 
       <div id={`${id}-tabs`} role="tablist" aria-label="Stores" className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
         {widget.stores.map((s, n) => (

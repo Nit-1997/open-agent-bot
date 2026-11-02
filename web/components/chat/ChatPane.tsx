@@ -9,7 +9,7 @@ import { useShell } from "@/components/shell/ShellProvider";
 import { ListState } from "@/components/ui/ListState";
 import { ApiError } from "@/lib/api";
 import { chatIndex } from "@/lib/chatIndex";
-import { chatsApi, toHistory } from "@/lib/chats";
+import { cardDates, chatsApi, toHistory } from "@/lib/chats";
 import { errorMessage } from "@/lib/errors";
 import { isolate, rememberLine } from "@/lib/persona";
 import { type ReportRef, sameReports } from "@/lib/reportRefs";
@@ -50,7 +50,7 @@ function useHistoryLoader(threadId: string, status: string, attempt: number) {
     let alive = true;
     Promise.all([chatsApi.get(threadId), chatsApi.messages(threadId)])
       .then(([{ chat }, { items }]) => {
-        if (alive) dispatch({ type: "loaded", id: threadId, title: chat.title, history: toHistory(threadId, items) });
+        if (alive) dispatch({ type: "loaded", id: threadId, title: chat.title, history: toHistory(threadId, items), cardDates: cardDates(items) });
       })
       .catch((e: unknown) => {
         if (alive) dispatch({ type: "failed", id: threadId, missing: e instanceof ApiError && e.status === 404, error: errorMessage(e) });
@@ -188,6 +188,7 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
               persona={persona}
               draft={thread.starter}
               history={thread.history}
+              shownAt={thread.cardDates}
               autoFocus={active}
               emptyHeading={showHeader ? "h2" : "h1"}
               memory={rememberLine(profile, persona.name)}

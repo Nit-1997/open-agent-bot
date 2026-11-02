@@ -20,6 +20,8 @@ export function WidgetRenderer(props: {
   onCartEdit?: (e: CartEdits) => void;
   stalePlan?: boolean;
   onPlanEdit?: (e: PlanEdits) => void;
+  lockedAt?: string | null;
+  agentName?: string;
 }) {
   const { idPrefix, toolCallId, args, locale } = props;
   const r = validateWidget((args as { widget?: unknown } | undefined)?.widget);
@@ -42,7 +44,16 @@ export function WidgetRenderer(props: {
       return <StayList idPrefix={idPrefix} toolCallId={toolCallId} widget={w} locale={locale} />;
     case "plan":
       return (
-        <PlanCard idPrefix={idPrefix} toolCallId={toolCallId} widget={w} stale={props.stalePlan} onEdit={props.stalePlan ? undefined : props.onPlanEdit} />
+        <PlanCard
+          idPrefix={idPrefix}
+          toolCallId={toolCallId}
+          widget={w}
+          locale={locale}
+          stale={props.stalePlan}
+          onEdit={props.stalePlan ? undefined : props.onPlanEdit}
+          lockedAt={props.lockedAt}
+          agentName={props.agentName}
+        />
       );
     case "cart":
       return (
@@ -52,6 +63,8 @@ export function WidgetRenderer(props: {
           locale={locale}
           stale={props.staleCart}
           onEdit={props.staleCart ? undefined : props.onCartEdit}
+          lockedAt={props.lockedAt}
+          agentName={props.agentName}
         />
       );
   }

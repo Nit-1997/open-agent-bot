@@ -31,6 +31,8 @@ export function TurnView(props: {
   onCartEdit?: (e: CartEdits) => void;
   latestPlans?: ReadonlySet<string>;
   onPlanEdit?: (e: PlanEdits) => void;
+  arrived?: ReadonlySet<string>;
+  shownAt?: Readonly<Record<string, string>>;
   openReportId?: string | null;
   reportHint?: "right" | "tap";
   onOpenReport?: (reportId: string, toolCallId: string) => void;
@@ -86,7 +88,9 @@ export function TurnView(props: {
             {turn.items.map((item) => {
               if (item.kind === "text") return <Markdown key={item.id} id={`${id}-md-${item.id}`} text={item.text} />;
               if (item.kind === "widget" && isFollowups(item.widget)) return null;
-              if (item.kind === "widget")
+              if (item.kind === "widget") {
+                const live = !!props.arrived?.has(item.id);
+                const newest = item.id === props.latestCart || !!props.latestPlans?.has(item.id);
                 return (
                   <WidgetRenderer
                     key={item.id}
@@ -97,11 +101,14 @@ export function TurnView(props: {
                     answered={props.answered}
                     onAnswer={(text) => props.onAnswer(text, true)}
                     staleCart={item.id !== props.latestCart}
-                    onCartEdit={props.onCartEdit}
+                    onCartEdit={live ? props.onCartEdit : undefined}
                     stalePlan={!props.latestPlans?.has(item.id)}
-                    onPlanEdit={props.onPlanEdit}
+                    onPlanEdit={live ? props.onPlanEdit : undefined}
+                    lockedAt={newest && !live ? (props.shownAt?.[item.id] ?? null) : undefined}
+                    agentName={props.persona.name}
                   />
                 );
+              }
               return (
                 <ReportCard
                   key={item.id}

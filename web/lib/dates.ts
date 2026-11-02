@@ -20,3 +20,15 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   if (days < 7) return `${days} ${days === 1 ? "day" : "days"} ago`;
   return `on ${shortDate(iso, now)}`;
 }
+
+export function cardDate(iso: string | null | undefined, locale?: string, now: Date = new Date()): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleDateString(locale, {
+    month: "short",
+    day: "numeric",
+    ...(d.getFullYear() !== now.getFullYear() && { year: "numeric" }),
+  });
+}

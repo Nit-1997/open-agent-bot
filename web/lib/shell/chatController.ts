@@ -10,6 +10,7 @@ export type Thread = {
   status: ThreadStatus;
   title: string;
   history?: HistoryMessage[];
+  cardDates?: Record<string, string>;
   error?: string;
   model?: string;
   starter?: string;
@@ -35,7 +36,7 @@ export type ChatAction =
   | { type: "showDraft"; freshId: string }
   | { type: "newDraft"; id: string; starter?: string }
   | { type: "open"; id: string }
-  | { type: "loaded"; id: string; title: string; history: HistoryMessage[] }
+  | { type: "loaded"; id: string; title: string; history: HistoryMessage[]; cardDates?: Record<string, string> }
   | { type: "failed"; id: string; missing: boolean; error?: string }
   | { type: "retry"; id: string }
   | { type: "running"; id: string; running: boolean }
@@ -104,7 +105,7 @@ export function chatReducer(s: ChatState, a: ChatAction): ChatState {
       return prune({ ...s, activeId: a.id, threads: { ...s.threads, [a.id]: loading } });
     }
     case "loaded":
-      return patch(s, a.id, { status: "ready", title: a.title, history: a.history, error: undefined });
+      return patch(s, a.id, { status: "ready", title: a.title, history: a.history, cardDates: a.cardDates, error: undefined });
     case "failed":
       return patch(s, a.id, { status: a.missing ? "missing" : "error", error: a.error });
     case "retry": {

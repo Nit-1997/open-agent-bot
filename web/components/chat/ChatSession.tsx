@@ -32,6 +32,7 @@ export type ChatSessionProps = {
   persona: AgentPersona;
   draft?: string;
   history?: HistoryMessage[];
+  shownAt?: Readonly<Record<string, string>>;
   composerAccessory?: ReactNode;
   composerPlaceholder: string;
   composerLabel: string;
@@ -75,6 +76,7 @@ export function ChatSession(props: ChatSessionProps) {
   }, [lastId]);
   const [frames, setFrames] = useState<Record<string, BrowserFrame>>({});
   const [edits, setEdits] = useState<WorkspaceEdits>({});
+  const [arrived, setArrived] = useState<ReadonlySet<string>>(() => new Set());
   const onCartEdit = useCallback((cart: CartEdits) => setEdits((e) => withCartEdits(e, cart)), []);
   const onPlanEdit = useCallback((plan: PlanEdits) => setEdits((e) => withPlanEdits(e, plan)), []);
   const latestCart = useMemo(() => {
@@ -132,6 +134,7 @@ export function ChatSession(props: ChatSessionProps) {
       },
       onToolCallStartEvent: ({ event }) => {
         toolCalls.current.set(event.toolCallId, { name: event.toolCallName });
+        if (event.toolCallName === "show_widget") setArrived((a) => new Set(a).add(event.toolCallId));
       },
       onToolCallEndEvent: ({ event, toolCallName, toolCallArgs }) => {
         const title = typeof toolCallArgs?.title === "string" ? toolCallArgs.title : undefined;
@@ -245,6 +248,8 @@ export function ChatSession(props: ChatSessionProps) {
                   onCartEdit={onCartEdit}
                   latestPlans={latestPlans}
                   onPlanEdit={onPlanEdit}
+                  arrived={arrived}
+                  shownAt={props.shownAt}
                   openReportId={props.openReportId}
                   reportHint={props.reportHint}
                   onOpenReport={props.onOpenReport}

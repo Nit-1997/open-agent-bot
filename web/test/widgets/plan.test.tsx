@@ -79,6 +79,17 @@ describe("PlanCard event", () => {
     expect(screen.getByRole("button", { name: "Increase guests" })).toBeDisabled();
   });
 
+  it("locks a card from an earlier session and dates it", () => {
+    const now = new Date("2026-11-05T12:00:00Z");
+    const { rerender } = render(<PlanCard toolCallId="p6" widget={event} lockedAt="2026-11-01T12:00:00Z" agentName="Sage" now={now} />);
+    expect(document.getElementById("plan-p6-locked-note")?.textContent).toBe("From Nov 1 · ask Sage to update it");
+    expect(screen.getByLabelText("Guests")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Increase guests" })).toBeDisabled();
+    expect(screen.getByLabelText("Date")).toBeDisabled();
+    rerender(<PlanCard toolCallId="p6" widget={event} lockedAt={null} agentName="Sage" now={now} />);
+    expect(document.getElementById("plan-p6-locked-note")?.textContent).toBe("From an earlier session · ask Sage to update it");
+  });
+
   it("shows a free-text date as plain text", () => {
     render(<PlanCard toolCallId="p5" widget={{ ...event, value: { ...event.value, date: "Nov 14" } } as Plan} onEdit={vi.fn()} />);
     expect(screen.getByText("Nov 14")).toBeInTheDocument();
@@ -155,9 +166,9 @@ describe("workspace edits queue", () => {
 });
 
 describe("plan step label", () => {
-  it("says saved or read", () => {
-    expect(stepLabel("plan", { action: "set", kind: "event" })).toBe("Saved the event");
-    expect(stepLabel("plan", { action: "patch", kind: "event" }, false)).toBe("Saving the event");
+  it("says updated or read", () => {
+    expect(stepLabel("plan", { action: "set", kind: "event" })).toBe("Updated the event");
+    expect(stepLabel("plan", { action: "patch", kind: "event" }, false)).toBe("Updating the event");
     expect(stepLabel("plan", { action: "get", kind: "trip" })).toBe("Read the trip");
   });
 });

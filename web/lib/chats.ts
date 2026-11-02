@@ -58,6 +58,25 @@ export function toHistory(chatId: string, items: StoredMessage[]): HistoryMessag
   });
 }
 
+const DATED_CARDS: ReadonlySet<string> = new Set(["cart", "plan"]);
+
+function widgetKind(args: string): string | undefined {
+  try {
+    const kind = (JSON.parse(args) as { widget?: { kind?: unknown } } | null)?.widget?.kind;
+    return typeof kind === "string" ? kind : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function cardDates(items: StoredMessage[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of items)
+    for (const p of m.parts ?? [])
+      if (p.type === "tool" && p.name === "show_widget" && DATED_CARDS.has(widgetKind(p.args) ?? "")) out[p.id] = m.createdAt;
+  return out;
+}
+
 export function formatWhen(iso: string | null | undefined, locale?: string): string {
   if (!iso) return "never";
   const date = new Date(iso);

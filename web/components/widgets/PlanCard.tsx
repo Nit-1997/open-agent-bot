@@ -5,6 +5,7 @@ import type { Plan } from "@shared/widgets";
 import { Minus, Plus } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { PlanEdits } from "@shared/workspace";
+import { cardDate } from "@/lib/dates";
 import { widgetId } from "./widgetId";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -154,15 +155,24 @@ export function PlanCard({
   widget,
   onEdit,
   stale = false,
+  locale,
+  lockedAt,
+  agentName = "the agent",
+  now,
 }: {
   toolCallId: string;
   idPrefix?: string;
   widget: Plan;
   onEdit?: (e: PlanEdits) => void;
   stale?: boolean;
+  locale?: string;
+  lockedAt?: string | null;
+  agentName?: string;
+  now?: Date;
 }) {
   const id = widgetId("plan", toolCallId, idPrefix);
   const locked = stale || !onEdit;
+  const shownOn = lockedAt === undefined ? undefined : cardDate(lockedAt, locale, now);
   const initial =
     widget.entity === "event"
       ? { guests: widget.value.guests, date: widget.value.date, budget: widget.value.budget }
@@ -201,6 +211,11 @@ export function PlanCard({
           {stale ? "Updated plan below" : kindLabel}
         </span>
       </header>
+      {lockedAt !== undefined && (
+        <p id={`${id}-locked-note`} className="mt-1 text-xs text-text-muted">
+          {shownOn ? `From ${shownOn} · ask ${agentName} to update it` : `From an earlier session · ask ${agentName} to update it`}
+        </p>
+      )}
 
       {widget.entity === "event" && (
         <div id={`${id}-fields`} className="mt-3 flex flex-wrap items-end gap-4">
