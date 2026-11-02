@@ -11,3 +11,4 @@ export const reportsApi = {
 
 export const reportPdfHref = (id: string) => `/api/artifacts/${id}?format=pdf`;
 export const reportHtmlHref = (id: string) => `/api/artifacts/${id}`;
+export const reportThumbHref = (id: string) => `/api/artifacts/${id}?format=thumb`;

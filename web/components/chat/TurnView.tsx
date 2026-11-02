@@ -1,8 +1,9 @@
 import type { AgentPersona } from "@shared/profile";
 import { Check } from "lucide-react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
-import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { ReportCard } from "@/components/reports/ReportCard";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
+import { parseArtifactId } from "@/lib/reportRefs";
 import type { Turn } from "@/lib/turns";
 import { ActivitySteps } from "./ActivitySteps";
 import { Followups } from "./Followups";
@@ -30,6 +31,9 @@ export function TurnView(props: {
   onCartEdit?: (e: CartEdits) => void;
   latestPlans?: ReadonlySet<string>;
   onPlanEdit?: (e: PlanEdits) => void;
+  openReportId?: string | null;
+  reportHint?: "right" | "tap";
+  onOpenReport?: (reportId: string, toolCallId: string) => void;
 }) {
   const { turn, running } = props;
   const id = `${props.idPrefix}-turn-${turn.id}`;
@@ -98,20 +102,18 @@ export function TurnView(props: {
                     onPlanEdit={props.onPlanEdit}
                   />
                 );
-              if (item.result === undefined) {
-                return (
-                  <div
-                    id={`${id}-artifact-pending-${item.id}`}
-                    key={item.id}
-                    role="status"
-                    aria-label="Writing the report"
-                    className="flex h-40 animate-pulse items-center justify-center rounded-2xl border border-border bg-surface text-sm text-text-muted"
-                  >
-                    Writing the report…
-                  </div>
-                );
-              }
-              return <ArtifactCard key={item.id} idPrefix={props.idPrefix} toolCallId={item.id} title={item.title} result={item.result} />;
+              return (
+                <ReportCard
+                  key={item.id}
+                  idPrefix={props.idPrefix}
+                  toolCallId={item.id}
+                  title={item.title}
+                  result={item.result}
+                  pressed={!!props.openReportId && parseArtifactId(item.result) === props.openReportId}
+                  hint={props.reportHint ?? "right"}
+                  onOpen={(reportId, toolCallId) => props.onOpenReport?.(reportId, toolCallId)}
+                />
+              );
             })}
           </div>
           {!running && <SourcesRow id={`${id}-sources`} sources={turn.sources} />}

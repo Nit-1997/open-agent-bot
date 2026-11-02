@@ -3,21 +3,25 @@
 import { FileText, MessageSquare, Plus, Search, SquareCheckBig } from "lucide-react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { AccountMenu } from "@/components/AccountMenu";
+import { hrefFor } from "@shared/routes";
+import { useBreakpoint } from "@/lib/shell/breakpoints";
 import { SEARCH_INPUT_ID } from "@/lib/shell/searchNav";
 import { navSectionOf, useRoute } from "@/lib/shell/useRoute";
 import { RailButton, RailLink } from "./RailLink";
 import { useShell } from "./ShellProvider";
 import { SidebarToggle } from "./SidebarToggle";
 
-export function chatHrefOf(chats: ReturnType<typeof useShell>["chats"]): string {
+export function chatHrefOf(chats: ReturnType<typeof useShell>["chats"], opts: { withReport?: boolean } = {}): string {
   const t = chats.threads[chats.activeId];
-  return t && t.claimed ? `/chats/${t.id}` : "/";
+  if (!t || !t.claimed) return "/";
+  return hrefFor({ section: "chat", chatId: t.id, report: (opts.withReport && chats.panels[t.id]?.reportId) || null });
 }
 
 export function Rail(props: { sidebarOpen: boolean; onToggleSidebar: () => void; showNewChat: boolean }) {
   const shell = useShell();
   const { persona, running, newChat, requestFocus } = shell;
   const route = useRoute();
+  const desktop = useBreakpoint() === "desktop";
   const section = navSectionOf(route);
   const chatHidden = route?.section !== "chat";
   const working = running.size > 0 && chatHidden;
@@ -32,7 +36,7 @@ export function Rail(props: { sidebarOpen: boolean; onToggleSidebar: () => void;
         <AgentOrb id="rail-orb" look={persona.look} size={30} className="mb-[18px]" />
         <RailLink
           id="rail-chats"
-          href={chatHrefOf(shell.chats)}
+          href={chatHrefOf(shell.chats, { withReport: desktop })}
           label="Chats"
           icon={MessageSquare}
           active={section === "chat"}

@@ -9,6 +9,7 @@
   --surface-accent: #eceae6;
   --paper: #ffffff;
   --sidebar: #f6f4f1;
+  --panel: #f4f2ef;
   --border: #e5e3df;
   --border-strong: #d8d5cf;
   --text-primary: #111111;
@@ -48,6 +49,7 @@ html.dark {
   --surface-accent: #23262d;
   --paper: #2c2f36;
   --sidebar: #131418;
+  --panel: #16171b;
   --border: #383b42;
   --border-strong: #4a4d55;
   --text-primary: #f2f1ef;
@@ -85,6 +87,7 @@ html.dark {
   --color-surface-accent: var(--surface-accent);
   --color-paper: var(--paper);
   --color-sidebar: var(--sidebar);
+  --color-panel: var(--panel);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-text-primary: var(--text-primary);
@@ -289,6 +292,10 @@ html.dark .orb[data-look="dusk"] {
     font-size: 14.5px;
     line-height: 1.6;
   }
+}
+
+.report-card-pressed {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mist-500) 18%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

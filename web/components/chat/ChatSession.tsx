@@ -10,6 +10,7 @@ import { errorCodeIn, noteRunFailure } from "@/lib/authState";
 import type { HistoryMessage } from "@/lib/chats";
 import { classifyRunError, NOT_SAVED_EVENT, notSavedMessage, type RunErrorKind } from "@/lib/errors";
 import type { WorkflowStepEvent } from "@/lib/steps";
+import { parseArtifactId, REPORT_TOOLS, type ReportRef, reportsIn, reportTitleIn } from "@/lib/reportRefs";
 import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
@@ -40,7 +41,14 @@ export type ChatSessionProps = {
   onRunningChange: (running: boolean) => void;
   onClaimed: (firstText: string) => void;
   onRunEnd: () => void;
+  openReportId?: string | null;
+  reportHint?: "right" | "tap";
+  onOpenReport?: (reportId: string, toolCallId: string) => void;
+  onReports?: (reports: ReportRef[]) => void;
+  onReportReady?: (ready: ReportReady) => void;
 };
+
+export type ReportReady = ReportRef & { tool: string };
 
 export function ChatSession(props: ChatSessionProps) {
   const agentId = threadAgentId(props.threadId);
@@ -84,7 +92,17 @@ export function ChatSession(props: ChatSessionProps) {
   }, [turns]);
   useThreadContext(agentId, "workspace_edits", workspaceContextValue(edits));
 
-  const { onRunningChange, onClaimed, onRunEnd } = props;
+  const { onRunningChange, onClaimed, onRunEnd, onReports, onReportReady } = props;
+  const reports = useMemo(() => reportsIn(turns), [turns]);
+  const reportKey = reports.map((r) => `${r.reportId}:${r.title}`).join("|");
+  const reportsRef = useRef(reports);
+  useEffect(() => {
+    reportsRef.current = reports;
+  }, [reports]);
+  useEffect(() => {
+    onReports?.(reportsRef.current);
+  }, [reportKey, onReports]);
+  const toolCalls = useRef(new Map<string, { name: string; title?: string }>());
   const claim = useRef<{ text: string; waiting: boolean; done: boolean }>({ text: "", waiting: false, done: false });
   useEffect(() => {
     onRunningChange(running);
@@ -115,6 +133,21 @@ export function ChatSession(props: ChatSessionProps) {
           setWorkflow((w) => ({ ...w, [id]: [...(w[id] ?? []), event.value as WorkflowStepEvent] }));
         if (event.name === NOT_SAVED_EVENT) setUnsaved(notSavedMessage(event.value));
       },
+      onToolCallStartEvent: ({ event }) => {
+        toolCalls.current.set(event.toolCallId, { name: event.toolCallName });
+      },
+      onToolCallEndEvent: ({ event, toolCallName, toolCallArgs }) => {
+        const title = typeof toolCallArgs?.title === "string" ? toolCallArgs.title : undefined;
+        toolCalls.current.set(event.toolCallId, { name: toolCallName, title });
+      },
+      onToolCallResultEvent: ({ event }) => {
+        const call = toolCalls.current.get(event.toolCallId);
+        const content = typeof event.content === "string" ? event.content : "";
+        const reportId = parseArtifactId(content);
+        if (!call || !REPORT_TOOLS.has(call.name) || !reportId) return;
+        const title = call.title?.trim() || reportTitleIn(content) || "Report";
+        onReportReady?.({ reportId, toolCallId: event.toolCallId, title, tool: call.name });
+      },
       onRunErrorEvent: ({ event }) => {
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
         noteRunFailure(event.code);
@@ -122,7 +155,7 @@ export function ChatSession(props: ChatSessionProps) {
       },
     });
     return () => sub.unsubscribe();
-  }, [agent, onClaimed]);
+  }, [agent, onClaimed, onReportReady]);
 
   useEffect(() => {
     if (!running) return;
@@ -214,6 +247,9 @@ export function ChatSession(props: ChatSessionProps) {
                   onCartEdit={onCartEdit}
                   latestPlans={latestPlans}
                   onPlanEdit={onPlanEdit}
+                  openReportId={props.openReportId}
+                  reportHint={props.reportHint}
+                  onOpenReport={props.onOpenReport}
                 />
               </div>
             ))}

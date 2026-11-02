@@ -5,6 +5,9 @@ type Subscriber = {
   onEvent?: (p: { event: { type: string } }) => void;
   onRunErrorEvent?: (p: { event: { code?: string; message?: string } }) => void;
   onCustomEvent?: (p: { event: { name: string; value: unknown } }) => void;
+  onToolCallStartEvent?: (p: { event: { toolCallId: string; toolCallName: string } }) => void;
+  onToolCallEndEvent?: (p: { event: { toolCallId: string }; toolCallName: string; toolCallArgs: Record<string, unknown> }) => void;
+  onToolCallResultEvent?: (p: { event: { toolCallId: string; content: string } }) => void;
 };
 
 export class FakeAgent {
@@ -27,6 +30,13 @@ export class FakeAgent {
       if (type === "RUN_STARTED") s.onRunStartedEvent?.({ event: { type } });
       if (type === "RUN_ERROR") s.onRunErrorEvent?.({ event: { code: "MODEL_ERROR", message: "boom", ...extra } });
       s.onEvent?.({ event: { type, ...extra } });
+    }
+  }
+  toolCall(toolCallId: string, name: string, args: Record<string, unknown>, result: string) {
+    for (const s of this.subscribers) {
+      s.onToolCallStartEvent?.({ event: { toolCallId, toolCallName: name } });
+      s.onToolCallEndEvent?.({ event: { toolCallId }, toolCallName: name, toolCallArgs: args });
+      s.onToolCallResultEvent?.({ event: { toolCallId, content: result } });
     }
   }
 }

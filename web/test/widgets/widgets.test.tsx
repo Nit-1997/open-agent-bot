@@ -4,7 +4,7 @@ import { FlightList } from "@/components/widgets/FlightList";
 import { UiCard } from "@/components/widgets/UiCard";
 import { WeatherCard } from "@/components/widgets/WeatherCard";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
-import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { ReportCard } from "@/components/reports/ReportCard";
 import { expectUniqueIds } from "../support/ids";
 import { validWidgets } from "./fixtures";
 
@@ -244,7 +244,15 @@ describe("widgets", () => {
         {all.map((w, i) => (
           <WidgetRenderer key={i} idPrefix={prefix} toolCallId={`tc${i}`} args={{ widget: w }} locale="en-US" />
         ))}
-        <ArtifactCard idPrefix={prefix} toolCallId="tc-report" title="Guide" result="artifact abcdefghijkl created" />
+        <ReportCard
+          idPrefix={prefix}
+          toolCallId="tc-report"
+          title="Guide"
+          result="artifact abcdefghijkl created"
+          pressed={false}
+          hint="right"
+          onOpen={() => {}}
+        />
       </section>
     );
     const { container } = render(<div id="t-panes">{[pane("chat-pane-a"), pane("chat-pane-b")]}</div>);

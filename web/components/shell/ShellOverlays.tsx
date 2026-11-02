@@ -16,7 +16,7 @@ export function ShellOverlays() {
   const { overlay, close, open, profile, saveProfile } = shell;
   switch (overlay) {
     case "sidebar":
-      return breakpoint === "tablet" ? (
+      return breakpoint === "tablet" || (breakpoint === "desktop" && shell.report.inline) ? (
         <Overlay
           id="sidebar-overlay"
           label="Chats"
