@@ -93,7 +93,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", settingsRoutes({ hubs: deps.hubs, limiter: deps.limiter }));
   app.route("/", onboardingRoutes({ ...deps.onboarding, limiter: deps.limiter }));
   app.route("/", providerRoutes({ hubs: deps.hubs, logins: deps.logins, profiles: deps.profiles, limiter: deps.limiter }));
-  app.route("/", artifactRoutes({ artifacts: deps.artifacts, owner: deps.repos }));
+  app.route("/", artifactRoutes({ artifacts: deps.artifacts, owner: deps.repos, limiter: deps.limiter }));
   app.route("/", adminRoutes({ admin: deps.admin, limiter: deps.limiter }));
   app.notFound((c) => c.json({ error: "not_found", message: "Not found." }, 404));
 

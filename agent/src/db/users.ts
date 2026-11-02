@@ -34,7 +34,7 @@ import {
   type WorkspaceRepo,
 } from "./types.js";
 
-const CONTENT_TYPE: Record<ArtifactFile, string> = { html: "text/html", pdf: "application/pdf" };
+const CONTENT_TYPE: Record<ArtifactFile, string> = { html: "text/html", pdf: "application/pdf", jpg: "image/jpeg" };
 const HISTORY_LIMIT = 200;
 
 const CREDENTIAL_KINDS: readonly CredentialKind[] = ["api_key", "oauth"];
@@ -328,9 +328,11 @@ function artifacts(db: Db, userId: string): ArtifactRepo {
     async get(id) {
       if (!ARTIFACT_ID_RE.test(id)) return undefined;
       const { data } = await read("artifacts.get", () =>
-        db.from("artifacts").select("id, chat_id, title, pdf_path").eq("id", id).eq("user_id", userId).maybeSingle(),
+        db.from("artifacts").select("id, chat_id, title, pdf_path, thumb_path").eq("id", id).eq("user_id", userId).maybeSingle(),
       );
-      return data ? { id: data.id, chatId: data.chat_id, title: data.title, pdfReady: !!data.pdf_path } : undefined;
+      return data
+        ? { id: data.id, chatId: data.chat_id, title: data.title, pdfReady: !!data.pdf_path, thumbReady: !!data.thumb_path }
+        : undefined;
     },
     async page(page) {
       const from = pageOffset(page, REPORTS_PAGE_SIZE);
@@ -364,6 +366,18 @@ function artifacts(db: Db, userId: string): ArtifactRepo {
           .eq("id", id)
           .eq("user_id", userId),
       );
+    },
+    async setThumb(id) {
+      const { data } = await must(
+        "artifacts.setThumb",
+        db
+          .from("artifacts")
+          .update({ thumb_path: artifactPath(userId, validArtifactId(id), "jpg") })
+          .eq("id", id)
+          .eq("user_id", userId)
+          .select("id"),
+      );
+      return (data ?? []).length > 0;
     },
   };
 }
@@ -423,7 +437,7 @@ function storage(db: Db, userId: string): ArtifactStorage {
     async upload(id, file, bytes) {
       const { error } = await bucket().upload(artifactPath(userId, validArtifactId(id), file), bytes, {
         contentType: CONTENT_TYPE[file],
-        upsert: file === "pdf",
+        upsert: file !== "html",
       });
       if (error) throw storageError("storage.upload", error as StorageFailure);
     },

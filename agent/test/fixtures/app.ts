@@ -2,7 +2,7 @@ import { createAccessService } from "../../src/access/service.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/admin/authAdmin.js";
 import { createAdminService } from "../../src/admin/service.js";
 import { type AppDeps, createApp } from "../../src/app.js";
-import { ArtifactStore } from "../../src/artifacts/store.js";
+import { ArtifactStore, type Renderer } from "../../src/artifacts/store.js";
 import { createGuards } from "../../src/auth/middleware.js";
 import { UserStatusCache } from "../../src/auth/status.js";
 import { AuthError, type AuthUser } from "../../src/auth/verify.js";
@@ -178,7 +178,7 @@ export class FakeAccounts {
 
 export type Harness = Awaited<ReturnType<typeof makeApp>>;
 
-export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; render?: (html: string) => Promise<Buffer> } = {}) {
+export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; render?: Renderer; renderThumb?: Renderer } = {}) {
   const db = new MemoryDb();
   const accounts = new FakeAccounts();
   for (const u of [ALICE, BOB, ADMIN]) accounts.add(u);
@@ -213,7 +213,10 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
     await (await hubs.get(user)).login(providerId, ui);
   });
   const profiles = (id: string) => new SupabaseProfileStore(repos(id).profiles);
-  const artifacts = new ArtifactStore(over.render ?? (async (html) => Buffer.from(`%PDF ${html.length}`)));
+  const artifacts = new ArtifactStore(
+    over.render ?? (async (html) => Buffer.from(`%PDF ${html.length}`)),
+    over.renderThumb ?? (async (html) => Buffer.from(`JPG ${html.length}`)),
+  );
   const admin = createAdminService({
     repo: accounts.repo(),
     auth: accounts.auth(),

@@ -106,16 +106,27 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
     expect((await rb.messages.history(chat)).total).toBe(0);
   });
 
-  it("uploads artifacts as text/html and application/pdf and keeps them private to the owner", async () => {
-    const store = new ArtifactStore(async () => Buffer.from("%PDF-1.4 integration"));
+  it("uploads artifacts as text/html, application/pdf and image/jpeg and keeps them private to the owner", async () => {
+    const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9]);
+    const store = new ArtifactStore(
+      async () => Buffer.from("%PDF-1.4 integration"),
+      async () => jpg,
+    );
     const ra = forUser(service(), a.id);
+    const rb = forUser(service(), b.id);
     const { id } = await store.save(ra, null, "Integration report", "<h1>Hi</h1>");
     expect(await store.get(ra, id)).toEqual({ title: "Integration report", html: "<h1>Hi</h1>" });
+    expect((await store.thumbnail(ra, id))?.equals(jpg)).toBe(true);
     expect((await store.renderPdf(ra, id))?.pdf.toString()).toContain("%PDF");
-    expect((await ra.artifacts.get(id))?.pdfReady).toBe(true);
-    expect(await store.get(forUser(service(), b.id), id)).toBeNull();
+    expect(await ra.artifacts.get(id)).toMatchObject({ pdfReady: true, thumbReady: true });
+    expect((await ra.storage.download(id, "jpg"))?.equals(jpg)).toBe(true);
+    const { data: row } = await service().from("artifacts").select("thumb_path").eq("id", id).single();
+    expect(row?.thumb_path).toBe(`${a.id}/${id}.jpg`);
+    expect(await rb.artifacts.setThumb(id)).toBe(false);
+    expect(await store.get(rb, id)).toBeNull();
+    expect(await store.thumbnail(rb, id)).toBeNull();
     const { data } = await service().storage.from("artifacts").list(a.id);
-    expect(data?.map((o) => o.name).sort()).toEqual([`${id}.html`, `${id}.pdf`]);
+    expect(data?.map((o) => o.name).sort()).toEqual([`${id}.html`, `${id}.jpg`, `${id}.pdf`]);
   });
 
   it("runs access_request_submit with the documented outcomes and the per-IP cap", async () => {

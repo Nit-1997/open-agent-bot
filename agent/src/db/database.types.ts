@@ -67,6 +67,7 @@ export type Database = {
           id: string
           pdf_path: string | null
           size_bytes: number
+          thumb_path: string | null
           title: string
           user_id: string
         }
@@ -77,6 +78,7 @@ export type Database = {
           id: string
           pdf_path?: string | null
           size_bytes: number
+          thumb_path?: string | null
           title: string
           user_id: string
         }
@@ -87,6 +89,7 @@ export type Database = {
           id?: string
           pdf_path?: string | null
           size_bytes?: number
+          thumb_path?: string | null
           title?: string
           user_id?: string
         }

@@ -110,15 +110,13 @@ export class MemoryDb {
         async history(chatId: string, limit = 200) {
           const mine = db.messages.filter((m) => m.chatId === chatId && m.userId === userId);
           return {
-            items: mine
-              .slice(-limit)
-              .map(({ role, content, status, createdAt, parts }) => ({
-                role,
-                content,
-                status,
-                createdAt,
-                ...(parts && { parts: structuredClone(parts) }),
-              })),
+            items: mine.slice(-limit).map(({ role, content, status, createdAt, parts }) => ({
+              role,
+              content,
+              status,
+              createdAt,
+              ...(parts && { parts: structuredClone(parts) }),
+            })),
             total: mine.length,
           };
         },
@@ -179,7 +177,7 @@ export class MemoryDb {
       },
       artifacts: {
         async insert(row: { id: string; chatId: string | null; title: string; sizeBytes: number }) {
-          db.artifacts.set(row.id, { ...row, userId, pdfReady: false, createdAt: db.at() });
+          db.artifacts.set(row.id, { ...row, userId, pdfReady: false, thumbReady: false, createdAt: db.at() });
         },
         async page(page: number) {
           const mine = [...db.artifacts.values()]
@@ -193,11 +191,19 @@ export class MemoryDb {
         },
         async get(id: string) {
           const a = db.artifacts.get(id);
-          return a && a.userId === userId ? { id: a.id, chatId: a.chatId, title: a.title, pdfReady: a.pdfReady } : undefined;
+          return a && a.userId === userId
+            ? { id: a.id, chatId: a.chatId, title: a.title, pdfReady: a.pdfReady, thumbReady: a.thumbReady }
+            : undefined;
         },
         async setPdf(id: string) {
           const a = db.artifacts.get(id);
           if (a && a.userId === userId) a.pdfReady = true;
+        },
+        async setThumb(id: string) {
+          const a = db.artifacts.get(id);
+          if (!a || a.userId !== userId) return false;
+          a.thumbReady = true;
+          return true;
         },
       },
       search: {

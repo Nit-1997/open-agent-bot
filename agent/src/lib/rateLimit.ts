@@ -13,6 +13,8 @@ export const LIMITS = {
   chats: { max: 120, windowMs: 10 * 60_000 },
   lists: { max: 240, windowMs: 10 * 60_000 },
   search: { max: 60, windowMs: 10 * 60_000 },
+  artifacts: { max: 600, windowMs: 10 * 60_000 },
+  renders: { max: 40, windowMs: 10 * 60_000 },
   admin: { max: 120, windowMs: 10 * 60_000 },
   emailLinkIp: { max: 5, windowMs: 60 * 60_000 },
   emailLinkAddr: { max: 3, windowMs: 60 * 60_000 },

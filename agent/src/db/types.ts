@@ -8,11 +8,11 @@ export type NewMessage = Omit<StoredMessage, "createdAt">;
 
 export type VersionedEntity = { kind: EntityKind; id: string; value: unknown; version: number; updatedAt: number };
 
-export type ArtifactRow = { id: string; chatId: string | null; title: string; pdfReady: boolean };
-export type ArtifactListRow = ArtifactRow & { sizeBytes: number; createdAt: string };
+export type ArtifactRow = { id: string; chatId: string | null; title: string; pdfReady: boolean; thumbReady: boolean };
+export type ArtifactListRow = Omit<ArtifactRow, "thumbReady"> & { sizeBytes: number; createdAt: string };
 export type ChatEntity = VersionedEntity & { chatId: string };
 export type EntityCounts = Record<EntityKind, number>;
-export type ArtifactFile = "html" | "pdf";
+export type ArtifactFile = "html" | "pdf" | "jpg";
 
 export type ProviderSettingsRow = { data: unknown; deviceId: string; stamp: string };
 
@@ -51,6 +51,7 @@ export interface ArtifactRepo {
   insert(row: { id: string; chatId: string | null; title: string; sizeBytes: number }): Promise<void>;
   get(id: string): Promise<ArtifactRow | undefined>;
   setPdf(id: string): Promise<void>;
+  setThumb(id: string): Promise<boolean>;
   page(page: number): Promise<Page<ArtifactListRow>>;
   summary(id: string): Promise<ArtifactListRow | undefined>;
 }
