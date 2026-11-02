@@ -129,7 +129,7 @@ describe("artifacts route", () => {
     expect(failed.status).toBe(502);
     const html = await failed.text();
     expect(html).toContain("This report couldn't be loaded.");
-    expect(html).toContain('<a href="/api/artifacts/abcdefghijkl" target="_self">Try again</a>');
+    expect(html).toContain('<a id="report-error-retry-link" href="/api/artifacts/abcdefghijkl" target="_self">Try again</a>');
     expect(html).not.toMatch(/<script/i);
   });
 

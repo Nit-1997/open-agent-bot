@@ -38,3 +38,29 @@ describe("proxy sign-in redirect", () => {
     expect(new URL(res.headers.get("location") ?? "").searchParams.get("next")).toBe("/");
   });
 });
+
+describe("proxy signed-out report frames", () => {
+  const url = `${APP_ORIGIN}/api/artifacts/AbCdEf_-1234`;
+
+  it("gives a framed report request the HTML error page with the report CSP", async () => {
+    for (const dest of ["iframe", "frame", "document"]) {
+      const res = await proxy(new NextRequest(url, { headers: { "sec-fetch-dest": dest } }));
+      expect(res.status).toBe(401);
+      expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
+      expect(await res.text()).toContain("This report couldn't be loaded.");
+    }
+  });
+
+  it("keeps JSON for fetches, PDFs and thumbnails", async () => {
+    for (const [path, dest] of [
+      ["", "empty"],
+      ["?format=pdf", "document"],
+      ["?format=thumb", "image"],
+    ]) {
+      const res = await proxy(new NextRequest(`${url}${path}`, { headers: { "sec-fetch-dest": dest } }));
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "signed_out" });
+    }
+  });
+});
