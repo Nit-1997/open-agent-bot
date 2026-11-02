@@ -1,3 +1,4 @@
+import type { OpenReport } from "../artifacts/openReport.js";
 import type { AuthUser } from "../auth/verify.js";
 import type { FrameBus } from "../browser/frames.js";
 import type { Evidence } from "../grounding/evidence.js";
@@ -25,6 +26,7 @@ export type SessionEntry = {
   cart?: ActiveCart;
   turnStats?: () => { jevCalls: number; jevCostUsd: number };
   setOpenReport?: (note: string | undefined) => void;
+  openReport?: OpenReport;
 };
 
 export type CreateSession = (

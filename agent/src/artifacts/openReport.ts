@@ -11,10 +11,12 @@ export async function loadOpenReport(
   owner: ArtifactOwner,
   chatId: string,
   id: string,
+  cached?: OpenReport,
 ): Promise<OpenReport | null> {
   try {
     const row = await owner.artifacts.get(id);
     if (!row || row.chatId !== chatId) return null;
+    if (cached?.id === id) return { ...cached, title: row.title };
     const report = await artifacts.get(owner, id);
     if (!report) return null;
     return { id, title: row.title, text: truncate(htmlToText(report.html), OPEN_REPORT_CHARS) };

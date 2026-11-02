@@ -198,6 +198,21 @@ describe("widgets", () => {
   it("GroundingNote lists the claims", () => {
     render(<WidgetRenderer idPrefix="t" toolCallId="g1" args={{ widget: validWidgets.grounding_note }} locale="en-US" />);
     expect(screen.getByText(/\$7\.49, In Stock/)).toBeInTheDocument();
+    expect(screen.queryByText(/open report/)).toBeNull();
+  });
+
+  it("GroundingNote labels claims from the open report apart from unsourced ones", () => {
+    const widget = { kind: "grounding_note", claims: ["$990"], fromReport: ["$45", "$385"] };
+    render(<WidgetRenderer idPrefix="t" toolCallId="g2" args={{ widget }} locale="en-US" />);
+    expect(document.getElementById("t-grounding-note-g2-unsourced")).toHaveTextContent("Not found in the sources I read: $990.");
+    expect(document.getElementById("t-grounding-note-g2-report")).toHaveTextContent("From your open report: $45, $385.");
+  });
+
+  it("GroundingNote shows only the open-report line when every claim came from it", () => {
+    const widget = { kind: "grounding_note", claims: [], fromReport: ["$45"] };
+    render(<WidgetRenderer idPrefix="t" toolCallId="g3" args={{ widget }} locale="en-US" />);
+    expect(document.getElementById("t-grounding-note-g3-unsourced")).toBeNull();
+    expect(document.getElementById("t-grounding-note-g3-report")).toHaveTextContent("From your open report: $45.");
   });
 
   it("WidgetRenderer renders nothing for invalid payload", () => {

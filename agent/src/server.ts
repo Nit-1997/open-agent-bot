@@ -140,7 +140,7 @@ const app = createApp({
       messages: r.messages,
       profiles: profiles(user.id),
       workspace: new SupabaseWorkspaceStore(r.workspace, chatId),
-      openReport: (id) => loadOpenReport(artifacts, r, chatId, id),
+      openReport: (id, cached) => loadOpenReport(artifacts, r, chatId, id, cached),
       timeLimitMs: cfg.runTimeLimitSeconds * 1000,
     };
   },

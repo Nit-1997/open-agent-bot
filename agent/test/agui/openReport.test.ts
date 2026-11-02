@@ -1,5 +1,5 @@
-import type { RunAgentInput } from "@ag-ui/core";
-import { describe, expect, it } from "vitest";
+import { EventType, type RunAgentInput } from "@ag-ui/core";
+import { describe, expect, it, vi } from "vitest";
 import { readOpenReport } from "../../src/agui/input.js";
 import { handleRun, type RunContext } from "../../src/agui/runHandler.js";
 import { loadOpenReport, OPEN_REPORT_CHARS, openReportNote } from "../../src/artifacts/openReport.js";
@@ -65,6 +65,20 @@ describe("loadOpenReport", () => {
     expect(r!.text.length).toBeLessThanOrEqual(OPEN_REPORT_CHARS + "\n[truncated]".length);
   });
 
+  it("reuses this session's copy of the same report without downloading it again, and still checks the row", async () => {
+    const { db, store, alice, id, other } = await seed();
+    const first = await loadOpenReport(store, alice, CHAT_1, id);
+    const get = vi.spyOn(store, "get");
+    const again = await loadOpenReport(store, alice, CHAT_1, id, first!);
+    expect(again).toEqual(first);
+    expect(get).not.toHaveBeenCalled();
+    expect(await loadOpenReport(store, alice, CHAT_1, other, first!)).toBeNull();
+    expect(await loadOpenReport(store, db.forUser(BOB.id), CHAT_1, id, first!)).toBeNull();
+    const swapped = await loadOpenReport(store, alice, CHAT_1, id, { ...first!, id: "zzzzzzzzzzzz" });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(swapped?.id).toBe(id);
+  });
+
   it("gives null for another chat's report, another user's report, a missing object and a loader error", async () => {
     const { db, store, alice, id, other } = await seed();
     expect(await loadOpenReport(store, alice, CHAT_1, other)).toBeNull();
@@ -89,13 +103,13 @@ describe("openReportNote", () => {
 });
 
 describe("the open report in a run", () => {
-  const setup = () => {
+  const setup = (reply = "The campground.") => {
     const db = new MemoryDb();
     const notes: (string | undefined)[] = [];
     const evidence = new Evidence();
     const session = fakeSession(async (emit) => {
       emit(ev.assistantStart);
-      emit(ev.delta("The campground."));
+      emit(ev.delta(reply));
       emit(ev.assistantEnd());
     });
     const store = new SessionStore({
@@ -111,17 +125,19 @@ describe("the open report in a run", () => {
     });
     const r = db.forUser(ALICE.id);
     const loads: string[] = [];
+    const cachedSeen: (string | undefined)[] = [];
     const ctx = (load: RunContext["openReport"]): RunContext => ({
       user: ALICE,
       chats: r.chats,
       messages: r.messages,
       timeLimitMs: 60_000,
-      openReport: async (id) => {
+      openReport: async (id, cached) => {
         loads.push(id);
-        return load!(id);
+        cachedSeen.push(cached?.id);
+        return load!(id, cached);
       },
     });
-    return { db, store, notes, ctx, loads, session, evidence };
+    return { db, store, notes, ctx, loads, session, evidence, cachedSeen };
   };
   const drain = async (it: AsyncIterable<unknown>) => {
     for await (const _ of it);
@@ -139,8 +155,7 @@ describe("the open report in a run", () => {
     expect(notes[0]).toContain("Riverside Campground at $65.");
     expect(notes[0]).not.toContain("Forged");
     expect(session.prompts[0]).not.toContain("open_report");
-    expect(evidence.unverified("The campground is $65 a night.")).toEqual([]);
-    expect(evidence.unverified("The lodge is $990 a night.")).not.toEqual([]);
+    expect(evidence.unverified("The campground is $65 a night.")).toEqual(["$65"]);
     const saved = (await db.forUser(ALICE.id).messages.history(CHAT_1)).items;
     expect(saved[0]).toMatchObject({ role: "user", content: "what's the cheapest option in this report?" });
   });
@@ -165,6 +180,36 @@ describe("the open report in a run", () => {
     );
     expect(notes).toEqual([undefined, undefined]);
     expect((await db.forUser(ALICE.id).messages.history(CHAT_1)).items.filter((m) => m.role === "assistant")).toHaveLength(2);
+  });
+
+  it("labels the reply's claims from the open report, and only for that run", async () => {
+    const { store, ctx, evidence } = setup("Riverside is $65 and https://example.com/riverside; the lodge is $990.");
+    const loaded = ctx(async (id) => ({ id, title: "Big Sur stays", text: "Riverside Campground at $65. https://example.com/riverside" }));
+    const notesOf = async (it: AsyncIterable<unknown>) => {
+      const out: unknown[] = [];
+      for await (const e of it) {
+        const ev = e as { type: string; toolCallId?: string; delta?: string };
+        if (ev.type === EventType.TOOL_CALL_ARGS && ev.toolCallId?.endsWith("-widget")) out.push(JSON.parse(ev.delta!).widget);
+      }
+      return out;
+    };
+    const withPanel = await notesOf(
+      handleRun(input([ctxEntry({ openReport: { id: "abcdefghijkl" } })]), loaded, store, new AbortController().signal),
+    );
+    expect(withPanel).toEqual([{ kind: "grounding_note", claims: ["$990"], fromReport: ["$65", "https://example.com/riverside"] }]);
+    expect(evidence.hasUrl("https://example.com/riverside")).toBe(false);
+    expect(evidence.unverified("$65")).toEqual(["$65"]);
+    const panelClosed = await notesOf(handleRun(input([], "r2"), loaded, store, new AbortController().signal));
+    expect(panelClosed).toEqual([{ kind: "grounding_note", claims: ["$65", "https://example.com/riverside", "$990"] }]);
+  });
+
+  it("hands the session's last loaded report to the next run's loader", async () => {
+    const { store, ctx, cachedSeen } = setup();
+    const loaded = ctx(async (id) => ({ id, title: "T", text: "body" }));
+    const open = (runId: string) => input([ctxEntry({ openReport: { id: "abcdefghijkl" } })], runId);
+    await drain(handleRun(open("r1"), loaded, store, new AbortController().signal));
+    await drain(handleRun(open("r2"), loaded, store, new AbortController().signal));
+    expect(cachedSeen).toEqual([undefined, "abcdefghijkl"]);
   });
 
   it("clears the previous note on a run without the entry", async () => {

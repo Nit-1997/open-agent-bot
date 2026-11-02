@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultModelRef, pickModel } from "../../src/session/createSession.js";
+import { defaultModelRef, joinNotes, pickModel } from "../../src/session/createSession.js";
 
 const model = (provider: string, id: string) => ({ provider, id }) as never;
 
@@ -28,5 +28,22 @@ describe("defaultModelRef", () => {
     expect(defaultModelRef(h, "groq/x")).toBe("groq/x");
     expect(defaultModelRef(h, "openai/gone")).toBeNull();
     expect(defaultModelRef(h, undefined)).toBeNull();
+  });
+});
+
+describe("joinNotes", () => {
+  it("joins the notes that are present with a blank line, in order", () => {
+    expect(joinNotes("<workspace>a</workspace>", "<open_report>b</open_report>")).toBe(
+      "<workspace>a</workspace>\n\n<open_report>b</open_report>",
+    );
+    expect(joinNotes(undefined, "<open_report>b</open_report>")).toBe("<open_report>b</open_report>");
+    expect(joinNotes("<workspace>a</workspace>", undefined)).toBe("<workspace>a</workspace>");
+    expect(joinNotes("", "x")).toBe("x");
+  });
+
+  it("gives undefined when no note is present, so no context message is added", () => {
+    expect(joinNotes()).toBeUndefined();
+    expect(joinNotes(undefined, undefined)).toBeUndefined();
+    expect(joinNotes("", undefined)).toBeUndefined();
   });
 });

@@ -164,7 +164,8 @@ export const AskSchema = Type.Object({
 
 export const GroundingNoteSchema = Type.Object({
   kind: Type.Literal("grounding_note"),
-  claims: Type.Array(Str, { minItems: 1 }),
+  claims: Type.Array(Str),
+  fromReport: Type.Optional(Type.Array(Str, { minItems: 1 })),
 });
 
 const CartPickSchema = Type.Object({

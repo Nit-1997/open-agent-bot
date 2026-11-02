@@ -279,6 +279,40 @@ describe("grounding", () => {
     expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
   });
 
+  it("labels claims found only in the open report instead of counting them as sourced", () => {
+    const report = new Evidence();
+    report.add("Kirk Creek $45 a night, 4.5 stars, https://example.com/kirk");
+    const t = createTranslator({ ...ids(), reportEvidence: report });
+    const out = [
+      ...[searchEnd, assistantStart, delta("Kirk Creek is $45 and 4.5 stars; diyas $6.99; the lodge $990.")].flatMap((e) => t.translate(e)),
+      ...t.finish(),
+    ];
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$990"], fromReport: ["$45", "4.5 stars"] }]);
+  });
+
+  it("notes claims that are all from the open report with no unsourced list", () => {
+    const report = new Evidence();
+    report.add("Kirk Creek $45");
+    const t = createTranslator({ ...ids(), reportEvidence: report });
+    const out = [...[assistantStart, delta("Kirk Creek is $45.")].flatMap((e) => t.translate(e)), ...t.finish()];
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: [], fromReport: ["$45"] }]);
+  });
+
+  it("never makes a link or image from the open report clickable or sourced", () => {
+    const evidence = new Evidence();
+    const report = new Evidence();
+    report.add("https://example.com/kirk https://example.com/kirk.jpg $45");
+    const t = createTranslator({ ...ids(), evidence, reportEvidence: report });
+    const card = uiEnd([
+      { type: "cards", items: [{ title: "Kirk Creek", url: "https://example.com/kirk", image: "https://example.com/kirk.jpg" }] },
+    ]);
+    const [widget] = widgetArgs([...t.translate(card), ...t.finish()]);
+    expect(widget.blocks[0].items[0]).toEqual({ title: "Kirk Creek" });
+    expect(widget.removedLinks).toBe(1);
+    expect(evidence.hasUrl("https://example.com/kirk")).toBe(false);
+    expect(evidence.unverified("$45")).toEqual(["$45"]);
+  });
+
   it("turns research tool updates into workflow_step events", () => {
     const step = { workflow: "research", phase: "plan", status: "start" };
     const update = {

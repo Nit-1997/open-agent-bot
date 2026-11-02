@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
 import { type OpenReport, openReportNote } from "../artifacts/openReport.js";
+import { Evidence } from "../grounding/evidence.js";
 import type { AuthUser } from "../auth/verify.js";
 import type { ChatRepo, MessageRepo, NewMessage } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
@@ -35,7 +36,7 @@ export type RunContext = {
   messages: MessageRepo;
   profiles?: ProfileStore;
   workspace?: WorkspaceStore;
-  openReport?: (id: string) => Promise<OpenReport | null>;
+  openReport?: (id: string, cached?: OpenReport) => Promise<OpenReport | null>;
   timeLimitMs: number;
 };
 
@@ -115,9 +116,9 @@ async function claim(ctx: RunContext, chatId: string, model: string | undefined)
   }
 }
 
-async function openReportFor(ctx: RunContext, id: string | null): Promise<OpenReport | null> {
+async function openReportFor(ctx: RunContext, id: string | null, cached: OpenReport | undefined): Promise<OpenReport | null> {
   if (!id || !ctx.openReport) return null;
-  return ctx.openReport(id).catch((err) => {
+  return ctx.openReport(id, cached).catch((err) => {
     log.warn(`[run] user=${ctx.user.id} open report failed`, err);
     return null;
   });
@@ -182,9 +183,11 @@ export async function* handleRun(
   if (signal.aborted) return;
   entry.busy = true;
   entry.lastRunId = runId;
-  const openReport = await openReportFor(ctx, readOpenReport(input));
+  const openReport = await openReportFor(ctx, readOpenReport(input), entry.openReport);
+  if (openReport) entry.openReport = openReport;
   entry.setOpenReport?.(openReport ? openReportNote(openReport) : undefined);
-  if (openReport) entry.evidence?.add(openReport.text);
+  const reportEvidence = openReport ? new Evidence() : undefined;
+  reportEvidence?.add(openReport?.text ?? "");
   const savedPrompt = await persist(
     ctx,
     threadId,
@@ -205,7 +208,17 @@ export async function* handleRun(
     ]);
   };
   try {
-    for await (const e of runTurn({ input, entry, signal, ctx, last, history, userContext, stats: createStatsCollector() })) {
+    for await (const e of runTurn({
+      input,
+      entry,
+      signal,
+      ctx,
+      last,
+      history,
+      userContext,
+      reportEvidence,
+      stats: createStatsCollector(),
+    })) {
       transcript.see(e);
       if (isTerminal(e) && !(await saveReply(e.type === EventType.RUN_FINISHED ? "complete" : "interrupted")))
         yield custom(NOT_SAVED_EVENT, { message: REPLY_NOT_SAVED });
@@ -231,10 +244,11 @@ type Turn = {
   last: Message;
   history: HistoryMessage[] | undefined;
   userContext: UserContext | null;
+  reportEvidence: Evidence | undefined;
   stats: StatsCollector;
 };
 
-async function* runTurn({ input, entry, signal, ctx, last, history, userContext, stats }: Turn): AsyncGenerator<BaseEvent> {
+async function* runTurn({ input, entry, signal, ctx, last, history, userContext, reportEvidence, stats }: Turn): AsyncGenerator<BaseEvent> {
   const { threadId, runId } = input;
   entry.onRunStart?.();
 
@@ -269,7 +283,7 @@ async function* runTurn({ input, entry, signal, ctx, last, history, userContext,
     return custom("run_stats", stats.snapshot(turn));
   };
 
-  const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence });
+  const translator = createTranslator({ newId: randomUUID, evidence: entry.evidence, reportEvidence });
   const unsubscribe = entry.session.subscribe((e: PiEvent) => {
     logEvent(threadId, e);
     modelError = observe(stats, e) ?? modelError;
