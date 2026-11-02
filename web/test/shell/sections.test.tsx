@@ -2,8 +2,6 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSection } from "@/components/agent/AgentSection";
 import { EmptyState } from "@/components/chat/EmptyState";
-import { PlanDetail } from "@/components/plans/PlanDetail";
-import { PlansView } from "@/components/plans/PlansView";
 import { ReportDetail } from "@/components/reports/ReportDetail";
 import { ReportsView } from "@/components/reports/ReportsView";
 import { highlightParts } from "@/components/search/Highlight";
@@ -104,71 +102,6 @@ describe("ReportsView and ReportDetail", () => {
     phone.unmount();
     renderShell(<ReportDetail reportId={rid(9)} />);
     expect(await screen.findByText("This report doesn't exist or isn't yours.")).toBeInTheDocument();
-  });
-});
-
-const trip = {
-  kind: "plan",
-  entity: "trip",
-  id: "t1",
-  version: 1,
-  value: {
-    destination: "Big Sur",
-    start: "2026-11-14",
-    end: "2026-11-16",
-    travelers: 2,
-    stays: [{ name: "Bad link", url: "javascript:alert(1)" }],
-    days: [],
-  },
-};
-const planSummary = {
-  chatId: CHAT,
-  chatTitle: "Big Sur",
-  kind: "trip",
-  entityId: "t1",
-  key: "dDE",
-  title: "Big Sur",
-  line: "Big Sur, 2 travelers",
-  version: 1,
-  updatedAt: new Date().toISOString(),
-};
-
-describe("PlansView and PlanDetail", () => {
-  it("shows counts on the filter, replaces the URL on filter and shows the filtered empty state", async () => {
-    const counts = { cart: 0, trip: 1, event: 0, shortlist: 0, all: 1 };
-    routes["/api/plans?"] = (url) => {
-      const kind = new URL(url, "https://x").searchParams.get("kind");
-      const items = kind === "cart" ? [] : [planSummary];
-      return Response.json({ items, total: items.length, page: 1, pageSize: 12, counts });
-    };
-    const { rerender } = renderShell(<PlansView page={1} kind={null} />);
-    expect(await screen.findByRole("radio", { name: "All · 1" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("radio", { name: "Trips · 1" })).toBeInTheDocument();
-    expect(document.getElementById(`plans-row-${CHAT}-trip-dDE-view`)).toHaveAttribute("href", `/plans/${CHAT}/trip/dDE`);
-    fireEvent.click(screen.getByRole("radio", { name: "Carts · 0" }));
-    expect(nav.replace).toHaveBeenCalledWith("/plans?kind=cart");
-    rerender(<PlansView page={1} kind="cart" />);
-    expect(await screen.findByText(/No carts yet./)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show all plans" })).toBeInTheDocument();
-  });
-
-  it("renders a trip read-only with unsafe links as text, and explains 422 and 404", async () => {
-    routes[`/api/plans/${CHAT}/trip/dDE`] = () => Response.json({ plan: planSummary, widget: trip });
-    routes[`/api/plans/${CHAT}/trip/b2xk`] = () => Response.json({ error: "invalid_plan" }, { status: 422 });
-    routes[`/api/plans/${CHAT}/trip/bm9wZQ`] = () => Response.json({ error: "not_found" }, { status: 404 });
-    const { container, unmount } = renderShell(<PlanDetail chatId={CHAT} kind="trip" planKey="dDE" />);
-    expect(await screen.findByText("To change this plan, open its chat.")).toBeInTheDocument();
-    expect(container.querySelectorAll("input:not([disabled])")).toHaveLength(0);
-    expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
-    expect(screen.getByText("Bad link").tagName).toBe("SPAN");
-    expect(document.querySelector("[id^='plan-detail-trip-dDE']")).not.toBeNull();
-    expectUniqueIds(container);
-    unmount();
-    const second = renderShell(<PlanDetail chatId={CHAT} kind="trip" planKey="b2xk" />);
-    expect(await screen.findByText(/saved in an older shape/)).toBeInTheDocument();
-    second.unmount();
-    renderShell(<PlanDetail chatId={CHAT} kind="trip" planKey="bm9wZQ" />);
-    expect(await screen.findByText("This plan doesn't exist or isn't yours.")).toBeInTheDocument();
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeQuery } from "../../../shared/lists.js";
-import { entityIdFromKey, entityKey, safeHttpUrl } from "../../../shared/workspace.js";
+import { safeHttpUrl } from "../../../shared/workspace.js";
 
 describe("normalizeQuery", () => {
   it("removes control and format characters, normalises and collapses whitespace", () => {
@@ -17,25 +17,6 @@ describe("normalizeQuery", () => {
     expect(normalizeQuery("a".repeat(101))).toBeNull();
     expect(normalizeQuery(`${" ".repeat(398)}abc`)).toBeNull();
     expect(normalizeQuery(undefined)).toBeNull();
-  });
-});
-
-describe("entityKey", () => {
-  it.each(["..", ".", "a/b", "50%", "x?y#z", "Zürich trip", "t1", "😀 party", "x".repeat(100)])("round-trips %j", (id) => {
-    const key = entityKey(id);
-    expect(key).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(entityIdFromKey(key)).toBe(id);
-  });
-
-  it("rejects keys that aren't canonical, decode badly or decode to too much", () => {
-    expect(entityKey("t1")).toBe("dDE");
-    expect(entityIdFromKey("dDF")).toBeUndefined();
-    expect(entityIdFromKey("t2")).toBeUndefined();
-    expect(entityIdFromKey("_w")).toBeUndefined();
-    expect(entityIdFromKey(entityKey("x".repeat(101)))).toBeUndefined();
-    expect(entityIdFromKey("a")).toBeUndefined();
-    expect(entityIdFromKey("ab/c")).toBeUndefined();
-    expect(entityIdFromKey(42)).toBeUndefined();
   });
 });
 

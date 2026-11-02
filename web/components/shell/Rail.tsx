@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, MessageSquare, Plus, Search, SquareCheckBig } from "lucide-react";
+import { FileText, MessageSquare, Plus, Search } from "lucide-react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { AccountMenu } from "@/components/AccountMenu";
 import { hrefFor } from "@shared/routes";
@@ -60,7 +60,6 @@ export function Rail(props: { sidebarOpen: boolean; onToggleSidebar: () => void;
           onClick={() => (section === "search" ? document.getElementById(SEARCH_INPUT_ID)?.focus() : requestFocus("search"))}
         />
         <RailLink id="rail-reports" href="/reports" label="Reports" icon={FileText} active={section === "reports"} />
-        <RailLink id="rail-plans" href="/plans" label="Plans and carts" icon={SquareCheckBig} active={section === "plans"} />
         {props.showNewChat && <RailButton id="rail-new-chat" label="New chat" icon={Plus} onClick={newChat} />}
       </div>
       <div id="rail-bottom" className="flex flex-col items-center gap-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, MessageSquare, SquareCheckBig } from "lucide-react";
+import { FileText, MessageSquare, Search } from "lucide-react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { initials } from "@/lib/profile";
@@ -36,8 +36,8 @@ export function MobileTabs() {
       className="grid h-[calc(64px+env(safe-area-inset-bottom))] shrink-0 grid-cols-4 border-t border-surface pb-[env(safe-area-inset-bottom)]"
     >
       <Tab id="mobile-tabs-chat" href={chatHrefOf(shell.chats)} label="Chat" icon={MessageSquare} active={section === "chat"} />
+      <Tab id="mobile-tabs-search" href="/search" label="Search" icon={Search} active={section === "search"} />
       <Tab id="mobile-tabs-reports" href="/reports" label="Reports" icon={FileText} active={section === "reports"} />
-      <Tab id="mobile-tabs-plans" href="/plans" label="Plans" icon={SquareCheckBig} active={section === "plans"} />
       <button
         id="mobile-tabs-you"
         type="button"

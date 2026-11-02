@@ -114,7 +114,7 @@ describe("focus requests", () => {
     );
     await flush();
     act(() => shellRef.current!.requestFocus("search"));
-    await go("/plans");
+    await go("/chats");
     const sidebar = byId("sidebar-search-input");
     sidebar.focus();
     await go("/search?q=ta");

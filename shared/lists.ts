@@ -1,9 +1,7 @@
-import type { EntityKind } from "./workspace.ts";
 import type { PageResponse } from "./pages.ts";
 
 export const CHATS_PAGE_SIZE = 20;
 export const REPORTS_PAGE_SIZE = 12;
-export const PLANS_PAGE_SIZE = 12;
 export const SEARCH_PAGE_SIZE = 10;
 export const SEARCH_MIN = 3;
 export const SEARCH_MAX = 100;
@@ -24,21 +22,6 @@ export type ReportSummary = {
   pdfReady: boolean;
   sizeBytes: number;
 };
-
-export type PlanSummary = {
-  chatId: string;
-  chatTitle: string;
-  kind: EntityKind;
-  entityId: string;
-  key: string;
-  title: string;
-  line: string;
-  version: number;
-  updatedAt: string;
-};
-
-export type PlanCounts = Record<EntityKind, number> & { all: number };
-export type PlansResponse = PageResponse<PlanSummary> & { counts: PlanCounts };
 
 export type Snippet = { text: string; truncatedStart: boolean; truncatedEnd: boolean };
 

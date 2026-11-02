@@ -2,15 +2,12 @@ import { ARTIFACT_ID_RE } from "./artifacts.ts";
 import { normalizeId } from "./ids.ts";
 import { isSearchScope, normalizeQuery, type SearchScope } from "./lists.ts";
 import { parsePage } from "./pages.ts";
-import { type EntityKind, entityIdFromKey, isEntityKind } from "./workspace.ts";
 
 export type Route =
   | { section: "chat"; chatId: string | null; report: string | null }
   | { section: "chats"; page: number }
   | { section: "reports"; page: number }
   | { section: "report"; id: string }
-  | { section: "plans"; page: number; kind: EntityKind | null }
-  | { section: "plan"; chatId: string; kind: EntityKind; key: string; entityId: string }
   | { section: "search"; q: string | null; scope: SearchScope; page: number }
   | { section: "admin" };
 
@@ -23,7 +20,7 @@ const pageOf = (params: Params) => parsePage(params.get("page")) ?? 1;
 export function parseRoute(pathname: string, params: Params = new URLSearchParams()): Route | null {
   const parts = pathname.split("/").slice(1);
   if (parts.length > 1 && parts.at(-1) === "") parts.pop();
-  const [head, a, b, c, ...rest] = parts;
+  const [head, a, b, ...rest] = parts;
   if (rest.length) return null;
   switch (head) {
     case "":
@@ -40,16 +37,6 @@ export function parseRoute(pathname: string, params: Params = new URLSearchParam
     case "reports": {
       if (a === undefined) return { section: "reports", page: pageOf(params) };
       return ARTIFACT_ID_RE.test(a) && b === undefined ? { section: "report", id: a } : null;
-    }
-    case "plans": {
-      if (a === undefined) {
-        const kind = params.get("kind");
-        return { section: "plans", page: pageOf(params), kind: isEntityKind(kind) ? kind : null };
-      }
-      const chatId = normalizeId(a);
-      const entityId = c === undefined ? undefined : entityIdFromKey(c);
-      if (!chatId || !isEntityKind(b) || entityId === undefined) return null;
-      return { section: "plan", chatId, kind: b, key: c as string, entityId };
     }
     case "search": {
       if (a !== undefined) return null;
@@ -80,10 +67,6 @@ export function hrefFor(route: Route): string {
       return withQuery("/reports", { page: pageParam(route.page) });
     case "report":
       return `/reports/${route.id}`;
-    case "plans":
-      return withQuery("/plans", { kind: route.kind, page: pageParam(route.page) });
-    case "plan":
-      return `/plans/${route.chatId}/${route.kind}/${route.key}`;
     case "search":
       return withQuery("/search", { q: route.q, scope: route.scope === "all" ? null : route.scope, page: pageParam(route.page) });
     case "admin":

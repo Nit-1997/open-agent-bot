@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentCard } from "@/components/shell/AgentCard";
@@ -9,6 +11,9 @@ import { ChatList } from "@/components/chat/ChatList";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { useShell } from "@/components/shell/ShellProvider";
 import { DEFAULT_AGENT } from "@shared/profile";
+import { parseRoute } from "@shared/routes";
+import MissingPage from "@/app/(app)/[...missing]/page";
+import ShellNotFound from "@/app/(app)/not-found";
 import { chatIndex } from "@/lib/chatIndex";
 import { render } from "@testing-library/react";
 import { copilot } from "../support/copilot";
@@ -63,6 +68,8 @@ describe("Rail", () => {
     expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Chats" })).not.toHaveAttribute("aria-current");
+    expect(document.getElementById("rail-plans")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Plans/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "New chat" })).toBeNull();
     const toggle = screen.getByRole("button", { name: "Collapse sidebar" });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -233,6 +240,18 @@ describe("ChatHeader", () => {
   });
 });
 
+describe("removed Plans section", () => {
+  it("falls through to the shell's not-found page", () => {
+    expect(parseRoute("/plans")).toBeNull();
+    expect(parseRoute("/plans/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trip/dDE")).toBeNull();
+    expect(existsSync(join(process.cwd(), "app/(app)/plans"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "app/api/plans"))).toBe(false);
+    expect(() => MissingPage()).toThrow("notFound");
+    render(<ShellNotFound />);
+    expect(document.getElementById("shell-not-found-title")).toHaveTextContent("This page doesn't exist.");
+  });
+});
+
 describe("phone chrome", () => {
   it("top bar shows the agent on chat routes and the section title elsewhere; tabs mark the current page; You opens the sheet", async () => {
     mockViewport(390);
@@ -249,6 +268,12 @@ describe("phone chrome", () => {
     await act(async () => nav.go("/reports"));
     expect(document.getElementById("mobile-topbar-title")).toHaveTextContent("Reports");
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
+    const tabs = document.getElementById("mobile-tabs")!;
+    expect([...tabs.children].map((t) => t.textContent)).toEqual(["Chat", "Search", "Reports", expect.stringMatching(/You$/)]);
+    expect(document.getElementById("mobile-tabs-plans")).toBeNull();
+    await act(async () => nav.go("/search"));
+    expect(document.getElementById("mobile-tabs-search")).toHaveAttribute("aria-current", "page");
+    expect(document.getElementById("mobile-tabs-reports")).not.toHaveAttribute("aria-current");
     expectUniqueIds(container);
     const you = screen.getByRole("button", { name: /You/ });
     fireEvent.click(you);

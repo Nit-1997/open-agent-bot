@@ -9,8 +9,6 @@ const TITLES = {
   chats: "All chats",
   reports: "Reports",
   report: "Reports",
-  plans: "Plans",
-  plan: "Plans",
   search: "Search",
   admin: "",
 } as const;

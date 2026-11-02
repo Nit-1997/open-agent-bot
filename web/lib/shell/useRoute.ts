@@ -10,7 +10,7 @@ export function useRoute(): Route | null {
   return useMemo(() => parseRoute(pathname, params), [pathname, params]);
 }
 
-export type NavSection = "chat" | "search" | "reports" | "plans";
+export type NavSection = "chat" | "search" | "reports";
 
 export function navSectionOf(route: Route | null): NavSection | null {
   switch (route?.section) {
@@ -22,9 +22,6 @@ export function navSectionOf(route: Route | null): NavSection | null {
     case "reports":
     case "report":
       return "reports";
-    case "plans":
-    case "plan":
-      return "plans";
     default:
       return null;
   }
