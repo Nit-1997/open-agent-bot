@@ -16,6 +16,7 @@ import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import type { CartEdits, PlanEdits, WorkspaceEdits } from "@shared/workspace";
 import { withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
+import { useAgentMessages } from "@/lib/useAgentMessages";
 import { threadAgentId, useThreadContext } from "@/lib/useThreadContext";
 import type { BrowserFrame } from "./LiveBrowser";
 import { QUIET_ANSWER, TurnView } from "./TurnView";
@@ -64,7 +65,8 @@ export function ChatSession(props: ChatSessionProps) {
   const [below, setBelow] = useState(false);
 
   const [workflow, setWorkflow] = useState<Record<string, WorkflowStepEvent[]>>({});
-  const turns = useMemo(() => withWorkflow(buildTurns(agent.messages as readonly ChatMessage[]), workflow), [agent.messages, workflow]);
+  const messages = useAgentMessages(agent) as readonly ChatMessage[];
+  const turns = useMemo(() => withWorkflow(buildTurns(messages), workflow), [messages, workflow]);
   const running = sending || agent.isRunning;
   const lastId = turns.at(-1)?.id;
   const lastRef = useRef(lastId);
@@ -94,13 +96,9 @@ export function ChatSession(props: ChatSessionProps) {
 
   const { onRunningChange, onClaimed, onRunEnd, onReports, onReportReady } = props;
   const reports = useMemo(() => reportsIn(turns), [turns]);
-  const reportKey = reports.map((r) => `${r.reportId}:${r.title}`).join("|");
-  const sentReports = useRef<string | null>(null);
   useEffect(() => {
-    if (sentReports.current === reportKey) return;
-    sentReports.current = reportKey;
     onReports?.(reports);
-  });
+  }, [reports, onReports]);
   const toolCalls = useRef(new Map<string, { name: string; title?: string }>());
   const claim = useRef<{ text: string; waiting: boolean; done: boolean }>({ text: "", waiting: false, done: false });
   useEffect(() => {
@@ -143,6 +141,7 @@ export function ChatSession(props: ChatSessionProps) {
         const call = toolCalls.current.get(event.toolCallId);
         const content = typeof event.content === "string" ? event.content : "";
         const reportId = parseArtifactId(content);
+        toolCalls.current.delete(event.toolCallId);
         if (!call || !REPORT_TOOLS.has(call.name) || !reportId) return;
         const title = call.title?.trim() || reportTitleIn(content) || "Report";
         onReportReady?.({ reportId, toolCallId: event.toolCallId, title, tool: call.name });
