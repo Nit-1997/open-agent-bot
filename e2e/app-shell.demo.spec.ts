@@ -2,12 +2,8 @@ import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import { expectContrast, expectNoHorizontalScroll } from "./support/a11y";
 import { mockReportRun } from "./support/reportRun";
-import { BIG_SUR, BIG_SUR_REPORT, LIVE_REPORT, SECOND_REPORT, SEED, TRIP_ID } from "./support/seed";
+import { BIG_SUR, BIG_SUR_REPORT, CART_CARD_ID, LIVE_REPORT, SECOND_REPORT, SEED, TRIP_CARD_ID } from "./support/seed";
 import { seeded } from "./support/state";
-
-function entityKey(id: string): string {
-  return Buffer.from(id, "utf8").toString("base64url");
-}
 
 const composer = (page: Page) => page.locator("main [id$='-composer-input']:visible");
 const setTheme = async (page: Page, dark: boolean) => {
@@ -24,7 +20,7 @@ const historyLength = (page: Page) => page.evaluate(() => window.history.length)
 
 test.describe.configure({ mode: "serial" });
 
-test("desktop: first run, sidebar, chats, search, reports, plans, account and resize @desktop", async ({ page }) => {
+test("desktop: first run, sidebar, chats, search, reports, saved cards, account and resize @desktop", async ({ page }) => {
   const s = seeded();
   let chatCount: number = SEED.chats;
 
@@ -282,30 +278,32 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     await expect(page).toHaveURL(new RegExp(`/chats/${s.bigSur}$`));
   });
 
-  await test.step("7. Plans: counts, the trip filter and a read-only trip", async () => {
-    await page.locator("#rail-plans").click();
-    await expect(page.locator("#plans-filter-all")).toHaveText("All · 4");
-    await expect(page.locator("#plans-filter-trip")).toHaveText("Trips · 1");
-    await page.locator("#plans-filter-trip").click();
-    await expect(page).toHaveURL(/\/plans\?kind=trip$/);
-    const key = entityKey(TRIP_ID);
-    await page.locator(`#plans-row-${s.tripChat}-trip-${key}-view`).click();
-    await expect(page).toHaveURL(new RegExp(`/plans/${s.tripChat}/trip/${key}$`));
-    await expect(page.locator("#plan-detail-header-title")).toHaveText("Big Sur");
-    await expect(page.locator("#plan-detail-inner input:enabled")).toHaveCount(0);
-    await page.locator("#plan-detail-open-chat").click();
-    await expect(page).toHaveURL(new RegExp(`/chats/${s.tripChat}$`));
+  await test.step("7. Cards from earlier sessions are read-only", async () => {
+    const cart = `#chat-pane-${s.cartChat}-cart-${CART_CARD_ID}`;
+    const lockedCart = async () => {
+      await expect(page.locator(`${cart}-locked-note`)).toContainText("Prices from");
+      await expect(page.locator(`${cart}-locked-note`)).toContainText("ask Sage to refresh");
+      await expect(page.locator(`${cart} [id$='-dec']`).first()).toBeDisabled();
+      for (const b of await page.locator(`${cart} [id$='-dec'], ${cart} [id$='-inc']`).all()) await expect(b).toBeDisabled();
+      await expect(page.locator(`${cart} [id$='-swap'], ${cart} [id$='-remove']`)).toHaveCount(0);
+    };
+    await page.goto(`/chats/${s.cartChat}`);
+    await lockedCart();
+    await page.reload();
+    await lockedCart();
+    const trip = `#chat-pane-${s.bigSur}-plan-${TRIP_CARD_ID}`;
+    await page.goto(`/chats/${s.bigSur}`);
+    await expect(page.locator(`${trip}-locked-note`)).toContainText(/^From .+ · ask Sage to update it$/);
+    await expect(page.locator(`${trip} input:enabled`)).toHaveCount(0);
   });
 
   await test.step("8. Deep links, other people's chats and signed-out redirects", async () => {
     const extra = await page.context().newPage();
     await extra.goto(`/reports/${s.reports[1]}`);
     await expect(extra.locator("#report-detail-frame")).toBeVisible();
-    await extra.goto(`/plans/${s.tripChat}/trip/${entityKey(TRIP_ID)}`);
-    await expect(extra.locator("#plan-detail-header-title")).toHaveText("Big Sur");
     await extra.goto(`/chats/${s.otherChat}`);
     await expect(extra.locator(`#chat-pane-${s.otherChat}-missing-title`)).toHaveText("This chat doesn't exist or isn't yours.");
-    await extra.goto(`/plans/${s.tripChat}/trip/..`);
+    await extra.goto("/plans");
     await expect(extra.locator("#shell-not-found-title")).toHaveText("This page doesn't exist.");
     await expect(extra.locator("#rail")).toBeVisible();
     await extra.close();
@@ -329,7 +327,7 @@ test("desktop: first run, sidebar, chats, search, reports, plans, account and re
     await page.keyboard.press("Escape");
     for (const dark of [false, true]) {
       await setTheme(page, dark);
-      for (const path of ["/", "/search?q=big", "/reports", "/plans"]) {
+      for (const path of ["/", "/search?q=big", "/reports", `/chats/${s.cartChat}`]) {
         await page.goto(path);
         await page.locator("#shell-main").waitFor();
         await page.waitForTimeout(400);
@@ -426,7 +424,7 @@ test("phone: top bar, tabs, drawer and account sheet @phone", async ({ page }) =
     await expect(page.locator("#mobile-topbar-name")).toHaveText("Milo");
     for (const [tab, path] of [
       ["#mobile-tabs-reports", /\/reports$/],
-      ["#mobile-tabs-plans", /\/plans$/],
+      ["#mobile-tabs-search", /\/search$/],
       ["#mobile-tabs-chat", /\/(chats\/[0-9a-f-]+)?$/],
     ] as const) {
       await page.locator(tab).click();
@@ -434,6 +432,14 @@ test("phone: top bar, tabs, drawer and account sheet @phone", async ({ page }) =
       await expect(page.locator(tab)).toHaveAttribute("aria-current", "page");
       await expectNoHorizontalScroll(page, tab);
     }
+    const cartChat = seeded().cartChat;
+    const cart = page.locator(`#chat-pane-${cartChat}-cart-${CART_CARD_ID}`);
+    await page.goto(`/chats/${cartChat}`);
+    await expect(page.locator(`#chat-pane-${cartChat}-cart-${CART_CARD_ID}-locked-note`)).toContainText("ask Milo to refresh");
+    const box = await cart.boundingBox();
+    expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+    await expectNoHorizontalScroll(page, "the cart chat");
+    await page.goto("/");
     await page.locator("#mobile-topbar-menu").click();
     const drawer = page.locator("#mobile-drawer-panel");
     await expect(page.locator("#mobile-drawer-close")).toBeFocused();
