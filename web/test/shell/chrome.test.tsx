@@ -51,7 +51,10 @@ beforeEach(() => {
   localStorage.clear();
   document.documentElement.classList.remove("dark");
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 function RailHost() {
   const { sidebar } = useShell();
@@ -156,6 +159,8 @@ describe("Rail", () => {
 
 describe("ChatList", () => {
   it("groups newest first, marks the active chat, shows 20 of 24 and appends the next page", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 5, 15, 23, 0));
     vi.stubGlobal("fetch", chatsFixture(24));
     nav.reset(`/chats/${id(2)}`);
     const { container } = renderShell(<ChatList id="chat-list-sidebar" variant="sidebar" />);
