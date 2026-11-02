@@ -39,6 +39,33 @@ describe("proxy sign-in redirect", () => {
   });
 });
 
+describe("proxy landing page", () => {
+  const frameSrc = (res: Response) => (res.headers.get("content-security-policy") ?? "").split("; ").find((d) => d.startsWith("frame-src"));
+
+  it("shows signed-out visitors the landing page with the YouTube player allowed", async () => {
+    for (const path of ["/", "/landing"]) {
+      const res = await proxy(new NextRequest(`${APP_ORIGIN}${path}`));
+      expect(res.status).toBe(200);
+      expect(frameSrc(res)).toBe("frame-src 'self' https://www.youtube-nocookie.com");
+    }
+  });
+
+  it("keeps frames locked to the app everywhere else", async () => {
+    const res = await proxy(new NextRequest(`${APP_ORIGIN}/login`));
+    expect(frameSrc(res)).toBe("frame-src 'self'");
+  });
+
+  it("gives signed-in users the app at / without the YouTube allowance", async () => {
+    vi.mocked(updateSession).mockResolvedValue({
+      response: NextResponse.next(),
+      session: { user: { id: "u1", email: "a@b.c", name: "", isAdmin: false }, unavailable: false },
+    });
+    const res = await proxy(new NextRequest(`${APP_ORIGIN}/`));
+    expect(res.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(frameSrc(res)).toBe("frame-src 'self'");
+  });
+});
+
 describe("proxy signed-out report frames", () => {
   const url = `${APP_ORIGIN}/api/artifacts/AbCdEf_-1234`;
 
