@@ -4,7 +4,18 @@ import type { AgentPersona, Profile } from "@shared/profile";
 import { agentPersona } from "@shared/profile";
 import { hrefFor, parseRoute } from "@shared/routes";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import type { ModelList } from "@/lib/models";
 import { currentBreakpoint, useBreakpoint } from "@/lib/shell/breakpoints";
 import {
@@ -93,9 +104,9 @@ export function ShellProvider(props: {
     if (BREAKPOINT_OVERLAYS.has(overlay)) setOverlay("none");
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     chatsRef.current = chats;
-  }, [chats]);
+  });
 
   const activeThread = chats.threads[chats.activeId];
   const reportInline =

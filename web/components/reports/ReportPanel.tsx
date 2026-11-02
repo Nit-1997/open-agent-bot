@@ -50,9 +50,12 @@ export function ReportPanel(props: {
     closeRef.current = onClose;
   });
 
+  const inputFor = useRef(reportId);
   useEffect(() => {
+    if (inputFor.current === reportId) return;
+    inputFor.current = reportId;
     userInput.current = false;
-  }, [reportId]);
+  });
 
   useFocusTrap(ref, modalActive);
 

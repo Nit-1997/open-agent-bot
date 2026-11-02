@@ -166,6 +166,7 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
   const lastShown = useRef<string | null>(null);
   useEffect(() => {
     const prev = lastShown.current;
+    if (prev === shownId) return;
     lastShown.current = shownId;
     if (shownId && focusTitle.current) {
       focusTitle.current = false;
@@ -179,7 +180,7 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
       const card = ref && document.getElementById(widgetId("artifact-card", ref.toolCallId, id));
       (card ?? document.getElementById(composerId))?.focus();
     });
-  }, [shownId, id, composerId]);
+  });
 
   if (!thread) return null;
   const phone = breakpoint === "phone";

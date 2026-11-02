@@ -95,13 +95,12 @@ export function ChatSession(props: ChatSessionProps) {
   const { onRunningChange, onClaimed, onRunEnd, onReports, onReportReady } = props;
   const reports = useMemo(() => reportsIn(turns), [turns]);
   const reportKey = reports.map((r) => `${r.reportId}:${r.title}`).join("|");
-  const reportsRef = useRef(reports);
+  const sentReports = useRef<string | null>(null);
   useEffect(() => {
-    reportsRef.current = reports;
-  }, [reports]);
-  useEffect(() => {
-    onReports?.(reportsRef.current);
-  }, [reportKey, onReports]);
+    if (sentReports.current === reportKey) return;
+    sentReports.current = reportKey;
+    onReports?.(reports);
+  });
   const toolCalls = useRef(new Map<string, { name: string; title?: string }>());
   const claim = useRef<{ text: string; waiting: boolean; done: boolean }>({ text: "", waiting: false, done: false });
   useEffect(() => {
