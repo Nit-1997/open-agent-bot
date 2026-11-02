@@ -701,6 +701,40 @@ Spec review on 2026-11-01, against the code at `a34de8a`, the live database and 
 12. **Smaller fixes.** `chatHrefOf` adds `?report=` on desktop only (not `MobileTabs`). The panel slot only exists for ready or draft chats. The modal is at `z-30` under `ShellOverlays`. Focus returns after `inert` is removed. The modal's Escape listener ignores keys while a shell overlay is open. Inert reach is described correctly. `mist` became `mist-500`. Hydration renders `desktop` first. The `create_artifact` description no longer promises "inline … full screen".
 13. **Cut.** The per-pane metadata cache (one cheap fetch per swap) and the thumbnail size cap.
 
-## Build notes
+## Build notes (2026-11-01)
 
-Empty until the build. Record outcomes of "Claims to verify", deviations and review fixes here, as the app shell spec does.
+What the build changed or settled, and why.
+
+### Claims to verify: outcomes
+
+1. **A hidden, inert iframe keeps its document.** Verified. E2E 6b.6 marks the panel's iframe, goes to Reports with the rail and back with the rail's Chats (which carries `?report=` on desktop), and finds the same node with zero new `/api/artifacts/` requests. The component test also keeps one frame across a pane switch, a trip to `/reports` and both breakpoints.
+2. **A report's script can't take focus from the composer.** Verified in Chromium. The seeded `e2eReport002` calls `window.focus()` and focuses a button on load; after the reload with it open (6b.5) and after the mocked auto-open (6b.10), the composer still has focus 1.5 s later. The guard itself is covered by component tests (frame takes focus with no input after a URL open: focus goes back; after a `pointerdown` in the panel: left alone).
+3. **The thumbnail shows the desktop layout.** Verified on desktop: the lazily rendered thumbnails of the two seeded Big Sur reports load (6b.2, `naturalWidth > 0`) and read well at 320×128 in a screenshot of the run. The viewport stays 800×320 at 1.5×. The phone card (358×150) was not inspected separately.
+4. **`pointer-events: none` keeps the drag going.** Verified in Chromium (6b.4 drags the grip to about 50 % and lands at 48–52). The Safari check was not done.
+5. **`inertOutside` with `aria-modal` hides the chat from screen readers.** Not done (no VoiceOver or NVDA session). The component test checks `inert` lands on the rail, the chat column and the status line, never on the backdrop or `#shell-frame`, and is removed exactly.
+6. **The migration applies as written.** Applied with the MCP as `20261102000914_artifact_thumbnails`; the bucket now allows `text/html`, `application/pdf` and `image/jpeg`. Security advisors: nothing new (the eight INFO `rls_enabled_no_policy` rows and the two auth WARNs are unchanged). Performance advisors: only the existing INFO `unused_index` rows. `repos.int.test.ts` uploads and downloads a `jpg`, checks `thumb_path = <user>/<id>.jpg` and that another user's `setThumb` is a no-op.
+7. **CopilotKit 1.83 accepts the mocked stream.** Verified with the fixture as specified (`e2e/support/reportRun.ts`): `data: <json>\n\n` lines of `RUN_STARTED` (echoing the request's `threadId` and `runId`), `TOOL_CALL_START/ARGS/END`, `TOOL_CALL_RESULT` (`role: "tool"`), one text message and `RUN_FINISHED`, served for `**/api/copilotkit/agent/openagent/run` with `{ times: 1 }`. The card appears, the panel auto-opens on "3 of 3" and the run ends normally. The recorded request body carries the `open_report` entry for `e2eReport001`.
+8. **The open-report note helps on a real model.** Verified once with the e2e user and DeepSeek V4 Flash: the seeded `e2eReport001` HTML was replaced by a table of three stays ($1,450, $385, $45), the chat opened with `?report=e2eReport001`, and "What's the cheapest option in this report?" got "The cheapest option in the report is Kirk Creek Campground at $45/night." The first try also showed the grounding note "Not found in the sources I read: $45, $385"; see "Open report counts as evidence".
+
+### Deviations
+
+- **Effects in production.** In the production build, after `useAgent` swaps its provisional agent for the registered one, `ChatSession`'s dependency-keyed effects (`[reportKey]`, `[turns]`) did not re-run for the restored history, although an effect without deps did. The panel then never got the report list ("Report" instead of "1 of 2"). The jsdom tests didn't show it. The root cause (React, Next or CopilotKit) is not identified. `onReports` now runs in an every-commit effect that compares with the key it last sent; `useReportUrl`, the focus return in `ChatPane` and the reset in `ReportPanel` compare with refs the same way, and `ShellProvider` updates `chatsRef` in an every-commit layout effect.
+- **Back on phone.** On the second open and `page.goBack()` in 13b, the URL went back but the route's `report` didn't change, so the viewer stayed open. `useReportUrl` now also listens for `popstate` and reads `window.location` directly; the route comparison stays for links and forward navigation.
+- **Open report counts as evidence.** The loaded report's clipped text is added to the run's `Evidence`, so the grounding note doesn't flag the report's own numbers as unverified.
+- **Focus guard input.** Besides `pointerdown` and `keydown` in the panel, `pointerover` on the frame counts as user input: a click inside the frame never reaches the parent page, so without it the guard could pull focus out of a report the user just clicked into within 3 s.
+- **Route tests.** The artifact route tests moved from `test/artifacts.test.tsx` (deleted with `ArtifactCard`) to `web/test/api/artifacts.test.ts`, not `test/api/routes.test.ts`. Frame error pages apply to `sec-fetch-dest` `iframe`, `frame` and `document`, including a bad id and an auth failure; the 429 page reads `Retry-After` or the body's `retryAfter` (60 s if neither), and error responses now pass `Retry-After` through.
+- **Agent shapes.** `ArtifactStore` takes its renderers positionally (`render`, `renderThumb`). `ArtifactListRow` leaves out `thumbReady` (the list doesn't select `thumb_path`). `ShellApi.report.setWidth(fraction, commit = true)` writes `oa.reportPanel` only on commit.
+- **Seed.** `e2eReport002` is "Big Sur campgrounds" (second card, with the focus script) and `e2eReport003` is "Packing list"; both belong to the Big Sur chat. `SEED.reports` stays 13.
+- **E2E structure.** The phone test's sign-out moved from step 13 to a new step 14, so 13b runs while signed in. 6b ends by closing the panel, so step 7's "Open chat" lands on `/chats/<id>` without a restored `?report=`. Contrast in 13b toggles the `dark` class directly (the account sheet is behind the modal viewer).
+- **Contrast.** axe `color-contrast` passes on the panel and cards (desktop) and the phone viewer in both themes with the tokens as specified; no token changed.
+
+### Results
+
+- Agent: `npm test` 1026 passed, 36 skipped; `npm run test:supabase` 31 passed; typecheck, lint and build clean.
+- Web: 424 tests in 47 files; `tsc --noEmit`, `eslint .` and `npm run build` clean.
+- E2E: `npx playwright test` 3/3 (desktop, tablet, phone), twice in a row.
+
+### Not done
+
+- Manual Safari drag check (claim 4) and VoiceOver/NVDA check (claim 5).
+- The demo recording (`make-demo.mjs`); the owner records it.
