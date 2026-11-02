@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { groupByDate, groupItems } from "@/lib/dateGroups";
 import { isolate, knowsSummary, rememberLine } from "@/lib/persona";
 import { currentBreakpoint } from "@/lib/shell/breakpoints";
-import { chatReducer, initialChatState, isUntouchedDraft, MAX_PANES, mountedIds } from "@/lib/shell/chatController";
+import { chatReducer, initialChatState, isUntouchedDraft, MAX_PANELS, MAX_PANES, mountedIds } from "@/lib/shell/chatController";
 import { readSidebarOpen, writeSidebarOpen } from "@/lib/shell/sidebarPref";
 import { mockViewport } from "../support/media";
 
@@ -159,5 +159,49 @@ describe("chatController", () => {
     s = chatReducer(s, { type: "model", id: "c1", model: "openrouter/x" });
     expect(s.threads.c1).toMatchObject({ status: "ready", title: "T", model: "openrouter/x" });
     expect(s.threads.d0.model).toBeUndefined();
+  });
+
+  it("opens and closes a chat's report, and the same report again is a no-op", () => {
+    let s = chatReducer(initialChatState("d0"), { type: "open", id: "c1" });
+    s = chatReducer(s, { type: "openReport", id: "c1", reportId: "r1", how: "user" });
+    expect(s.panels.c1).toEqual({ reportId: "r1", how: "user", pushed: false });
+    const same = chatReducer(s, { type: "openReport", id: "c1", reportId: "r1", how: "url" });
+    expect(same).toBe(s);
+    s = chatReducer(s, { type: "openReport", id: "c1", reportId: "r2", how: "auto", pushed: true });
+    expect(s.panels.c1).toEqual({ reportId: "r2", how: "auto", pushed: true });
+    s = chatReducer(s, { type: "closeReport", id: "c1" });
+    expect(s.panels.c1).toBeUndefined();
+    expect(chatReducer(s, { type: "closeReport", id: "c1" })).toBe(s);
+  });
+
+  it("sets run flags only while running, counts user swaps as picked, and resets them on a new run", () => {
+    let s = chatReducer(initialChatState("d0"), { type: "open", id: "c1" });
+    s = chatReducer(s, { type: "openReport", id: "c1", reportId: "r1", how: "user" });
+    s = chatReducer(s, { type: "closeReport", id: "c1" });
+    expect(s.threads.c1.runFlags).toBeUndefined();
+    s = chatReducer(s, { type: "running", id: "c1", running: true });
+    expect(s.threads.c1.runFlags).toEqual({ dismissed: false, picked: false });
+    s = chatReducer(s, { type: "openReport", id: "c1", reportId: "r1", how: "auto" });
+    expect(s.threads.c1.runFlags).toEqual({ dismissed: false, picked: false });
+    s = chatReducer(s, { type: "openReport", id: "c1", reportId: "r2", how: "user" });
+    expect(s.threads.c1.runFlags).toEqual({ dismissed: false, picked: true });
+    s = chatReducer(s, { type: "closeReport", id: "c1" });
+    expect(s.threads.c1.runFlags).toEqual({ dismissed: true, picked: true });
+    s = chatReducer(s, { type: "running", id: "c1", running: false });
+    s = chatReducer(s, { type: "running", id: "c1", running: true });
+    expect(s.threads.c1.runFlags).toEqual({ dismissed: false, picked: false });
+  });
+
+  it("keeps panels when an idle thread is pruned, and caps them at 20", () => {
+    let s = chatReducer(initialChatState("d0"), { type: "open", id: "c1" });
+    s = chatReducer(s, { type: "openReport", id: "c1", reportId: "r1", how: "user" });
+    s = chatReducer(s, { type: "open", id: "c2" });
+    expect(s.threads.c1).toBeUndefined();
+    expect(s.panels.c1).toEqual({ reportId: "r1", how: "user", pushed: false });
+    for (let i = 0; i < MAX_PANELS + 5; i++) s = chatReducer(s, { type: "openReport", id: `t${i}`, reportId: `r${i}`, how: "url" });
+    expect(Object.keys(s.panels)).toHaveLength(MAX_PANELS);
+    expect(s.panels.c1).toBeUndefined();
+    expect(s.panels.t0).toBeUndefined();
+    expect(s.panels[`t${MAX_PANELS + 4}`]).toBeDefined();
   });
 });

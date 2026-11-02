@@ -1,6 +1,7 @@
 import type { HistoryMessage } from "@/lib/chats";
 
 export const MAX_PANES = 3;
+export const MAX_PANELS = 20;
 
 export type ThreadStatus = "draft" | "loading" | "ready" | "missing" | "error";
 
@@ -15,9 +16,20 @@ export type Thread = {
   used: boolean;
   claimed: boolean;
   attempt: number;
+  runFlags?: RunFlags;
 };
 
-export type ChatState = { draftId: string; activeId: string; threads: Record<string, Thread>; running: string[] };
+export type RunFlags = { dismissed: boolean; picked: boolean };
+export type PanelHow = "user" | "auto" | "url";
+export type Panel = { reportId: string; how: PanelHow; pushed: boolean };
+
+export type ChatState = {
+  draftId: string;
+  activeId: string;
+  threads: Record<string, Thread>;
+  running: string[];
+  panels: Record<string, Panel>;
+};
 
 export type ChatAction =
   | { type: "showDraft"; freshId: string }
@@ -28,7 +40,9 @@ export type ChatAction =
   | { type: "retry"; id: string }
   | { type: "running"; id: string; running: boolean }
   | { type: "claimed"; id: string; title: string }
-  | { type: "model"; id: string; model: string };
+  | { type: "model"; id: string; model: string }
+  | { type: "openReport"; id: string; reportId: string; how: PanelHow; pushed?: boolean }
+  | { type: "closeReport"; id: string };
 
 const draft = (id: string, starter?: string): Thread => ({
   id,
@@ -41,7 +55,7 @@ const draft = (id: string, starter?: string): Thread => ({
 });
 
 export function initialChatState(draftId: string, starter?: string): ChatState {
-  return { draftId, activeId: draftId, threads: { [draftId]: draft(draftId, starter) }, running: [] };
+  return { draftId, activeId: draftId, threads: { [draftId]: draft(draftId, starter) }, running: [], panels: {} };
 }
 
 export const paneId = (threadId: string) => `chat-pane-${threadId}`;
@@ -60,6 +74,20 @@ function prune(s: ChatState): ChatState {
 
 const patch = (s: ChatState, id: string, p: Partial<Thread>): ChatState =>
   s.threads[id] ? { ...s, threads: { ...s.threads, [id]: { ...s.threads[id], ...p } } } : s;
+
+function flag(s: ChatState, id: string, key: keyof RunFlags): ChatState {
+  const t = s.threads[id];
+  if (!t || !s.running.includes(id)) return s;
+  return patch(s, id, { runFlags: { dismissed: false, picked: false, ...t.runFlags, [key]: true } });
+}
+
+function withPanel(panels: Record<string, Panel>, id: string, panel: Panel): Record<string, Panel> {
+  const rest = { ...panels };
+  delete rest[id];
+  const keys = Object.keys(rest);
+  const drop = new Set(keys.slice(0, Math.max(0, keys.length + 1 - MAX_PANELS)));
+  return { ...Object.fromEntries(Object.entries(rest).filter(([k]) => !drop.has(k))), [id]: panel };
+}
 
 export function chatReducer(s: ChatState, a: ChatAction): ChatState {
   switch (a.type) {
@@ -86,12 +114,24 @@ export function chatReducer(s: ChatState, a: ChatAction): ChatState {
     case "running": {
       const others = s.running.filter((id) => id !== a.id);
       const next = { ...s, running: a.running ? [...others, a.id] : others };
-      return prune(a.running ? patch(next, a.id, { used: true }) : next);
+      return prune(a.running ? patch(next, a.id, { used: true, runFlags: { dismissed: false, picked: false } }) : next);
     }
     case "claimed":
       return patch(s, a.id, { claimed: true, title: s.threads[a.id]?.title || a.title, status: "ready" });
     case "model":
       return patch(s, a.id, { model: a.model });
+    case "openReport": {
+      const current = s.panels[a.id];
+      if (current?.reportId === a.reportId) return s;
+      const next = { ...s, panels: withPanel(s.panels, a.id, { reportId: a.reportId, how: a.how, pushed: a.pushed ?? false }) };
+      return a.how === "user" ? flag(next, a.id, "picked") : next;
+    }
+    case "closeReport": {
+      if (!s.panels[a.id]) return s;
+      const panels = { ...s.panels };
+      delete panels[a.id];
+      return flag({ ...s, panels }, a.id, "dismissed");
+    }
   }
 }
 

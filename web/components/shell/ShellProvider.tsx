@@ -2,10 +2,11 @@
 
 import type { AgentPersona, Profile } from "@shared/profile";
 import { agentPersona } from "@shared/profile";
+import { hrefFor, parseRoute } from "@shared/routes";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ModelList } from "@/lib/models";
-import { useBreakpoint } from "@/lib/shell/breakpoints";
+import { currentBreakpoint, useBreakpoint } from "@/lib/shell/breakpoints";
 import {
   type ChatAction,
   type ChatState,
@@ -13,7 +14,9 @@ import {
   composerInputId,
   initialChatState,
   isUntouchedDraft,
+  type PanelHow,
 } from "@/lib/shell/chatController";
+import { readPanelFraction, writePanelFraction } from "@/lib/shell/reportPanelPref";
 import { readSidebarOpen, writeSidebarOpen } from "@/lib/shell/sidebarPref";
 
 export type Overlay = "none" | "sidebar" | "drawer" | "account" | "profile" | "models";
@@ -33,7 +36,8 @@ export type ShellApi = {
   chats: ChatState;
   dispatch(a: ChatAction): void;
   newChat(): void;
-  sidebar: { open: boolean; toggle(): void };
+  sidebar: { open: boolean; inline: boolean; toggle(): void };
+  report: ReportApi;
   overlay: Overlay;
   profileFocus?: "agent";
   open(o: Exclude<Overlay, "none">, opts?: { focus?: "agent" }): void;
@@ -43,7 +47,18 @@ export type ShellApi = {
   takeFocusRequest(target: FocusTarget): boolean;
 };
 
+export type ReportApi = {
+  open(threadId: string, reportId: string, how: PanelHow): void;
+  close(threadId: string): void;
+  inline: boolean;
+  width: number;
+  setWidth(fraction: number, commit?: boolean): void;
+};
+
 const ShellContext = createContext<ShellApi | null>(null);
+
+const chatPath = (threadId: string) => `/chats/${threadId}`;
+const urlReport = () => new URLSearchParams(window.location.search).get("report");
 
 export function useShell(): ShellApi {
   const api = useContext(ShellContext);
@@ -66,6 +81,7 @@ export function ShellProvider(props: {
   const [chats, dispatch] = useReducer(chatReducer, props.starter, (starter) => initialChatState(crypto.randomUUID(), starter));
   const chatsRef = useRef(chats);
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen);
+  const [panelWidth, setPanelWidth] = useState(readPanelFraction);
   const [overlay, setOverlay] = useState<Overlay>("none");
   const [profileFocus, setProfileFocus] = useState<"agent" | undefined>(undefined);
   const [seenBreakpoint, setSeenBreakpoint] = useState(breakpoint);
@@ -80,6 +96,19 @@ export function ShellProvider(props: {
   useEffect(() => {
     chatsRef.current = chats;
   }, [chats]);
+
+  const activeThread = chats.threads[chats.activeId];
+  const reportInline =
+    breakpoint === "desktop" &&
+    parseRoute(pathname)?.section === "chat" &&
+    !!chats.panels[chats.activeId] &&
+    (activeThread?.status === "ready" || activeThread?.status === "draft");
+  const sidebarInline = breakpoint === "desktop" && sidebarOpen && !reportInline;
+  const [seenInline, setSeenInline] = useState(reportInline);
+  if (reportInline !== seenInline) {
+    setSeenInline(reportInline);
+    if (!reportInline && breakpoint === "desktop" && overlay === "sidebar") setOverlay("none");
+  }
 
   useEffect(() => {
     if (focusRequest.current && FOCUS_PATH[focusRequest.current] !== pathname) focusRequest.current = null;
@@ -113,12 +142,52 @@ export function ShellProvider(props: {
     });
   }, []);
 
-  const toggle = useCallback(() => {
+  const toggleInline = useCallback(() => {
     setSidebarOpen((was) => {
       writeSidebarOpen(!was);
       return !was;
     });
   }, []);
+  const toggle = useCallback(() => {
+    if (!reportInline) return toggleInline();
+    if (overlay === "sidebar") close();
+    else open("sidebar");
+  }, [reportInline, toggleInline, overlay, open, close]);
+
+  const openReport = useCallback((threadId: string, reportId: string, how: PanelHow) => {
+    const s = chatsRef.current;
+    const existing = s.panels[threadId];
+    const writes = threadId === s.activeId && window.location.pathname === chatPath(threadId);
+    const push = writes && currentBreakpoint() === "phone" && !existing?.pushed;
+    dispatch({ type: "openReport", id: threadId, reportId, how, pushed: !!existing?.pushed || push });
+    if (!writes || (existing?.reportId === reportId && urlReport() === reportId)) return;
+    const href = hrefFor({ section: "chat", chatId: threadId, report: reportId });
+    if (push) window.history.pushState({ oaReport: reportId }, "", href);
+    else window.history.replaceState(null, "", href);
+  }, []);
+
+  const closeReport = useCallback((threadId: string) => {
+    const s = chatsRef.current;
+    const panel = s.panels[threadId];
+    if (!panel) return;
+    const writes = threadId === s.activeId && window.location.pathname === chatPath(threadId);
+    if (writes && panel.pushed && urlReport() === panel.reportId) {
+      window.history.back();
+      return;
+    }
+    dispatch({ type: "closeReport", id: threadId });
+    if (writes && urlReport() !== null) window.history.replaceState(null, "", chatPath(threadId));
+  }, []);
+
+  const setWidth = useCallback((fraction: number, commit = true) => {
+    setPanelWidth(fraction);
+    if (commit) writePanelFraction(fraction);
+  }, []);
+
+  const report = useMemo<ReportApi>(
+    () => ({ open: openReport, close: closeReport, inline: reportInline, width: panelWidth, setWidth }),
+    [openReport, closeReport, reportInline, panelWidth, setWidth],
+  );
 
   const newChat = useCallback(() => {
     const current = chatsRef.current;
@@ -146,7 +215,8 @@ export function ShellProvider(props: {
       chats,
       dispatch,
       newChat,
-      sidebar: { open: sidebarOpen, toggle },
+      sidebar: { open: sidebarOpen, inline: sidebarInline, toggle },
+      report,
       overlay,
       profileFocus,
       open,
@@ -165,7 +235,9 @@ export function ShellProvider(props: {
       chats,
       newChat,
       sidebarOpen,
+      sidebarInline,
       toggle,
+      report,
       overlay,
       profileFocus,
       open,
