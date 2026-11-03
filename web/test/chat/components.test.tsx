@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ActivitySteps } from "@/components/chat/ActivitySteps";
 import { Markdown } from "@/components/chat/Markdown";
 import { SourcesRow } from "@/components/chat/SourcesRow";
-import { AccessDisabled, SignedOutBanner } from "@/components/SessionNotices";
+import { AccessDisabled, SignedOutBanner } from "@/components/session/SignedOutBanner";
 import { noteAuthFailure, resetAuthState, useAuthState } from "@/lib/authState";
 import type { Step } from "@/lib/turns";
 

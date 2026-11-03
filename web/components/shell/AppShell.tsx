@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { Onboarding } from "@/components/profile/onboarding/Onboarding";
-import { AccessDisabled, SignedOutBanner } from "@/components/SessionNotices";
+import { AccessDisabled, SignedOutBanner } from "@/components/session/SignedOutBanner";
 import { useAuthState } from "@/lib/authState";
 import { useModels } from "@/lib/models";
 import { type Profile, saveProfile, useProfile } from "@/lib/profile";
