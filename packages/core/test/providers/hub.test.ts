@@ -8,6 +8,7 @@ import type { ProviderHub } from "../../src/providers/hub.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";
 import { testHub } from "../fixtures/hub.js";
 import { MemoryDb } from "../fixtures/memoryRepos.js";
+import { NO_CAPABILITIES } from "../../src/identity/types.js";
 import { ADMIN, ALICE } from "../fixtures/users.js";
 
 const seed = {
@@ -229,7 +230,7 @@ describe("ProviderHub", () => {
 
   it("offers the operator gateway only to the admin", async () => {
     const db = new MemoryDb();
-    const user = await testHub({ litellm: seed, userId: ALICE.id, isAdmin: false }, db);
+    const user = await testHub({ litellm: seed, userId: ALICE.id, capabilities: NO_CAPABILITIES }, db);
     expect(user.list().some((p) => p.id === "litellm")).toBe(false);
     expect(user.resolve("litellm/chat-default")).toBeUndefined();
   });
@@ -237,16 +238,19 @@ describe("ProviderHub", () => {
   it("refuses private addresses for invited users, also when a stored one resolves inside", async () => {
     const f = fakeFetch([[/\/models$/, () => json({ data: [{ id: "m1" }] })]]);
     const db = new MemoryDb();
-    const user = await testHub({ userId: ALICE.id, isAdmin: false, fetch: f }, db);
+    const user = await testHub({ userId: ALICE.id, capabilities: NO_CAPABILITIES, fetch: f }, db);
     await expect(user.addLocal({ kind: "custom", baseUrl: "http://10.0.0.5:8000/v1" })).rejects.toMatchObject({ kind: "unprocessable" });
     await expect(user.addLocal({ kind: "custom", baseUrl: "http://localhost:8000/v1" })).rejects.toMatchObject({ kind: "unprocessable" });
-    const rebinding = await testHub({ userId: ALICE.id, isAdmin: false, fetch: f, lookup: async () => ["169.254.169.254"] }, db);
+    const rebinding = await testHub(
+      { userId: ALICE.id, capabilities: NO_CAPABILITIES, fetch: f, lookup: async () => ["169.254.169.254"] },
+      db,
+    );
     await expect(rebinding.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" })).rejects.toMatchObject({
       kind: "unprocessable",
     });
     const ok = await user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" });
     expect(ok.configured).toBe(true);
-    const later = await testHub({ userId: ALICE.id, isAdmin: false, fetch: f, lookup: async () => ["127.0.0.1"] }, db);
+    const later = await testHub({ userId: ALICE.id, capabilities: NO_CAPABILITIES, fetch: f, lookup: async () => ["127.0.0.1"] }, db);
     expect(later.list().find((p) => p.id === "custom")?.configured).toBe(false);
   });
 
@@ -264,7 +268,7 @@ describe("ProviderHub", () => {
       [/\/models$/, () => json({ data: [{ id: "m1" }] })],
       [/\/chat\/completions$/, sse],
     ]);
-    const user = await testHub({ userId: ALICE.id, isAdmin: false, userFetch: createSafeFetch(f) });
+    const user = await testHub({ userId: ALICE.id, capabilities: NO_CAPABILITIES, userFetch: createSafeFetch(f) });
     await user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" });
     await user.test("custom/m1");
     expect(f.calls).toContain("https://models.example.com/v1/chat/completions");
@@ -274,7 +278,7 @@ describe("ProviderHub", () => {
     const blocked = (async () => {
       throw new TypeError("fetch failed", { cause: new BlockedAddressError("refusing models.example.com") });
     }) as typeof fetch;
-    const user = await testHub({ userId: ALICE.id, isAdmin: false, userFetch: blocked });
+    const user = await testHub({ userId: ALICE.id, capabilities: NO_CAPABILITIES, userFetch: blocked });
     await expect(user.addLocal({ kind: "custom", baseUrl: "https://models.example.com/v1" })).rejects.toMatchObject({
       kind: "unprocessable",
       message: "That address isn't reachable from the server.",

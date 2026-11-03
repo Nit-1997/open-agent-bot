@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
 import { createGuards } from "../../src/identity/guards.js";
-import type { AuthEnv, AuthOutcome, Identity, Principal } from "../../src/identity/types.js";
+import { type AuthEnv, type AuthOutcome, type Identity, NO_CAPABILITIES, type Principal } from "../../src/identity/types.js";
+import { ALL_CAPABILITIES } from "../fixtures/users.js";
 import { UserError } from "../../src/lib/errors.js";
 
-const ADMIN: Principal = { id: "33333333-3333-4333-8333-333333333333", email: "admin@example.test", isAdmin: true };
-const USER: Principal = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test", isAdmin: false };
+const ADMIN: Principal = { id: "33333333-3333-4333-8333-333333333333", email: "admin@example.test", capabilities: ALL_CAPABILITIES };
+const USER: Principal = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test", capabilities: NO_CAPABILITIES };
 
 function harness(outcome: AuthOutcome, isLiveAdmin: (p: Principal) => Promise<boolean> = async () => true) {
   const authenticate = vi.fn(async () => outcome);
