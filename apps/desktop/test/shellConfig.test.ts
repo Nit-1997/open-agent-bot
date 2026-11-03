@@ -47,7 +47,7 @@ describe("loadShellConfig outside test mode", () => {
         "OPEN_AGENT_SHELL_SAVE_PATH",
         "OPEN_AGENT_SHELL_SINGLE_INSTANCE_ID",
         "OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET",
-        "OPEN_AGENT_SHELL_ATTACH_PORT",
+        "OPEN_AGENT_SHELL_FAKE_LOCATION",
       ].sort(),
     );
   });
@@ -56,8 +56,8 @@ describe("loadShellConfig outside test mode", () => {
     it(`ignores ${name} and lists it by name`, () => {
       const value = name.endsWith("PORT_RANGE")
         ? "18420-18429"
-        : name.endsWith("ATTACH_PORT")
-          ? "18420"
+        : name.endsWith("FAKE_LOCATION")
+          ? "outside"
           : name.endsWith("SOCKET")
             ? "1"
             : "/tmp/x";
@@ -69,7 +69,7 @@ describe("loadShellConfig outside test mode", () => {
       expect(cfg.dockerOverride).toBeUndefined();
       expect(cfg.externalLog).toBeUndefined();
       expect(cfg.savePath).toBeUndefined();
-      expect(cfg.attachPort).toBeUndefined();
+      expect(cfg.fakeOutside).toBe(false);
       expect(cfg.allowSystemSocket).toBe(false);
       expect(cfg.portRange).toEqual([41100, 41199]);
     });
@@ -102,7 +102,7 @@ describe("loadShellConfig in test mode", () => {
         OPEN_AGENT_SHELL_SAVE_PATH: "/tmp/save.bin",
         OPEN_AGENT_SHELL_SINGLE_INSTANCE_ID: "spec-a",
         OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET: "1",
-        OPEN_AGENT_SHELL_ATTACH_PORT: "18420",
+        OPEN_AGENT_SHELL_FAKE_LOCATION: "outside",
       }),
       real,
     );
@@ -120,7 +120,7 @@ describe("loadShellConfig in test mode", () => {
       savePath: "/tmp/save.bin",
       singleInstanceId: "spec-a",
       allowSystemSocket: true,
-      attachPort: 18420,
+      fakeOutside: true,
       ignored: [],
     });
   });
@@ -161,8 +161,7 @@ describe("loadShellConfig in test mode", () => {
     ["a relative save path", { OPEN_AGENT_SHELL_SAVE_PATH: "save.bin" }],
     ["a bad single-instance id", { OPEN_AGENT_SHELL_SINGLE_INSTANCE_ID: "../x" }],
     ["an allow-system-socket value other than 1", { OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET: "yes" }],
-    ["an attach port outside 18000-19999", { OPEN_AGENT_SHELL_ATTACH_PORT: "3000" }],
-    ["a non-numeric attach port", { OPEN_AGENT_SHELL_ATTACH_PORT: "18420x" }],
+    ["a fake location other than outside", { OPEN_AGENT_SHELL_FAKE_LOCATION: "inside" }],
   ];
 
   for (const [label, extra] of refusals) {

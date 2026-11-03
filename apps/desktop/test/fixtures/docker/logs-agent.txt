@@ -1,0 +1,3 @@
+agent-1  | [jev] candidates=typesafe/jev-latest,openrouter/typesafe/jev-1.14
+agent-1  | agent serving in process only
+agent-1  | [local] listening on 0.0.0.0:3000

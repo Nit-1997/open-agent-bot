@@ -1,10 +1,9 @@
-import { randomBytes } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { FAKE_DIR, type FakeAgent, type Recorder, startFakeAgent, startRecorder } from "./support/fakeDocker";
+import { createFakeDocker, FAKE_DIR, type FakeDocker, fakeServices, type Recorder, startRecorder } from "./support/fakeDocker";
 import { everyElementHasUniqueId } from "./support/ids";
-import { launchShell, newStateDir, type Shell, type ShellEnv, seedStack, spawnSecondInstance } from "./support/launch";
+import { launchShell, newStateDir, type Shell, type ShellEnv, spawnSecondInstance } from "./support/launch";
 
 const PORT = 18420;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -14,7 +13,7 @@ const SHELL_CSP =
 
 let env: ShellEnv;
 let token: string;
-let agent: FakeAgent;
+let fake: FakeDocker;
 let recorder: Recorder;
 let shell: Shell;
 
@@ -34,24 +33,25 @@ const clickOut = async (page: Page, id: string, key: string) => {
 test.beforeEach(async () => {
   const info = test.info();
   const stateDir = newStateDir("scaffold");
+  fake = await createFakeDocker("scaffold", { pull: { layers: 2, msPerLayer: 20 } });
   env = {
     stateDir,
     project: PROJECT,
-    portRange: "18420-18429",
-    attachPort: PORT,
+    portRange: `${PORT}-${PORT}`,
+    docker: fake.bin,
+    services: fakeServices(stateDir),
     externalLog: join(stateDir, "external.log"),
     savePath: join(stateDir, "saved.bin"),
   };
-  token = randomBytes(32).toString("hex");
-  seedStack(stateDir, { project: PROJECT, port: PORT, token });
-  agent = await startFakeAgent({ port: PORT, stackFile: join(stateDir, "stack.json") });
   recorder = await startRecorder(PORT + 1);
   shell = await launchShell(env, info);
+  await expect.poll(() => shell.status()?.screen, { timeout: 30_000 }).toBe("app");
+  token = must(shell.stack()?.launchToken, "launch token");
 });
 
 test.afterEach(async () => {
   await shell?.app.close().catch(() => {});
-  await agent?.stop();
+  await fake?.cleanup();
   await recorder?.stop();
   const log = shell?.log() ?? "";
   expect(log).not.toContain(token);

@@ -1,0 +1,9 @@
+agent-1   | 2026-11-03T17:04:51.682980921Z [jev] candidates=typesafe/jev-latest,openrouter/typesafe/jev-1.14
+agent-1   | 2026-11-03T17:04:51.684512046Z agent serving in process only
+agent-1   | 2026-11-03T17:04:51.688433004Z [local] listening on 0.0.0.0:3000
+search-1  | 2026-11-03T17:04:45.194816418Z 2026-11-03 17:04:45,194 ERROR:searx.engines: (PID 637) ahmia: can't register engine (loading engine failed)
+renderer-1  | 2026-11-03T17:04:55.951081631Z renderer listening on :8100
+search-1    | 2026-11-03T17:04:45.289162001Z 2026-11-03 17:04:45,288 ERROR:searx.engines: (PID 637) torch: can't register engine (loading engine failed)
+search-1    | 2026-11-03T17:04:45.307984876Z 2026-11-03 17:04:45,307 WARNING:searx.botdetection.config: missing config file: /opt/open-agent/limiter.toml
+search-1    | 2026-11-03T17:04:45.308367918Z [INFO] Started worker-1
+search-1    | 2026-11-03T17:04:49.278066378Z 2026-11-03 17:04:49,277 ERROR:searx.botdetection: X-Forwarded-For nor X-Real-IP header is set!
