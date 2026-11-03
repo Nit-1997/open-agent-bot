@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyRunError, isUserStop } from "@/lib/errors";
+import { classifyRunError, isUserStop } from "../src/lib/errors.ts";
 
 describe("classifyRunError", () => {
   it("finds agent error codes in the error message or context", () => {

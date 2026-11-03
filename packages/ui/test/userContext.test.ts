@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getUserContext } from "@/lib/userContext";
+import { getUserContext } from "../src/lib/userContext.ts";
 
 describe("getUserContext", () => {
   it("getUserContext returns tz, locale, local time without Z", () => {

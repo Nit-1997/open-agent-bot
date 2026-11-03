@@ -1,5 +1,5 @@
-import { api } from "@oab/ui/platform/api";
-import { readApi } from "@/lib/api";
+import { api } from "../platform/api.ts";
+import { readApi } from "./api.ts";
 
 export type ProviderView = {
   id: string;

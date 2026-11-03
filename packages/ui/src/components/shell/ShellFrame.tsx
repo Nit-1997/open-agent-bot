@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChatHost } from "@/components/chat/ChatHost";
-import { useBreakpoint } from "@/lib/shell/breakpoints";
+import { ChatHost } from "../chat/ChatHost.tsx";
+import { useBreakpoint } from "../../lib/shell/breakpoints.ts";
 import { MobileTabs } from "./MobileTabs";
 import { MobileTopBar } from "./MobileTopBar";
 import { SHELL_FRAME_ID } from "./Overlay";

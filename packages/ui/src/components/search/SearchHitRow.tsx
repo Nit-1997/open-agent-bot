@@ -1,9 +1,9 @@
 import type { SearchHit } from "@oab/shared/lists";
 import { FileText, MessageSquare } from "lucide-react";
-import { Link } from "@oab/ui/platform";
-import { UNTITLED } from "@/components/chat/ChatHeader";
-import { fromChat } from "@/components/reports/ReportRow";
-import { shortDate } from "@/lib/dates";
+import { Link } from "../../platform/index.ts";
+import { UNTITLED } from "../chat/ChatHeader.tsx";
+import { fromChat } from "../reports/ReportRow.tsx";
+import { shortDate } from "../../lib/dates.ts";
 import { Highlight } from "./Highlight";
 
 export const hitKey = (h: SearchHit) => (h.kind === "chat" ? `chat-${h.chatId}` : `report-${h.id}`);

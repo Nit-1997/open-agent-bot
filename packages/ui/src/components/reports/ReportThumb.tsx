@@ -2,7 +2,7 @@
 
 import { FileText } from "lucide-react";
 import { useState } from "react";
-import { reportThumbHref } from "@/lib/reports";
+import { reportThumbHref } from "../../lib/reports.ts";
 
 export function ReportThumb(props: { id: string; reportId: string; tall: boolean }) {
   const { id, reportId } = props;
@@ -19,7 +19,6 @@ export function ReportThumb(props: { id: string; reportId: string; tall: boolean
           <FileText id={`${id}-fallback-icon`} aria-hidden="true" size={28} />
         </span>
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           id={`${id}-img`}
           src={reportThumbHref(reportId)}

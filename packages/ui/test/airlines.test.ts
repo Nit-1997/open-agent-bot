@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { airlineHost } from "@/lib/airlines";
+import { airlineHost } from "../src/lib/airlines.ts";
 
 describe("airlineHost", () => {
   it("maps airline names, as Google Flights shows them, to their sites", () => {

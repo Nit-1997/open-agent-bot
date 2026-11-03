@@ -1,19 +1,16 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentSection } from "@/components/agent/AgentSection";
-import { EmptyState } from "@/components/chat/EmptyState";
-import { ReportDetail } from "@/components/reports/ReportDetail";
-import { ReportsView } from "@/components/reports/ReportsView";
-import { highlightParts } from "@/components/search/Highlight";
-import { SearchView } from "@/components/search/SearchView";
+import { AgentSection } from "../../src/components/agent/AgentSection.tsx";
+import { EmptyState } from "../../src/components/chat/EmptyState.tsx";
+import { ReportDetail } from "../../src/components/reports/ReportDetail.tsx";
+import { ReportsView } from "../../src/components/reports/ReportsView.tsx";
+import { highlightParts } from "../../src/components/search/Highlight.tsx";
+import { SearchView } from "../../src/components/search/SearchView.tsx";
 import { DEFAULT_AGENT } from "@oab/shared/profile";
 import { expectUniqueIds } from "../support/ids";
 import { mockViewport } from "../support/media";
 import { nav } from "../support/navigation";
 import { renderShell } from "../support/shell";
-
-vi.mock("next/navigation", async () => (await import("../support/navigation")).navigationMock());
-vi.mock("next/link", async () => (await import("../support/link")).linkMock());
 
 const CHAT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const rid = (n: number) => `report${String(n).padStart(6, "0")}`;

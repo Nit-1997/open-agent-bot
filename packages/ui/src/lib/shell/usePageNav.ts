@@ -1,7 +1,7 @@
 "use client";
 
 import { hrefFor, type Route } from "@oab/shared/routes";
-import { useNavigate } from "@oab/ui/platform";
+import { useNavigate } from "../../platform/index.ts";
 import { useCallback } from "react";
 
 export function usePageNav(build: (page: number) => Route) {

@@ -1,10 +1,10 @@
 import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { StayList as StayListWidget, UiWidget } from "@oab/shared/widgets";
-import { SourcesRow } from "@/components/chat/SourcesRow";
-import { CartCard } from "@/components/widgets/CartCard";
-import { StayList } from "@/components/widgets/StayList";
-import { UiCard } from "@/components/widgets/UiCard";
+import { SourcesRow } from "../../src/components/chat/SourcesRow.tsx";
+import { CartCard } from "../../src/components/widgets/CartCard.tsx";
+import { StayList } from "../../src/components/widgets/StayList.tsx";
+import { UiCard } from "../../src/components/widgets/UiCard.tsx";
 import { expectUniqueIds } from "../support/ids";
 
 const BAD = ["javascript:alert(1)", "data:text/html,<b>x</b>", "vbscript:x", "//evil.example/x"];

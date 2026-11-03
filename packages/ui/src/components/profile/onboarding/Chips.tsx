@@ -3,7 +3,7 @@
 import type { Access } from "@oab/shared/onboarding";
 import { Check, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { addTag, cleanTag } from "@/lib/onboarding";
+import { addTag, cleanTag } from "../../../lib/onboarding.ts";
 
 export type ChipOption = { value: string; label?: string; access?: Access };
 

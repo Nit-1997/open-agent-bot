@@ -1,14 +1,14 @@
 "use client";
 
-import { AccessEnded, SessionEnded } from "@oab/ui/components/shell/SessionFallbacks.tsx";
-import { usePlatform } from "@oab/ui/platform";
+import { AccessEnded, SessionEnded } from "./SessionFallbacks.tsx";
+import { usePlatform } from "../../platform/index.ts";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { Onboarding } from "@/components/profile/onboarding/Onboarding";
-import { useAuthState } from "@/lib/authState";
-import { useModels } from "@/lib/models";
-import { type Profile, saveProfile, useProfile } from "@/lib/profile";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { Onboarding } from "../profile/onboarding/Onboarding.tsx";
+import { useAuthState } from "../../lib/authState.ts";
+import { useModels } from "../../lib/models.ts";
+import { type Profile, saveProfile, useProfile } from "../../lib/profile.ts";
 import { ShellFrame } from "./ShellFrame";
 import { ShellOverlays } from "./ShellOverlays";
 import { ShellProvider } from "./ShellProvider";

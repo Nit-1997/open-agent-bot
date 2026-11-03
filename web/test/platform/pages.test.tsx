@@ -3,7 +3,7 @@ import { ReportDetail } from "@oab/ui/components/reports/ReportDetail.tsx";
 import { ReportsView } from "@oab/ui/components/reports/ReportsView.tsx";
 import { SearchView } from "@oab/ui/components/search/SearchView.tsx";
 import { RouteView } from "@oab/ui/views/RouteView.tsx";
-import { isValidElement, type ReactElement, type ReactNode } from "react";
+import { type ComponentProps, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import NewChatPage from "@/app/(app)/page";
 import ChatPage from "@/app/(app)/chats/[id]/page";
@@ -59,11 +59,17 @@ describe("Next (app) pages render the ui route views", () => {
     expect(tree(await ReportPage(params(REPORT)))).toEqual(tree(<ReportDetail key={REPORT} reportId={REPORT} />));
   });
 
-  it.each([
-    [{}, <SearchView q="" scope="all" page={1} />],
-    [{ q: "  Big Sur ", scope: "reports", page: "2" }, <SearchView q="  Big Sur " scope="reports" page={2} />],
-    [{ q: ["x", "y"], scope: "nope" }, <SearchView q="x" scope="all" page={1} />],
-  ])("search passes q, scope and page from %j", async (q, expected) => {
-    expect(tree(await SearchPage(search(q)))).toEqual(tree(expected));
+  it.each<[Record<string, string | string[]>, ComponentProps<typeof SearchView>]>([
+    [{}, { q: "", scope: "all", page: 1 }],
+    [
+      { q: "  Big Sur ", scope: "reports", page: "2" },
+      { q: "  Big Sur ", scope: "reports", page: 2 },
+    ],
+    [
+      { q: ["x", "y"], scope: "nope" },
+      { q: "x", scope: "all", page: 1 },
+    ],
+  ])("search passes q, scope and page from %j", async (q, props) => {
+    expect(tree(await SearchPage(search(q)))).toEqual(tree(<SearchView {...props} />));
   });
 });

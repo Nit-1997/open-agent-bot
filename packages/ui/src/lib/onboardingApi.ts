@@ -1,11 +1,11 @@
 "use client";
 
-import { api } from "@oab/ui/platform/api";
+import { api } from "../platform/api.ts";
 import type { OnboardingOptions, Place } from "@oab/shared/onboarding";
 import type { Home } from "@oab/shared/profile";
 import { useEffect, useState } from "react";
-import { readApi } from "@/lib/api";
-import { noteAuthFailure } from "@/lib/authState";
+import { readApi } from "./api.ts";
+import { noteAuthFailure } from "./authState.ts";
 import { optionsQuery } from "./onboarding";
 
 export async function searchPlaces(q: string, signal?: AbortSignal): Promise<Place[]> {

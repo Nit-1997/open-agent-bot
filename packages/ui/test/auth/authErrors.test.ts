@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { apiErrorMessage } from "@/lib/apiErrors";
-import { AUTH_ERROR_COPY, authErrorCopy, callbackErrorCode } from "@/lib/authErrors";
+import { apiErrorMessage } from "../../src/lib/apiErrors.ts";
+import { AUTH_ERROR_COPY, authErrorCopy, callbackErrorCode } from "../../src/lib/authErrors.ts";
 
 describe("login error copy", () => {
   it("maps every known code to its copy", () => {

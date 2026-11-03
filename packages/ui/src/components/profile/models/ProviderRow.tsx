@@ -2,8 +2,8 @@
 
 import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useState } from "react";
-import { Favicon } from "@/components/chat/Favicon";
-import { type ProviderView, providersApi, type TestResult } from "@/lib/providers";
+import { Favicon } from "../../chat/Favicon.tsx";
+import { type ProviderView, providersApi, type TestResult } from "../../../lib/providers.ts";
 import { ModelPicker } from "./ModelPicker";
 import { ConnectForm, KeyForm } from "./ProviderForms";
 import { SignIn } from "./SignIn";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { SlideId, SummaryLine } from "@/lib/onboarding";
+import type { SlideId, SummaryLine } from "../../../lib/onboarding.ts";
 
 export function Summary(props: {
   id: string;

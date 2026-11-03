@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { AgentOrb } from "@/components/agent/AgentOrb";
+import { AgentOrb } from "../src/components/agent/AgentOrb.tsx";
 
 const classes = (el: Element | null) => new Set((el?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
 

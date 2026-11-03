@@ -17,7 +17,7 @@ import {
   TRAVEL_STYLES,
 } from "@oab/shared/onboarding";
 import type { Profile } from "@oab/shared/profile";
-import { addTag, detectedLine, toggle } from "@/lib/onboarding";
+import { addTag, detectedLine, toggle } from "../../../lib/onboarding.ts";
 import { AddressField } from "./AddressField";
 import { AddChip, Chip, type ChipOption, ChipRow, Row, SingleRow } from "./Chips";
 

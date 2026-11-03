@@ -1,8 +1,8 @@
 "use client";
 
 import { type RefObject, useCallback, useEffect, useRef } from "react";
-import { widgetId } from "@/components/widgets/widgetId";
-import type { ReportRef } from "@/lib/reportRefs";
+import { widgetId } from "../../components/widgets/widgetId.ts";
+import type { ReportRef } from "../reportRefs.ts";
 
 export function useReportFocusReturn(opts: {
   shownId: string | null;

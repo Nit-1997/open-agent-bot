@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LiveBrowser } from "@/components/chat/LiveBrowser";
+import { LiveBrowser } from "../../src/components/chat/LiveBrowser.tsx";
 
 const frame = { url: "https://www.shipt.com/shop/stores/search?query=rice", data: "/9j/AAA" };
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { clearedProfile } from "@/lib/profile";
-import { useBreakpoint } from "@/lib/shell/breakpoints";
-import { ModelsPanel } from "@/components/profile/ModelsPanel";
-import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
+import { clearedProfile } from "../../lib/profile.ts";
+import { useBreakpoint } from "../../lib/shell/breakpoints.ts";
+import { ModelsPanel } from "../profile/ModelsPanel.tsx";
+import { ProfileDrawer } from "../profile/ProfileDrawer.tsx";
 import { AccountSheet } from "./AccountSheet";
 import { MobileDrawer } from "./MobileDrawer";
 import { Overlay } from "./Overlay";

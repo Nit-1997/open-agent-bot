@@ -1,17 +1,17 @@
 "use client";
 
 import { normalizeQuery, SEARCH_MIN, type SearchResponse, type SearchScope } from "@oab/shared/lists";
-import { useNavigate } from "@oab/ui/platform";
+import { useNavigate } from "../../platform/index.ts";
 import { useEffect, useRef, useState } from "react";
-import { useShell } from "@/components/shell/ShellProvider";
-import { SidebarSearch } from "@/components/shell/SidebarSearch";
-import { ListState } from "@/components/ui/ListState";
-import { Pager } from "@/components/ui/Pager";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { SectionPage } from "@/components/ui/SectionPage";
-import { errorMessage } from "@/lib/errors";
-import { searchApi } from "@/lib/search";
-import { SEARCH_FIELD_ID, searchHref } from "@/lib/shell/searchNav";
+import { useShell } from "../shell/ShellProvider.tsx";
+import { SidebarSearch } from "../shell/SidebarSearch.tsx";
+import { ListState } from "../ui/ListState.tsx";
+import { Pager } from "../ui/Pager.tsx";
+import { SectionHeader } from "../ui/SectionHeader.tsx";
+import { SectionPage } from "../ui/SectionPage.tsx";
+import { errorMessage } from "../../lib/errors.ts";
+import { searchApi } from "../../lib/search.ts";
+import { SEARCH_FIELD_ID, searchHref } from "../../lib/shell/searchNav.ts";
 import { hitKey, SearchHitRow } from "./SearchHitRow";
 import { SearchScopeTabs } from "./SearchScopeTabs";
 

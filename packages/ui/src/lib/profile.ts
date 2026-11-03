@@ -1,7 +1,7 @@
-import { api } from "@oab/ui/platform/api";
+import { api } from "../platform/api.ts";
 import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { readApi } from "@/lib/api";
+import { readApi } from "./api.ts";
 
 export type { Profile };
 

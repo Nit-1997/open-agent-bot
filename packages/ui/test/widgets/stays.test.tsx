@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { StayList as StayListWidget } from "@oab/shared/widgets";
-import { StayList } from "@/components/widgets/StayList";
-import { stepLabel } from "@/lib/steps";
+import { StayList } from "../../src/components/widgets/StayList.tsx";
+import { stepLabel } from "../../src/lib/steps.ts";
 
 const widget: StayListWidget = {
   kind: "stay_list",

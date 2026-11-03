@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parsePage } from "@oab/shared/pages";
-import { pageCount, rangeText } from "@/lib/pagination";
+import { pageCount, rangeText } from "../../src/lib/pagination.ts";
 
 describe("pagination", () => {
   it("describes the visible range", () => {

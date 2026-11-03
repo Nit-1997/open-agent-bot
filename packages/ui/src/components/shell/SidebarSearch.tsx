@@ -1,10 +1,10 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useNavigate, usePathname, useSearchParams } from "@oab/ui/platform";
+import { useNavigate, usePathname, useSearchParams } from "../../platform/index.ts";
 import { useEffect, useRef, useState } from "react";
 import { isSearchScope, SEARCH_MAX } from "@oab/shared/lists";
-import { SEARCH_DEBOUNCE_MS, searchHref } from "@/lib/shell/searchNav";
+import { SEARCH_DEBOUNCE_MS, searchHref } from "../../lib/shell/searchNav.ts";
 
 export function useSearchField() {
   const router = useNavigate();

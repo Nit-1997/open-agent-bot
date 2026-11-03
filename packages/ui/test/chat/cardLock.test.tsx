@@ -4,7 +4,7 @@ import { act, render, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { EMPTY, type Observable } from "rxjs";
 import { describe, expect, it, vi } from "vitest";
-import { ChatSession } from "@/components/chat/ChatSession";
+import { ChatSession } from "../../src/components/chat/ChatSession.tsx";
 
 class RealAgent extends AbstractAgent {
   run(): Observable<BaseEvent> {

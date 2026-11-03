@@ -2,8 +2,8 @@
 
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Overlay } from "@/components/shell/Overlay";
-import { type ProviderView, providersApi } from "@/lib/providers";
+import { Overlay } from "../shell/Overlay.tsx";
+import { type ProviderView, providersApi } from "../../lib/providers.ts";
 import { ProviderRow } from "./models/ProviderRow";
 import { SearchSettings } from "./models/SearchSettings";
 

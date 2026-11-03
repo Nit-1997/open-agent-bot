@@ -1,9 +1,9 @@
 import type { ReportSummary } from "@oab/shared/lists";
 import { Download, FileText } from "lucide-react";
-import { Link } from "@oab/ui/platform";
-import { UNTITLED } from "@/components/chat/ChatHeader";
-import { shortDate } from "@/lib/dates";
-import { reportPdfHref } from "@/lib/reports";
+import { Link } from "../../platform/index.ts";
+import { UNTITLED } from "../chat/ChatHeader.tsx";
+import { shortDate } from "../../lib/dates.ts";
+import { reportPdfHref } from "../../lib/reports.ts";
 
 export const fromChat = (r: Pick<ReportSummary, "chatId" | "chatTitle">) =>
   r.chatId === null ? "Chat deleted" : r.chatTitle?.trim() || UNTITLED;

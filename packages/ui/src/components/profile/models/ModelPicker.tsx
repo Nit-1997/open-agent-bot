@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { contextLabel, type ProviderModel, type ProviderView, providersApi } from "@/lib/providers";
+import { contextLabel, type ProviderModel, type ProviderView, providersApi } from "../../../lib/providers.ts";
 import { input } from "./styles";
 
 const SEARCH_AFTER = 12;

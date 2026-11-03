@@ -4,8 +4,8 @@ import type { Place } from "@oab/shared/onboarding";
 import type { Home } from "@oab/shared/profile";
 import { MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
-import { homeFromPlace } from "@/lib/onboarding";
-import { searchPlaces } from "@/lib/onboardingApi";
+import { homeFromPlace } from "../../../lib/onboarding.ts";
+import { searchPlaces } from "../../../lib/onboardingApi.ts";
 
 export const TYPEAHEAD_MS = 250;
 

@@ -2,11 +2,11 @@
 
 import { User } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { AccountMenuItems } from "@/components/shell/AccountMenuItems";
-import { useShell } from "@/components/shell/ShellProvider";
-import { initials } from "@/lib/profile";
-import { useDismiss } from "@/lib/useDismiss";
-import { useMenuKeys } from "@/lib/useMenuKeys";
+import { AccountMenuItems } from "./shell/AccountMenuItems.tsx";
+import { useShell } from "./shell/ShellProvider.tsx";
+import { initials } from "../lib/profile.ts";
+import { useDismiss } from "../lib/useDismiss.ts";
+import { useMenuKeys } from "../lib/useMenuKeys.ts";
 
 export function AccountMenu() {
   const { user, profile } = useShell();

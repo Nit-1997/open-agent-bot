@@ -1,5 +1,5 @@
 import type { AgentPersona } from "@oab/shared/profile";
-import { AgentOrb } from "@/components/agent/AgentOrb";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
 
 export const UNTITLED = "Untitled chat";
 

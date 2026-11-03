@@ -2,8 +2,8 @@
 
 import type { PageResponse } from "@oab/shared/pages";
 import { useCallback, useEffect, useState } from "react";
-import { pageCount } from "@/lib/pagination";
-import { errorMessage } from "@/lib/errors";
+import { pageCount } from "./pagination.ts";
+import { errorMessage } from "./errors.ts";
 
 export type PagedState<R> = { status: "loading"; data?: R } | { status: "ready"; data: R } | { status: "error"; error: string; data?: R };
 

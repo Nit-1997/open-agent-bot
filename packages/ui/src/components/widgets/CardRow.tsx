@@ -34,7 +34,6 @@ export function Picture({
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     <img id={id} src={safe} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={className} />
   );
 }
@@ -190,7 +189,6 @@ export function ImageBlock({ id, block, m }: { id: string; block: Extract<UiBloc
   if (failed || !src) return null;
   return (
     <figure id={id} className="mt-2 overflow-hidden rounded-xl border border-border bg-surface">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         id={`${id}-img`}
         src={src}

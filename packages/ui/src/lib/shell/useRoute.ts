@@ -1,7 +1,7 @@
 "use client";
 
 import { parseRoute, type Route } from "@oab/shared/routes";
-import { usePathname, useSearchParams } from "@oab/ui/platform";
+import { usePathname, useSearchParams } from "../../platform/index.ts";
 import { useMemo } from "react";
 
 export function useRoute(): Route | null {

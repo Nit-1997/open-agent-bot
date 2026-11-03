@@ -1,6 +1,6 @@
-import { api } from "@oab/ui/platform/api";
+import { api } from "../platform/api.ts";
 import type { SearchResponse, SearchScope } from "@oab/shared/lists";
-import { readApi } from "@/lib/api";
+import { readApi } from "./api.ts";
 
 export const searchApi = {
   search: async (q: string, scope: SearchScope, page: number, signal?: AbortSignal) => {

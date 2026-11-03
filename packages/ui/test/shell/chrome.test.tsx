@@ -1,28 +1,22 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentCard } from "@/components/shell/AgentCard";
-import { MobileTabs } from "@/components/shell/MobileTabs";
-import { MobileTopBar } from "@/components/shell/MobileTopBar";
-import { Rail } from "@/components/shell/Rail";
-import { ShellFrame } from "@/components/shell/ShellFrame";
-import { ChatList } from "@/components/chat/ChatList";
-import { ChatHeader } from "@/components/chat/ChatHeader";
-import { useShell } from "@/components/shell/ShellProvider";
+import { AgentCard } from "../../src/components/shell/AgentCard.tsx";
+import { MobileTabs } from "../../src/components/shell/MobileTabs.tsx";
+import { MobileTopBar } from "../../src/components/shell/MobileTopBar.tsx";
+import { Rail } from "../../src/components/shell/Rail.tsx";
+import { ShellFrame } from "../../src/components/shell/ShellFrame.tsx";
+import { ChatList } from "../../src/components/chat/ChatList.tsx";
+import { ChatHeader } from "../../src/components/chat/ChatHeader.tsx";
+import { useShell } from "../../src/components/shell/ShellProvider.tsx";
 import { DEFAULT_AGENT } from "@oab/shared/profile";
-import { parseRoute } from "@oab/shared/routes";
-import MissingPage from "@/app/(app)/[...missing]/page";
-import ShellNotFound from "@/app/(app)/not-found";
-import { chatIndex } from "@/lib/chatIndex";
+import { chatIndex } from "../../src/lib/chatIndex.ts";
 import { render } from "@testing-library/react";
 import { copilot } from "../support/copilot";
 import { expectUniqueIds } from "../support/ids";
 import { mockViewport } from "../support/media";
 import { nav } from "../support/navigation";
-import { renderWithPlatform } from "../support/platform";
 import { flush, profile, renderShell } from "../support/shell";
 
-vi.mock("next/navigation", async () => (await import("../support/navigation")).navigationMock());
-vi.mock("next/link", async () => (await import("../support/link")).linkMock());
 vi.mock("@copilotkit/react-core/v2", async () => (await import("../support/copilot")).copilotMock());
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -241,16 +235,6 @@ describe("ChatHeader", () => {
     expect(screen.queryByRole("status")).toBeNull();
     rerender(<ChatHeader id="h" title="Big Sur" running persona={{ ...DEFAULT_AGENT, name: "Sage" }} />);
     expect(screen.getByRole("status")).toHaveTextContent("Sage is working on this");
-  });
-});
-
-describe("removed Plans section", () => {
-  it("falls through to the shell's not-found page", () => {
-    expect(parseRoute("/plans")).toBeNull();
-    expect(parseRoute("/plans/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trip/dDE")).toBeNull();
-    expect(() => MissingPage()).toThrow("notFound");
-    renderWithPlatform(<ShellNotFound />);
-    expect(document.getElementById("shell-not-found-title")).toHaveTextContent("This page doesn't exist.");
   });
 });
 

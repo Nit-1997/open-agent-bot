@@ -2,8 +2,8 @@
 
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { type ModelList, type ModelOption, modelLabel, normalizeRef } from "@/lib/models";
-import { useDismiss } from "@/lib/useDismiss";
+import { type ModelList, type ModelOption, modelLabel, normalizeRef } from "../../lib/models.ts";
+import { useDismiss } from "../../lib/useDismiss.ts";
 
 export function ModelMenu(props: {
   id: string;

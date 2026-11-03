@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { settingsApi } from "@/lib/onboardingApi";
+import { settingsApi } from "../../../lib/onboardingApi.ts";
 import { ghost, input, solid } from "./styles";
 
 export function SearchSettings() {

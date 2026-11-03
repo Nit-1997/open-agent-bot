@@ -2,8 +2,8 @@
 
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { ExternalLink } from "@/components/widgets/ExternalLink";
-import type { Source } from "@/lib/sources";
+import { ExternalLink } from "../widgets/ExternalLink.tsx";
+import type { Source } from "../../lib/sources.ts";
 import { Favicon } from "./Favicon";
 
 export function SourcesRow({ id, sources }: { id: string; sources: Source[] }) {

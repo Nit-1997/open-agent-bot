@@ -1,10 +1,10 @@
 "use client";
 
 import { FileText, MessageSquare, Search } from "lucide-react";
-import { Link } from "@oab/ui/platform";
+import { Link } from "../../platform/index.ts";
 import type { LucideIcon } from "lucide-react";
-import { initials } from "@/lib/profile";
-import { navSectionOf, useRoute } from "@/lib/shell/useRoute";
+import { initials } from "../../lib/profile.ts";
+import { navSectionOf, useRoute } from "../../lib/shell/useRoute.ts";
 import { chatHrefOf } from "./Rail";
 import { useShell } from "./ShellProvider";
 

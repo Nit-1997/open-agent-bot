@@ -1,12 +1,12 @@
 "use client";
 
 import { FileText, MessageSquare, Plus, Search } from "lucide-react";
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { AccountMenu } from "@/components/AccountMenu";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { AccountMenu } from "../AccountMenu.tsx";
 import { hrefFor } from "@oab/shared/routes";
-import { useBreakpoint } from "@/lib/shell/breakpoints";
-import { SEARCH_INPUT_ID } from "@/lib/shell/searchNav";
-import { navSectionOf, useRoute } from "@/lib/shell/useRoute";
+import { useBreakpoint } from "../../lib/shell/breakpoints.ts";
+import { SEARCH_INPUT_ID } from "../../lib/shell/searchNav.ts";
+import { navSectionOf, useRoute } from "../../lib/shell/useRoute.ts";
 import { RailButton, RailLink } from "./RailLink";
 import { useShell } from "./ShellProvider";
 import { SidebarToggle } from "./SidebarToggle";

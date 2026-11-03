@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { dedupeSources, faviconUrl, linksIn, searchResults } from "@/lib/sources";
-import { stepLabel, summarizeSteps } from "@/lib/steps";
-import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
+import { dedupeSources, faviconUrl, linksIn, searchResults } from "../../src/lib/sources.ts";
+import { stepLabel, summarizeSteps } from "../../src/lib/steps.ts";
+import { buildTurns, type ChatMessage, withWorkflow } from "../../src/lib/turns.ts";
 
 const call = (id: string, name: string, args: unknown) => ({ id, type: "function", function: { name, arguments: JSON.stringify(args) } });
 

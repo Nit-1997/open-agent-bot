@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ReportCard } from "@/components/reports/ReportCard";
+import { ReportCard } from "../src/components/reports/ReportCard.tsx";
 import { expectUniqueIds } from "./support/ids";
 
 const result = "artifact abcdefghijkl created: Diwali plan";

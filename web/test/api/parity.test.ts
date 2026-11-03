@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthUnavailable, getAgentAuth, SignedOut } from "@/lib/auth";
-import { AUTH_ERROR_COPY } from "@/lib/authErrors";
+import { AUTH_ERROR_COPY } from "@oab/ui/lib/authErrors.ts";
 import { ConfigError } from "@/lib/env";
 import { AGENT_URL, APP_ORIGIN, AUTH, SERVICE_SECRET, stubAgentEnv } from "../support/agentEnv";
 import { type AuthMode, EXPORTED, parityCases, type RouteKey } from "./parityCases";

@@ -1,7 +1,7 @@
-import { api } from "@oab/ui/platform/api";
+import { api } from "../platform/api.ts";
 import type { ChatSummary, MessagePart, StoredMessage } from "@oab/shared/chats";
 import type { Page, PageResponse } from "@oab/shared/pages";
-import { readApi } from "@/lib/api";
+import { readApi } from "./api.ts";
 
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 type AssistantMessage = { id: string; role: "assistant"; content: string; toolCalls?: ToolCall[] };

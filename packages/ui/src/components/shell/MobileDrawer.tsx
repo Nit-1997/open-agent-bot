@@ -1,9 +1,9 @@
 "use client";
 
 import { SlidersHorizontal, X } from "lucide-react";
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { ChatList } from "@/components/chat/ChatList";
-import { initials } from "@/lib/profile";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { ChatList } from "../chat/ChatList.tsx";
+import { initials } from "../../lib/profile.ts";
 import { NewChatButton } from "./NewChatButton";
 import { Overlay } from "./Overlay";
 import { useShell } from "./ShellProvider";

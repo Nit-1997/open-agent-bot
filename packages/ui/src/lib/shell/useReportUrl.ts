@@ -1,9 +1,9 @@
 "use client";
 
 import { hrefFor, parseRoute } from "@oab/shared/routes";
-import { type PlatformHistory, usePlatformHistory } from "@oab/ui/platform";
+import { type PlatformHistory, usePlatformHistory } from "../../platform/index.ts";
 import { useEffect, useRef } from "react";
-import { useShell } from "@/components/shell/ShellProvider";
+import { useShell } from "../../components/shell/ShellProvider.tsx";
 import type { ChatAction } from "./chatController";
 import { useBreakpoint } from "./breakpoints";
 

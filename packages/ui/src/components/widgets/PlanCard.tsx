@@ -5,7 +5,7 @@ import type { Plan } from "@oab/shared/widgets";
 import { Minus, Plus } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { PlanEdits } from "@oab/shared/workspace";
-import { cardDate } from "@/lib/dates";
+import { cardDate } from "../../lib/dates.ts";
 import { widgetId } from "./widgetId";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;

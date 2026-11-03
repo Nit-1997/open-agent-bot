@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ProviderView } from "@/lib/providers";
+import type { ProviderView } from "../../../lib/providers.ts";
 import { input, solid } from "./styles";
 
 type LocalInput = { kind: string; baseUrl: string; apiKey?: string; label?: string };

@@ -1,10 +1,10 @@
 import type { AgentPersona } from "@oab/shared/profile";
 import { Check } from "lucide-react";
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { ReportCard } from "@/components/reports/ReportCard";
-import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
-import { parseArtifactId } from "@/lib/reportRefs";
-import type { Turn } from "@/lib/turns";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { ReportCard } from "../reports/ReportCard.tsx";
+import { WidgetRenderer } from "../widgets/WidgetRenderer.tsx";
+import { parseArtifactId } from "../../lib/reportRefs.ts";
+import type { Turn } from "../../lib/turns.ts";
 import { ActivitySteps } from "./ActivitySteps";
 import { Followups } from "./Followups";
 import { type BrowserFrame, LiveBrowser } from "./LiveBrowser";

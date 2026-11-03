@@ -3,15 +3,15 @@
 import type { ReportSummary } from "@oab/shared/lists";
 import { hrefFor } from "@oab/shared/routes";
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, X } from "lucide-react";
-import { Link } from "@oab/ui/platform";
+import { Link } from "../../platform/index.ts";
 import { type ReactNode, type Ref, useEffect, useState } from "react";
-import { ArtifactFrame } from "@/components/artifacts/ArtifactFrame";
-import { ListState } from "@/components/ui/ListState";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { ApiError } from "@/lib/api";
-import { errorMessage } from "@/lib/errors";
-import { reportHtmlHref, reportPdfHref, reportsApi } from "@/lib/reports";
-import { useBreakpoint } from "@/lib/shell/breakpoints";
+import { ArtifactFrame } from "../artifacts/ArtifactFrame.tsx";
+import { ListState } from "../ui/ListState.tsx";
+import { SectionHeader } from "../ui/SectionHeader.tsx";
+import { ApiError } from "../../lib/api.ts";
+import { errorMessage } from "../../lib/errors.ts";
+import { reportHtmlHref, reportPdfHref, reportsApi } from "../../lib/reports.ts";
+import { useBreakpoint } from "../../lib/shell/breakpoints.ts";
 import { fromChat } from "./ReportRow";
 
 type State =

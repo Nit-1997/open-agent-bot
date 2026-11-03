@@ -2,7 +2,7 @@
 
 import { Maximize2, X } from "lucide-react";
 import { type MouseEvent, type RefObject, useEffect, useRef, useState } from "react";
-import { hostOf } from "@/lib/sources";
+import { hostOf } from "../../lib/sources.ts";
 
 export type BrowserFrame = { url: string; data: string };
 
@@ -62,7 +62,6 @@ function Expanded({
           <X id={`${id}-expanded-close-icon`} aria-hidden="true" size={18} />
         </button>
       </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         id={`${id}-expanded-img`}
         src={src}
@@ -110,7 +109,6 @@ export function LiveBrowser({ id, frame, live }: { id: string; frame: BrowserFra
           onClick={expand}
           className="block w-full bg-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-mist-500"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             id={`${id}-img`}
             src={src}
@@ -132,7 +130,6 @@ export function LiveBrowser({ id, frame, live }: { id: string; frame: BrowserFra
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 rounded-lg border border-border bg-paper px-2 py-1 text-xs text-text-muted hover:border-border-strong focus-visible:outline-2 focus-visible:outline-mist-500"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img id={`${id}-thumb`} src={src} alt="" className="h-8 w-12 rounded object-cover object-top" />
         <span id={`${id}-thumb-label`}>Browser · {host}</span>
       </button>
@@ -144,7 +141,6 @@ export function LiveBrowser({ id, frame, live }: { id: string; frame: BrowserFra
           onClick={expand}
           className="mt-2 block w-full"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img id={`${id}-full`} src={src} alt={`Last view of ${host}`} className="w-full rounded-xl border border-border" />
         </button>
       )}

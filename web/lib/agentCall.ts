@@ -1,6 +1,6 @@
 import { type ActionResult, failure } from "@/lib/actionResult";
 import { type AgentFailure, type AgentRequest, agentFetch, authFailureOf, unreachableOf } from "@/lib/agentServer";
-import { type ApiErrorBody, apiErrorMessage } from "@/lib/apiErrors";
+import { type ApiErrorBody, apiErrorMessage } from "@oab/ui/lib/apiErrors.ts";
 import { type AgentAuth, getAgentAuth } from "@/lib/auth";
 
 const asFailure = (f: AgentFailure) => failure(f.status, f.error, f.message);

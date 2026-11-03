@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { FlightList } from "@/components/widgets/FlightList";
-import { UiCard } from "@/components/widgets/UiCard";
-import { WeatherCard } from "@/components/widgets/WeatherCard";
-import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
-import { ReportCard } from "@/components/reports/ReportCard";
+import { FlightList } from "../../src/components/widgets/FlightList.tsx";
+import { UiCard } from "../../src/components/widgets/UiCard.tsx";
+import { WeatherCard } from "../../src/components/widgets/WeatherCard.tsx";
+import { WidgetRenderer } from "../../src/components/widgets/WidgetRenderer.tsx";
+import { ReportCard } from "../../src/components/reports/ReportCard.tsx";
 import { expectUniqueIds } from "../support/ids";
 import { validWidgets } from "./fixtures";
 

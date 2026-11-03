@@ -11,7 +11,7 @@ import {
   summaryLines,
   toggle,
   travelers,
-} from "@/lib/onboarding";
+} from "../src/lib/onboarding.ts";
 
 describe("slideOrder", () => {
   it("asks for the model just before the summary, or first when nothing is set up", () => {

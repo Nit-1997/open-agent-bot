@@ -1,4 +1,4 @@
-import { authErrorCopy } from "@/lib/authErrors";
+import { authErrorCopy } from "./authErrors.ts";
 
 export type ApiErrorBody = { error?: unknown; message?: unknown; retryAfter?: unknown; step?: unknown };
 

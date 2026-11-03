@@ -1,10 +1,10 @@
 import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { groupByDate, groupItems } from "@/lib/dateGroups";
-import { isolate, knowsSummary, rememberLine } from "@/lib/persona";
-import { currentBreakpoint } from "@/lib/shell/breakpoints";
-import { chatReducer, initialChatState, isUntouchedDraft, MAX_PANELS, MAX_PANES, mountedIds } from "@/lib/shell/chatController";
-import { readSidebarOpen, writeSidebarOpen } from "@/lib/shell/sidebarPref";
+import { groupByDate, groupItems } from "../../src/lib/dateGroups.ts";
+import { isolate, knowsSummary, rememberLine } from "../../src/lib/persona.ts";
+import { currentBreakpoint } from "../../src/lib/shell/breakpoints.ts";
+import { chatReducer, initialChatState, isUntouchedDraft, MAX_PANELS, MAX_PANES, mountedIds } from "../../src/lib/shell/chatController.ts";
+import { readSidebarOpen, writeSidebarOpen } from "../../src/lib/shell/sidebarPref.ts";
 import { mockViewport } from "../support/media";
 
 describe("groupByDate", () => {

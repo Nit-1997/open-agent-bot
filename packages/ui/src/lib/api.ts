@@ -1,5 +1,5 @@
-import { type ApiErrorBody, apiErrorMessage } from "@/lib/apiErrors";
-import { noteAuthFailure } from "@/lib/authState";
+import { type ApiErrorBody, apiErrorMessage } from "./apiErrors.ts";
+import { noteAuthFailure } from "./authState.ts";
 
 export class ApiError extends Error {
   override name = "ApiError";

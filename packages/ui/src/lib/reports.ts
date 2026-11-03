@@ -1,7 +1,7 @@
-import { api } from "@oab/ui/platform/api";
+import { api } from "../platform/api.ts";
 import type { ReportSummary } from "@oab/shared/lists";
 import type { PageResponse } from "@oab/shared/pages";
-import { readApi } from "@/lib/api";
+import { readApi } from "./api.ts";
 
 export const reportsApi = {
   page: async (page: number, signal?: AbortSignal) =>

@@ -1,11 +1,11 @@
 import { emptyProfile } from "@oab/shared/profile";
-import { memoryRouter, type Platform, PlatformProvider, type PlatformSlots } from "@oab/ui/platform";
+import { memoryRouter, type Platform, PlatformProvider, type PlatformSlots } from "../../src/platform/index.ts";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppShell } from "@/components/shell/AppShell";
-import { noteAuthFailure, resetAuthState } from "@/lib/authState";
-import { chatIndex } from "@/lib/chatIndex";
-import { resetProfileStore } from "@/lib/profile";
+import { AppShell } from "../../src/components/shell/AppShell.tsx";
+import { noteAuthFailure, resetAuthState } from "../../src/lib/authState.ts";
+import { chatIndex } from "../../src/lib/chatIndex.ts";
+import { resetProfileStore } from "../../src/lib/profile.ts";
 import { copilot } from "../support/copilot";
 import { expectUniqueIds } from "../support/ids";
 import { mockViewport } from "../support/media";

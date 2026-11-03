@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef } from "react";
-import { useBreakpoint } from "@/lib/shell/breakpoints";
+import { useBreakpoint } from "../../lib/shell/breakpoints.ts";
 
 export function SectionHeader(props: {
   id: string;

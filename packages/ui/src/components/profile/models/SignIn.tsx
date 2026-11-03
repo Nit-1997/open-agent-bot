@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { type LoginState, type ProviderView, providersApi } from "@/lib/providers";
+import { type LoginState, type ProviderView, providersApi } from "../../../lib/providers.ts";
 import { input, solid } from "./styles";
 
 export function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollMs: number; onDone: () => void; onCancel: () => void }) {

@@ -1,14 +1,12 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ShellFrame } from "@/components/shell/ShellFrame";
-import { chatIndex } from "@/lib/chatIndex";
+import { ShellFrame } from "../../src/components/shell/ShellFrame.tsx";
+import { chatIndex } from "../../src/lib/chatIndex.ts";
 import { copilot } from "../support/copilot";
 import { expectUniqueIds } from "../support/ids";
 import { mockViewport } from "../support/media";
 import { flush, nav, renderShell } from "../support/shell";
 
-vi.mock("next/navigation", async () => (await import("../support/navigation")).navigationMock());
-vi.mock("next/link", async () => (await import("../support/link")).linkMock());
 vi.mock("@copilotkit/react-core/v2", async () => (await import("../support/copilot")).copilotMock());
 
 const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

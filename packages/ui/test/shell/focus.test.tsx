@@ -1,18 +1,16 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "../../src/platform/index.ts";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SearchView } from "@/components/search/SearchView";
-import { ShellFrame } from "@/components/shell/ShellFrame";
-import { useShell } from "@/components/shell/ShellProvider";
-import { chatIndex } from "@/lib/chatIndex";
-import { composerInputId } from "@/lib/shell/chatController";
+import { SearchView } from "../../src/components/search/SearchView.tsx";
+import { ShellFrame } from "../../src/components/shell/ShellFrame.tsx";
+import { useShell } from "../../src/components/shell/ShellProvider.tsx";
+import { chatIndex } from "../../src/lib/chatIndex.ts";
+import { composerInputId } from "../../src/lib/shell/chatController.ts";
 import { copilot } from "../support/copilot";
 import { mockViewport } from "../support/media";
 import { flush, nav, renderShell } from "../support/shell";
 
-vi.mock("next/navigation", async () => (await import("../support/navigation")).navigationMock());
-vi.mock("next/link", async () => (await import("../support/link")).linkMock());
 vi.mock("@copilotkit/react-core/v2", async () => (await import("../support/copilot")).copilotMock());
 
 const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

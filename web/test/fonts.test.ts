@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const WEB = join(import.meta.dirname, "..");
+const UI = join(WEB, "../packages/ui");
 const read = (path: string) => readFileSync(join(WEB, path), "utf8");
+const readUi = (path: string) => readFileSync(join(UI, path), "utf8");
 
 const FONT_FILES = [
   "@fontsource/instrument-serif/latin-400.css",
@@ -28,22 +30,23 @@ describe("self-hosted fonts", () => {
   });
 
   it("imports exactly the five latin font files", () => {
-    expect(imports(read("app/fonts.css"))).toEqual(FONT_FILES);
+    expect(imports(readUi("src/styles/fonts.css"))).toEqual(FONT_FILES);
   });
 
-  it("resolves every font file from web", () => {
-    const resolve = createRequire(join(WEB, "package.json")).resolve;
+  it("resolves every font file from ui", () => {
+    const resolve = createRequire(join(UI, "package.json")).resolve;
     for (const spec of FONT_FILES) expect(() => resolve(spec)).not.toThrow();
   });
 
-  it("loads fonts.css from the root layout and keeps only h-full on <html>", () => {
+  it("loads fonts.css from the root layout's globals.css and keeps only h-full on <html>", () => {
     const layout = read("app/layout.tsx");
-    expect(layout).toMatch(/^import "\.\/fonts\.css";$/m);
+    expect(layout).toMatch(/^import "\.\/globals\.css";$/m);
+    expect(read("app/globals.css")).toMatch(/^@import "@oab\/ui\/styles\/fonts\.css";$/m);
     expect(layout).toContain('className="h-full"');
   });
 
   it("maps the three families in the theme", () => {
-    const css = read("app/globals.css");
+    const css = readUi("src/styles/theme.css");
     expect(css).toContain('--font-display: "Instrument Serif", Georgia, serif;');
     expect(css).toContain('--font-sans: "DM Sans Variable", system-ui, sans-serif;');
     expect(css).toContain('--font-mono: "DM Mono", Menlo, monospace;');

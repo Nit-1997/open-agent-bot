@@ -1,9 +1,9 @@
 "use client";
 
 import type { ChatSummary } from "@oab/shared/chats";
-import { Link } from "@oab/ui/platform";
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { useShell } from "@/components/shell/ShellProvider";
+import { Link } from "../../platform/index.ts";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { useShell } from "../shell/ShellProvider.tsx";
 import { UNTITLED } from "./ChatHeader";
 
 export function ChatListGroup(props: {

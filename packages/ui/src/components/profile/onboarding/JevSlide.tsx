@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { providersApi } from "@/lib/providers";
+import { providersApi } from "../../../lib/providers.ts";
 
 const input =
   "mt-2 w-full rounded-xl border border-border bg-paper px-3.5 py-2.5 text-[14px] text-text-primary outline-none transition placeholder:text-text-faint focus:border-mist-300";

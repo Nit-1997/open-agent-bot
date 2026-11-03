@@ -1,8 +1,8 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { widgetId } from "@/components/widgets/widgetId";
-import { parseArtifactId } from "@/lib/reportRefs";
+import { widgetId } from "../widgets/widgetId.ts";
+import { parseArtifactId } from "../../lib/reportRefs.ts";
 import { ReportThumb } from "./ReportThumb";
 
 const HINT = { right: "Report · open on the right", tap: "Report · tap to read" } as const;

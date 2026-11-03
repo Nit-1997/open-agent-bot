@@ -3,8 +3,8 @@
 import type { StayList as StayListWidget } from "@oab/shared/widgets";
 import { Check, Star } from "lucide-react";
 import { useState } from "react";
-import { money } from "@/lib/format";
-import { Favicon } from "@/components/chat/Favicon";
+import { money } from "../../lib/format.ts";
+import { Favicon } from "../chat/Favicon.tsx";
 import { Picture } from "./CardRow";
 import { ExternalLink } from "./ExternalLink";
 import { widgetId } from "./widgetId";

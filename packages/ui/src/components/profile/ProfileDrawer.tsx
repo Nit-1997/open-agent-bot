@@ -1,14 +1,14 @@
 "use client";
 
 import type { Profile } from "@oab/shared/profile";
-import { usePlatform } from "@oab/ui/platform";
+import { usePlatform } from "../../platform/index.ts";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { AgentSection } from "@/components/agent/AgentSection";
-import { Overlay } from "@/components/shell/Overlay";
-import type { ModelList } from "@/lib/models";
-import { useOnboardingOptions } from "@/lib/onboardingApi";
-import { initials } from "@/lib/profile";
+import { AgentSection } from "../agent/AgentSection.tsx";
+import { Overlay } from "../shell/Overlay.tsx";
+import type { ModelList } from "../../lib/models.ts";
+import { useOnboardingOptions } from "../../lib/onboardingApi.ts";
+import { initials } from "../../lib/profile.ts";
 import { ModelOptions } from "./ModelOptions";
 import { ShoppingSection, TravelSection, YouSection } from "./onboarding/sections";
 

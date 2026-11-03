@@ -1,7 +1,7 @@
 import type { StoredMessage } from "@oab/shared/chats";
 import { describe, expect, it } from "vitest";
-import { cardDates, STOPPED_MARK, toHistory } from "@/lib/chats";
-import { buildTurns, type ChatMessage } from "@/lib/turns";
+import { cardDates, STOPPED_MARK, toHistory } from "../../src/lib/chats.ts";
+import { buildTurns, type ChatMessage } from "../../src/lib/turns.ts";
 
 const at = "2026-11-01T00:00:00Z";
 const cart = { kind: "cart", stores: ["traderjoes"], scope: ["Trader Joe's"], items: [], picks: {}, homes: {} };

@@ -1,8 +1,8 @@
 "use client";
 
-import { Link, usePlatform } from "@oab/ui/platform";
-import { ChatList } from "@/components/chat/ChatList";
-import { useChatIndex } from "@/lib/chatIndex";
+import { Link, usePlatform } from "../../platform/index.ts";
+import { ChatList } from "../chat/ChatList.tsx";
+import { useChatIndex } from "../../lib/chatIndex.ts";
 import { AgentCard } from "./AgentCard";
 import { NewChatButton } from "./NewChatButton";
 import { SidebarSearch } from "./SidebarSearch";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ModelList } from "@/lib/models";
+import type { ModelList } from "../../../lib/models.ts";
 import { ModelOptions } from "../ModelOptions";
 import { ProvidersList } from "../ModelsPanel";
 

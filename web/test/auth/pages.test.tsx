@@ -5,7 +5,7 @@ import LoginPage from "@/app/login/page";
 import RequestAccessPage from "@/app/request-access/page";
 import { getClaimsOrNull } from "@/lib/auth";
 import { linkBinding } from "@/lib/authCookies";
-import { AUTH_ERROR_COPY } from "@/lib/authErrors";
+import { AUTH_ERROR_COPY } from "@oab/ui/lib/authErrors.ts";
 import { checkFormTs } from "@/lib/formToken";
 import { stubAgentEnv } from "../support/agentEnv";
 

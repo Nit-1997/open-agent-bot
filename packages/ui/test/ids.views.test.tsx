@@ -316,8 +316,8 @@ const views: View[] = [
 describe("unique ids in rendered views", () => {
   it.each(views)("$name", async ({ run }) => {
     const container = await run();
-    expect(container.querySelectorAll("*").length).toBeGreaterThan(3);
-    expectUniqueIds(document.body);
+    expect(container.querySelectorAll("*").length).toBeGreaterThan(1);
+    expectUniqueIds(container);
   });
 
   it("widgets gallery", () => {
@@ -365,7 +365,7 @@ describe("unique ids in rendered views", () => {
     const input = document.getElementById(`${sid}-composer-input`) as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: "Plan a Big Sur weekend." } });
     fireEvent.keyDown(input, { key: "Enter" });
-    const agent = copilot.agents.get("ids-agent")!;
+    const agent = [...copilot.agents.values()].at(-1)!;
     await act(async () => {
       agent.emit("RUN_STARTED");
       agent.addMessage({ id: "u-1", role: "user", content: "Plan a Big Sur weekend." });

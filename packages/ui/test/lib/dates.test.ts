@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardDate } from "@/lib/dates";
+import { cardDate } from "../../src/lib/dates.ts";
 
 describe("cardDate", () => {
   const now = new Date(2026, 10, 1, 18, 0);

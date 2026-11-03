@@ -5,8 +5,8 @@ import type { Cart } from "@oab/shared/widgets";
 import type { CartEdits } from "@oab/shared/workspace";
 import { Info, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { cardDate } from "@/lib/dates";
-import { money as formatMoney } from "@/lib/format";
+import { cardDate } from "../../lib/dates.ts";
+import { money as formatMoney } from "../../lib/format.ts";
 import { Picture } from "./CardRow";
 import { widgetId } from "./widgetId";
 

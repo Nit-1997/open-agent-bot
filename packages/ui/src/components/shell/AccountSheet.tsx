@@ -1,6 +1,6 @@
 "use client";
 
-import { usePlatform } from "@oab/ui/platform";
+import { usePlatform } from "../../platform/index.ts";
 import { AccountMenuItems } from "./AccountMenuItems";
 import { Overlay } from "./Overlay";
 import { useShell } from "./ShellProvider";

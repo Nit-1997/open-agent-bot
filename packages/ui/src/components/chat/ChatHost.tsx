@@ -1,10 +1,10 @@
 "use client";
 
 import { useLayoutEffect } from "react";
-import { useShell } from "@/components/shell/ShellProvider";
-import { mountedIds } from "@/lib/shell/chatController";
-import { useReportUrl } from "@/lib/shell/useReportUrl";
-import { useRoute } from "@/lib/shell/useRoute";
+import { useShell } from "../shell/ShellProvider.tsx";
+import { mountedIds } from "../../lib/shell/chatController.ts";
+import { useReportUrl } from "../../lib/shell/useReportUrl.ts";
+import { useRoute } from "../../lib/shell/useRoute.ts";
 import { ChatPane } from "./ChatPane";
 
 export function ChatHost() {

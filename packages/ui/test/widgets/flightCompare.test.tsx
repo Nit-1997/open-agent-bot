@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { FlightList as FlightListData } from "@oab/shared/widgets";
 import { describe, expect, it } from "vitest";
-import { FlightList } from "@/components/widgets/FlightList";
+import { FlightList } from "../../src/components/widgets/FlightList.tsx";
 
 const widget: FlightListData = {
   kind: "flight_list",

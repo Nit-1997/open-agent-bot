@@ -1,4 +1,4 @@
-import { type ModelList, normalizeRef } from "@/lib/models";
+import { type ModelList, normalizeRef } from "../../lib/models.ts";
 
 export function ModelOptions({
   id,

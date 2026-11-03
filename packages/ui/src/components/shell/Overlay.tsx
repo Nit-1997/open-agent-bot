@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef } from "react";
-import { focusables, useFocusTrap } from "@/lib/shell/useFocusTrap";
+import { focusables, useFocusTrap } from "../../lib/shell/useFocusTrap.ts";
 
 export const SHELL_FRAME_ID = "shell-frame";
 

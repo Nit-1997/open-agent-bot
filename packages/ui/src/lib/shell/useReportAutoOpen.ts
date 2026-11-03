@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReportReady } from "@/components/chat/ChatSession";
-import { type Overlay, useShell } from "@/components/shell/ShellProvider";
+import type { ReportReady } from "../../components/chat/ChatSession.tsx";
+import { type Overlay, useShell } from "../../components/shell/ShellProvider.tsx";
 import { shouldAutoOpen } from "./autoOpen";
 import type { Breakpoint } from "./breakpoints";
 

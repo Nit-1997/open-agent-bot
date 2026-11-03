@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { faviconUrl } from "@/lib/sources";
+import { faviconUrl } from "../../lib/sources.ts";
 
 export function Favicon({ id, host, size = 18, className = "" }: { id: string; host: string; size?: number; className?: string }) {
   const [failed, setFailed] = useState(false);
@@ -19,7 +19,6 @@ export function Favicon({ id, host, size = 18, className = "" }: { id: string; h
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     <img
       id={id}
       src={faviconUrl(host)}

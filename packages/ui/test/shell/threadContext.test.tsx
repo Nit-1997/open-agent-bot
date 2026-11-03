@@ -2,7 +2,7 @@ import { HttpAgent } from "@ag-ui/client";
 import { CopilotKitCore } from "@copilotkit/core";
 import { render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useThreadContext } from "@/lib/useThreadContext";
+import { useThreadContext } from "../../src/lib/useThreadContext.ts";
 
 const core = new CopilotKitCore({ deferInitialConnection: true });
 

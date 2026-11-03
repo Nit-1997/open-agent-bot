@@ -1,6 +1,6 @@
 "use client";
 
-import { airlineHost } from "@/lib/airlines";
+import { airlineHost } from "../../lib/airlines.ts";
 import { Favicon } from "../chat/Favicon";
 import {
   type FlightPrefs,
@@ -13,7 +13,7 @@ import {
 } from "@oab/shared/flights";
 import type { FlightList as FlightListData } from "@oab/shared/widgets";
 import { useMemo, useState } from "react";
-import { money } from "@/lib/format";
+import { money } from "../../lib/format.ts";
 import { ExternalLink } from "./ExternalLink";
 import { widgetId } from "./widgetId";
 

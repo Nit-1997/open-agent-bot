@@ -1,11 +1,11 @@
 "use client";
 
 import { type KeyboardEvent, type RefObject, useCallback, useEffect, useRef } from "react";
-import { SHELL_FRAME_ID } from "@/components/shell/Overlay";
-import { useShell } from "@/components/shell/ShellProvider";
-import type { ReportRef } from "@/lib/reportRefs";
-import { inertOutside } from "@/lib/shell/inertOutside";
-import { focusables, useFocusTrap } from "@/lib/shell/useFocusTrap";
+import { SHELL_FRAME_ID } from "../shell/Overlay.tsx";
+import { useShell } from "../shell/ShellProvider.tsx";
+import type { ReportRef } from "../../lib/reportRefs.ts";
+import { inertOutside } from "../../lib/shell/inertOutside.ts";
+import { focusables, useFocusTrap } from "../../lib/shell/useFocusTrap.ts";
 import { ReportViewer } from "./ReportViewer";
 
 export type PanelPlacement = "inline" | "overlay" | "screen";

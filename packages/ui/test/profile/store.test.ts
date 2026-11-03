@@ -1,6 +1,6 @@
 import { emptyProfile } from "@oab/shared/profile";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearedProfile, initials, loadProfile, resetProfileStore, saveProfile } from "@/lib/profile";
+import { clearedProfile, initials, loadProfile, resetProfileStore, saveProfile } from "../../src/lib/profile.ts";
 
 afterEach(() => {
   vi.unstubAllGlobals();

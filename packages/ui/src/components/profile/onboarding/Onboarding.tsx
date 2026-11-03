@@ -1,15 +1,15 @@
 "use client";
 
 import { agentPersona, emptyProfile, type Profile, type Section } from "@oab/shared/profile";
-import { AgentOrb } from "@/components/agent/AgentOrb";
+import { AgentOrb } from "../../agent/AgentOrb.tsx";
 import { useCallback, useEffect, useState } from "react";
-import { type ModelList, normalizeRef } from "@/lib/models";
-import { jevProvider, type SlideId, slideOrder, starters, summaryLines } from "@/lib/onboarding";
-import { useOnboardingOptions } from "@/lib/onboardingApi";
-import { type ProviderView, providersApi } from "@/lib/providers";
+import { type ModelList, normalizeRef } from "../../../lib/models.ts";
+import { jevProvider, type SlideId, slideOrder, starters, summaryLines } from "../../../lib/onboarding.ts";
+import { useOnboardingOptions } from "../../../lib/onboardingApi.ts";
+import { type ProviderView, providersApi } from "../../../lib/providers.ts";
 import { JevSlide } from "./JevSlide";
 import { ModelStep } from "./ModelStep";
-import { AgentSection } from "@/components/agent/AgentSection";
+import { AgentSection } from "../../agent/AgentSection.tsx";
 import { ShoppingSection, TravelSection, YouSection } from "./sections";
 import { Summary } from "./Summary";
 

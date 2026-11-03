@@ -1,6 +1,6 @@
 import type { AgentPersona } from "@oab/shared/profile";
 import { PartyPopper, Plane, ShoppingBag, Telescope } from "lucide-react";
-import { AgentOrb } from "@/components/agent/AgentOrb";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
 
 const SUGGESTIONS = [
   { icon: PartyPopper, label: "Plan", text: "Plan a Diwali party for 20 people at my place this Saturday" },

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Composer } from "@/components/chat/Composer";
+import { Composer } from "../../src/components/chat/Composer.tsx";
 
 describe("Composer", () => {
   it("keeps the cursor in the message box after sending with the button", () => {

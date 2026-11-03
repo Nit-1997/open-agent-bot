@@ -1,10 +1,10 @@
 "use client";
 
-import { Link } from "@oab/ui/platform";
-import { ListState } from "@/components/ui/ListState";
-import { useChatIndex, chatIndex } from "@/lib/chatIndex";
-import { DATE_GROUP_LABEL, groupItems } from "@/lib/dateGroups";
-import { useRoute } from "@/lib/shell/useRoute";
+import { Link } from "../../platform/index.ts";
+import { ListState } from "../ui/ListState.tsx";
+import { useChatIndex, chatIndex } from "../../lib/chatIndex.ts";
+import { DATE_GROUP_LABEL, groupItems } from "../../lib/dateGroups.ts";
+import { useRoute } from "../../lib/shell/useRoute.ts";
 import type { ChatSummary } from "@oab/shared/chats";
 import { ChatListGroup } from "./ChatListGroup";
 

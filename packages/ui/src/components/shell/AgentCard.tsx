@@ -1,7 +1,7 @@
 "use client";
 
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { knowsSummary } from "@/lib/persona";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { knowsSummary } from "../../lib/persona.ts";
 import { useShell } from "./ShellProvider";
 
 export function AgentCard({ id }: { id: string }) {

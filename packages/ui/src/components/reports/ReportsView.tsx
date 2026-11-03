@@ -2,14 +2,14 @@
 
 import type { ReportSummary } from "@oab/shared/lists";
 import { useCallback } from "react";
-import { useShell } from "@/components/shell/ShellProvider";
-import { ListState } from "@/components/ui/ListState";
-import { Pager } from "@/components/ui/Pager";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { SectionPage } from "@/components/ui/SectionPage";
-import { reportsApi } from "@/lib/reports";
-import { usePageNav } from "@/lib/shell/usePageNav";
-import { usePagedList } from "@/lib/usePagedList";
+import { useShell } from "../shell/ShellProvider.tsx";
+import { ListState } from "../ui/ListState.tsx";
+import { Pager } from "../ui/Pager.tsx";
+import { SectionHeader } from "../ui/SectionHeader.tsx";
+import { SectionPage } from "../ui/SectionPage.tsx";
+import { reportsApi } from "../../lib/reports.ts";
+import { usePageNav } from "../../lib/shell/usePageNav.ts";
+import { usePagedList } from "../../lib/usePagedList.ts";
 import { ReportRow } from "./ReportRow";
 
 export function ReportsView({ page }: { page: number }) {

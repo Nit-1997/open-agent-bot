@@ -1,4 +1,4 @@
-import type { RunErrorKind } from "@/lib/errors";
+import type { RunErrorKind } from "../lib/errors.ts";
 
 const TEXT: Record<RunErrorKind, string> = {
   THREAD_BUSY: "Still working on the last message — wait for it to finish.",

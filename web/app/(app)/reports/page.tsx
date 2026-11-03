@@ -1,5 +1,5 @@
 import { parsePage } from "@oab/shared/pages";
-import { ReportsView } from "@/components/reports/ReportsView";
+import { ReportsView } from "@oab/ui/components/reports/ReportsView.tsx";
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {
   const raw = (await searchParams).page;

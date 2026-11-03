@@ -3,7 +3,7 @@
 import type { AgentPersona, Profile } from "@oab/shared/profile";
 import { agentPersona } from "@oab/shared/profile";
 import { hrefFor, parseRoute } from "@oab/shared/routes";
-import { type PlatformUser, useNavigate, usePathname, usePlatform, usePlatformHistory } from "@oab/ui/platform";
+import { type PlatformUser, useNavigate, usePathname, usePlatform, usePlatformHistory } from "../../platform/index.ts";
 import {
   createContext,
   type ReactNode,
@@ -16,8 +16,8 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ModelList } from "@/lib/models";
-import { currentBreakpoint, useBreakpoint } from "@/lib/shell/breakpoints";
+import type { ModelList } from "../../lib/models.ts";
+import { currentBreakpoint, useBreakpoint } from "../../lib/shell/breakpoints.ts";
 import {
   type ChatAction,
   type ChatState,
@@ -26,9 +26,9 @@ import {
   initialChatState,
   isUntouchedDraft,
   type PanelHow,
-} from "@/lib/shell/chatController";
-import { readPanelFraction, writePanelFraction } from "@/lib/shell/reportPanelPref";
-import { readSidebarOpen, writeSidebarOpen } from "@/lib/shell/sidebarPref";
+} from "../../lib/shell/chatController.ts";
+import { readPanelFraction, writePanelFraction } from "../../lib/shell/reportPanelPref.ts";
+import { readSidebarOpen, writeSidebarOpen } from "../../lib/shell/sidebarPref.ts";
 
 export type Overlay = "none" | "sidebar" | "drawer" | "account" | "profile" | "models";
 export type FocusTarget = "search" | "composer";

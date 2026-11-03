@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Plan } from "@oab/shared/widgets";
-import { PlanCard } from "@/components/widgets/PlanCard";
-import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
-import { stepLabel } from "@/lib/steps";
-import { hasEdits, withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
+import { PlanCard } from "../../src/components/widgets/PlanCard.tsx";
+import { WidgetRenderer } from "../../src/components/widgets/WidgetRenderer.tsx";
+import { stepLabel } from "../../src/lib/steps.ts";
+import { hasEdits, withCartEdits, withPlanEdits, workspaceContextValue } from "../../src/lib/workspaceEdits.ts";
 
 const event: Plan = {
   kind: "plan",

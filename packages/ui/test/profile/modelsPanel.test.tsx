@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ModelsPanel } from "@/components/profile/ModelsPanel";
-import type { ProviderView } from "@/lib/providers";
+import { ModelsPanel } from "../../src/components/profile/ModelsPanel.tsx";
+import type { ProviderView } from "../../src/lib/providers.ts";
 
 const base = (over: Partial<ProviderView>): ProviderView => ({
   id: "x",

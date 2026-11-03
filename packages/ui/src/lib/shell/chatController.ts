@@ -1,4 +1,4 @@
-import type { HistoryMessage } from "@/lib/chats";
+import type { HistoryMessage } from "../chats.ts";
 
 export const MAX_PANES = 3;
 export const MAX_PANELS = 20;

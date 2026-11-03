@@ -1,5 +1,5 @@
-import type { Overlay } from "@/components/shell/ShellProvider";
-import { REPORT_TOOLS } from "@/lib/reportRefs";
+import type { Overlay } from "../../components/shell/ShellProvider.tsx";
+import { REPORT_TOOLS } from "../reportRefs.ts";
 import type { Breakpoint } from "./breakpoints";
 
 export type AutoOpenInput = {

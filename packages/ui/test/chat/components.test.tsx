@@ -1,15 +1,12 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { ActivitySteps } from "@/components/chat/ActivitySteps";
-import { Markdown } from "@/components/chat/Markdown";
-import { SourcesRow } from "@/components/chat/SourcesRow";
-import { AccessDisabled } from "@/components/session/AccessDisabled";
-import { SignedOutBanner } from "@/components/session/SignedOutBanner";
-import { noteAuthFailure, resetAuthState, useAuthState } from "@/lib/authState";
-import type { Step } from "@/lib/turns";
+import { ActivitySteps } from "../../src/components/chat/ActivitySteps.tsx";
+import { Markdown } from "../../src/components/chat/Markdown.tsx";
+import { SourcesRow } from "../../src/components/chat/SourcesRow.tsx";
+import { noteAuthFailure, resetAuthState, useAuthState } from "../../src/lib/authState.ts";
+import type { Step } from "../../src/lib/turns.ts";
 
-import { expectUniqueIds, htmlIds } from "../support/ids";
-import { renderWithPlatform } from "../support/platform";
+import { htmlIds } from "../support/ids";
 
 describe("Markdown", () => {
   it("gives every element a unique id and opens links in a new tab", () => {
@@ -83,18 +80,6 @@ function AuthProbe() {
 
 describe("session notices", () => {
   afterEach(() => resetAuthState());
-
-  it("render unique ids", () => {
-    const { container } = renderWithPlatform(
-      <>
-        <SignedOutBanner />
-        <AccessDisabled />
-      </>,
-    );
-    expectUniqueIds(container);
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
-    expect(screen.getByText("Your access has been turned off.")).toBeInTheDocument();
-  });
 
   it("tracks signed_out and account_disabled from API answers, and never downgrades disabled", () => {
     render(<AuthProbe />);

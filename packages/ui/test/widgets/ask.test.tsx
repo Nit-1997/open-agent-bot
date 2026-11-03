@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { AskWidget } from "@oab/shared/widgets";
 import { describe, expect, it, vi } from "vitest";
-import { AskCard, formatAnswers } from "@/components/widgets/AskCard";
-import { WeatherCard } from "@/components/widgets/WeatherCard";
+import { AskCard, formatAnswers } from "../../src/components/widgets/AskCard.tsx";
+import { WeatherCard } from "../../src/components/widgets/WeatherCard.tsx";
 
 const widget: AskWidget = {
   kind: "ask",

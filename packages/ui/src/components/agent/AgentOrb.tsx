@@ -1,5 +1,5 @@
 import type { AgentLook } from "@oab/shared/profile";
-import { initials } from "@/lib/profile";
+import { initials } from "../../lib/profile.ts";
 
 export type OrbSize = 22 | 26 | 28 | 30 | 36 | 40 | 44 | 72 | 112;
 

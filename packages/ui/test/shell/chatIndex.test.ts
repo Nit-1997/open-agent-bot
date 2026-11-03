@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { chatIndex } from "@/lib/chatIndex";
+import { chatIndex } from "../../src/lib/chatIndex.ts";
 
 const TOTAL = 45;
 const row = (n: number) => ({ id: `chat-${n}`, title: `Chat ${n}`, lastMessageAt: "2026-11-01T10:00:00Z" });

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ErrorBanner } from "@/components/ErrorBanner";
+import { ErrorBanner } from "../src/components/ErrorBanner.tsx";
 
 describe("ErrorBanner", () => {
   it("offers retry for model errors", () => {

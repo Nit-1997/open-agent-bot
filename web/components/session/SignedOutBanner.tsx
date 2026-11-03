@@ -1,5 +1,5 @@
 import { Link } from "@oab/ui/platform";
-import { AUTH_ERROR_COPY } from "@/lib/authErrors";
+import { AUTH_ERROR_COPY } from "@oab/ui/lib/authErrors.ts";
 
 export function SignedOutBanner() {
   return (

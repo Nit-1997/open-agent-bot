@@ -1,5 +1,5 @@
 import { SignOutForm } from "@/components/auth/SignOutForm";
-import { AUTH_ERROR_COPY } from "@/lib/authErrors";
+import { AUTH_ERROR_COPY } from "@oab/ui/lib/authErrors.ts";
 
 export function AccessDisabled() {
   return (

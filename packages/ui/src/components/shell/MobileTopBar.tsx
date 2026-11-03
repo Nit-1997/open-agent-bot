@@ -1,8 +1,8 @@
 "use client";
 
 import { Menu, Plus } from "lucide-react";
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { useRoute } from "@/lib/shell/useRoute";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { useRoute } from "../../lib/shell/useRoute.ts";
 import { useShell } from "./ShellProvider";
 
 const TITLES = {

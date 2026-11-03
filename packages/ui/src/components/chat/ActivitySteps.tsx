@@ -2,8 +2,8 @@
 
 import { BookOpen, Check, ChevronDown, CloudSun, FileText, Plane, Search, Wrench } from "lucide-react";
 import { useState } from "react";
-import { stepKind, stepLabel, summarizeSteps } from "@/lib/steps";
-import type { Step } from "@/lib/turns";
+import { stepKind, stepLabel, summarizeSteps } from "../../lib/steps.ts";
+import type { Step } from "../../lib/turns.ts";
 import { Favicon } from "./Favicon";
 
 const ICONS = { search: Search, read: BookOpen, weather: CloudSun, flight: Plane, write: FileText, other: Wrench };

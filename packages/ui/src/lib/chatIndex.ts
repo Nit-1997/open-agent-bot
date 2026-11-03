@@ -4,8 +4,8 @@ import { type ChatSummary, chatTitleFrom } from "@oab/shared/chats";
 import { CHATS_PAGE_SIZE } from "@oab/shared/lists";
 import type { PageResponse } from "@oab/shared/pages";
 import { useEffect, useSyncExternalStore } from "react";
-import { chatsApi } from "@/lib/chats";
-import { errorMessage } from "@/lib/errors";
+import { chatsApi } from "./chats.ts";
+import { errorMessage } from "./errors.ts";
 
 export type ChatIndexState = {
   status: "idle" | "loading" | "ready" | "error";

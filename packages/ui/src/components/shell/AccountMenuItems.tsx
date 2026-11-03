@@ -1,11 +1,11 @@
 "use client";
 
 import { Check, LogOut, Moon, SlidersHorizontal, UserRound } from "lucide-react";
-import { usePlatform } from "@oab/ui/platform";
+import { usePlatform } from "../../platform/index.ts";
 import { useState } from "react";
-import { AgentOrb } from "@/components/agent/AgentOrb";
-import { useShell } from "@/components/shell/ShellProvider";
-import { isDark, setTheme } from "@/lib/theme";
+import { AgentOrb } from "../agent/AgentOrb.tsx";
+import { useShell } from "./ShellProvider.tsx";
+import { isDark, setTheme } from "../../lib/theme.ts";
 
 const ITEM =
   "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-text-secondary transition hover:bg-surface hover:text-text-primary focus-visible:bg-surface";

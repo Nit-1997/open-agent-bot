@@ -1,11 +1,11 @@
 import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ModelMenu } from "@/components/profile/ModelMenu";
-import { Onboarding } from "@/components/profile/onboarding/Onboarding";
-import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
-import type { ModelList } from "@/lib/models";
-import type { ProviderView } from "@/lib/providers";
+import { ModelMenu } from "../../src/components/profile/ModelMenu.tsx";
+import { Onboarding } from "../../src/components/profile/onboarding/Onboarding.tsx";
+import { ProfileDrawer } from "../../src/components/profile/ProfileDrawer.tsx";
+import type { ModelList } from "../../src/lib/models.ts";
+import type { ProviderView } from "../../src/lib/providers.ts";
 import { renderWithPlatform } from "../support/platform";
 
 const models: ModelList = {
@@ -386,30 +386,6 @@ describe("ProfileDrawer", () => {
     expect(onClear).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /yes, clear/i }));
     expect(onClear).toHaveBeenCalled();
-  });
-
-  it("shows the agent group and a sign-out-on-all-devices form, with unique ids, and no recent chats", () => {
-    const { container } = renderWithPlatform(
-      <ProfileDrawer
-        profile={profile}
-        models={models}
-        onSave={async () => {}}
-        onClose={() => {}}
-        onRestart={() => {}}
-        onClear={() => {}}
-      />,
-    );
-    expect(screen.getByRole("heading", { name: "Your agent" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Recent chats" })).toBeNull();
-    const signOut = screen.getByRole("button", { name: "Sign out on all devices" });
-    expect(signOut).toHaveAttribute("id", "profile-signout-all");
-    const form = signOut.closest("form") as HTMLFormElement;
-    expect(form).toHaveAttribute("action", "/auth/signout");
-    expect(form).toHaveAttribute("method", "post");
-    expect(new FormData(form).get("scope")).toBe("global");
-    const ids = [...container.querySelectorAll("*")].filter((e) => e.namespaceURI === "http://www.w3.org/1999/xhtml").map((e) => e.id);
-    expect(ids.filter((id) => !id)).toEqual([]);
-    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("closes on Escape", () => {

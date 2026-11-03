@@ -1,8 +1,8 @@
 "use client";
 
-import { api } from "@oab/ui/platform/api";
+import { api } from "../platform/api.ts";
 import { useCallback, useEffect, useState } from "react";
-import { readApi } from "@/lib/api";
+import { readApi } from "./api.ts";
 
 export type ModelOption = { id: string; label: string; provider?: string; note?: string };
 export type ModelList = { default: string | null; models: ModelOption[] };

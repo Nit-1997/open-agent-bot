@@ -1,12 +1,12 @@
 import type { StoredMessage } from "@oab/shared/chats";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { toHistory } from "@/lib/chats";
-import { parseArtifactId, reportsIn, reportTitleIn } from "@/lib/reportRefs";
-import { type AutoOpenInput, shouldAutoOpen } from "@/lib/shell/autoOpen";
-import { inertOutside } from "@/lib/shell/inertOutside";
-import { clampPanel, DEFAULT_PANEL_FRACTION, fractionLimits, step } from "@/lib/shell/panelWidth";
-import { readPanelFraction, writePanelFraction } from "@/lib/shell/reportPanelPref";
-import { buildTurns, type ChatMessage } from "@/lib/turns";
+import { toHistory } from "../../src/lib/chats.ts";
+import { parseArtifactId, reportsIn, reportTitleIn } from "../../src/lib/reportRefs.ts";
+import { type AutoOpenInput, shouldAutoOpen } from "../../src/lib/shell/autoOpen.ts";
+import { inertOutside } from "../../src/lib/shell/inertOutside.ts";
+import { clampPanel, DEFAULT_PANEL_FRACTION, fractionLimits, step } from "../../src/lib/shell/panelWidth.ts";
+import { readPanelFraction, writePanelFraction } from "../../src/lib/shell/reportPanelPref.ts";
+import { buildTurns, type ChatMessage } from "../../src/lib/turns.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();

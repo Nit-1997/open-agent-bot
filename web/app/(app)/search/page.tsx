@@ -1,6 +1,6 @@
 import { isSearchScope } from "@oab/shared/lists";
 import { parsePage } from "@oab/shared/pages";
-import { SearchView } from "@/components/search/SearchView";
+import { SearchView } from "@oab/ui/components/search/SearchView.tsx";
 
 type Search = Promise<{ q?: string | string[]; scope?: string | string[]; page?: string | string[] }>;
 

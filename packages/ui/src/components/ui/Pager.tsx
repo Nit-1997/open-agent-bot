@@ -1,4 +1,4 @@
-import { pageCount, rangeText } from "@/lib/pagination";
+import { pageCount, rangeText } from "../../lib/pagination.ts";
 
 const button =
   "rounded-full border border-border px-3 py-1 text-[12px] font-medium text-text-secondary transition hover:border-border-strong hover:text-text-primary disabled:opacity-40";
