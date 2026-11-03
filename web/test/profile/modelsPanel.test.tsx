@@ -201,6 +201,43 @@ describe("ModelsPanel", () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
+  const FLOW_URL = "/api/providers/logins/11111111-2222-3333-4444-555555555555";
+  const cancels = () => calls.filter((c) => c.url === FLOW_URL && c.method === "DELETE");
+  const startChatGPT = async () => {
+    const view = render(<ModelsPanel onClose={() => {}} onChanged={() => {}} pollMs={5} />);
+    fireEvent.click(within(await screen.findByRole("listitem", { name: "OpenAI" })).getByRole("button", { name: "Sign in with ChatGPT" }));
+    await within(row("OpenAI")).findByRole("link", { name: /Open ChatGPT sign-in/ });
+    return view;
+  };
+
+  it("cancels an unfinished ChatGPT sign-in when the panel closes, so it can't block anything", async () => {
+    const view = await startChatGPT();
+    expect(cancels()).toHaveLength(0);
+    view.unmount();
+    expect(cancels()).toHaveLength(1);
+    expect(vi.mocked(fetch).mock.calls.find(([url, init]) => url === FLOW_URL && init?.method === "DELETE")?.[1]).toMatchObject({
+      keepalive: true,
+    });
+  });
+
+  it("cancels an unfinished ChatGPT sign-in once when the page is left", async () => {
+    const view = await startChatGPT();
+    window.dispatchEvent(new Event("pagehide"));
+    view.unmount();
+    expect(cancels()).toHaveLength(1);
+  });
+
+  it("does not cancel a ChatGPT sign-in that already finished", async () => {
+    const view = await startChatGPT();
+    fireEvent.change(within(row("OpenAI")).getByLabelText("Paste the final redirect URL"), {
+      target: { value: "http://127.0.0.1:1455/auth/callback?code=c" },
+    });
+    fireEvent.click(within(row("OpenAI")).getByRole("button", { name: "Finish sign-in" }));
+    await waitFor(() => expect(row("OpenAI")).toHaveTextContent("Connected · signed in"));
+    view.unmount();
+    expect(cancels()).toHaveLength(0);
+  });
+
   it("shows the key hint instead of the key, and keeps the key field empty after saving", async () => {
     providers[1] = { ...providers[1], hint: "gsk_…a91f" };
     render(<ModelsPanel onClose={() => {}} onChanged={() => {}} />);

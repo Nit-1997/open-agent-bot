@@ -234,11 +234,20 @@ export class ProviderHub {
     return entry.kind === "local" ? id in this.settings.custom : this.signedIn.has(id);
   }
 
+  private usable(id: string, modelId: string): boolean {
+    const signin = catalogEntry(id)?.signin;
+    return !signin || this.signedIn.get(id) !== "signin" || signin.models.has(modelId);
+  }
+
   private enabledFor(id: string): string[] {
     const entry = catalogEntry(id);
     const stored = this.settings.enabled[id];
-    if (stored) return stored;
-    return (entry?.recommended ?? []).filter((m) => this.rt.getModel(id, m));
+    if (stored) {
+      const usable = stored.filter((m) => this.usable(id, m));
+      if (usable.length || !stored.length) return usable;
+    }
+    const recommended = (this.signedIn.get(id) === "signin" && entry?.signin?.recommended) || entry?.recommended || [];
+    return recommended.filter((m) => this.rt.getModel(id, m) && this.usable(id, m));
   }
 
   list(): ProviderView[] {
@@ -350,18 +359,21 @@ export class ProviderHub {
   models(id: string): ModelView[] {
     if (!catalogEntry(id)) throw new UserError(`provider ${id} is not supported`, "not_found");
     const enabled = new Set(this.enabledFor(id));
-    return this.rt.getModels(id).map((m) => ({
-      id: m.id,
-      label: m.name || m.id,
-      contextWindow: m.contextWindow,
-      ...(priceNote(m) && { note: priceNote(m) }),
-      enabled: enabled.has(m.id),
-    }));
+    return this.rt
+      .getModels(id)
+      .filter((m) => this.usable(id, m.id))
+      .map((m) => ({
+        id: m.id,
+        label: m.name || m.id,
+        contextWindow: m.contextWindow,
+        ...(priceNote(m) && { note: priceNote(m) }),
+        enabled: enabled.has(m.id),
+      }));
   }
 
   async setEnabled(id: string, modelIds: string[]): Promise<void> {
     if (!catalogEntry(id)) throw new UserError(`provider ${id} is not supported`, "not_found");
-    const unknown = modelIds.find((m) => !this.rt.getModel(id, m));
+    const unknown = modelIds.find((m) => !this.rt.getModel(id, m) || !this.usable(id, m));
     if (unknown) throw new UserError(`unknown model ${unknown} for ${id}`);
     this.settings.enabled[id] = [...new Set(modelIds)];
     await this.save();
@@ -384,7 +396,7 @@ export class ProviderHub {
   resolve(ref: string): AnyModel | undefined {
     const slash = ref.indexOf("/");
     const [provider, modelId] = slash < 0 ? ["litellm", ref] : [ref.slice(0, slash), ref.slice(slash + 1)];
-    if (!this.isConfigured(provider)) return undefined;
+    if (!this.isConfigured(provider) || !this.usable(provider, modelId)) return undefined;
     return this.rt.getModel(provider, modelId);
   }
 

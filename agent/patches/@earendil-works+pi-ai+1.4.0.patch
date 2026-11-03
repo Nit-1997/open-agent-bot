@@ -1,0 +1,13 @@
+diff --git a/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-chatgpt.js b/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-chatgpt.js
+index a351c28..37f8212 100644
+--- a/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-chatgpt.js
++++ b/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-chatgpt.js
+@@ -199,7 +199,7 @@ async function loginOpenAIChatGPT(interaction, options) {
+     const callback = await startCallbackServer(state).catch((error) => {
+         if (!(error instanceof Error && "code" in error && error.code === "EADDRINUSE"))
+             throw error;
+-        throw new Error(`Port ${CALLBACK_PORT} is in use, probably by an unfinished login in another pi session or by the Codex CLI. Cancel that login and try again.`);
++        return { server: { close() { }, closeAllConnections() { } }, result: new Promise(() => { }) };
+     });
+     const authorizationUrl = new URL(AUTHORIZE_URL);
+     authorizationUrl.search = new URLSearchParams({

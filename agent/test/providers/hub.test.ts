@@ -1,6 +1,9 @@
 import { BlockedAddressError } from "../../src/lib/net.js";
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
+import { OPENAI_CODEX_MODELS } from "@earendil-works/pi-ai/providers/openai-codex.models";
 import { describe, expect, it } from "vitest";
+import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
+import { wrapper } from "../fixtures/app.js";
 import type { ProviderHub } from "../../src/providers/hub.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";
 import { testHub } from "../fixtures/hub.js";
@@ -101,6 +104,40 @@ describe("ProviderHub", () => {
       label: expect.any(String),
       note: "$2 in · $8 out per 1M tokens",
     });
+  });
+
+  it("offers only ChatGPT-plan models after a ChatGPT sign-in and drops ones the plan rejects", async () => {
+    const plan = new Set(Object.values(OPENAI_CODEX_MODELS).map((m) => m.id));
+    const db = new MemoryDb();
+    const { hub: keyed } = await make(db);
+    await keyed.setKey("openai", "sk-x");
+    expect(keyed.models("openai").some((m) => m.id === "gpt-5.5")).toBe(true);
+    await keyed.setEnabled("openai", ["gpt-5.5"]);
+
+    const creds = new SupabaseCredentialStore(ADMIN.id, db.forUser(ADMIN.id).credentials, wrapper);
+    await creds.modify("openai", async () => ({ type: "oauth", refresh: "r", access: "a", expires: Date.now() + 3_600_000 }));
+    const { hub } = await make(db);
+
+    const listed = hub.models("openai").map((m) => m.id);
+    expect(listed.length).toBeGreaterThan(0);
+    expect(listed.every((id) => plan.has(id))).toBe(true);
+    expect(listed).not.toContain("gpt-5.5");
+    expect(
+      hub
+        .enabledModels()
+        .filter((m) => m.id.startsWith("openai/"))
+        .map((m) => m.id),
+    ).toEqual(["openai/gpt-6.1-sol", "openai/gpt-6-luna"]);
+    expect(hub.resolve("openai/gpt-5.5")).toBeUndefined();
+    expect(hub.resolve("openai/gpt-6.1-sol")).toMatchObject({ id: "gpt-6.1-sol" });
+    await expect(hub.setEnabled("openai", ["gpt-5.5"])).rejects.toThrow(/unknown model gpt-5.5/);
+    await hub.setEnabled("openai", ["gpt-6-sol"]);
+    expect(
+      hub
+        .enabledModels()
+        .filter((m) => m.id.startsWith("openai/"))
+        .map((m) => m.id),
+    ).toEqual(["openai/gpt-6-sol"]);
   });
 
   it("resolves references, including old LiteLLM aliases without a provider", async () => {
