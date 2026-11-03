@@ -1,0 +1,72 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": ["src/**/*.ts", "test/**/*.ts", "*.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "assist": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "next",
+                      "next/**",
+                      "next-*",
+                      "react",
+                      "react/**",
+                      "react-*",
+                      "react-*/**",
+                      "@supabase/**",
+                      "@oab/ui",
+                      "@oab/ui/**",
+                      "@oab/core",
+                      "@oab/core/**",
+                      "@copilotkit/**",
+                      "node:*",
+                      "**/web",
+                      "**/web/**",
+                      "**/cloud",
+                      "**/cloud/**",
+                      "@oab/cloud",
+                      "@oab/cloud/**"
+                    ],
+                    "message": "packages/bff must stay framework-free: no Next, React, Supabase, ui, core, CopilotKit, Node, web or cloud imports."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

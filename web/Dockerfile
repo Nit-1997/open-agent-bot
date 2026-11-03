@@ -5,12 +5,14 @@ COPY package.json package-lock.json ./
 COPY scripts/postinstall.mjs ./scripts/
 COPY patches ./patches
 COPY packages/shared/package.json packages/shared/
+COPY packages/bff/package.json packages/bff/
 COPY packages/core/package.json packages/core/
 COPY packages/ui/package.json packages/ui/
 COPY web/package.json web/
 COPY e2e/package.json e2e/
 RUN npm ci -w web --include-workspace-root
 COPY packages/shared ./packages/shared
+COPY packages/bff ./packages/bff
 COPY packages/ui ./packages/ui
 COPY web ./web
 ARG NEXT_PUBLIC_SUPABASE_URL

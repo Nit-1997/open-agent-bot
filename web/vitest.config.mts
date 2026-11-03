@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@oab\/shared\/(.*)$/, replacement: fileURLToPath(new URL("../packages/shared/src/$1.ts", import.meta.url)) },
+      { find: /^@oab\/bff$/, replacement: fileURLToPath(new URL("../packages/bff/src/index.ts", import.meta.url)) },
       { find: /^@oab\/ui\/platform\/api$/, replacement: fileURLToPath(new URL("../packages/ui/src/platform/api.ts", import.meta.url)) },
       { find: /^@oab\/ui\/platform$/, replacement: fileURLToPath(new URL("../packages/ui/src/platform/index.ts", import.meta.url)) },
       {

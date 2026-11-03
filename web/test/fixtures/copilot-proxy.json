@@ -1,0 +1,848 @@
+{
+  "note": "Hand-written intended behaviour of the /api/copilotkit streaming proxy (PR 2.3b). Signed in for every row; APP is the app origin.",
+  "rows": [
+    {
+      "name": "info reaches the agent with accept and the server credentials only, query dropped",
+      "request": {
+        "method": "GET",
+        "url": "/api/copilotkit/info?agentId=openagent&next=%2F..%2Fadmin",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "accept": "application/json"
+        },
+        "body": null
+      },
+      "reply": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "set-cookie": "agent=1",
+          "x-foo": "bar",
+          "cache-control": "public, max-age=60"
+        },
+        "chunks": [
+          "{\"version\":\"1.83.0\"}"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"version\":\"1.83.0\"}",
+        "upstream": [
+          {
+            "method": "GET",
+            "path": "/copilotkit/info",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "run streams three chunks in three reads with the ping untouched and only content-type copied",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/run?debug=1",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+      },
+      "reply": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/event-stream",
+          "set-cookie": "agent=1",
+          "x-foo": "bar",
+          "cache-control": "public, max-age=60"
+        },
+        "chunks": [
+          "data: {\"type\":\"RUN_STARTED\",\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\"}\n\n",
+          ": ping\n\n",
+          "data: {\"type\":\"RUN_FINISHED\",\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\"}\n\n"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "text/event-stream",
+          "cache-control": "private, no-store"
+        },
+        "body": "data: {\"type\":\"RUN_STARTED\",\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\"}\n\n: ping\n\ndata: {\"type\":\"RUN_FINISHED\",\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\"}\n\n",
+        "reads": 3,
+        "upstream": [
+          {
+            "method": "POST",
+            "path": "/copilotkit/agent/openagent/run",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "content-type",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "connect reaches the agent connect path",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/connect",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\"}"
+      },
+      "reply": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/event-stream",
+          "set-cookie": "agent=1",
+          "x-foo": "bar",
+          "cache-control": "public, max-age=60"
+        },
+        "chunks": [
+          "data: {\"type\":\"RUN_FINISHED\",\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\"}\n\n"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "text/event-stream",
+          "cache-control": "private, no-store"
+        },
+        "body": "data: {\"type\":\"RUN_FINISHED\",\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\"}\n\n",
+        "upstream": [
+          {
+            "method": "POST",
+            "path": "/copilotkit/agent/openagent/connect",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "content-type",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\"}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "stop reaches the agent with the validated lowercase thread id",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/stop/22222222-2222-4222-8222-222222222222",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "application/json"
+        },
+        "body": "{}"
+      },
+      "reply": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "x-foo": "bar"
+        },
+        "chunks": [
+          "{\"stopped\":true}"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"stopped\":true}",
+        "upstream": [
+          {
+            "method": "POST",
+            "path": "/copilotkit/agent/openagent/stop/22222222-2222-4222-8222-222222222222",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "content-type",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": "{}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "agent 403 passes through with its body",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/stop/22222222-2222-4222-8222-222222222222",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "application/json"
+        },
+        "body": "{}"
+      },
+      "reply": {
+        "status": 403,
+        "headers": {
+          "content-type": "application/json",
+          "set-cookie": "agent=1"
+        },
+        "chunks": [
+          "{\"error\":\"forbidden\",\"message\":\"That chat belongs to someone else.\"}"
+        ]
+      },
+      "expect": {
+        "status": 403,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"forbidden\",\"message\":\"That chat belongs to someone else.\"}",
+        "upstream": [
+          {
+            "method": "POST",
+            "path": "/copilotkit/agent/openagent/stop/22222222-2222-4222-8222-222222222222",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "content-type",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": "{}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "thread list is not allowlisted",
+      "request": {
+        "method": "GET",
+        "url": "/api/copilotkit/threads?agentId=openagent",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else"
+        },
+        "body": null
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "another agent id is not allowlisted",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/other/run",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "nested info is not allowlisted",
+      "request": {
+        "method": "GET",
+        "url": "/api/copilotkit/a/b/info",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else"
+        },
+        "body": null
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "the bare prefix is not allowlisted",
+      "request": {
+        "method": "GET",
+        "url": "/api/copilotkit",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else"
+        },
+        "body": null
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "stop without a thread id is not allowlisted",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/stop",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{}"
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "stop with a non-uuid thread id is not allowlisted",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/stop/not-a-uuid",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{}"
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "stop with an encoded slash in the thread id is not allowlisted",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/stop/22222222-2222-4222-8222-222222222222%2F..",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{}"
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "run with an extra segment is not allowlisted",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/run/extra",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+      },
+      "reply": null,
+      "expect": {
+        "status": 404,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"not_found\",\"message\":\"Not found.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "GET run is the wrong method",
+      "request": {
+        "method": "GET",
+        "url": "/api/copilotkit/agent/openagent/run",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else"
+        },
+        "body": null
+      },
+      "reply": null,
+      "expect": {
+        "status": 405,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"method_not_allowed\",\"message\":\"Method not allowed.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "GET connect is the wrong method",
+      "request": {
+        "method": "GET",
+        "url": "/api/copilotkit/agent/openagent/connect",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else"
+        },
+        "body": null
+      },
+      "reply": null,
+      "expect": {
+        "status": 405,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"method_not_allowed\",\"message\":\"Method not allowed.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "PATCH info is the wrong method",
+      "request": {
+        "method": "PATCH",
+        "url": "/api/copilotkit/info",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP"
+        },
+        "body": null
+      },
+      "reply": null,
+      "expect": {
+        "status": 405,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"method_not_allowed\",\"message\":\"Method not allowed.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "DELETE info is the wrong method",
+      "request": {
+        "method": "DELETE",
+        "url": "/api/copilotkit/info",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP"
+        },
+        "body": null
+      },
+      "reply": null,
+      "expect": {
+        "status": 405,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"method_not_allowed\",\"message\":\"Method not allowed.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "POST info is the wrong method",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/info",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{}"
+      },
+      "reply": null,
+      "expect": {
+        "status": 405,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"method_not_allowed\",\"message\":\"Method not allowed.\"}",
+        "upstream": []
+      }
+    },
+    {
+      "name": "a 302 from the agent is a 502 and is not followed",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/run",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+      },
+      "reply": {
+        "status": 302,
+        "headers": {
+          "location": "https://evil.test/steal",
+          "content-type": "text/plain"
+        },
+        "chunks": [
+          "moved"
+        ]
+      },
+      "expect": {
+        "status": 502,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"agent_unreachable\",\"message\":\"The agent isn't reachable.\"}",
+        "upstream": [
+          {
+            "method": "POST",
+            "path": "/copilotkit/agent/openagent/run",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "content-type",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a 307 from the agent on info is a 502",
+      "request": {
+        "method": "GET",
+        "url": "/api/copilotkit/info",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "accept": "application/json"
+        },
+        "body": null
+      },
+      "reply": {
+        "status": 307,
+        "headers": {
+          "location": "/elsewhere"
+        },
+        "chunks": []
+      },
+      "expect": {
+        "status": 502,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"agent_unreachable\",\"message\":\"The agent isn't reachable.\"}",
+        "upstream": [
+          {
+            "method": "GET",
+            "path": "/copilotkit/info",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "an unreachable agent is a 502",
+      "request": {
+        "method": "POST",
+        "url": "/api/copilotkit/agent/openagent/run",
+        "headers": {
+          "cookie": "sb-access=browser-cookie",
+          "authorization": "Bearer browser-token",
+          "x-agent-secret": "browser-secret",
+          "x-client-ip": "6.6.6.6",
+          "x-forwarded-for": "7.7.7.7",
+          "x-user-id": "someone-else",
+          "origin": "APP",
+          "content-type": "application/json",
+          "accept": "text/event-stream"
+        },
+        "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+      },
+      "reply": {
+        "network": true
+      },
+      "expect": {
+        "status": 502,
+        "headerNames": [
+          "cache-control",
+          "content-type"
+        ],
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "private, no-store"
+        },
+        "body": "{\"error\":\"agent_unreachable\",\"message\":\"The agent isn't reachable.\"}",
+        "upstream": [
+          {
+            "method": "POST",
+            "path": "/copilotkit/agent/openagent/run",
+            "headerNames": [
+              "accept",
+              "authorization",
+              "content-type",
+              "x-agent-secret"
+            ],
+            "auth": true,
+            "body": "{\"threadId\":\"22222222-2222-4222-8222-222222222222\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[],\"context\":[],\"state\":{},\"forwardedProps\":{}}"
+          }
+        ]
+      }
+    }
+  ]
+}

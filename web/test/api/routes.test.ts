@@ -30,7 +30,7 @@ describe("shell API routes", () => {
   it.each([
     ["chat", () => chat(req("/api/chats/x"), params({ id: "not-a-uuid" })), 404],
     ["reports page", () => reports(req("/api/reports?page=0")), 400],
-    ["report id", () => report(req("/api/reports/.."), params({ id: ".." })), 404],
+    ["report id", () => report(req("/api/reports/..%2F.."), params({ id: "../.." })), 404],
     ["search short", () => search(req("/api/search?q=a")), 400],
     ["search two characters", () => search(req("/api/search?q=ab")), 400],
     ["search long", () => search(req(`/api/search?q=${"a".repeat(101)}`)), 400],

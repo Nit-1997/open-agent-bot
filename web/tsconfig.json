@@ -30,6 +30,9 @@
       "@oab/shared/*": [
         "../packages/shared/src/*"
       ],
+      "@oab/bff": [
+        "../packages/bff/src/index.ts"
+      ],
       "typebox": [
         "../node_modules/typebox"
       ],
