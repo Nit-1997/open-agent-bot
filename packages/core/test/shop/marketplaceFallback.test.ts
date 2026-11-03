@@ -44,7 +44,7 @@ function setup(blocked: string[]) {
       return { store: j.store, item: j.item, tiles: [tile(j.item.query, "", 5)] };
     });
   const cart = new ActiveCart();
-  const shop = shopTool({ pool: {} as never, threadId: "t", userContext: null, region: "US", storeFor: (n) => STORES[n], cart, search });
+  const shop = shopTool({ pool: {} as never, sessionKey: "t", userContext: null, region: "US", storeFor: (n) => STORES[n], cart, search });
   const call = async (p: object) => {
     const r = await shop.execute("c", p as never, undefined, undefined, {} as never);
     return {

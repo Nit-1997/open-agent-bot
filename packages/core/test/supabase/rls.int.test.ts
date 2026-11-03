@@ -25,8 +25,7 @@ const TABLES = [
   "provider_credentials",
 ];
 
-const denied = (r: { data: unknown; error: { code?: string } | null }) =>
-  !!r.error || (Array.isArray(r.data) && r.data.length === 0) || r.data === null;
+const denied = (r: { data: unknown; error: unknown }) => !!r.error || (Array.isArray(r.data) && r.data.length === 0) || r.data === null;
 
 describe.skipIf(!enabled)("RLS and grants (live project)", () => {
   let a: TestUser;

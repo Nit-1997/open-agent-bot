@@ -46,7 +46,6 @@ export function hostedAgentDeps(
     keyWrapper: new LocalKeyWrapper(cfg.credentialKeys),
     gateway: hostedGateway(cfg),
     host: "0.0.0.0",
-    port: cfg.port,
     routes: (core) =>
       hostedRoutes({
         access: createAccessService({

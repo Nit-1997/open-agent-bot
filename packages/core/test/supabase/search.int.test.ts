@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { forUser } from "../../src/hosted/store/users.js";
+import type { SearchResult, SearchRow } from "../../src/store/types.js";
 import { cleanedEmails, createBareUser, deleteCreatedUsers, enabled, managementQuery, remainingRows, service } from "./helpers.js";
 
 describe.skipIf(!enabled)("search_user_content (live project)", () => {
@@ -10,6 +11,17 @@ describe.skipIf(!enabled)("search_user_content (live project)", () => {
 
   const rpc = (user: string, q: string, scope = "all", limit = 10, offset = 0) =>
     service().rpc("search_user_content", { p_user: user, p_query: q, p_scope: scope, p_limit: limit, p_offset: offset });
+
+  const found = async (user: string, q: string, scope = "all", limit = 10, offset = 0): Promise<SearchResult> => {
+    const { data, error } = await rpc(user, q, scope, limit, offset);
+    if (error || data === null) throw new Error(`search_user_content failed: ${error?.message ?? "no data"}`);
+    return data as SearchResult;
+  };
+
+  const snippetOf = (row: SearchRow | undefined): string => {
+    if (typeof row?.snippet !== "string") throw new Error("expected a row with a snippet");
+    return row.snippet;
+  };
 
   const at = (n: number) => new Date(Date.UTC(2026, 9, 1 + n)).toISOString();
 
@@ -51,52 +63,52 @@ describe.skipIf(!enabled)("search_user_content (live project)", () => {
   }, 60_000);
 
   it("matches titles, messages and report titles, newest first, with stable counts per scope", async () => {
-    const all = (await rpc(a.id, "big sur")).data;
+    const all = await found(a.id, "big sur");
     expect(all).toMatchObject({ total: 2, chats: 1, reports: 1 });
-    expect(all.items.map((i: { kind: string }) => i.kind)).toEqual(["report", "chat"]);
+    expect(all.items.map((i) => i.kind)).toEqual(["report", "chat"]);
     for (const scope of ["chats", "reports"]) {
-      const r = (await rpc(a.id, "big sur", scope)).data;
+      const r = await found(a.id, "big sur", scope);
       expect([r.chats, r.reports]).toEqual([1, 1]);
       expect(r.total).toBe(1);
     }
-    const msg = (await rpc(a.id, "mcway")).data;
+    const msg = await found(a.id, "mcway");
     expect(msg.items[0]).toMatchObject({ kind: "chat", refId: chats.sur, match: "message" });
-    const start = msg.items[0].snippetStart as number;
-    expect(msg.items[0].snippet.toLowerCase()).toContain("mcway");
-    expect(msg.items[0].snippet.toLowerCase().indexOf("mcway")).toBeLessThanOrEqual(60);
+    const start = msg.items[0].snippetStart;
+    expect(snippetOf(msg.items[0]).toLowerCase()).toContain("mcway");
+    expect(snippetOf(msg.items[0]).toLowerCase().indexOf("mcway")).toBeLessThanOrEqual(60);
     expect(start).toBeGreaterThan(1);
   });
 
   it("returns one row for a chat matching by title and message", async () => {
-    const r = (await rpc(a.id, "tacos")).data;
+    const r = await found(a.id, "tacos");
     expect(r.total).toBe(1);
     expect(r.items[0]).toMatchObject({ refId: chats.both, match: "title" });
-    expect(r.items[0].snippet).toContain("tacos");
+    expect(snippetOf(r.items[0])).toContain("tacos");
   });
 
   it("is case-insensitive and handles non-ASCII", async () => {
-    expect((await rpc(a.id, "ZÜRICH")).data.total).toBe(1);
-    expect((await rpc(a.id, "WEEKEND")).data.total).toBe(1);
+    expect((await found(a.id, "ZÜRICH")).total).toBe(1);
+    expect((await found(a.id, "WEEKEND")).total).toBe(1);
   });
 
   it("matches %, _ and \\ literally", async () => {
-    expect((await rpc(a.id, "50%")).data.total).toBe(1);
-    expect((await rpc(a.id, "5_")).data.total).toBe(0);
-    expect((await rpc(a.id, "a\\b")).data.total).toBe(1);
-    expect((await rpc(a.id, "%%")).data.total).toBe(0);
+    expect((await found(a.id, "50%")).total).toBe(1);
+    expect((await found(a.id, "5_")).total).toBe(0);
+    expect((await found(a.id, "a\\b")).total).toBe(1);
+    expect((await found(a.id, "%%")).total).toBe(0);
   });
 
   it("pages with a stable total and keeps totals past the end", async () => {
-    const first = (await rpc(a.id, "ri", "all", 1, 0)).data;
-    const second = (await rpc(a.id, "ri", "all", 1, 1)).data;
+    const first = await found(a.id, "ri", "all", 1, 0);
+    const second = await found(a.id, "ri", "all", 1, 1);
     expect(first.total).toBe(second.total);
     expect(first.items[0].refId).not.toBe(second.items[0]?.refId);
-    const past = (await rpc(a.id, "big sur", "all", 10, 100)).data;
+    const past = await found(a.id, "big sur", "all", 10, 100);
     expect(past).toMatchObject({ total: 2, chats: 1, reports: 1, items: [] });
   });
 
   it("never shows another user's rows", async () => {
-    const r = (await rpc(b.id, "big sur")).data;
+    const r = await found(b.id, "big sur");
     expect(r).toMatchObject({ total: 1, chats: 1, reports: 0 });
     expect(r.items[0].title).toBe("Big Sur for Bob");
   });

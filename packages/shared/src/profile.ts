@@ -44,7 +44,7 @@ export type NameCheck = { ok: true; name: string } | { ok: false; error: string 
 const NAME_EMPTY = "Give your agent a name.";
 const NAME_LONG = `Keep it to ${AGENT_NAME_MAX} characters.`;
 const NAME_CHARS = "Use letters, numbers, spaces, apostrophes, hyphens or periods.";
-const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} '’.\-]*$/u;
+const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} '’.-]*$/u;
 const STACKED_MARKS = /\p{M}{3}/u;
 const CONTROL = /\p{Cc}/u;
 

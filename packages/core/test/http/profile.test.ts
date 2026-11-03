@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
 import { DEFAULT_AGENT } from "@oab/shared/profile";
+import { WorkspaceStore } from "../../src/workspace/store.js";
 import { makeApp } from "../fixtures/app.js";
 import { ALICE } from "../fixtures/users.js";
 
@@ -32,6 +33,7 @@ describe("PUT /profile and the agent persona", () => {
       busy: true,
       lastUsed: 0,
       dispose: vi.fn(async () => {}),
+      workspace: new WorkspaceStore(),
     };
     const store = new SessionStore({ idleMs: 1000, create: async () => running });
     await store.getOrCreate({ user: ALICE, chatId: "c" }, null, DEFAULT_AGENT);

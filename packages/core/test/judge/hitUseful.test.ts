@@ -12,6 +12,7 @@ function fake(
     available: true,
     score: async () => null,
     choose: async () => null,
+    classify: async () => null,
     usage: () => ({ calls: 0, failures: 0, costUsd: 0 }),
     yesno: async (items, c, o) => {
       seen.state = items[0].state;

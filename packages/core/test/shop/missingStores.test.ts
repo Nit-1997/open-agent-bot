@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { shopTool } from "../../src/tools/shop.js";
 
 const run = async (region: string | undefined, params: Record<string, unknown>) => {
-  const tool = shopTool({ pool: {} as never, threadId: "t", userContext: null, region });
+  const tool = shopTool({ pool: {} as never, sessionKey: "t", userContext: null, region });
   const r = await tool.execute("c", params as never, undefined, undefined, {} as never);
   return (r.content[0] as { text: string }).text;
 };

@@ -4,6 +4,7 @@ import { validateWidget } from "@oab/shared/widgets";
 import { flightsTool, googleFlightsUrl, parseGoogleFlights } from "../../src/tools/flights.js";
 import { renderData } from "../../src/render/registry.js";
 import { ok } from "../../src/tools/result.js";
+import { textOf } from "../fixtures/toolResult.js";
 
 const page = readFileSync(new URL("../fixtures/google-flights-sfo-bna.txt", import.meta.url), "utf8");
 
@@ -171,7 +172,7 @@ describe("flights tool", () => {
       {} as never,
     );
     expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain("Ask them which airport");
+    expect(textOf(r)).toContain("Ask them which airport");
   });
 
   it("names no Bay Area example in its description", () => {

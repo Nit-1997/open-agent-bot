@@ -31,7 +31,7 @@ function stub(replies: Reply[]) {
       status: reply.status ?? 200,
       headers: { "content-type": "application/json", ...reply.headers },
     });
-  }) as typeof fetch;
+  }) as typeof globalThis.fetch;
   const db = createServiceClient({ supabaseUrl: "https://stub.supabase.test", supabaseSecretKey: "sb_secret_test" }, { fetch });
   return { db, calls, left: () => queue.length };
 }

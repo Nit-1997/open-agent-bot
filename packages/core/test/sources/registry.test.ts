@@ -60,7 +60,7 @@ describe("SourceRegistry", () => {
 
 describe("resolveStore", () => {
   const r = createRegistry();
-  const id = (s: string, jsonld = false) => resolveStore(r, s, { jsonld }).id;
+  const id = (s: string) => resolveStore(r, s).id;
 
   it("keeps regional Amazon domains apart", () => {
     expect(id("amazon.in")).toBe("amazon.in");

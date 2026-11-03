@@ -33,7 +33,7 @@ async function setup() {
   const cart = workspaceCart(store);
   const shop = shopTool({
     pool: {} as never,
-    threadId: "t",
+    sessionKey: "t",
     userContext: null,
     storeFor: (n) => (n === "target" ? target : undefined),
     cart,

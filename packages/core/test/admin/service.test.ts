@@ -59,7 +59,7 @@ function authWith(reply: (url: URL, init: RequestInit) => Response) {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     calls.push(`${init.method ?? "GET"} ${url.pathname}`);
     return reply(url, init);
-  }) as typeof fetch;
+  }) as typeof globalThis.fetch;
   const cfg = {
     supabaseUrl: "https://stub.supabase.test",
     supabaseSecretKey: "sb_secret_test",

@@ -120,7 +120,7 @@ export async function remainingRows(emails: string[]): Promise<number> {
   if (!emails.length) return 0;
   const db = service();
   let total = 0;
-  for (const table of ["profiles", "access_requests", "invited_emails"]) {
+  for (const table of ["profiles", "access_requests", "invited_emails"] as const) {
     const { count, error } = await db.from(table).select("*", { count: "exact", head: true }).in("email", emails);
     if (error) throw error;
     total += count ?? 0;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConfigError, hasCap } from "../src/config.js";
-import { loadHostedConfig, parseCredentialKeys } from "../src/hosted/config.js";
+import { loadHostedConfig } from "../src/hosted/config.js";
 import { TEST_ENV, testConfig } from "./fixtures/config.js";
 
 const b64 = (n: number, fill = 1) => Buffer.alloc(n, fill).toString("base64");
@@ -172,22 +172,5 @@ describe("loadHostedConfig", () => {
       { id: "chat-sonnet-5.5", label: "Sonnet 5.5", note: "Best quality, about $0.05 a turn" },
       { id: "chat-gemma4", label: "Gemma 4" },
     ]);
-  });
-});
-
-describe("parseCredentialKeys", () => {
-  it("takes the first entry as current and keeps older keys for reading", () => {
-    const keys = parseCredentialKeys(`v2:${b64(32, 2)},v1:${b64(32, 1)}`);
-    expect(keys.current).toBe(2);
-    expect([...keys.keys.keys()]).toEqual([2, 1]);
-  });
-
-  it("rejects 31- and 33-byte keys, duplicate versions, v0 and junk", () => {
-    expect(() => parseCredentialKeys(`v1:${b64(31)}`)).toThrow(/32 bytes/);
-    expect(() => parseCredentialKeys(`v1:${b64(33)}`)).toThrow(/32 bytes/);
-    expect(() => parseCredentialKeys(`v1:${b64(32)},v1:${b64(32, 2)}`)).toThrow(/twice/);
-    expect(() => parseCredentialKeys(`v0:${b64(32)}`)).toThrow(/v<n>/);
-    expect(() => parseCredentialKeys("")).toThrow(/empty/);
-    expect(() => parseCredentialKeys("key")).toThrow(/v<n>/);
   });
 });

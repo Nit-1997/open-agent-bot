@@ -1,22 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAccessService, hashIp, normalizeEmail, readRequest } from "../../src/hosted/access/service.js";
+import { type AccessDeps, createAccessService, hashIp, normalizeEmail, readRequest } from "../../src/hosted/access/service.js";
 import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
 import { RateLimiter } from "../../src/lib/rateLimit.js";
 
 const pepper = Buffer.alloc(32, 3);
 const form = (n = 0) => ({ name: "A", email: "a@example.test", note: "", formToken: `token-${n}` });
 
-function service(over: Partial<Parameters<typeof createAccessService>[0]> = {}) {
+function service(over: Partial<AccessDeps> = {}) {
   const queue = new BackgroundQueue({ name: "test", max: 50, concurrency: 2 });
   const deps = {
     pepper,
     limiter: new RateLimiter(),
     queue,
-    submit: vi.fn(async () => "inserted" as const),
-    sendMagicLink: vi.fn(async () => ({})),
-    ...over,
+    submit: vi.fn<AccessDeps["submit"]>(async () => "inserted"),
+    sendMagicLink: vi.fn<AccessDeps["sendMagicLink"]>(async () => ({})),
   };
-  return { svc: createAccessService(deps), queue, deps };
+  return { svc: createAccessService({ ...deps, ...over }), queue, deps };
 }
 
 describe("access service", () => {
@@ -24,7 +23,7 @@ describe("access service", () => {
     const { svc, queue, deps } = service();
     svc.request(form(), "198.51.100.9");
     await queue.idle();
-    const arg = (deps.submit.mock.calls[0] as unknown as [{ ipHash: Buffer }])[0];
+    const arg = deps.submit.mock.calls[0][0];
     expect(arg.ipHash.equals(hashIp(pepper, "198.51.100.9"))).toBe(true);
     expect(JSON.stringify(deps.submit.mock.calls)).not.toContain("198.51.100.9");
     expect(JSON.stringify(deps.submit.mock.calls)).not.toContain("token-0");

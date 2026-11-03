@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BrowserPool } from "../src/browser/pool.js";
-import { parseCredentialKeys } from "../src/hosted/config.js";
+import { parseCredentialKeys } from "../src/secrets/keys.js";
 import { LocalKeyWrapper } from "../src/secrets/keyWrapper.js";
 import { createAdminGuard } from "../src/hosted/identity/adminGuard.js";
 import { hostedRoutes } from "../src/hosted/routes.js";
@@ -91,6 +91,16 @@ describe("startAgent", () => {
     expect(agent.port).toBeGreaterThan(0);
     const res = await fetch(`http://127.0.0.1:${agent.port}/health`);
     expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("listens on config.port when no port is given", async () => {
+    const probe = createServer();
+    const port = await new Promise<number>((resolve) =>
+      probe.listen(0, "127.0.0.1", () => resolve((probe.address() as { port: number }).port)),
+    );
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+    const agent = await start({ port: undefined, config: testConfig({ LOG_LEVEL: "error", AGENT_PORT: String(port) }) });
+    expect(agent.port).toBe(port);
   });
 
   it("listens on the host it is given", async () => {

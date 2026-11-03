@@ -12,6 +12,7 @@ export const B3_EXCEPTIONS: string[] = [];
 const SELF = "@oab/core";
 const HOSTED = "hosted/";
 const LOCAL_IDENTITY = "identity/local";
+const UNEXPORTED = new Set(["hosted", "scripts"]);
 const REGEX_AFTER = new Set(["return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void", "throw", "yield", "await"]);
 
 type Token = { kind: "word" | "string" | "punct"; value: string };
@@ -114,6 +115,12 @@ function target(file: string, specifier: string): string | undefined {
   return undefined;
 }
 
+const firstSegment = (path: string) =>
+  path
+    .split("/")
+    .find((s) => s && s !== ".")
+    ?.toLowerCase() ?? "";
+
 const isVendor = (specifier: string) => specifier === "jose" || specifier.startsWith("jose/") || specifier.startsWith("@supabase/");
 
 export type Exceptions = { b1: string[]; b3: string[] };
@@ -128,7 +135,7 @@ export function boundaryViolations(tree: SourceTree, exceptions: Exceptions = { 
       if (!isHosted(file) && to !== undefined && isHosted(to) && !exceptions.b1.includes(file)) add("B1");
       if (isHosted(file) && specifier.startsWith(".") && !isHosted(to!)) add("B2");
       if (!isHosted(file) && isVendor(specifier) && !exceptions.b3.includes(file)) add("B3");
-      if (self && (isHosted(`${to}/`) || !isHosted(file))) add("B4");
+      if (self && (UNEXPORTED.has(firstSegment(to!)) || !isHosted(file))) add("B4");
       if (isHosted(file) && to?.startsWith(LOCAL_IDENTITY)) add("B6");
     }
   }

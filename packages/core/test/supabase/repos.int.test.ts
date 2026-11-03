@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ArtifactStore } from "../../src/artifacts/store.js";
 import { createVerifier } from "../../src/hosted/identity/verify.js";
-import { parseCredentialKeys } from "../../src/hosted/config.js";
+import { parseCredentialKeys } from "../../src/secrets/keys.js";
 import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
 import { forUser } from "../../src/hosted/store/users.js";
 import { RepoProfileStore } from "../../src/profile/store.js";

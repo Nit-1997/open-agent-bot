@@ -32,6 +32,7 @@ const fakeJudge = (
   available: true,
   score: async () => null,
   yesno: async () => null,
+  classify: async () => null,
   choose: async (state, options) => {
     seen.state = state;
     seen.options = options;

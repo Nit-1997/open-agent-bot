@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BrowserPool } from "../../src/browser/pool.js";
 import { browseTool } from "../../src/tools/browse.js";
+import { textOf } from "../fixtures/toolResult.js";
 
 let server: Server;
 let base: string;
@@ -42,9 +43,8 @@ afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
-const text = (r: { content: Array<{ text?: string }> }) => r.content[0].text ?? "";
 const run = (threadId: string, actions: unknown[]) =>
-  browseTool({ pool, threadId, userContext: null, allowPrivateHosts: true }).execute(
+  browseTool({ pool, sessionKey: threadId, userContext: null, allowPrivateHosts: true }).execute(
     "c",
     { actions } as never,
     undefined,
@@ -60,37 +60,37 @@ describe("browse (real Chromium)", () => {
       { op: "read" },
     ]);
     expect(r.isError).toBeFalsy();
-    expect(text(r)).toContain("Results for sony xm5");
-    expect(text(r)).toContain("₹26,990");
-    expect(text(r)).toMatch(/^url: .*\/search\?q=sony\+xm5/);
+    expect(textOf(r)).toContain("Results for sony xm5");
+    expect(textOf(r)).toContain("₹26,990");
+    expect(textOf(r)).toMatch(/^url: .*\/search\?q=sony\+xm5/);
   });
 
   it("keeps page state across calls on the same thread", async () => {
     const r = await run("t1", [{ op: "read" }]);
-    expect(text(r)).toContain("Results for sony xm5");
+    expect(textOf(r)).toContain("Results for sony xm5");
   });
 
   it("stops at checkout link with handoff message", async () => {
     await run("t2", [{ op: "goto", url: `${base}/search?q=x` }]);
     const r = await run("t2", [{ op: "click", text: "Proceed to checkout" }]);
-    expect(text(r)).toMatch(/^stopped: .+\. Hand this link to the user: .*\/search\?q=x/);
+    expect(textOf(r)).toMatch(/^stopped: .+\. Hand this link to the user: .*\/search\?q=x/);
   });
 
   it("stops when a click navigates onto a blocked url", async () => {
     await run("t3", [{ op: "goto", url: `${base}/search?q=x` }]);
     const r = await run("t3", [{ op: "click", selector: "#cart" }]);
-    expect(text(r)).toMatch(/^stopped: /);
-    expect(text(r)).toContain("/cart");
+    expect(textOf(r)).toMatch(/^stopped: /);
+    expect(textOf(r)).toContain("/cart");
   });
 
   it("detects captcha page as blocked", async () => {
     const r = await run("t4", [{ op: "goto", url: `${base}/captcha` }]);
-    expect(text(r)).toBe(`blocked by 127.0.0.1: ${base}/captcha`);
+    expect(textOf(r)).toBe(`blocked by 127.0.0.1: ${base}/captcha`);
   });
 
   it("reports 403 as blocked", async () => {
     const r = await run("t4", [{ op: "goto", url: `${base}/forbidden` }]);
-    expect(text(r)).toBe(`blocked by 127.0.0.1: ${base}/forbidden`);
+    expect(textOf(r)).toBe(`blocked by 127.0.0.1: ${base}/forbidden`);
   });
 
   it("caps actions at 10", async () => {
@@ -99,12 +99,12 @@ describe("browse (real Chromium)", () => {
       Array.from({ length: 11 }, () => ({ op: "read" })),
     );
     expect(r.isError).toBe(true);
-    expect(text(r)).toBe("too many actions (max 10 per call)");
+    expect(textOf(r)).toBe("too many actions (max 10 per call)");
   });
 
   it("closing a thread drops its page", async () => {
     await pool.close("t1");
     const r = await run("t1", [{ op: "read" }]);
-    expect(text(r)).not.toContain("Results for sony xm5");
+    expect(textOf(r)).not.toContain("Results for sony xm5");
   });
 });

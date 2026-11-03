@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { describe, it } from "node:test";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { appOrigin, previewOriginProblem, runsPreviewProject } from "./origin.ts";
+import { readEnvFiles } from "./env.ts";
+import { ALLOW_LIVE_ENV, allowLive, appOrigin, liveOriginProblem, previewOriginProblem } from "./origin.ts";
 
 const E2E = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLAYWRIGHT = createRequire(import.meta.url).resolve("@playwright/test/cli");
 const LIVE = "https://app.localhost";
 const PREVIEW = "http://localhost:18300";
+const PROJECTS = ["desktop", "tablet", "phone", "smoke", "preview-m1"];
 
 describe("previewOriginProblem", () => {
   for (const ok of ["http://localhost:18000", "http://localhost:18300", "http://127.0.0.1:19999", "http://127.0.0.1:18443"]) {
@@ -40,65 +44,69 @@ describe("previewOriginProblem", () => {
   }
 });
 
-describe("runsPreviewProject", () => {
-  const cases: Array<[string[], boolean]> = [
-    [["test", "--project=smoke"], true],
-    [["test", "--project", "preview-m1"], true],
-    [["test", "--project=desktop", "--project=smoke"], true],
-    [["test", "--project", "desktop", "SMOKE"], true],
-    [["test", "--project=*"], true],
-    [["test", "--project=preview-*"], true],
-    [["test", "--project=Preview-M1"], true],
-    [["test"], true],
-    [["test", "--project=desktop", "--project=tablet", "--project=phone"], false],
-    [["test", "--project", "desktop", "--list"], false],
-    [["test", "--project=tab*"], false],
-  ];
-  for (const [args, expected] of cases) {
-    it(`${args.join(" ")} → ${expected}`, () => assert.equal(runsPreviewProject(["node", "playwright", ...args]), expected));
+describe("liveOriginProblem", () => {
+  for (const ok of [LIVE, "https://app.example.com", PREVIEW]) {
+    it(`accepts ${ok}`, () => assert.equal(liveOriginProblem(ok), undefined));
+  }
+  for (const bad of [undefined, "", "app.localhost", "ftp://app.localhost", "https://app.localhost/", "https://app.localhost/x", "not a url"]) {
+    it(`refuses ${JSON.stringify(bad)}`, () => assert.match(liveOriginProblem(bad) ?? "", /APP_ORIGIN/));
   }
 });
 
-describe("appOrigin", () => {
-  const argv = (...projects: string[]) => ["node", "playwright", "test", ...projects.map((p) => `--project=${p}`)];
+describe("allowLive", () => {
+  it("is on only for E2E_ALLOW_LIVE=1", () => {
+    assert.equal(allowLive({ [ALLOW_LIVE_ENV]: "1" }), true);
+    for (const value of [undefined, "", "0", "true", "yes", " 1", "1 "]) assert.equal(allowLive({ [ALLOW_LIVE_ENV]: value }), false, String(value));
+  });
+});
 
-  it("preview projects use the explicit preview origin", () => {
-    assert.equal(appOrigin({ argv: argv("smoke"), explicit: PREVIEW, fallback: LIVE, inWorker: false }), PREVIEW);
+describe("appOrigin", () => {
+  it("accepts an explicit preview origin", () => {
+    assert.equal(appOrigin({ explicit: PREVIEW, allowLive: false }), PREVIEW);
+    assert.equal(appOrigin({ explicit: ` ${PREVIEW} `, allowLive: false }), PREVIEW);
   });
-  it("preview projects never fall back to the env-file origin", () => {
-    assert.throws(() => appOrigin({ argv: argv("smoke"), explicit: undefined, fallback: LIVE, inWorker: false }), /APP_ORIGIN is not set/);
-    assert.throws(() => appOrigin({ argv: argv("preview-m1"), explicit: " ", fallback: PREVIEW, inWorker: false }), /APP_ORIGIN is not set/);
+  it("requires an explicit origin, even with the live opt-in", () => {
+    for (const explicit of [undefined, "", " "]) {
+      assert.throws(() => appOrigin({ explicit, allowLive: false }), /APP_ORIGIN is not set/);
+      assert.throws(() => appOrigin({ explicit, allowLive: true }), /APP_ORIGIN is not set/);
+    }
   });
-  it("preview projects refuse the live origin", () => {
-    assert.throws(() => appOrigin({ argv: argv("preview-m1"), explicit: LIVE, fallback: LIVE, inWorker: false }), /must be http:\/\/localhost/);
+  it("refuses the live origin without the opt-in and names the opt-in", () => {
+    assert.throws(() => appOrigin({ explicit: LIVE, allowLive: false }), /must be http:\/\/localhost.*E2E_ALLOW_LIVE=1/s);
   });
-  it("a run without --project includes the preview projects", () => {
-    assert.throws(() => appOrigin({ argv: ["node", "playwright", "test"], explicit: LIVE, fallback: LIVE, inWorker: false }), /APP_ORIGIN/);
+  it("accepts a live origin with the opt-in, still checking its shape", () => {
+    assert.equal(appOrigin({ explicit: LIVE, allowLive: true }), LIVE);
+    assert.throws(() => appOrigin({ explicit: `${LIVE}/`, allowLive: true }), /APP_ORIGIN/);
   });
-  it("the demo suite keeps its own explicit origin requirement", () => {
-    assert.equal(appOrigin({ argv: argv("desktop", "tablet", "phone"), explicit: undefined, fallback: LIVE, inWorker: false }), LIVE);
-    assert.throws(() => appOrigin({ argv: argv("desktop"), explicit: undefined, fallback: "", inWorker: false }), /missing APP_ORIGIN/);
-  });
-  it("workers reuse the origin the runner already checked", () => {
-    assert.equal(appOrigin({ argv: ["node", "worker"], explicit: PREVIEW, fallback: LIVE, inWorker: true }), PREVIEW);
+});
+
+describe("env files", () => {
+  const dir = mkdtempSync(join(tmpdir(), "oab-e2e-env-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("never supply APP_ORIGIN or the live opt-in", () => {
+    const file = join(dir, ".env-e2e");
+    writeFileSync(file, `APP_ORIGIN=${LIVE}\nE2E_ALLOW_LIVE=1\nE2E_OPENROUTER_KEY="k"\n`);
+    assert.deepEqual(readEnvFiles([file, join(dir, "missing")]), { E2E_OPENROUTER_KEY: "k" });
   });
 });
 
 describe("playwright config", () => {
-  const list = (project: string, origin: string | undefined) => {
+  const list = (project: string, origin: string | undefined, extra: NodeJS.ProcessEnv = {}) => {
     const env: NodeJS.ProcessEnv = { ...process.env };
     delete env.APP_ORIGIN;
+    delete env[ALLOW_LIVE_ENV];
     delete env.TEST_WORKER_INDEX;
     if (origin !== undefined) env.APP_ORIGIN = origin;
     const run = spawnSync(process.execPath, [PLAYWRIGHT, "test", `--project=${project}`, "--list"], {
       cwd: E2E,
-      env,
+      env: { ...env, ...extra },
       encoding: "utf8",
     });
     return { status: run.status, output: `${run.stdout}${run.stderr}` };
   };
 
-  for (const project of ["smoke", "preview-m1"]) {
+  for (const project of PROJECTS) {
     it(`${project} refuses to load without APP_ORIGIN`, () => {
       const run = list(project, undefined);
       assert.notEqual(run.status, 0);
@@ -114,7 +122,15 @@ describe("playwright config", () => {
       assert.equal(run.status, 0, run.output);
     });
   }
-  it("the demo project still loads with its own origin", () => {
-    assert.equal(list("desktop", LIVE).status, 0);
+  it("a run without --project refuses the live origin", () => {
+    const env: NodeJS.ProcessEnv = { ...process.env, APP_ORIGIN: LIVE };
+    delete env[ALLOW_LIVE_ENV];
+    const run = spawnSync(process.execPath, [PLAYWRIGHT, "test", "--list"], { cwd: E2E, env, encoding: "utf8" });
+    assert.notEqual(run.status, 0);
+    assert.match(`${run.stdout}${run.stderr}`, /must be http:\/\/localhost/);
+  });
+  it("the live origin loads only with E2E_ALLOW_LIVE=1", () => {
+    assert.equal(list("desktop", LIVE, { [ALLOW_LIVE_ENV]: "1" }).status, 0);
+    assert.notEqual(list("desktop", LIVE, { [ALLOW_LIVE_ENV]: "true" }).status, 0);
   });
 });

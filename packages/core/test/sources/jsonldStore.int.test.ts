@@ -6,6 +6,7 @@ import { jsonldStore } from "../../src/sources/retail/jsonldStore.js";
 import type { RetailCtx } from "../../src/sources/retail/types.js";
 import { BrowserPool } from "../../src/browser/pool.js";
 import { shopTool } from "../../src/tools/shop.js";
+import { textOf } from "../fixtures/toolResult.js";
 
 const product = (name: string, price: string, extra: object = {}) => ({
   "@context": "https://schema.org",
@@ -101,23 +102,21 @@ describe("JSON-LD store for unknown domains", () => {
     };
     const tool = shopTool({
       pool,
-      threadId: "jsonld-t",
+      sessionKey: "jsonld-t",
       userContext: null,
       allowPrivateHosts: true,
       webSearch: ctx().webSearch,
       storeFor: (s) => stores[s],
       cart: new ActiveCart(),
     });
-    const r = (await tool.execute(
-      ...([
-        "c",
-        { stores: Object.keys(stores), items: [{ query: "Sony WH-1000XM5 Wireless Headphones" }] },
-        undefined,
-        undefined,
-        {},
-      ] as never[]),
-    )) as { content: Array<{ text: string }> };
-    const text = r.content[0].text;
+    const r = await tool.execute(
+      "c",
+      { stores: Object.keys(stores), items: [{ query: "Sony WH-1000XM5 Wireless Headphones" }] },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    const text = textOf(r);
     expect(text).toContain("Sony WH-1000XM5 Wireless Headphones — $298.00");
     expect(text).toContain(`${wallBase}/p/xm5`);
     expect(text).toMatch(/blocked by a bot check/);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyPatch } from "@oab/shared/workspace";
 import { planTool } from "../../src/tools/plan.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
+import { textOf } from "../fixtures/toolResult.js";
 
 function setup() {
   const store = new WorkspaceStore();
@@ -10,7 +11,6 @@ function setup() {
   return { store, run };
 }
 const party = { title: "8th birthday", guests: 12, budget: 300, menu: ["pizza"] };
-const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
 describe("plan tool", () => {
   it("sets an entity, saves it and shows a plan card", async () => {
@@ -19,7 +19,7 @@ describe("plan tool", () => {
     expect(r.isError).toBeUndefined();
     expect(await store.get("event", "main")).toMatchObject({ version: 1, value: party });
     expect(r.details.widget).toMatchObject({ kind: "plan", entity: "event", id: "main", version: 1, value: party });
-    expect(text(r)).toMatch(/^Set event "main" \(version 1\)/);
+    expect(textOf(r)).toMatch(/^Set event "main" \(version 1\)/);
   });
 
   it("accepts the value as a JSON string", async () => {
@@ -32,7 +32,7 @@ describe("plan tool", () => {
     const { store, run } = setup();
     const r = await run({ action: "set", kind: "event", value: { title: "x", guests: 0 } });
     expect(r.isError).toBe(true);
-    expect(text(r)).toContain("/guests");
+    expect(textOf(r)).toContain("/guests");
     expect(await store.list()).toEqual([]);
   });
 
@@ -67,7 +67,7 @@ describe("plan tool", () => {
     const unknownOp = await run({ action: "patch", kind: "event", ops: [{ op: "move", path: "/theme" }] });
     const required = await run({ action: "patch", kind: "event", ops: [{ op: "remove", path: "/guests" }] });
     for (const r of [bad, missing, noValue, unknownOp, required]) expect(r.isError).toBe(true);
-    expect(text(bad)).toContain("invalid");
+    expect(textOf(bad)).toContain("invalid");
     expect(await store.get("event", "main")).toMatchObject({ version: 1, value: party });
   });
 
@@ -75,17 +75,17 @@ describe("plan tool", () => {
     const { run } = setup();
     const r = await run({ action: "patch", kind: "trip", ops: [{ op: "replace", path: "/travelers", value: 3 }] });
     expect(r.isError).toBe(true);
-    expect(text(r)).toBe('No trip "main" in this session yet; use set first.');
+    expect(textOf(r)).toBe('No trip "main" in this session yet; use set first.');
   });
 
   it("gets one entity or all of a kind", async () => {
     const { run } = setup();
     await run({ action: "set", kind: "event", id: "a", value: party });
     await run({ action: "set", kind: "event", id: "b", value: { ...party, guests: 3 } });
-    expect(text(await run({ action: "get", kind: "event", id: "b" }))).toContain('"guests":3');
-    expect(text(await run({ action: "get", kind: "event" }))).toContain('event "a"');
-    expect(text(await run({ action: "get", kind: "trip" }))).toBe("No trip in this session yet.");
-    expect(text(await run({ action: "get", kind: "event", id: "zz" }))).toBe('No event "zz" in this session.');
+    expect(textOf(await run({ action: "get", kind: "event", id: "b" }))).toContain('"guests":3');
+    expect(textOf(await run({ action: "get", kind: "event" }))).toContain('event "a"');
+    expect(textOf(await run({ action: "get", kind: "trip" }))).toBe("No trip in this session yet.");
+    expect(textOf(await run({ action: "get", kind: "event", id: "zz" }))).toBe('No event "zz" in this session.');
   });
 
   it("reads the cart but never writes it", async () => {
@@ -141,7 +141,7 @@ describe("applyPatch", () => {
     for (let i = 0; i < 50; i++) await store.put("event", `e${i}`, party);
     const r = await run({ action: "set", kind: "event", id: "e50", value: party });
     expect(r.isError).toBe(true);
-    expect(text(r)).toBe("This session already holds 50 plans. Update one of them instead of adding another.");
+    expect(textOf(r)).toBe("This session already holds 50 plans. Update one of them instead of adding another.");
     expect((await run({ action: "set", kind: "event", id: "e1", value: party })).isError).toBeUndefined();
   });
 });

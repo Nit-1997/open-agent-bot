@@ -1,19 +1,19 @@
 import type { CredentialKind } from "@oab/core/secrets/envelope.js";
 import { UserError } from "@oab/core/lib/errors.js";
-import {
-  type ArtifactFile,
-  type ArtifactListRow,
-  type ArtifactRepo,
-  type ArtifactStorage,
-  type ChatRepo,
-  type CredentialRepo,
-  type CredentialRow,
-  type MessageRepo,
-  type ProfileRepo,
-  type ProviderSettingsRepo,
-  type SearchRepo,
-  type SearchResult,
-  type UserRepos,
+import type {
+  ArtifactFile,
+  ArtifactListRow,
+  ArtifactRepo,
+  ArtifactStorage,
+  ChatRepo,
+  CredentialRepo,
+  CredentialRow,
+  MessageRepo,
+  ProfileRepo,
+  ProviderSettingsRepo,
+  SearchRepo,
+  SearchResult,
+  UserRepos,
 } from "@oab/core/store/types.js";
 import { ARTIFACT_ID_RE } from "@oab/shared/artifacts";
 import type { MessagePart, MessageRole, MessageStatus } from "@oab/shared/chats";

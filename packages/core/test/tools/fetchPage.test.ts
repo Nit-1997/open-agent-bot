@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fetchPageTool } from "../../src/tools/fetchPage.js";
 import { fakeFetch, html } from "../fixtures/fakeFetch.js";
+import { textOf } from "../fixtures/toolResult.js";
 
-const text = (r: { content: Array<{ text?: string }> }) => r.content[0].text ?? "";
 const publicDns = async () => ["93.184.216.34"];
 const call = (f: typeof fetch, url: string, lookup = publicDns) =>
   fetchPageTool({ fetch: f, lookup }).execute("c", { url }, undefined, undefined, {} as never);
@@ -14,24 +14,24 @@ describe("fetch_page", () => {
       [/doc\.pdf/, () => new Response("%PDF", { headers: { "content-type": "application/pdf" } })],
     ]);
     const big = await call(f, "https://example.com/big");
-    expect(text(big)).toMatch(/\[truncated\]$/);
-    expect(text(big).length).toBeLessThan(12200);
+    expect(textOf(big)).toMatch(/\[truncated\]$/);
+    expect(textOf(big).length).toBeLessThan(12200);
     const pdf = await call(f, "https://example.com/doc.pdf");
     expect(pdf.isError).toBe(true);
-    expect(text(pdf)).toBe("unsupported content-type application/pdf");
+    expect(textOf(pdf)).toBe("unsupported content-type application/pdf");
   });
 
   it("fetch_page reports 403 as possible blocking", async () => {
     const f = fakeFetch([[/shop/, () => html("denied", 403)]]);
     const r = await call(f, "https://shop.example.com/item");
     expect(r.isError).toBe(true);
-    expect(text(r)).toBe("HTTP 403 from shop.example.com — the site may be blocking automated access");
+    expect(textOf(r)).toBe("HTTP 403 from shop.example.com — the site may be blocking automated access");
   });
 
   it("returns readable text for html", async () => {
     const f = fakeFetch([[/ok/, () => html("<article><h1>Title</h1><p>Body text here.</p></article>")]]);
     const r = await call(f, "https://example.com/ok");
-    expect(text(r)).toContain("Body text here.");
+    expect(textOf(r)).toContain("Body text here.");
   });
 
   it("lists the page's product images after the text", async () => {
@@ -44,7 +44,7 @@ describe("fetch_page", () => {
           ),
       ],
     ]);
-    const t = text(await call(f, "https://example.com/shop"));
+    const t = textOf(await call(f, "https://example.com/shop"));
     expect(t).toContain("images:\n- Tiempo Academy TF — https://example.com/b.jpg");
   });
 
@@ -71,7 +71,7 @@ describe("fetch_page network guard", () => {
     ]);
     const r = await call(f, "https://example.com/go");
     expect(r.isError).toBe(true);
-    expect(text(r)).toContain("refusing internal or private address");
+    expect(textOf(r)).toContain("refusing internal or private address");
     expect(f.calls).toEqual(["https://example.com/go"]);
   });
 
@@ -79,7 +79,7 @@ describe("fetch_page network guard", () => {
     const f = fakeFetch([[/.*/, () => html("secret")]]);
     const r = await call(f, "https://rebind.example.com/", async () => ["10.0.0.5"]);
     expect(r.isError).toBe(true);
-    expect(text(r)).toContain("resolves to a private address");
+    expect(textOf(r)).toContain("resolves to a private address");
     expect(f.calls).toEqual([]);
   });
 
@@ -88,7 +88,7 @@ describe("fetch_page network guard", () => {
       [/old/, () => new Response(null, { status: 301, headers: { location: "/new" } })],
       [/new/, () => html("<article><p>Moved here.</p></article>")],
     ]);
-    const t = text(await call(f, "https://example.com/old"));
+    const t = textOf(await call(f, "https://example.com/old"));
     expect(t).toMatch(/^url: https:\/\/example\.com\/new/);
     expect(t).toContain("Moved here.");
   });
@@ -116,6 +116,6 @@ describe("fetch_page structured data", () => {
     );
 
   it("appends compact structured lines", async () => {
-    expect(text(await run())).toMatch(/\n\nstructured:\n- product: Kettle — EUR 39.9, InStock$/);
+    expect(textOf(await run())).toMatch(/\n\nstructured:\n- product: Kettle — EUR 39.9, InStock$/);
   });
 });

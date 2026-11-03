@@ -3,7 +3,7 @@ import { validateWidget } from "@oab/shared/widgets";
 import { askUserTool } from "../../src/tools/askUser.js";
 
 const exec = (params: unknown) =>
-  askUserTool().execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
+  askUserTool().execute("c", params as never, undefined, undefined, {} as never) as Promise<{
     isError?: boolean;
     content: Array<{ text: string }>;
     details: { widget?: unknown };
