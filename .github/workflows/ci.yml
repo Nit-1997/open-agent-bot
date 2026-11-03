@@ -22,8 +22,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run lint -w @oab/core
-      - run: npm run format:check -w @oab/core
+      - run: npm run lint -w @oab/core -w @oab/shared
+      - run: npm run format:check -w @oab/core -w @oab/shared
       - run: npm run typecheck -w @oab/core
       - run: npm test -w @oab/core
       - run: npm run build -w @oab/core
@@ -67,4 +67,5 @@ jobs:
           preview="docker compose --env-file /dev/null --profile local -f docker-compose.yml -f deploy-config/compose.preview.yml config --format json"
           test "$($preview | jq -r .name)" = oab-preview
           test "$($preview | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
+          test "$($preview | jq '[.services[].ports[]? | .published | tonumber] | all(. >= 18000)')" = true
           test "$($preview | jq -c '[.services[].ports[]? | .published] | sort')" = '["18300","18800"]'
