@@ -1,5 +1,5 @@
 import type { Model } from "@earendil-works/pi-ai";
-import { isPlanKind } from "../../../shared/workspace.js";
+import { isPlanKind } from "@oab/shared/workspace";
 import type { ArtifactStore } from "../artifacts/store.js";
 import { FrameBus } from "../browser/frames.js";
 import type { BrowserPool } from "../browser/pool.js";

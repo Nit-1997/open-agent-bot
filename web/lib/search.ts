@@ -1,4 +1,4 @@
-import type { SearchResponse, SearchScope } from "@shared/lists";
+import type { SearchResponse, SearchScope } from "@oab/shared/lists";
 import { readApi } from "@/lib/api";
 
 export const searchApi = {

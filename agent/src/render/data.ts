@@ -1,5 +1,5 @@
 import type { Stay } from "../stays/types.js";
-import type { FlightPrefs } from "../../../shared/flights.js";
+import type { FlightPrefs } from "@oab/shared/flights";
 
 export type WeatherData = {
   kind: "weather";

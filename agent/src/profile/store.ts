@@ -1,4 +1,4 @@
-import { emptyProfile, type Profile, parseProfile, withoutInvalidAgent } from "../../../shared/profile.js";
+import { emptyProfile, type Profile, parseProfile, withoutInvalidAgent } from "@oab/shared/profile";
 import type { ProfileRepo } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";

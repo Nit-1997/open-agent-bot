@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { validateWidget } from "../../../shared/widgets.js";
+import { validateWidget } from "@oab/shared/widgets";
 import { type Judge, noJudge, type YesNoCriteria } from "../../src/judge/index.js";
 import { stayMatch } from "../../src/judge/criteria/stayMatch.js";
 import { renderData } from "../../src/render/registry.js";

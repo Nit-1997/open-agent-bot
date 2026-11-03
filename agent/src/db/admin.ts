@@ -1,6 +1,6 @@
-import type { AccessRequestView, InviteStatus, ProfileView, RequestFilter, RequestStatus, UserStatus } from "../../../shared/admin.js";
-import { isUuid } from "../../../shared/ids.js";
-import { PAGE_SIZE, type Page } from "../../../shared/pages.js";
+import type { AccessRequestView, InviteStatus, ProfileView, RequestFilter, RequestStatus, UserStatus } from "@oab/shared/admin";
+import { isUuid } from "@oab/shared/ids";
+import { PAGE_SIZE, type Page } from "@oab/shared/pages";
 import { UserError } from "../lib/errors.js";
 import { fromBytea, toBytea } from "./bytea.js";
 import type { Db } from "./client.js";

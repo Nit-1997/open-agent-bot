@@ -1,5 +1,5 @@
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
-import { hrefFor, parseRoute } from "@shared/routes";
+import { hrefFor, parseRoute } from "@oab/shared/routes";
 import { notFound, redirect } from "next/navigation";
 import { appOrigin } from "@/lib/env";
 import { type SessionUser, sessionUserFromClaims } from "@/lib/sessionUser";

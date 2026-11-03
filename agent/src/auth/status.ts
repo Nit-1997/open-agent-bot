@@ -1,4 +1,4 @@
-import type { UserStatus } from "../../../shared/admin.js";
+import type { UserStatus } from "@oab/shared/admin";
 
 type Lookup = (userId: string) => Promise<UserStatus | undefined>;
 type Entry = { active: boolean; at: number };

@@ -1,8 +1,8 @@
 "use client";
 
-import { type ChatSummary, chatTitleFrom } from "@shared/chats";
-import { CHATS_PAGE_SIZE } from "@shared/lists";
-import type { PageResponse } from "@shared/pages";
+import { type ChatSummary, chatTitleFrom } from "@oab/shared/chats";
+import { CHATS_PAGE_SIZE } from "@oab/shared/lists";
+import type { PageResponse } from "@oab/shared/pages";
 import { useEffect, useSyncExternalStore } from "react";
 import { chatsApi } from "@/lib/chats";
 import { errorMessage } from "@/lib/errors";

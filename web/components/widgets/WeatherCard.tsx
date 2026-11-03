@@ -1,4 +1,4 @@
-import type { WeatherCard as WeatherCardData } from "@shared/widgets";
+import type { WeatherCard as WeatherCardData } from "@oab/shared/widgets";
 import { widgetId } from "./widgetId";
 
 export function WeatherCard({ toolCallId, idPrefix, widget }: { toolCallId: string; idPrefix?: string; widget: WeatherCardData }) {

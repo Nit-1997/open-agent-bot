@@ -1,6 +1,6 @@
 "use client";
 
-import { type AgentLook, type AgentTone, agentPersona, checkAgentName, type Profile } from "@shared/profile";
+import { type AgentLook, type AgentTone, agentPersona, checkAgentName, type Profile } from "@oab/shared/profile";
 import { useState } from "react";
 import { AgentOrb } from "./AgentOrb";
 import { AgentNameField } from "./AgentNameField";

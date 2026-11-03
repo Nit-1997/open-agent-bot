@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { type AgentPersona, agentPersona } from "../../../shared/profile.js";
+import { type AgentPersona, agentPersona } from "@oab/shared/profile";
 import type { AuthEnv } from "../auth/middleware.js";
 import { log } from "../lib/log.js";
 import type { RateLimiter } from "../lib/rateLimit.js";

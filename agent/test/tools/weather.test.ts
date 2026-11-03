@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateWidget } from "../../../shared/widgets.js";
+import { validateWidget } from "@oab/shared/widgets";
 import { renderData } from "../../src/render/registry.js";
 import { weatherTool, wmoCondition } from "../../src/tools/weather.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";

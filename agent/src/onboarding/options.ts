@@ -1,4 +1,4 @@
-import { type Chip, curatedFor, type OnboardingOptions } from "../../../shared/onboarding.js";
+import { type Chip, curatedFor, type OnboardingOptions } from "@oab/shared/onboarding";
 import { currencyOf, unitsOf } from "../prompt/region.js";
 import type { SourceRegistry } from "../sources/registry.js";
 import type { FlightSource } from "../sources/flights/google.js";

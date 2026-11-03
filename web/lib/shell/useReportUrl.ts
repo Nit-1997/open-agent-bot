@@ -1,6 +1,6 @@
 "use client";
 
-import { hrefFor, parseRoute } from "@shared/routes";
+import { hrefFor, parseRoute } from "@oab/shared/routes";
 import { useEffect, useRef } from "react";
 import { useShell } from "@/components/shell/ShellProvider";
 import type { ChatAction } from "./chatController";

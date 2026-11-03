@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { UiWidget } from "../../../shared/widgets.js";
+import type { UiWidget } from "@oab/shared/widgets";
 import { Evidence } from "../../src/grounding/evidence.js";
 import { groundUi } from "../../src/grounding/groundUi.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateWidget } from "../../../shared/widgets.js";
+import { validateWidget } from "@oab/shared/widgets";
 import { renderData } from "../../src/render/registry.js";
 import type { OpenTab } from "../../src/stays/types.js";
 import { staySource } from "../../src/sources/stays/define.js";

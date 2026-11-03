@@ -1,7 +1,7 @@
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
-import type { MessagePart } from "../../../shared/chats.js";
-import { parseWorkspaceEdits } from "../../../shared/workspace.js";
+import type { MessagePart } from "@oab/shared/chats";
+import { parseWorkspaceEdits } from "@oab/shared/workspace";
 import { historyFromStored, readWorkspaceEdits } from "../../src/agui/input.js";
 import { handleRun, type RunContext } from "../../src/agui/runHandler.js";
 import { Evidence } from "../../src/grounding/evidence.js";

@@ -1,15 +1,7 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { validateWidget } from "../../../shared/widgets.js";
-import {
-  applyPatch,
-  ENTITY_KINDS,
-  type EntityKind,
-  isEntityKind,
-  isPlanKind,
-  type PatchOp,
-  validateEntity,
-} from "../../../shared/workspace.js";
+import { validateWidget } from "@oab/shared/widgets";
+import { applyPatch, ENTITY_KINDS, type EntityKind, isEntityKind, isPlanKind, type PatchOp, validateEntity } from "@oab/shared/workspace";
 import { VersionConflict, WorkspaceFull } from "../workspace/conflict.js";
 import type { WorkspaceStore } from "../workspace/store.js";
 import { fail, ok, type ToolResult } from "./result.js";

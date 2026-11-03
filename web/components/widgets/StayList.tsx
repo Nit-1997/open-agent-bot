@@ -1,6 +1,6 @@
 "use client";
 
-import type { StayList as StayListWidget } from "@shared/widgets";
+import type { StayList as StayListWidget } from "@oab/shared/widgets";
 import { Check, Star } from "lucide-react";
 import { useState } from "react";
 import { money } from "@/lib/format";

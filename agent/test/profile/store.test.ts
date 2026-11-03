@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyProfile } from "../../../shared/profile.js";
+import { emptyProfile } from "@oab/shared/profile";
 import { SupabaseProfileStore } from "../../src/profile/store.js";
 import { MemoryDb } from "../fixtures/memoryRepos.js";
 import { ALICE, BOB } from "../fixtures/users.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateWidget } from "../../../shared/widgets.js";
+import { validateWidget } from "@oab/shared/widgets";
 import { askUserTool } from "../../src/tools/askUser.js";
 
 const exec = (params: unknown) =>

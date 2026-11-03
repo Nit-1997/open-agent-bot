@@ -1,5 +1,5 @@
-import type { ChatSummary, MessagePart, StoredMessage } from "@shared/chats";
-import type { Page, PageResponse } from "@shared/pages";
+import type { ChatSummary, MessagePart, StoredMessage } from "@oab/shared/chats";
+import type { Page, PageResponse } from "@oab/shared/pages";
 import { readApi } from "@/lib/api";
 
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };

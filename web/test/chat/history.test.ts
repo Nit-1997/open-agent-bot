@@ -1,4 +1,4 @@
-import type { StoredMessage } from "@shared/chats";
+import type { StoredMessage } from "@oab/shared/chats";
 import { describe, expect, it } from "vitest";
 import { cardDates, STOPPED_MARK, toHistory } from "@/lib/chats";
 import { buildTurns, type ChatMessage } from "@/lib/turns";

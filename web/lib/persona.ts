@@ -1,5 +1,5 @@
-import { NO_FOOD_RULES } from "@shared/onboarding";
-import type { Profile } from "@shared/profile";
+import { NO_FOOD_RULES } from "@oab/shared/onboarding";
+import type { Profile } from "@oab/shared/profile";
 
 const SUMMARY_MAX = 40;
 const TRAVEL_SHORT = { budget: "budget trips", comfort: "comfort trips", luxury: "luxury trips" } as const;

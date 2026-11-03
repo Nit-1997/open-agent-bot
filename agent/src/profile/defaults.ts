@@ -1,4 +1,4 @@
-import { INDEPENDENT } from "../../../shared/onboarding.js";
+import { INDEPENDENT } from "@oab/shared/onboarding";
 import type { SourceRegistry } from "../sources/registry.js";
 import type { RetailSource } from "../sources/retail/types.js";
 import type { StayKind, StaySource } from "../stays/types.js";

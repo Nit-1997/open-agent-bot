@@ -1,4 +1,4 @@
-import type { CartEdits, PlanEdits, WorkspaceEdits } from "@shared/workspace";
+import type { CartEdits, PlanEdits, WorkspaceEdits } from "@oab/shared/workspace";
 
 const isEmpty = (o: object | undefined) => !o || Object.keys(o).length === 0;
 

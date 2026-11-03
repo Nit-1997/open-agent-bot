@@ -1,6 +1,6 @@
 import type { SkillEntry } from "../skills/catalog.js";
 import { regionFor } from "./region.js";
-import { type AgentPersona, type AgentTone, DEFAULT_AGENT, homePlace } from "../../../shared/profile.js";
+import { type AgentPersona, type AgentTone, DEFAULT_AGENT, homePlace } from "@oab/shared/profile";
 import { profileLines } from "../profile/prompt.js";
 import { personaSection, TONE_LENGTH } from "./persona.js";
 import type { ProfileOverride, UserContext } from "./userContext.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePage } from "@shared/pages";
+import { parsePage } from "@oab/shared/pages";
 import { pageCount, rangeText } from "@/lib/pagination";
 
 describe("pagination", () => {

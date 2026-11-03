@@ -18,6 +18,6 @@ Every variable is required and checked on first use; nothing falls back to a def
 | `AGENT_URL` | Agent base URL (`http://agent:8000` in compose, `https://<AGENT_HOST>` on Vercel) |
 | `AGENT_SERVICE_SECRET` | 64 hex chars, sent as `x-agent-secret`; must match the agent's value |
 
-Sign-in uses `@supabase/ssr` server clients only; the browser never holds a Supabase client or a readable token. `proxy.ts` refreshes the session on every request, sends signed-out visitors to `/login` (or `401` on `/api/*`), hides `/admin` from non-admins and sets a per-request nonce CSP. Everything under `app/api/` is a thin server-side proxy that forwards the user's access token and the service secret to the agent, never the browser's headers or cookies. Widget payloads are validated with the schemas in `../shared/widgets.ts` before rendering.
+Sign-in uses `@supabase/ssr` server clients only; the browser never holds a Supabase client or a readable token. `proxy.ts` refreshes the session on every request, sends signed-out visitors to `/login` (or `401` on `/api/*`), hides `/admin` from non-admins and sets a per-request nonce CSP. Everything under `app/api/` is a thin server-side proxy that forwards the user's access token and the service secret to the agent, never the browser's headers or cookies. Widget payloads are validated with the schemas in `@oab/shared/widgets` (`../packages/shared/src/widgets.ts`) before rendering.
 
 See the repository [README](../README.md) and [CONTRIBUTING](../CONTRIBUTING.md) for the full stack.

@@ -1,7 +1,7 @@
 import { type Context, Hono } from "hono";
-import { isRequestFilter } from "../../../shared/admin.js";
-import { normalizeId } from "../../../shared/ids.js";
-import { PAGE_SIZE } from "../../../shared/pages.js";
+import { isRequestFilter } from "@oab/shared/admin";
+import { normalizeId } from "@oab/shared/ids";
+import { PAGE_SIZE } from "@oab/shared/pages";
 import type { AdminService } from "../admin/service.js";
 import type { AuthEnv } from "../auth/middleware.js";
 import { UserError } from "../lib/errors.js";

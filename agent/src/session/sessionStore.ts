@@ -4,7 +4,7 @@ import type { FrameBus } from "../browser/frames.js";
 import type { Evidence } from "../grounding/evidence.js";
 import { log } from "../lib/log.js";
 import type { PiSession } from "../pi/createPiSession.js";
-import type { AgentPersona } from "../../../shared/profile.js";
+import type { AgentPersona } from "@oab/shared/profile";
 import type { UserContext } from "../prompt/userContext.js";
 import type { ActiveCart } from "../shop/cart.js";
 import type { EarlierCards } from "../workspace/earlier.js";

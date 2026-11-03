@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { AccessRequestView, AdminUser } from "@shared/admin";
-import type { PageResponse } from "@shared/pages";
+import type { AccessRequestView, AdminUser } from "@oab/shared/admin";
+import type { PageResponse } from "@oab/shared/pages";
 import type { ActionResult } from "@/lib/actionResult";
 import { RequestsList } from "./RequestsList";
 import { UsersList } from "./UsersList";

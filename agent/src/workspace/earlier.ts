@@ -1,5 +1,5 @@
-import type { StoredMessage } from "../../../shared/chats.js";
-import { type Cart, type Plan, validateWidget } from "../../../shared/widgets.js";
+import type { StoredMessage } from "@oab/shared/chats";
+import { type Cart, type Plan, validateWidget } from "@oab/shared/widgets";
 import { clip, entityDetail, money, oneLine } from "./summary.js";
 
 export type EarlierCards = {

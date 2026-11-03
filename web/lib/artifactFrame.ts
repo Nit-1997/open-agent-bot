@@ -1,4 +1,4 @@
-import { ARTIFACT_CSP } from "@shared/artifacts";
+import { ARTIFACT_CSP } from "@oab/shared/artifacts";
 
 const PRIVATE = { "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
 const PASSTHROUGH = [401, 403, 404, 429];

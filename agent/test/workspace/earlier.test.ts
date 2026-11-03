@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MessagePart, StoredMessage } from "../../../shared/chats.js";
+import type { MessagePart, StoredMessage } from "@oab/shared/chats";
 import { earlierCards, earlierNote } from "../../src/workspace/earlier.js";
 
 const cart = (name: string, total: number, extra: object = {}) => ({

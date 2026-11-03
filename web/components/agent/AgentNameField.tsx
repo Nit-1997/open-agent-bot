@@ -1,6 +1,6 @@
 "use client";
 
-import { AGENT_NAME_MAX, AGENT_NAME_SUGGESTIONS } from "@shared/profile";
+import { AGENT_NAME_MAX, AGENT_NAME_SUGGESTIONS } from "@oab/shared/profile";
 
 export function AgentNameField(props: { id: string; value: string; error: string | null; onChange: (raw: string) => void }) {
   const { id, error } = props;

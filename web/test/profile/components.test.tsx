@@ -1,4 +1,4 @@
-import { emptyProfile, type Profile } from "@shared/profile";
+import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelMenu } from "@/components/profile/ModelMenu";

@@ -1,8 +1,8 @@
 "use client";
 
-import type { AgentPersona, Profile } from "@shared/profile";
-import { agentPersona } from "@shared/profile";
-import { hrefFor, parseRoute } from "@shared/routes";
+import type { AgentPersona, Profile } from "@oab/shared/profile";
+import { agentPersona } from "@oab/shared/profile";
+import { hrefFor, parseRoute } from "@oab/shared/routes";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,

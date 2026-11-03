@@ -1,6 +1,6 @@
 "use client";
 
-import type { PageResponse } from "@shared/pages";
+import type { PageResponse } from "@oab/shared/pages";
 import { useCallback, useEffect, useState } from "react";
 import { pageCount } from "@/lib/pagination";
 import { errorMessage } from "@/lib/errors";

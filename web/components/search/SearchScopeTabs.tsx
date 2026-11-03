@@ -1,4 +1,4 @@
-import { SEARCH_SCOPES, type SearchScope } from "@shared/lists";
+import { SEARCH_SCOPES, type SearchScope } from "@oab/shared/lists";
 import type { KeyboardEvent } from "react";
 
 const LABEL: Record<SearchScope, string> = { all: "All", chats: "Chats", reports: "Reports" };

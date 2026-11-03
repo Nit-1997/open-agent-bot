@@ -1,4 +1,4 @@
-import { normalizeId } from "@shared/ids";
+import { normalizeId } from "@oab/shared/ids";
 import { forwardToAgent, jsonError } from "@/lib/agentServer";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -6,8 +6,8 @@ import type { AuthUser } from "../auth/verify.js";
 import type { ChatRepo, MessageRepo, NewMessage } from "../db/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
-import { agentPersona, type Profile } from "../../../shared/profile.js";
-import { chatTitleFrom } from "../../../shared/chats.js";
+import { agentPersona, type Profile } from "@oab/shared/profile";
+import { chatTitleFrom } from "@oab/shared/chats";
 import type { ProfileStore } from "../profile/store.js";
 import type { UserContext } from "../prompt/userContext.js";
 import {
@@ -18,7 +18,7 @@ import {
   type SessionSeed,
   type SessionStore,
 } from "../session/sessionStore.js";
-import type { WorkspaceEdits } from "../../../shared/workspace.js";
+import type { WorkspaceEdits } from "@oab/shared/workspace";
 import { earlierCards } from "../workspace/earlier.js";
 import { applyEntityEdits, unappliedNote } from "../workspace/edits.js";
 import { custom, runError, runFinished, runStarted } from "./events.js";

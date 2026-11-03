@@ -1,6 +1,6 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { ASK_FIELD_TYPES, validateWidget } from "../../../shared/widgets.js";
+import { ASK_FIELD_TYPES, validateWidget } from "@oab/shared/widgets";
 import { fail, ok, type ToolResult } from "./result.js";
 
 const FIELDS_HELP = `Fields, prefilled with your best guess so the user can just confirm:

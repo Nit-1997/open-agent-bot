@@ -1,4 +1,4 @@
-import { parsePage } from "@shared/pages";
+import { parsePage } from "@oab/shared/pages";
 import { ReportsView } from "@/components/reports/ReportsView";
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {

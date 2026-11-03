@@ -1,6 +1,6 @@
 "use client";
 
-import { hrefFor, type Route } from "@shared/routes";
+import { hrefFor, type Route } from "@oab/shared/routes";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 

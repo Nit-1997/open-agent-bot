@@ -1,4 +1,4 @@
-import { parsePage } from "@shared/pages";
+import { parsePage } from "@oab/shared/pages";
 import { ChatsView } from "@/components/chat/ChatsView";
 
 export default async function ChatsPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {

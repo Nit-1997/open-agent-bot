@@ -1,4 +1,4 @@
-import type { AgentPersona, AgentTone } from "../../../shared/profile.js";
+import type { AgentPersona, AgentTone } from "@oab/shared/profile";
 
 export const TONE_LENGTH: Record<AgentTone, string> = {
   brief: "Be brief: the answer in one sentence, then at most 3 short bullets under 15 words. No pleasantries.",

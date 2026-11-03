@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hrefFor, parseRoute } from "../../../shared/routes.js";
+import { hrefFor, parseRoute } from "@oab/shared/routes";
 
 const CHAT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const parse = (url: string) => {

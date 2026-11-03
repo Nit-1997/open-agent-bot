@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { validateWidget } from "../../../shared/widgets.js";
+import { validateWidget } from "@oab/shared/widgets";
 import { renderData } from "../../src/render/registry.js";
 import { parseGoogleFlights } from "../../src/tools/flights.js";
 

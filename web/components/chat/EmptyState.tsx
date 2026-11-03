@@ -1,4 +1,4 @@
-import type { AgentPersona } from "@shared/profile";
+import type { AgentPersona } from "@oab/shared/profile";
 import { PartyPopper, Plane, ShoppingBag, Telescope } from "lucide-react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 

@@ -1,4 +1,4 @@
-import { ARTIFACT_ID_RE } from "@shared/artifacts";
+import { ARTIFACT_ID_RE } from "@oab/shared/artifacts";
 import { notFound } from "next/navigation";
 import { ReportDetail } from "@/components/reports/ReportDetail";
 

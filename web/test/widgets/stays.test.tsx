@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { StayList as StayListWidget } from "@shared/widgets";
+import type { StayList as StayListWidget } from "@oab/shared/widgets";
 import { StayList } from "@/components/widgets/StayList";
 import { stepLabel } from "@/lib/steps";
 

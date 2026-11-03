@@ -1,7 +1,7 @@
 "use client";
 
-import type { AdminUser } from "@shared/admin";
-import type { PageResponse } from "@shared/pages";
+import type { AdminUser } from "@oab/shared/admin";
+import type { PageResponse } from "@oab/shared/pages";
 import { useState } from "react";
 import { deleteUser, listUsers, setUserStatus } from "@/app/admin/actions";
 import { ghost, input } from "@/components/profile/models/styles";

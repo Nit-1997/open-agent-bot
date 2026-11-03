@@ -1,4 +1,4 @@
-import type { ReportSummary } from "@shared/lists";
+import type { ReportSummary } from "@oab/shared/lists";
 import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { UNTITLED } from "@/components/chat/ChatHeader";

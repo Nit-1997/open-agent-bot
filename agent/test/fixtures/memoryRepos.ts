@@ -1,6 +1,6 @@
-import { emptyProfile } from "../../../shared/profile.js";
-import type { ChatSummary, StoredMessage } from "../../../shared/chats.js";
-import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_PAGE_SIZE, type SearchScope, SNIPPET_CHARS } from "../../../shared/lists.js";
+import { emptyProfile } from "@oab/shared/profile";
+import type { ChatSummary, StoredMessage } from "@oab/shared/chats";
+import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_PAGE_SIZE, type SearchScope, SNIPPET_CHARS } from "@oab/shared/lists";
 import type { ArtifactFile, ArtifactListRow, ArtifactRow, CredentialRow, NewMessage, SearchRow, UserRepos } from "../../src/db/types.js";
 import { UserError } from "../../src/lib/errors.js";
 

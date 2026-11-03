@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReportSummary } from "@shared/lists";
+import type { ReportSummary } from "@oab/shared/lists";
 import { useCallback } from "react";
 import { useShell } from "@/components/shell/ShellProvider";
 import { ListState } from "@/components/ui/ListState";

@@ -1,6 +1,6 @@
 "use client";
 
-import { normalizeQuery, SEARCH_MIN, type SearchResponse, type SearchScope } from "@shared/lists";
+import { normalizeQuery, SEARCH_MIN, type SearchResponse, type SearchScope } from "@oab/shared/lists";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useShell } from "@/components/shell/ShellProvider";

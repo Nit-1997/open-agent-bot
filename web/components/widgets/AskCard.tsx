@@ -1,6 +1,6 @@
 "use client";
 
-import type { AskField, AskWidget } from "@shared/widgets";
+import type { AskField, AskWidget } from "@oab/shared/widgets";
 import { Check, ChevronDown, Minus, Plus } from "lucide-react";
 import { useState } from "react";
 import { widgetId } from "./widgetId";

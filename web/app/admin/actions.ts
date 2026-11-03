@@ -3,12 +3,12 @@
 import { type ActionResult, failure } from "@/lib/actionResult";
 import { callAgent, jsonBody, withAgentAuth } from "@/lib/agentCall";
 import type { AgentRequest } from "@/lib/agentServer";
-import { type AccessRequestView, type AdminUser, isRequestFilter } from "@shared/admin";
-import { normalizeId } from "@shared/ids";
-import type { PageResponse } from "@shared/pages";
+import { type AccessRequestView, type AdminUser, isRequestFilter } from "@oab/shared/admin";
+import { normalizeId } from "@oab/shared/ids";
+import type { PageResponse } from "@oab/shared/pages";
 import { type RequestAction, SEARCH_MAX, type UserAction } from "@/lib/admin";
 import { getClaimsOrNull } from "@/lib/auth";
-import { parsePage } from "@shared/pages";
+import { parsePage } from "@oab/shared/pages";
 
 const REQUEST_ACTIONS: readonly RequestAction[] = ["approve", "reject", "resend"];
 const USER_ACTIONS: readonly UserAction[] = ["deactivate", "reactivate"];

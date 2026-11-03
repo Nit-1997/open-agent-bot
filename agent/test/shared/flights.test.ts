@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { departBucket, matchesPrefs, rankAirports, rideOneWay } from "../../../shared/flights.js";
+import { departBucket, matchesPrefs, rankAirports, rideOneWay } from "@oab/shared/flights";
 
 describe("departBucket", () => {
   it("buckets 12h and 24h times into parts of the day", () => {

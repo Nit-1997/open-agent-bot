@@ -6,6 +6,7 @@
     "node": ">=22"
   },
   "workspaces": [
+    "packages/*",
     "agent",
     "web",
     "e2e"

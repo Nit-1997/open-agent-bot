@@ -1,7 +1,7 @@
 import type { Message, RunAgentInput } from "@ag-ui/core";
-import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
-import { parseWorkspaceEdits, type WorkspaceEdits } from "../../../shared/workspace.js";
-import { type Profile, parseProfile } from "../../../shared/profile.js";
+import { ARTIFACT_ID_RE } from "@oab/shared/artifacts";
+import { parseWorkspaceEdits, type WorkspaceEdits } from "@oab/shared/workspace";
+import { type Profile, parseProfile } from "@oab/shared/profile";
 import type { ProfileOverride, UserContext, Viewport } from "../prompt/userContext.js";
 import type { HistoryMessage } from "../session/sessionStore.js";
 

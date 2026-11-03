@@ -1,6 +1,6 @@
 "use client";
 
-import type { PageResponse } from "@shared/pages";
+import type { PageResponse } from "@oab/shared/pages";
 import { useState } from "react";
 import { type ActionResult, runAction } from "@/lib/actionResult";
 

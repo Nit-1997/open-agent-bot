@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_TONES, DEFAULT_AGENT } from "../../../shared/profile.js";
+import { AGENT_TONES, DEFAULT_AGENT } from "@oab/shared/profile";
 import { personaSection, TONE_LENGTH } from "../../src/prompt/persona.js";
 import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 

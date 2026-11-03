@@ -1,4 +1,4 @@
-import type { CartEdits, CartEntity } from "../../../shared/workspace.js";
+import type { CartEdits, CartEntity } from "@oab/shared/workspace";
 import type { Tile } from "./extract.js";
 import type { StoreResult } from "./rank.js";
 

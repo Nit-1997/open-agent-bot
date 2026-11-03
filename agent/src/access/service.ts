@@ -1,5 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
-import { normalizeEmail as parseEmail } from "../../../shared/email.js";
+import { normalizeEmail as parseEmail } from "@oab/shared/email";
 import type { SubmitOutcome } from "../db/admin.js";
 import type { BackgroundQueue } from "../lib/backgroundQueue.js";
 import { UserError } from "../lib/errors.js";

@@ -1,4 +1,4 @@
-import type { Profile } from "../../../shared/profile.js";
+import type { Profile } from "@oab/shared/profile";
 
 export type ProfileOverride = Partial<Profile>;
 export type Viewport = { width: number; height: number };

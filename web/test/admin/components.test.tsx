@@ -6,8 +6,8 @@ import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { RequestsList } from "@/components/admin/RequestsList";
 import { UsersList } from "@/components/admin/UsersList";
 import type { ActionResult } from "@/lib/actionResult";
-import type { AccessRequestView, AdminUser } from "@shared/admin";
-import type { PageResponse } from "@shared/pages";
+import type { AccessRequestView, AdminUser } from "@oab/shared/admin";
+import type { PageResponse } from "@oab/shared/pages";
 
 vi.mock("@/app/admin/actions", () => ({
   listRequests: vi.fn(),

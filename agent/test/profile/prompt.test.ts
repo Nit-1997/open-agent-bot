@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyProfile, type Profile } from "../../../shared/profile.js";
+import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { profileLines } from "../../src/profile/prompt.js";
 import { buildSystemPrompt } from "../../src/prompt/systemPrompt.js";
 

@@ -1,4 +1,4 @@
-import type { UiBlock, UiWidget } from "../../../shared/widgets.js";
+import type { UiBlock, UiWidget } from "@oab/shared/widgets";
 import type { Evidence } from "./evidence.js";
 
 function strings(v: unknown, out: string[] = []): string[] {

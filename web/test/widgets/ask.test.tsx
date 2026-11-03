@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { AskWidget } from "@shared/widgets";
+import type { AskWidget } from "@oab/shared/widgets";
 import { describe, expect, it, vi } from "vitest";
 import { AskCard, formatAnswers } from "@/components/widgets/AskCard";
 import { WeatherCard } from "@/components/widgets/WeatherCard";

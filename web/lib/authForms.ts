@@ -1,4 +1,4 @@
-import { normalizeEmail } from "@shared/email";
+import { normalizeEmail } from "@oab/shared/email";
 
 const TOKEN_HASH_RE = /^[A-Za-z0-9_-]{10,200}$/;
 const IP_RE = /^[0-9A-Fa-f:.]{2,45}$/;

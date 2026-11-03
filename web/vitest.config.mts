@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
-      { find: /^@shared\/(.*)$/, replacement: fileURLToPath(new URL("../shared/$1", import.meta.url)) },
+      { find: /^@oab\/shared\/(.*)$/, replacement: fileURLToPath(new URL("../packages/shared/src/$1.ts", import.meta.url)) },
       { find: /^@\/(.*)$/, replacement: fileURLToPath(new URL("./$1", import.meta.url)) },
       { find: /^typebox\/value$/, replacement: resolve("typebox/value") },
       { find: /^typebox$/, replacement: resolve("typebox") },

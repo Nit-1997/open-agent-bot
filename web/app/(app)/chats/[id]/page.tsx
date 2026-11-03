@@ -1,4 +1,4 @@
-import { normalizeId } from "@shared/ids";
+import { normalizeId } from "@oab/shared/ids";
 import { notFound } from "next/navigation";
 
 export default async function ChatPage({ params }: { params: Promise<{ id: string }> }) {

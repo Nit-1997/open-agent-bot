@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWorkspaceEdits } from "../../../shared/workspace.js";
+import { parseWorkspaceEdits } from "@oab/shared/workspace";
 import { applyEntityEdits, unappliedNote } from "../../src/workspace/edits.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
 

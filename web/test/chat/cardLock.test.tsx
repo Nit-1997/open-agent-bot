@@ -1,5 +1,5 @@
 import { AbstractAgent, type BaseEvent, type Message } from "@ag-ui/client";
-import { DEFAULT_AGENT } from "@shared/profile";
+import { DEFAULT_AGENT } from "@oab/shared/profile";
 import { act, render, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { EMPTY, type Observable } from "rxjs";

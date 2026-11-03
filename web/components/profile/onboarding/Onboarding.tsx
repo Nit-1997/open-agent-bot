@@ -1,6 +1,6 @@
 "use client";
 
-import { agentPersona, emptyProfile, type Profile, type Section } from "@shared/profile";
+import { agentPersona, emptyProfile, type Profile, type Section } from "@oab/shared/profile";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { useCallback, useEffect, useState } from "react";
 import { type ModelList, normalizeRef } from "@/lib/models";
