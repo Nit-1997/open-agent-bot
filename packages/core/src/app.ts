@@ -16,7 +16,8 @@ import { type ProfilesFor, profileRoutes } from "./http/profile.js";
 import { providerRoutes } from "./http/providers.js";
 import { settingsRoutes } from "./http/settings.js";
 import { UserError } from "./lib/errors.js";
-import type { ConcurrencyGate, RateLimiter } from "./lib/rateLimit.js";
+import type { RateLimiter } from "./lib/rateLimit.js";
+import type { RunPolicy } from "./policy/types.js";
 import type { UserHubs } from "./providers/hubs.js";
 import type { LoginFlows } from "./providers/logins.js";
 import type { SessionStore } from "./session/sessionStore.js";
@@ -24,7 +25,7 @@ import type { SessionStore } from "./session/sessionStore.js";
 export type AppDeps = {
   guards: Guards;
   limiter: RateLimiter;
-  gate: ConcurrencyGate;
+  runPolicy: RunPolicy;
   store: SessionStore;
   runContext: (user: Principal, chatId: string) => RunContext;
   repos: (userId: string) => UserRepos;
@@ -57,7 +58,7 @@ export function createApp(deps: AppDeps) {
 
   for (const path of USER_PATHS) app.use(path, guards.requireUser);
 
-  app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, limiter: deps.limiter, gate: deps.gate }));
+  app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, policy: deps.runPolicy }));
   app.route("/", chatRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", reportRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", searchRoutes({ repos: deps.repos, limiter: deps.limiter }));

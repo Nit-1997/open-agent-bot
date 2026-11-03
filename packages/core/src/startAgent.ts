@@ -14,6 +14,8 @@ import { createJudgeFrom, type Judge, judgeResolver } from "./judge/index.js";
 import { createLimiter } from "./lib/concurrency.js";
 import { log, setLogLevel } from "./lib/log.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "./lib/rateLimit.js";
+import { LocalRunPolicy } from "./policy/localRunPolicy.js";
+import type { RunPolicy } from "./policy/types.js";
 import { nearbyGroceries } from "./onboarding/groceries.js";
 import { RepoProfileStore } from "./profile/store.js";
 import type { ProviderHub } from "./providers/hub.js";
@@ -39,6 +41,7 @@ export type AgentDeps = Readonly<{
   store: Store;
   identity: Identity;
   keyWrapper: KeyWrapper;
+  runPolicy?: (h: { limiter: RateLimiter }) => RunPolicy;
   gateway?: GatewayLike;
   routes?: (core: CoreHandles) => RouteMount[];
   host?: string;
@@ -110,7 +113,7 @@ export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
   const app = createApp({
     guards: createGuards(deps.identity),
     limiter,
-    gate: new ConcurrencyGate(RUN_CONCURRENCY),
+    runPolicy: deps.runPolicy?.({ limiter }) ?? new LocalRunPolicy({ limiter, gate: new ConcurrencyGate(RUN_CONCURRENCY) }),
     store: sessions,
     runContext: (user, chatId) => {
       const r = repos(user.id);

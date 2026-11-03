@@ -4,8 +4,8 @@ import { Hono } from "hono";
 import { isUuid } from "@oab/shared/ids";
 import { handleRun, type RunContext } from "../agui/runHandler.js";
 import type { AuthEnv, Principal } from "../identity/types.js";
-import { type ConcurrencyGate, LIMITS, type RateLimiter, rateLimitError } from "../lib/rateLimit.js";
 import { UserError } from "../lib/errors.js";
+import type { RunPolicy } from "../policy/types.js";
 import { errorResponse } from "./handlers.js";
 import type { SessionStore } from "../session/sessionStore.js";
 
@@ -22,8 +22,7 @@ const HEARTBEAT = new TextEncoder().encode(": ping\n\n");
 export function aguiRoutes(deps: {
   store: SessionStore;
   context: (user: Principal, chatId: string) => RunContext;
-  limiter: RateLimiter;
-  gate: ConcurrencyGate;
+  policy: RunPolicy;
   heartbeatMs?: number;
   handle?: typeof handleRun;
 }) {
@@ -34,49 +33,53 @@ export function aguiRoutes(deps: {
     const body = await c.req.json().catch(() => null);
     if (!isRunInput(body)) return errorResponse(c, new UserError("invalid RunAgentInput", "invalid"));
     const user = c.get("user");
-    const verdict = deps.limiter.take(`run:${user.id}`, LIMITS.run);
-    if (!verdict.ok) return errorResponse(c, rateLimitError(verdict.retryAfter));
-    const leave = deps.gate.enter(user.id);
-    if (!leave) return errorResponse(c, rateLimitError(5));
     const input: RunAgentInput = { ...body, threadId: body.threadId.toLowerCase() };
-    const ctx = deps.context(user, input.threadId);
+    const admission = await deps.policy.admit({ principal: user, chatId: input.threadId, runId: input.runId });
+    if (!admission.ok) return errorResponse(c, admission.error);
+    const { ticket } = admission;
 
-    const encoder = new EventEncoder({ accept: c.req.header("accept") });
-    const ac = new AbortController();
-    c.req.raw.signal?.addEventListener("abort", () => ac.abort(), { once: true });
-    const textEncoder = new TextEncoder();
-    const sse = encoder.getContentType().startsWith("text/event-stream");
+    try {
+      const ctx = deps.context(user, input.threadId);
+      const encoder = new EventEncoder({ accept: c.req.header("accept") });
+      const ac = new AbortController();
+      c.req.raw.signal?.addEventListener("abort", () => ac.abort(), { once: true });
+      const textEncoder = new TextEncoder();
+      const sse = encoder.getContentType().startsWith("text/event-stream");
 
-    const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const ping = () => {
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const ping = () => {
+            try {
+              controller.enqueue(HEARTBEAT);
+            } catch {
+              clearInterval(beat);
+            }
+          };
+          const beat = sse ? setInterval(ping, deps.heartbeatMs ?? HEARTBEAT_MS) : undefined;
           try {
-            controller.enqueue(HEARTBEAT);
-          } catch {
+            for await (const event of handle(input, ctx, deps.store, ac.signal)) {
+              controller.enqueue(textEncoder.encode(encoder.encode(event)));
+            }
+          } finally {
             clearInterval(beat);
+            ticket.end();
+            try {
+              controller.close();
+            } catch {}
           }
-        };
-        const beat = sse ? setInterval(ping, deps.heartbeatMs ?? HEARTBEAT_MS) : undefined;
-        try {
-          for await (const event of handle(input, ctx, deps.store, ac.signal)) {
-            controller.enqueue(textEncoder.encode(encoder.encode(event)));
-          }
-        } finally {
-          clearInterval(beat);
-          leave();
-          try {
-            controller.close();
-          } catch {}
-        }
-      },
-      cancel() {
-        ac.abort();
-      },
-    });
+        },
+        cancel() {
+          ac.abort();
+        },
+      });
 
-    return new Response(stream, {
-      headers: { "content-type": encoder.getContentType(), "cache-control": "no-cache", connection: "keep-alive" },
-    });
+      return new Response(stream, {
+        headers: { "content-type": encoder.getContentType(), "cache-control": "no-cache", connection: "keep-alive" },
+      });
+    } catch (err) {
+      ticket.end();
+      throw err;
+    }
   });
 
   return app;
