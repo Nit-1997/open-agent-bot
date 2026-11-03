@@ -15,6 +15,7 @@ const POLL_MS = 75;
 const NOT_FOUND = "This page doesn't exist.";
 const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
 const EVIL = "https://evil.example";
+const HOLD_MS = 1_500;
 
 async function lastReplyLength(page: Page): Promise<number> {
   const article = page.locator("main [id$='-turns'] article:visible").last();
@@ -35,6 +36,12 @@ async function noBannerFor(page: Page, ms: number): Promise<void> {
     expect(await banner(page).count()).toBe(0);
     await page.waitForTimeout(250);
   }
+}
+
+async function holdVisible(page: Page, selectors: readonly string[]): Promise<void> {
+  for (const selector of selectors) await expect(page.locator(selector)).toBeVisible();
+  await page.waitForTimeout(HOLD_MS);
+  for (const selector of selectors) await expect(page.locator(selector)).toBeVisible();
 }
 
 async function errorCode(res: APIResponse): Promise<string> {
@@ -151,9 +158,8 @@ test("preview: stop without a banner, reports and PDF, search, settings, 404s, f
     await expect(field).toBeFocused();
     await field.pressSequentially("big sur", { delay: 60 });
     await expect(page).toHaveURL(/\/search\?q=big(\+|%20)sur$/);
-    await expect(page.locator(`#search-hit-chat-${s.bigSur}`)).toBeVisible();
-    await expect(page.locator(`#search-hit-report-${BIG_SUR_REPORT.id}`)).toBeVisible();
-    await expect(page.locator(`#search-hit-report-${SECOND_REPORT.id}`)).toBeVisible();
+    const hits = [`#search-hit-chat-${s.bigSur}`, `#search-hit-report-${BIG_SUR_REPORT.id}`, `#search-hit-report-${SECOND_REPORT.id}`];
+    await holdVisible(page, hits);
     const reportsTab = page.locator("#search-scopes-reports");
     await expect(reportsTab).toHaveText(/^Reports · \d+$/);
     const reports = Number((await reportsTab.innerText()).split("·")[1]);
@@ -162,6 +168,7 @@ test("preview: stop without a banner, reports and PDF, search, settings, 404s, f
     await expect(reportsTab).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#search-pager-range")).toHaveText(new RegExp(` of ${reports}$`));
     await expect(page.locator("#search-results > li[id^='search-hit-chat-']")).toHaveCount(0);
+    await holdVisible(page, hits.slice(1));
     console.log(`search "big sur": ${reports} reports`);
     await page.locator(`#search-hit-report-${BIG_SUR_REPORT.id}-link`).click();
     await expect(page).toHaveURL(new RegExp(`/reports/${BIG_SUR_REPORT.id}$`));
@@ -175,13 +182,15 @@ test("preview: stop without a banner, reports and PDF, search, settings, 404s, f
     await page.locator("#account-menu-models").click();
     await expect(page.locator("#models-panel")).toBeVisible();
     await expect(page.locator("#provider-openrouter-status")).not.toHaveText("Not connected");
-    await expect(page.locator("#models-search")).toBeVisible();
+    await page.locator("#models-search").scrollIntoViewIfNeeded();
+    await holdVisible(page, ["#models-search", "#models-search-title", "#models-search-brave", "#models-search-brave-status"]);
     await page.locator("#models-panel-close").click();
     await expect(page.locator("#models-panel")).toBeHidden();
     await page.locator("#account-menu-button").click();
     await page.locator("#account-menu-profile").click();
-    await expect(page.locator("#profile-drawer")).toBeVisible();
-    await expect(page.locator("#profile-group-model")).toBeVisible();
+    await holdVisible(page, ["#profile-drawer", "#profile-drawer-title", "#profile-group-agent"]);
+    await page.locator("#profile-group-model").scrollIntoViewIfNeeded();
+    await holdVisible(page, ["#profile-drawer", "#profile-group-model", "#profile-model-options", "#profile-manage-models"]);
     await page.locator("#profile-drawer-close").click();
     await expect(page.locator("#profile-drawer")).toHaveCount(0);
   });

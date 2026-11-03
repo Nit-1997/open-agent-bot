@@ -2,7 +2,7 @@ import net from "node:net";
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from "undici";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ALICE } from "../fixtures/users.js";
-import { copilotHarness, Deferred, fakeRun, parseSse, post, RUN, readUntil, runBody, STOP, T1 } from "./harness.js";
+import { copilotHarness, Deferred, fakeRun, parseSse, post, RUN, readUntil, runBody, STOP, T1, waitFor } from "./harness.js";
 
 let previous: Dispatcher;
 let mock: MockAgent;
@@ -46,7 +46,7 @@ describe("the copilot runtime in the agent", () => {
     expect(await stop.json()).toMatchObject({ stopped: true });
     expect(parseSse(await readUntil(reader, () => false)).at(-1)).toMatchObject({ code: "abort" });
     holds.get(T1)!.resolve();
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => h.gate.active === 0);
     expect(outbound).toEqual([]);
     expect(connects).not.toHaveBeenCalled();
     mock.assertNoPendingInterceptors();

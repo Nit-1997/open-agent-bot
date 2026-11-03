@@ -1,26 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { vi } from "vitest";
+import { nav } from "../../../packages/ui/test/support/navigation.tsx";
 
-export const nav = {
-  pathname: "/",
-  search: "",
-  push: vi.fn((href: string) => nav.go(href)),
-  replace: vi.fn((href: string) => nav.go(href)),
-  listeners: new Set<() => void>(),
-  go(href: string) {
-    const url = new URL(href, "https://app.test");
-    nav.pathname = url.pathname;
-    nav.search = url.search;
-    for (const l of nav.listeners) l();
-  },
-  reset(path = "/") {
-    const url = new URL(path, "https://app.test");
-    nav.pathname = url.pathname;
-    nav.search = url.search;
-    nav.push.mockClear();
-    nav.replace.mockClear();
-  },
-};
+export { nav };
 
 export const navigationMock = () => {
   const router = { push: nav.push, replace: nav.replace, back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() };

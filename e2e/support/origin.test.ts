@@ -55,6 +55,26 @@ describe("previewOriginProblem", () => {
   ]) {
     it(`refuses the look-alike ${bad}`, () => assert.match(previewOriginProblem(bad) ?? "", /APP_ORIGIN/));
   }
+  it("never echoes userinfo in a refusal", () => {
+    for (const bad of ["http://user:pw@localhost:18300", "http://user:pw@127.0.0.1:8000/x", "https://user:pw@app.localhost"]) {
+      for (const message of [
+        previewOriginProblem(bad),
+        previewOriginProblem(bad, "AGENT_ORIGIN"),
+        liveOriginProblem(`${bad}/`),
+        (() => {
+          try {
+            appOrigin({ explicit: bad, allowLive: false });
+          } catch (e) {
+            return (e as Error).message;
+          }
+        })(),
+      ]) {
+        assert.ok(message, bad);
+        assert.doesNotMatch(message, /pw|user/, message);
+        assert.match(message, /\*\*\*@/, message);
+      }
+    }
+  });
   it("names the variable it checks", () => {
     assert.match(previewOriginProblem("http://localhost:18300.evil.com", "AGENT_ORIGIN") ?? "", /^AGENT_ORIGIN must be/);
     assert.match(previewOriginProblem(undefined, "AGENT_ORIGIN") ?? "", /^AGENT_ORIGIN is not set/);

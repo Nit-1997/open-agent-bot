@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@oab/ui/components/AccountMenu.tsx";
 import { ProfileDrawer } from "@oab/ui/components/profile/ProfileDrawer.tsx";
 import { hostedPlatform, nextRouter } from "@/lib/platform/hosted";
-import { expectUniqueIds } from "../support/ids";
+import { expectUniqueIds } from "../../../packages/ui/test/support/ids.ts";
 import { nav } from "../support/navigation";
 import { hostedTestPlatform, renderWithPlatform } from "../support/platform";
 import { profile, renderShell } from "../support/shell";

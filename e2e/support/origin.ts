@@ -5,6 +5,8 @@ const PREVIEW_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const EXAMPLE_ORIGIN = "http://localhost:18300";
 const EXAMPLE = `APP_ORIGIN=${EXAMPLE_ORIGIN}`;
 
+const redact = (value: string) => value.replace(/^([a-z][a-z\d+.-]*:\/\/)[^/?#]*@/i, "$1***@");
+
 function parse(value: string): URL | undefined {
   try {
     return new URL(value);
@@ -26,7 +28,7 @@ export function previewOriginProblem(raw: string | undefined, name = "APP_ORIGIN
     port >= PREVIEW_PORTS.min &&
     port <= PREVIEW_PORTS.max &&
     value === url.origin;
-  return ok ? undefined : `${rule}; got ${value}`;
+  return ok ? undefined : `${rule}; got ${redact(value)}`;
 }
 
 export function liveOriginProblem(raw: string | undefined): string | undefined {
@@ -34,7 +36,7 @@ export function liveOriginProblem(raw: string | undefined): string | undefined {
   if (!value) return `APP_ORIGIN is not set; e2e runs need it explicitly, e.g. ${EXAMPLE}`;
   const url = parse(value);
   const ok = url !== undefined && (url.protocol === "http:" || url.protocol === "https:") && value === url.origin;
-  return ok ? undefined : `APP_ORIGIN must be an http(s) origin with no path or trailing slash; got ${value}`;
+  return ok ? undefined : `APP_ORIGIN must be an http(s) origin with no path or trailing slash; got ${redact(value)}`;
 }
 
 export const allowLive = (env: Readonly<Record<string, string | undefined>>): boolean => env[ALLOW_LIVE_ENV] === "1";

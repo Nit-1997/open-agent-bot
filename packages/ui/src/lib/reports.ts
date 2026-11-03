@@ -10,6 +10,8 @@ export const reportsApi = {
     readApi<{ report: ReportSummary }>(await api().fetch(`/reports/${encodeURIComponent(id)}`, { cache: "no-store", signal })),
 };
 
-export const reportPdfHref = (id: string) => api().url(`/artifacts/${id}?format=pdf`);
-export const reportHtmlHref = (id: string) => api().url(`/artifacts/${id}`);
-export const reportThumbHref = (id: string) => api().url(`/artifacts/${id}?format=thumb`);
+const artifactPath = (id: string) => `/artifacts/${encodeURIComponent(id)}` as const;
+
+export const reportPdfHref = (id: string) => api().url(`${artifactPath(id)}?format=pdf`);
+export const reportHtmlHref = (id: string) => api().url(artifactPath(id));
+export const reportThumbHref = (id: string) => api().url(`${artifactPath(id)}?format=thumb`);

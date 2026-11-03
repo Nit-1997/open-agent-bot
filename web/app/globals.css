@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 @import "@oab/ui/styles/theme.css";
 @import "@oab/ui/styles/fonts.css";
+@source "../app";
+@source "../components";
+@source "../lib";
 @source "../../packages/ui/src";

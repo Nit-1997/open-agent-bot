@@ -1,6 +1,7 @@
+import { jsonError } from "@oab/bff";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { isSameOrigin, jsonError } from "@/lib/agentServer";
+import { isSameOrigin } from "@/lib/agentServer";
 import { appOrigin } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 

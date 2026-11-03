@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AccessDisabled } from "@/components/session/AccessDisabled";
 import { SignedOutBanner } from "@/components/session/SignedOutBanner";
-import { expectUniqueIds } from "../support/ids";
+import { expectUniqueIds } from "../../../packages/ui/test/support/ids.ts";
 import { renderWithPlatform } from "../support/platform";
 
 vi.mock("next/navigation", async () => (await import("../support/navigation")).navigationMock());

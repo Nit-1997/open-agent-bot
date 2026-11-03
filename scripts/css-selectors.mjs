@@ -33,6 +33,9 @@ function parseBlock(css, start) {
     if (c === "/" && css[i + 1] === "*") {
       const close = css.indexOf("*/", i + 2);
       i = close < 0 ? css.length : close + 2;
+    } else if (c === "\\") {
+      buf += css.slice(i, i + 2);
+      i += 2;
     } else if (c === '"' || c === "'") {
       const next = readString(css, i);
       buf += css.slice(i, next);
@@ -65,6 +68,11 @@ export function splitSelectors(prelude) {
   let current = "";
   for (let i = 0; i < prelude.length; i++) {
     const c = prelude[i];
+    if (c === "\\") {
+      current += prelude.slice(i, i + 2);
+      i++;
+      continue;
+    }
     if (c === '"' || c === "'") {
       const next = readString(prelude, i);
       current += prelude.slice(i, next);

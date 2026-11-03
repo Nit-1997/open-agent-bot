@@ -3,12 +3,12 @@ import { discard, isRedirect, jsonError, PRIVATE_NO_STORE, refusal, unreachable,
 import type { BffContext } from "./types.ts";
 
 const PRIVATE = { "cache-control": PRIVATE_NO_STORE, "x-content-type-options": "nosniff" };
-export const ARTIFACT_PASSTHROUGH: readonly number[] = [401, 403, 404, 429];
+const ARTIFACT_PASSTHROUGH: readonly number[] = [401, 403, 404, 429];
 const FRAME_DESTS = new Set(["iframe", "frame", "document"]);
 
-export type Format = "html" | "pdf" | "thumb";
+type Format = "html" | "pdf" | "thumb";
 
-export const formatOf = (req: Request): Format => {
+const formatOf = (req: Request): Format => {
   const f = new URL(req.url).searchParams.get("format");
   return f === "pdf" || f === "thumb" ? f : "html";
 };

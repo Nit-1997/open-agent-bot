@@ -157,6 +157,38 @@ describe("copilotkit thread owners", () => {
     await connect.text();
   });
 
+  it.each([
+    ["the cap", () => new ThreadOwners({ max: 1 }), (o: ThreadOwners) => o.claim(T2, BOB.id)],
+    [
+      "the idle timeout",
+      () => {
+        let now = 0;
+        const owners = new ThreadOwners({ ttlMs: 1000, now: () => now });
+        return Object.assign(owners, { tick: () => (now += 1000) });
+      },
+      (o: ThreadOwners) => (o as ThreadOwners & { tick(): number }).tick(),
+    ],
+  ] as const)("still refuses Bob's stop and connect on Alice's live thread after %s evicts her owner entry", async (_, make, evict) => {
+    const owners = make();
+    const h = await copilotHarness({ handle: fakeRun({ holds }), owners });
+    const alice = await liveRun(h, ALICE, T1);
+    await waitFor(() => owners.size === 1);
+    evict(owners);
+    expect(owners.ownerOf(T1)).toBeUndefined();
+    for (const [path, body] of [
+      [STOP(T1), {}],
+      [CONNECT, runBody(T1)],
+    ] as const) {
+      const res = await post(h, BOB, path, body);
+      expect(res.status, path).toBe(403);
+      expect(await res.json()).toEqual({ error: "forbidden", message: "That chat belongs to someone else." });
+    }
+    const stop = await post(h, ALICE, STOP(T1), {});
+    expect(stop.status).toBe(200);
+    expect(await stop.json()).toMatchObject({ stopped: true });
+    expect(parseSse(await readUntil(alice, () => false)).at(-1)).toMatchObject({ type: "RUN_ERROR", code: "abort" });
+  });
+
   it("does not let a refused Bob run block Alice's run, connect or stop", async () => {
     const h = await copilotHarness({ handle: fakeRun({ holds }) });
     await h.db.forUser(ALICE.id).chats.claim(T3, {});

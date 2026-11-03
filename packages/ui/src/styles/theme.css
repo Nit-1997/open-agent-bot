@@ -193,7 +193,7 @@ html.dark {
   }
 
   html {
-    background: var(--backdrop-wash), url("/backdrop.jpg") center / cover no-repeat fixed, #6f9aa1;
+    background: var(--backdrop-wash), url("./backdrop.jpg") center / cover no-repeat fixed, #6f9aa1;
   }
 
   body {
