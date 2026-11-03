@@ -1,0 +1,7 @@
+[
+  {
+    "file": "packages/ui/src/platform/Link.tsx",
+    "tag": "a",
+    "reason": "anchorLink spreads LinkProps, whose id is a required string in the type"
+  }
+]
