@@ -122,7 +122,7 @@ describe("dist/local/main.js", () => {
     expect(line).toContain("1 saved model key");
     const reset = await started(localEnv(r, { OPEN_AGENT_RESET_CREDENTIALS: "1" }));
     try {
-      expect(reset.out()).toMatch(/OPEN_AGENT_RESET_CREDENTIALS=1: the credential key was missing, so 1 saved model key were deleted/);
+      expect(reset.out()).toMatch(/OPEN_AGENT_RESET_CREDENTIALS=1: the credential key was missing, so 1 saved model key was deleted/);
       const providers = JSON.parse((await call(reset.port, "/api/providers")).text) as {
         providers: Array<{ id: string; configured: boolean }>;
       };

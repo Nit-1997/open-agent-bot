@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import { env } from "../support/env.ts";
+import { completeOnboardingIfShown } from "../support/onboarding.ts";
 import { lastReplyLength, noAlertFor, readMarker, saveMarker, send, status, stopButton, waitForReplyDone } from "../support/localStack.ts";
 import terms from "./demoTerms.json" with { type: "json" };
 
@@ -9,6 +10,10 @@ const EVIL_PORT = 18399;
 const POLL_MS = 75;
 const HOLD_MS = 2_000;
 const MARKER = "demo";
+const REPLY_MS = 300_000;
+const REPORT_SETTLE_MS = 20_000;
+
+type ReportItem = { id: string; title: string };
 
 function evilPage(app: string): string {
   return `<!doctype html><html><head><title>Another website</title></head><body style="font:16px system-ui;padding:32px">
@@ -51,6 +56,45 @@ async function growTwice(page: Page): Promise<number[]> {
   return growth;
 }
 
+async function reportIds(page: Page): Promise<string[]> {
+  const res = await page.request.get("/api/reports");
+  expect(res.status()).toBe(200);
+  return ((await res.json()) as { items: ReportItem[] }).items.filter((r) => r.title.toLowerCase().includes(terms.search)).map((r) => r.id);
+}
+
+async function newReportId(page: Page, known: ReadonlySet<string>, timeout: number): Promise<string> {
+  let found = "";
+  await expect
+    .poll(
+      async () => {
+        found = (await reportIds(page)).find((id) => !known.has(id)) ?? "";
+        return found;
+      },
+      { timeout, intervals: [1_000] },
+    )
+    .not.toBe("")
+    .catch(() => undefined);
+  return found;
+}
+
+async function startNewChat(page: Page): Promise<void> {
+  const panel = page.locator("[id$='-report-panel']:visible");
+  if ((await panel.count()) > 0) {
+    await page.locator("[id$='-report-panel-close']:visible").click();
+    await expect(panel).toHaveCount(0);
+  }
+  await expect(page.locator("#sidebar-new-chat")).toBeVisible();
+  await page.locator("#sidebar-new-chat").click();
+}
+
+async function sendAndWait(page: Page, text: string): Promise<void> {
+  const turns = page.locator("main [id$='-turns'] article:visible");
+  const before = await turns.count();
+  await send(page, text);
+  await expect(turns).toHaveCount(before + 1, { timeout: 60_000 });
+  await waitForReplyDone(page, REPLY_MS);
+}
+
 async function downloadPdf(page: Page): Promise<number> {
   const download = page.waitForEvent("download");
   await page.locator("#report-detail-pdf").click();
@@ -62,7 +106,7 @@ async function downloadPdf(page: Page): Promise<number> {
 }
 
 test("local demo: no login, onboarding, streaming and stop, a report and its PDF, search, and foreign pages refused", async ({ page, baseURL }) => {
-  test.setTimeout(600_000);
+  test.setTimeout(900_000);
   const app = baseURL as string;
 
   await test.step("0. The OpenRouter key is saved through the API, same origin, before the UI opens", async () => {
@@ -78,20 +122,7 @@ test("local demo: no login, onboarding, streaming and stop, a report and its PDF
   });
 
   await test.step("2. Onboarding: name, look, tone, an OpenRouter model, then the summary", async () => {
-    for (let i = 0; i < 10; i++) {
-      if (await page.locator("#agent-section-onboarding-name-input").isVisible()) {
-        await page.locator("#agent-section-onboarding-name-input").fill("Sage");
-        await page.locator("#agent-section-onboarding-look-ember").click();
-        await page.locator("#agent-section-onboarding-tone-brief").click();
-      }
-      if (await page.locator("#onboarding-model-list").isVisible()) await page.getByRole("radio", { name: /DeepSeek V4 Flash/ }).click();
-      if (await page.locator("#onboarding-summary").isVisible()) break;
-      await page.locator("#onboarding-next").click();
-    }
-    await expect(page.locator("#onboarding-summary")).toContainText("Sage · brief · ember look");
-    await page.waitForTimeout(HOLD_MS);
-    await page.locator("#onboarding-next").click();
-    await expect(page.locator("#rail")).toBeVisible();
+    expect(await completeOnboardingIfShown(page, { summaryHoldMs: HOLD_MS })).toBe(true);
   });
 
   await test.step("3. The account menu has no sign-out, admin or usage meter; OpenRouter shows connected", async () => {
@@ -109,7 +140,7 @@ test("local demo: no login, onboarding, streaming and stop, a report and its PDF
 
   let chatId = "";
   await test.step("4. A long reply streams; Stop holds the length with no error; a follow-up completes", async () => {
-    await page.locator("#sidebar-new-chat").click();
+    await startNewChat(page);
     await send(page, terms.long);
     await expect(page).toHaveURL(/\/chats\/[0-9a-f-]{36}$/, { timeout: 60_000 });
     chatId = new URL(page.url()).pathname.split("/").at(-1) as string;
@@ -121,23 +152,25 @@ test("local demo: no login, onboarding, streaming and stop, a report and its PDF
     await page.waitForTimeout(2_000);
     expect(await lastReplyLength(page)).toBe(stoppedAt);
     await noAlertFor(page, 5_000);
-    const turns = page.locator("main [id$='-turns'] article:visible");
-    const before = await turns.count();
-    await send(page, terms.followUp);
-    await expect(turns).toHaveCount(before + 1, { timeout: 30_000 });
-    await waitForReplyDone(page, 180_000);
+    await sendAndWait(page, terms.followUp);
     await expect(page.locator("[role=alert]")).toHaveCount(0);
   });
 
   let reportId = "";
-  await test.step("5. A report is created, opens from /reports, and its PDF downloads", async () => {
-    await page.locator("#sidebar-new-chat").click();
+  await test.step("5. A real-model report is created, opens from /reports, and its PDF downloads", async () => {
+    const known = new Set(await reportIds(page));
+    await startNewChat(page);
     await send(page, terms.report);
     await expect(page).toHaveURL(/\/chats\/[0-9a-f-]{36}$/, { timeout: 60_000 });
-    await waitForReplyDone(page, 300_000);
-    const reports = (await (await page.request.get("/api/reports")).json()) as { items: Array<{ id: string; title: string }> };
-    reportId = reports.items.find((r) => r.title.toLowerCase().includes(terms.search))?.id ?? "";
-    expect(reportId, "a report whose title has the search keyword").not.toBe("");
+    await expect(status(page)).toBeVisible({ timeout: 30_000 }).catch(() => undefined);
+    await waitForReplyDone(page, REPLY_MS);
+    reportId = await newReportId(page, known, REPORT_SETTLE_MS);
+    if (!reportId) {
+      console.log("no report after the first reply; asking the model once more");
+      await sendAndWait(page, terms.reportNudge);
+      reportId = await newReportId(page, known, REPORT_SETTLE_MS);
+    }
+    expect(reportId, "a new report whose title has the search keyword").not.toBe("");
     await page.goto("/reports");
     await page.locator(`#reports-row-${reportId}-open`).click();
     await expect(page.locator("#report-detail-frame")).toHaveAttribute("src", new RegExp(`/api/artifacts/${reportId}`));

@@ -275,9 +275,24 @@ describe("loadLocalKeys KEK guard", () => {
       expect(listing(keysDir)).toEqual(["kek"]);
       expect(warn).toHaveBeenCalledTimes(1);
       const line = warn.mock.calls[0].join(" ");
-      expect(line).toContain("3 saved model keys");
+      expect(line).toContain("so 3 saved model keys were deleted");
+      expect(line).toContain("re-enter them in Models");
       expect(line).not.toContain(kek.keys.get(1)!.toString("base64"));
       expect(line).not.toContain(readFileSync(join(keysDir, "kek"), "utf8").trim());
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("words the reset warning for a single deleted key in the singular", () => {
+    mkdirSync(keysDir, { mode: 0o700 });
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => {});
+    try {
+      guard({ reset: true, credentialRows: () => 1, resetCredentials: vi.fn(() => 1) }).run();
+      const line = warn.mock.calls[0].join(" ");
+      expect(line).toContain("so 1 saved model key was deleted");
+      expect(line).toContain("re-enter it in Models");
+      expect(line).not.toMatch(/\bwere\b|\bthem\b/);
     } finally {
       warn.mockRestore();
     }
