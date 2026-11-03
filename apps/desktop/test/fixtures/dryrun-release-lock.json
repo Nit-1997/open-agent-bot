@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "kind": "release",
+  "version": "0.0.0-dryrun.1",
+  "composeSha256": "31e14d00d66d7bb6b8a2f41b64bb8230c631f6f9f637c7eaa938d080bf50a67d",
+  "images": {
+    "agent": "127.0.0.1:18501/oab-m5-open-agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "search": "127.0.0.1:18501/oab-m5-open-agent-search@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "pull": true
+}

@@ -1,0 +1,23 @@
+{
+  "notFound": {
+    "status": 1,
+    "stderr": "release not found\n"
+  },
+  "auth": {
+    "status": 1,
+    "stderr": "HTTP 401: Bad credentials (https://api.github.com/repos/Nit-1997/open-agent-bot/releases/tags/v1.0.0)\nTry authenticating with:  gh auth login\n"
+  },
+  "network": {
+    "status": 1,
+    "stderr": "error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com\n"
+  },
+  "server": {
+    "status": 1,
+    "stderr": "HTTP 502: Bad Gateway (https://api.github.com/repos/Nit-1997/open-agent-bot/releases/tags/v1.0.0)\n"
+  },
+  "found": {
+    "status": 0,
+    "stdout": "title:\tOpen Agent 1.0.0\ntag:\tv1.0.0\ndraft:\tfalse\n",
+    "stderr": ""
+  }
+}

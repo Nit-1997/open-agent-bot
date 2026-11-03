@@ -1,12 +1,22 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { assertReleaseLock } from "../../../scripts/release/releaseLib.mjs";
 import {
   checkFuses,
   checkPlist,
   composeStopRecorded,
   composeSubcommands,
+  dmgNameProblems,
   EXPECTED_FUSES,
   launchTargetProblems,
+  licenseProblems,
+  loggedPullProblems,
   parseFuses,
+  pullProblems,
+  refVersionsFor,
+  releaseArgProblems,
+  releaseStaticProblems,
   SIZE_BUDGET,
   sizeProblems,
   smokeEnv,
@@ -143,5 +153,92 @@ describe("packaged smoke launch helpers", () => {
       "status.json servicesVersion is dev, expected local-<sha>",
       "shell.log has no '[app] title Open Agent — Local build — test' line",
     ]);
+  });
+});
+
+describe("packaged smoke --release (M5 D8)", () => {
+  const lockBytes = readFileSync(join(__dirname, "fixtures/dryrun-release-lock.json"));
+  const lock = JSON.parse(lockBytes.toString("utf8"));
+  const repoLicense = Buffer.from("MIT License\n");
+  const base = {
+    lock,
+    lockBytes,
+    version: "0.0.0-dryrun.1",
+    composeSha256: lock.composeSha256 as string,
+    license: { app: repoLicense, repo: repoLicense },
+    assertLock: assertReleaseLock,
+  };
+
+  it("parses the version flag", () => {
+    expect(releaseArgProblems(undefined)).toEqual([]);
+    expect(releaseArgProblems("0.0.0-dryrun.1")).toEqual([]);
+    expect(releaseArgProblems("1.0.0")).toEqual([]);
+    expect(releaseArgProblems("v1.0.0")).toHaveLength(1);
+    expect(releaseArgProblems("dev")).toHaveLength(1);
+  });
+
+  it("passes a dry-run lock that equals --expect-lock", () => {
+    expect(releaseStaticProblems({ ...base, expectBytes: Buffer.from(lockBytes) })).toEqual([]);
+  });
+
+  it("flags a dev lock, the committed no-pins lock and a version mismatch", () => {
+    expect(releaseStaticProblems({ ...base, lock: { ...lock, kind: "dev" } })).toContain(
+      'services.lock.json: kind is "dev", expected "release"',
+    );
+    const committed = JSON.parse(readFileSync(join(__dirname, "../services.lock.json"), "utf8"));
+    expect(releaseStaticProblems({ ...base, lock: committed, composeSha256: committed.composeSha256 }).join("\n")).toMatch(
+      /images is null/,
+    );
+    expect(releaseStaticProblems({ ...base, version: "0.0.0-dryrun.2" })).toContain(
+      'services.lock.json: version is "0.0.0-dryrun.1", expected "0.0.0-dryrun.2"',
+    );
+  });
+
+  it("flags an --expect-lock mismatch and a missing or different LICENSE", () => {
+    expect(releaseStaticProblems({ ...base, expectBytes: Buffer.from(`${lockBytes} `) })).toEqual([
+      "services.lock.json is not byte-equal to --expect-lock",
+    ]);
+    expect(releaseStaticProblems({ ...base, license: { repo: repoLicense } })).toEqual(["Contents/Resources/LICENSE is missing"]);
+    expect(licenseProblems({ app: Buffer.from("other"), repo: repoLicense })).toEqual([
+      "Contents/Resources/LICENSE differs from the repo LICENSE",
+    ]);
+  });
+
+  it("checks the DMG names for the version", () => {
+    const v = "0.0.0-dryrun.1";
+    expect(dmgNameProblems([`/r/Open-Agent-${v}-arm64.dmg`, `/r/Open-Agent-${v}-x64.dmg`], v)).toEqual([]);
+    expect(dmgNameProblems(["/r/Open-Agent-0.0.0-dev-arm64.dmg", `/r/Open-Agent-${v}-x64.dmg`], v)).toEqual([
+      `DMG Open-Agent-0.0.0-dev-arm64.dmg is not named Open-Agent-${v}-arm64.dmg or Open-Agent-${v}-x64.dmg`,
+    ]);
+    expect(dmgNameProblems([`/r/Open-Agent-${v}-arm64.dmg`], v)).toEqual([`no DMG named Open-Agent-${v}-x64.dmg`]);
+  });
+
+  it("launches with the bundled lock: no services file, refVersions for the bundled refs", () => {
+    const env = smokeEnv(
+      { stateDir: "/tmp/s", project: "oab-smoke", range: "18488-18489", docker: "/tmp/d" },
+      { PATH: "/bin", HOME: "/h" },
+    );
+    expect(env).not.toHaveProperty("OPEN_AGENT_SHELL_SERVICES");
+    expect(refVersionsFor(lock, "0.0.0-dryrun.1")).toEqual({
+      [lock.images.agent]: "0.0.0-dryrun.1",
+      [lock.images.search]: "0.0.0-dryrun.1",
+    });
+  });
+
+  it("requires the fake pulls to name exactly the bundled refs, and the status to carry the version", () => {
+    const rec = (argv: string[]) => JSON.stringify({ argv, envNames: [], pid: 1, exitCode: 0 });
+    const both = [rec(["pull", lock.images.agent]), rec(["pull", lock.images.search])].join("\n");
+    expect(pullProblems(both, lock)).toEqual([]);
+    expect(pullProblems(rec(["pull", lock.images.agent]), lock)).toHaveLength(1);
+    expect(pullProblems(`${both}\n${rec(["pull", "oab-x:tag"])}`, lock)).toHaveLength(1);
+    expect(statusProblems({ screen: "app", servicesVersion: "0.0.0-dryrun.1" }, "", { release: "0.0.0-dryrun.1" })).toEqual([]);
+    expect(statusProblems({ screen: "app", servicesVersion: "0.0.0-fake" }, "", { release: "0.0.0-dryrun.1" })).toEqual([
+      "status.json servicesVersion is 0.0.0-fake, expected 0.0.0-dryrun.1",
+    ]);
+  });
+
+  it("reads real-docker pulls from shell.log and refuses refs outside the lock", () => {
+    const log = `[docker] pull ${lock.images.agent} env=PATH 0 ms=900\n[docker] pull ghcr.io/x/y@sha256:${"c".repeat(64)} env=PATH 0 ms=1\n`;
+    expect(loggedPullProblems(log, lock)).toEqual([`shell.log pulled ghcr.io/x/y@sha256:${"c".repeat(64)}, which is not a bundled ref`]);
   });
 });
