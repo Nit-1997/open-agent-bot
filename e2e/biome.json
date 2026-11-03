@@ -10,7 +10,9 @@
       "support/stubModel.ts",
       "support/stubModel.test.ts",
       "scripts/local-probes.mts",
-      "scripts/local-probes.test.ts"
+      "scripts/local-probes.test.ts",
+      "desktop/**/*.ts",
+      "playwright.desktop.config.ts"
     ]
   },
   "formatter": {

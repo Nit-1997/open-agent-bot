@@ -25,14 +25,37 @@ describe("static ids", () => {
     }
   });
 
+  it("checks every start tag in .html files, head included, and ignores doctype, comments and closing tags", () => {
+    const repo = mkdtempSync(join(tmpdir(), "ids-static-html-"));
+    try {
+      mkdirSync(join(repo, "s"), { recursive: true });
+      writeFileSync(
+        join(repo, "s/index.html"),
+        [
+          "<!doctype html>",
+          '<html id="h" lang="en">',
+          '<head id="hd"><meta charset="utf-8"><title id="t">x</title></head>',
+          "<!-- <p>commented</p> -->",
+          '<body id="b"><main id="m"><p>no id</p><img src="x.png" alt=""><span data-id="x" id="ok"></span></main></body>',
+          "</html>",
+        ].join("\n"),
+      );
+      const scan = scanIds({ repo, roots: ["s"], allowlist: [] });
+      assert.equal(scan.elements.length, 9);
+      assert.deepEqual(scan.missing, [`${join("s", "index.html")}:3 <meta>`, `${join("s", "index.html")}:5 <p>`, `${join("s", "index.html")}:5 <img>`]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it("gives every intrinsic JSX element in the ui and web sources an id", () => {
     const { elements, missing } = scanIds({ repo: REPO, roots: ID_ROOTS, allowlist: ALLOWLIST });
     assert.deepEqual(missing, []);
     assert.ok(elements.length >= BASE_COUNT, `${elements.length} elements, expected at least ${BASE_COUNT}`);
   });
 
-  it("scans the ui, web and local-web sources", () => {
-    for (const root of ["packages/ui/src", "packages/local-web/src", "web/app", "web/components"]) assert.ok(ID_ROOTS.includes(root), root);
+  it("scans the ui, web, local-web and desktop screen sources", () => {
+    for (const root of ["packages/ui/src", "packages/local-web/src", "web/app", "web/components", "apps/desktop/src/screens"]) assert.ok(ID_ROOTS.includes(root), root);
   });
 
   it("keeps the spread allowlist short, justified and in use", () => {

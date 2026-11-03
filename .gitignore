@@ -29,3 +29,7 @@ e2e/.local/
 
 # Factory evidence (videos, logs)
 .factory/
+
+# Mac app build outputs
+apps/desktop/build/
+apps/desktop/release/
