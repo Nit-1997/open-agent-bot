@@ -2,12 +2,11 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "@oab/shared/lists";
 import { emptyProfile } from "@oab/shared/profile";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { CredentialRow, NewMessage, UserRepos } from "../../src/db/types.js";
+import type { CredentialRow, NewMessage, Store, UserRepos } from "../../src/store/types.js";
 import { UserError, type UserErrorKind } from "../../src/lib/errors.js";
 import { readStoredProfile } from "../../src/profile/store.js";
 
-export type StoreUnderTest = { forUser(userId: string): UserRepos };
-export type ContractHarness = { store: StoreUnderTest; newUser(): Promise<string>; dispose(): Promise<void> };
+export type ContractHarness = { store: Store; newUser(): Promise<string>; dispose(): Promise<void> };
 
 const TITLE_MAX = 200;
 const DEFAULT_SETTINGS = { custom: {}, enabled: {}, hidden: [] };

@@ -1,26 +1,9 @@
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { biomeFixtures } from "./biomeFixture.js";
 
-const BIOME = createRequire(import.meta.url).resolve("@biomejs/biome/bin/biome");
-const PACKAGES = join(import.meta.dirname, "../../..");
-const work = mkdtempSync(join(tmpdir(), "no-cloud-"));
-let n = 0;
+const { lint, dispose } = biomeFixtures("no-cloud-");
 
-function lint(pkg: "core" | "shared", file: string, code: string) {
-  const root = join(work, String(n++), "packages", pkg);
-  mkdirSync(dirname(join(root, file)), { recursive: true });
-  const config = { extends: [join(PACKAGES, pkg, "biome.json")], files: { includes: ["src/**/*.ts"] } };
-  writeFileSync(join(root, "biome.json"), JSON.stringify(config));
-  writeFileSync(join(root, file), code);
-  const res = spawnSync(process.execPath, [BIOME, "lint", "--colors=off", file], { cwd: root, encoding: "utf8" });
-  return { status: res.status, out: `${res.stdout}${res.stderr}` };
-}
-
-afterAll(() => rmSync(work, { recursive: true, force: true }));
+afterAll(dispose);
 
 const blocked = [
   'import x from "../../../cloud/agent/store.ts";\nexport default x;\n',
