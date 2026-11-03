@@ -41,5 +41,6 @@ export default defineConfig({
       dependencies: ["tablet"],
       use: { ...devices["iPhone 13"], browserName: "chromium", viewport: phone, isMobile: true, hasTouch: true, video: { mode: "on", size: phone } },
     },
+    { name: "smoke", testMatch: /preview-smoke\.spec\.ts/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },
   ],
 });

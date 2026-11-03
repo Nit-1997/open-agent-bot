@@ -25,3 +25,6 @@ e2e/.auth/
 *.mp4
 
 .mcp.json
+
+# Factory evidence (videos, logs)
+.factory/
