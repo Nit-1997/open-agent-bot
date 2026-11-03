@@ -33,25 +33,36 @@ Agent tests marked `.int.test.ts` start a real Chromium against local fixture se
 
 ```
 packages/core/src/
-  server.ts            process wiring: config, Supabase clients, per-user hubs, session store, shutdown
-  app.ts               composes the HTTP routes in http/ behind the auth guards
-  auth/                service secret, JWT verification (JWKS, ES256), active-user cache, guards,
-                       the ambient provider env refusal
-  db/                  the only Supabase access: forUser(userId) repositories, admin repository,
-                       error mapping; db/client.ts may be imported only here and by entry points
-  crypto/              envelope AES-256-GCM for provider credentials, key wrapper, hints
-  access/              request-access and email-link service (IP pepper, padding, limits)
-  admin/               approve/invite/deactivate/delete, Supabase Auth admin adapter
+  server.ts            the container entry (Docker CMD node dist/server.js): only imports hosted/main.js
+  startAgent.ts        the composition root: startAgent(deps) wires the store, identity, key wrapper,
+                       run policy, provider hubs, sessions and extra routes, and starts the server
+  app.ts               composes the HTTP routes in http/ and the mounted routes behind the guards
+  config.ts            CoreConfig: settings every deployment shares (port, SearXNG, renderer, limits)
+  store/               the Store port: per-user repositories and row types (types.ts)
+  identity/            the Identity port (Principal, Capabilities, guards, RouteMount) and the user
+                       paths the core guard covers (userPaths.ts)
+  secrets/             envelope AES-256-GCM for provider credentials, the KeyWrapper, CREDENTIAL_KEYS
+                       parsing (keys.ts), hints, the credential store and secretsFor(store, wrapper)
+  policy/              the RunPolicy port and LocalRunPolicy (per-user rate limit and concurrency)
   scripts/             operator scripts run inside the container (credential key rotation)
+  hosted/              the hosted (Supabase) implementation; moves to cloud/agent in M6
+    main.ts            entry: loadHostedConfig → hostedAgentDeps → startAgent → signals
+    deps.ts, config.ts, gateway.ts, routes.ts, ambientEnv.ts
+    store/             Supabase client, the Store over Supabase, admin and rotation repositories
+    identity/          JWT verification (JWKS, ES256), active-user cache, capabilities, admin guard
+    admin/             approve/invite/deactivate/delete, Supabase Auth admin adapter
+    access/            request-access and email-link service (IP pepper, padding, limits)
+    http/              the access and admin routes
+    secrets/           credential key rotation
   http/                artifacts, chats, providers (model admin), profile, settings, onboarding
-                       (places, chip options), access, admin, agui (chat stream); handlers.ts
+                       (places, chip options), reports, search, agui (chat stream); handlers.ts
                        holds shared helpers
   agui/                run lifecycle (runHandler), input parsing, pi events → AG-UI events,
                        typed event builders (events.ts), run stats
   pi/                  creating and disposing pi agent sessions
-  providers/           model provider catalog, per-user hubs (LRU), the encrypted pi CredentialStore,
-                       OAuth sign-in flows bound to their user
-  profile/             ProfileStore (Supabase), the prompt lines built from it, and the tool
+  providers/           model provider catalog, per-user hubs (LRU) with capability-gated private
+                       networks and gateway, OAuth sign-in flows bound to their user
+  profile/             ProfileStore (over the Store port), the prompt lines built from it, and the tool
                        defaults it implies
   onboarding/          Photon address search, Overpass nearby groceries, onboarding chip rows
   session/             sessions keyed by user and chat, with per-user and global caps and idle sweep
@@ -62,10 +73,10 @@ packages/core/src/
                        browser may not do (policy.ts), live frames (frames.ts)
   shop/                catalog tile extraction, ranking and the per-chat cart
   stays/               hotel and rental search: one file per site in sources/
-  workspace/           per-chat saved plan state (Supabase): store, summary, edits, cart binding
+  workspace/           per-chat plan state kept in the agent session (in memory): store, summary, edits, cart binding
   grounding/           checks prices, ratings and links against tool evidence
   render/              tool data shapes (data.ts) → widget payloads
-  artifacts/           report storage in Supabase Storage, thumbnail and PDF requests to the renderer
+  artifacts/           report storage through the Store port, thumbnail and PDF requests to the renderer
                        (remoteRenderer.ts), and the report kit (reportKit.ts: CSS components plus the
                        guide the model sees in create_artifact)
   renderer/            the separate renderer service (main.ts): sandboxed Chromium for thumbnails and PDFs
@@ -97,8 +108,17 @@ web/
                        profile drawer, model management
   lib/                 pure helpers (turn building, sources, onboarding, persona), profile client,
                        API clients, lib/shell/ (breakpoints, chat controller, sidebar preference)
-e2e/                   Playwright demo against the local stack (see README "End-to-end demo")
+e2e/                   Playwright demo and preview checks against a preview stack (see README "End-to-end demo")
 ```
+
+### Hosted boundary
+
+Core never depends on the hosted implementation; the hosted code depends on core only through its ports.
+
+- Hosted files import core as `@oab/core/<path>.js` (a self-reference through the `exports` map in `packages/core/package.json`) and other hosted files by relative path. No relative import in `hosted/` leaves `hosted/`.
+- `@oab/core/hosted/*` and `@oab/core/scripts/*` are blocked: the `exports` map sets them to `null`, and the boundary test refuses them in any letter case. Hosted code never imports `@oab/core/identity/local*`.
+- Outside `hosted/`, nothing imports `hosted/` (except the entries `server.ts` and `scripts/rotateCredentials.ts`), `@supabase/*`, `jose` or `@oab/core/*`.
+- Rules B1–B6 (spec `docs/superpowers/specs/2026-11-02-m1-seams-design.md`, "Boundary rules") are enforced by `packages/core/test/lint/hostedBoundary.test.ts` over every `src/**/*.ts` and by `noRestrictedImports` overrides in `packages/core/biome.json`.
 
 ## Adding a tool
 
