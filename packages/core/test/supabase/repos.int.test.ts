@@ -3,10 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ArtifactStore } from "../../src/artifacts/store.js";
 import { createVerifier } from "../../src/hosted/identity/verify.js";
 import { parseCredentialKeys } from "../../src/config.js";
-import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
+import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
 import { forUser } from "../../src/hosted/store/users.js";
 import { RepoProfileStore } from "../../src/profile/store.js";
-import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
+import { EnvelopeCredentialStore } from "../../src/secrets/credentialStore.js";
 import {
   adminRepo,
   cleanedEmails,

@@ -1,4 +1,4 @@
-import type { CredentialKind } from "@oab/core/crypto/envelope.js";
+import type { CredentialKind } from "@oab/core/secrets/envelope.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import {
   type ArtifactFile,

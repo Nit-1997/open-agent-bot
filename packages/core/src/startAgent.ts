@@ -7,7 +7,7 @@ import { remoteRenderer } from "./artifacts/remoteRenderer.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { BrowserPool } from "./browser/pool.js";
 import type { CoreConfig } from "./config.js";
-import type { KeyWrapper } from "./crypto/keyWrapper.js";
+import type { KeyWrapper } from "./secrets/keyWrapper.js";
 import { createGuards } from "./identity/guards.js";
 import type { AuthEnv, Identity, RouteMount } from "./identity/types.js";
 import { pathCovered } from "./identity/userPaths.js";

@@ -2,7 +2,7 @@ import { BlockedAddressError } from "../../src/lib/net.js";
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { OPENAI_CODEX_MODELS } from "@earendil-works/pi-ai/providers/openai-codex.models";
 import { describe, expect, it } from "vitest";
-import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
+import { EnvelopeCredentialStore } from "../../src/secrets/credentialStore.js";
 import { wrapper } from "../fixtures/app.js";
 import type { ProviderHub } from "../../src/providers/hub.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";

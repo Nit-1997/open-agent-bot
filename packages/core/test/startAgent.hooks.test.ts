@@ -6,7 +6,7 @@ import { LoginFlows } from "../src/providers/logins.js";
 import { type SessionEntry, SessionStore } from "../src/session/sessionStore.js";
 import { forgetter, startAgent } from "../src/startAgent.js";
 import { parseCredentialKeys } from "../src/config.js";
-import { LocalKeyWrapper } from "../src/crypto/keyWrapper.js";
+import { LocalKeyWrapper } from "../src/secrets/keyWrapper.js";
 import { WorkspaceStore } from "../src/workspace/store.js";
 import { TEST_KEY_B64, testConfig } from "./fixtures/config.js";
 import { MemoryDb } from "./fixtures/memoryRepos.js";

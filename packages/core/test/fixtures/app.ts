@@ -11,7 +11,7 @@ import { AuthError, type Verifier } from "../../src/hosted/identity/verify.js";
 import { parseCredentialKeys } from "../../src/config.js";
 import { createGuards } from "../../src/identity/guards.js";
 import type { Principal } from "../../src/identity/types.js";
-import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
+import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
 import { PAGE_SIZE } from "@oab/shared/pages";
 import type { AdminRepo } from "../../src/hosted/store/admin.js";

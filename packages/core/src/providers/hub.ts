@@ -2,7 +2,7 @@ import type { AssistantMessage, Context, CredentialStore, Model } from "@earendi
 import { streamSimple as openAiCompletions } from "@earendil-works/pi-ai/api/openai-completions";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { keyHint } from "../crypto/hint.js";
+import { keyHint } from "../secrets/hint.js";
 import type { Capabilities } from "../identity/types.js";
 import type { CredentialListing, ProviderSettingsRepo } from "../store/types.js";
 import { UserError } from "../lib/errors.js";

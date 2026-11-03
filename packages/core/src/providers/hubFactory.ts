@@ -1,7 +1,7 @@
-import type { KeyWrapper } from "../crypto/keyWrapper.js";
+import type { KeyWrapper } from "../secrets/keyWrapper.js";
 import type { Principal } from "../identity/types.js";
 import type { UserRepos } from "../store/types.js";
-import { EnvelopeCredentialStore } from "./credentialStore.js";
+import { EnvelopeCredentialStore } from "../secrets/credentialStore.js";
 import { type HubOptions, ProviderHub } from "./hub.js";
 
 export type GatewayLike = Readonly<{ baseUrl: string; apiKey: string; models: Array<{ id: string; label: string; note?: string }> }>;

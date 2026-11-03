@@ -1,6 +1,6 @@
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { ProviderHub } from "../../src/providers/hub.js";
-import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
+import { EnvelopeCredentialStore } from "../../src/secrets/credentialStore.js";
 import { wrapper } from "./app.js";
 import { fakeFetch } from "./fakeFetch.js";
 import { MemoryDb } from "./memoryRepos.js";

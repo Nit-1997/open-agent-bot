@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@oab/core/config.js";
-import { LocalKeyWrapper } from "@oab/core/crypto/keyWrapper.js";
+import { LocalKeyWrapper } from "@oab/core/secrets/keyWrapper.js";
 import type { Identity } from "@oab/core/identity/types.js";
 import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
 import type { AgentDeps, CoreHandles } from "@oab/core/startAgent.js";
