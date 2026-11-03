@@ -1,11 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Mono, DM_Sans, Instrument_Serif } from "next/font/google";
 import { headers } from "next/headers";
+import "./fonts.css";
 import "./globals.css";
-
-const display = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-instrument-serif" });
-const sans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
-const mono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-dm-mono" });
 
 export const metadata: Metadata = {
   title: "Open Agent",
@@ -19,7 +15,7 @@ const THEME_SCRIPT = `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <html id="root-html" lang="en" className={`${display.variable} ${sans.variable} ${mono.variable} h-full`} suppressHydrationWarning>
+    <html id="root-html" lang="en" className="h-full" suppressHydrationWarning>
       <head id="root-head">
         <script id="theme-init" nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
