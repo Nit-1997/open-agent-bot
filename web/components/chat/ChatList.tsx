@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { ListState } from "@/components/ui/ListState";
 import { useChatIndex, chatIndex } from "@/lib/chatIndex";
 import { DATE_GROUP_LABEL, groupItems } from "@/lib/dateGroups";

@@ -1,7 +1,7 @@
 "use client";
 
 import { normalizeQuery, SEARCH_MIN, type SearchResponse, type SearchScope } from "@oab/shared/lists";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@oab/ui/platform";
 import { useEffect, useRef, useState } from "react";
 import { useShell } from "@/components/shell/ShellProvider";
 import { SidebarSearch } from "@/components/shell/SidebarSearch";
@@ -22,7 +22,7 @@ const typingInSearch = () => typeof document !== "undefined" && !!document.activ
 
 export function SearchView(props: { q: string; scope: SearchScope; page: number }) {
   const id = "search";
-  const router = useRouter();
+  const router = useNavigate();
   const { takeFocusRequest } = useShell();
   const input = useRef<HTMLInputElement>(null);
   const [mountFocus] = useState<MountFocus>(() => (takeFocusRequest("search") ? "input" : typingInSearch() ? "keep" : "header"));

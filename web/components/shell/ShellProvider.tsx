@@ -3,7 +3,7 @@
 import type { AgentPersona, Profile } from "@oab/shared/profile";
 import { agentPersona } from "@oab/shared/profile";
 import { hrefFor, parseRoute } from "@oab/shared/routes";
-import { usePathname, useRouter } from "next/navigation";
+import { useNavigate, usePathname, usePlatformHistory } from "@oab/ui/platform";
 import {
   createContext,
   type ReactNode,
@@ -86,7 +86,8 @@ export function ShellProvider(props: {
   starter?: string;
   children: ReactNode;
 }) {
-  const router = useRouter();
+  const router = useNavigate();
+  const history = usePlatformHistory();
   const pathname = usePathname();
   const breakpoint = useBreakpoint();
   const [chats, dispatch] = useReducer(chatReducer, props.starter, (starter) => initialChatState(crypto.randomUUID(), starter));
@@ -165,30 +166,36 @@ export function ShellProvider(props: {
     else open("sidebar");
   }, [reportInline, toggleInline, overlay, open, close]);
 
-  const openReport = useCallback((threadId: string, reportId: string, how: PanelHow) => {
-    const s = chatsRef.current;
-    const existing = s.panels[threadId];
-    const writes = threadId === s.activeId && window.location.pathname === chatPath(threadId);
-    const push = writes && currentBreakpoint() === "phone" && !existing?.pushed;
-    dispatch({ type: "openReport", id: threadId, reportId, how, pushed: !!existing?.pushed || push });
-    if (!writes || (existing?.reportId === reportId && urlReport() === reportId)) return;
-    const href = hrefFor({ section: "chat", chatId: threadId, report: reportId });
-    if (push) window.history.pushState({ oaReport: reportId }, "", href);
-    else window.history.replaceState(existing?.pushed ? { oaReport: reportId } : null, "", href);
-  }, []);
+  const openReport = useCallback(
+    (threadId: string, reportId: string, how: PanelHow) => {
+      const s = chatsRef.current;
+      const existing = s.panels[threadId];
+      const writes = threadId === s.activeId && window.location.pathname === chatPath(threadId);
+      const push = writes && currentBreakpoint() === "phone" && !existing?.pushed;
+      dispatch({ type: "openReport", id: threadId, reportId, how, pushed: !!existing?.pushed || push });
+      if (!writes || (existing?.reportId === reportId && urlReport() === reportId)) return;
+      const href = hrefFor({ section: "chat", chatId: threadId, report: reportId });
+      if (push) history.push({ oaReport: reportId }, href);
+      else history.replace(existing?.pushed ? { oaReport: reportId } : null, href);
+    },
+    [history],
+  );
 
-  const closeReport = useCallback((threadId: string) => {
-    const s = chatsRef.current;
-    const panel = s.panels[threadId];
-    if (!panel) return;
-    const writes = threadId === s.activeId && window.location.pathname === chatPath(threadId);
-    if (writes && panel.pushed && urlReport() === panel.reportId) {
-      window.history.back();
-      return;
-    }
-    dispatch({ type: "closeReport", id: threadId });
-    if (writes && urlReport() !== null) window.history.replaceState(null, "", chatPath(threadId));
-  }, []);
+  const closeReport = useCallback(
+    (threadId: string) => {
+      const s = chatsRef.current;
+      const panel = s.panels[threadId];
+      if (!panel) return;
+      const writes = threadId === s.activeId && window.location.pathname === chatPath(threadId);
+      if (writes && panel.pushed && urlReport() === panel.reportId) {
+        history.back();
+        return;
+      }
+      dispatch({ type: "closeReport", id: threadId });
+      if (writes && urlReport() !== null) history.replace(null, chatPath(threadId));
+    },
+    [history],
+  );
 
   const setWidth = useCallback((fraction: number, commit = true) => {
     setPanelWidth(fraction);

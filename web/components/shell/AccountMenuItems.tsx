@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, LogOut, Moon, Shield, SlidersHorizontal, UserRound } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { useState } from "react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { SignOutForm } from "@/components/auth/SignOutForm";

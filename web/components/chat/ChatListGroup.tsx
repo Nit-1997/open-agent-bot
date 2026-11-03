@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChatSummary } from "@oab/shared/chats";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { useShell } from "@/components/shell/ShellProvider";
 import { UNTITLED } from "./ChatHeader";

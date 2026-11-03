@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@oab/ui/platform/api";
 import type { OnboardingOptions, Place } from "@oab/shared/onboarding";
 import type { Home } from "@oab/shared/profile";
 import { useEffect, useState } from "react";
@@ -8,7 +9,7 @@ import { noteAuthFailure } from "@/lib/authState";
 import { optionsQuery } from "./onboarding";
 
 export async function searchPlaces(q: string, signal?: AbortSignal): Promise<Place[]> {
-  const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, { cache: "no-store", signal });
+  const res = await api().fetch(`/places?q=${encodeURIComponent(q)}`, { cache: "no-store", signal });
   if (!res.ok) {
     noteAuthFailure(res.status, ((await res.json().catch(() => ({}))) as { error?: unknown }).error);
     return [];
@@ -22,7 +23,8 @@ export function useOnboardingOptions(home: Home | undefined): OnboardingOptions 
   const [result, setResult] = useState<{ query: string; options: OnboardingOptions } | null>(null);
   useEffect(() => {
     let alive = true;
-    fetch(`/api/onboarding/options?${query}`, { cache: "no-store" })
+    api()
+      .fetch(`/onboarding/options?${query}`, { cache: "no-store" })
       .then((r) => readApi<OnboardingOptions>(r))
       .then((options) => {
         if (alive && options?.rows) setResult({ query, options });
@@ -38,10 +40,10 @@ export function useOnboardingOptions(home: Home | undefined): OnboardingOptions 
 export type SearchSettingsView = { braveSearch: boolean; braveSearchHint?: string };
 
 export const settingsApi = {
-  get: async (): Promise<SearchSettingsView> => readApi<SearchSettingsView>(await fetch("/api/settings", { cache: "no-store" })),
+  get: async (): Promise<SearchSettingsView> => readApi<SearchSettingsView>(await api().fetch("/settings", { cache: "no-store" })),
   saveBrave: async (apiKey: string) => {
     await readApi(
-      await fetch("/api/settings/brave-search/key", {
+      await api().fetch("/settings/brave-search/key", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ apiKey }),
@@ -49,6 +51,6 @@ export const settingsApi = {
     );
   },
   removeBrave: async () => {
-    await readApi(await fetch("/api/settings/brave-search", { method: "DELETE" }));
+    await readApi(await api().fetch("/settings/brave-search", { method: "DELETE" }));
   },
 };

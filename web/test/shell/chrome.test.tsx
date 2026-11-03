@@ -18,6 +18,7 @@ import { copilot } from "../support/copilot";
 import { expectUniqueIds } from "../support/ids";
 import { mockViewport } from "../support/media";
 import { nav } from "../support/navigation";
+import { renderWithPlatform } from "../support/platform";
 import { flush, profile, renderShell } from "../support/shell";
 
 vi.mock("next/navigation", async () => (await import("../support/navigation")).navigationMock());
@@ -248,7 +249,7 @@ describe("removed Plans section", () => {
     expect(parseRoute("/plans")).toBeNull();
     expect(parseRoute("/plans/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/trip/dDE")).toBeNull();
     expect(() => MissingPage()).toThrow("notFound");
-    render(<ShellNotFound />);
+    renderWithPlatform(<ShellNotFound />);
     expect(document.getElementById("shell-not-found-title")).toHaveTextContent("This page doesn't exist.");
   });
 });

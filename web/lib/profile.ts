@@ -1,3 +1,4 @@
+import { api } from "@oab/ui/platform/api";
 import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { readApi } from "@/lib/api";
@@ -15,7 +16,7 @@ const set = (next: State) => {
 };
 
 async function call(init?: RequestInit): Promise<Profile> {
-  const res = await fetch("/api/profile", { cache: "no-store", headers: { "content-type": "application/json" }, ...init });
+  const res = await api().fetch("/profile", { cache: "no-store", headers: { "content-type": "application/json" }, ...init });
   const body = await readApi<{ profile?: Profile }>(res);
   if (!body.profile) throw new Error("The agent didn't send a profile.");
   return body.profile;

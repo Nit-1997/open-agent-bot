@@ -1,7 +1,7 @@
 "use client";
 
 import { parseRoute, type Route } from "@oab/shared/routes";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "@oab/ui/platform";
 import { useMemo } from "react";
 
 export function useRoute(): Route | null {

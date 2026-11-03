@@ -1,3 +1,4 @@
+import { api } from "@oab/ui/platform/api";
 import { readApi } from "@/lib/api";
 
 export type ProviderView = {
@@ -31,7 +32,7 @@ export type LoginState = {
 };
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`/api/providers${path}`, { ...init, cache: "no-store", headers: { "content-type": "application/json" } });
+  const res = await api().fetch(`/providers${path}`, { ...init, cache: "no-store", headers: { "content-type": "application/json" } });
   return readApi<T>(res);
 }
 

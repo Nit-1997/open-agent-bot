@@ -1,3 +1,4 @@
+import { api } from "@oab/ui/platform/api";
 import type { ChatSummary, MessagePart, StoredMessage } from "@oab/shared/chats";
 import type { Page, PageResponse } from "@oab/shared/pages";
 import { readApi } from "@/lib/api";
@@ -12,10 +13,10 @@ export type HistoryMessage =
 export const STOPPED_MARK = "(stopped)";
 
 export const chatsApi = {
-  page: async (page: number) => readApi<PageResponse<ChatSummary>>(await fetch(`/api/chats?page=${page}`, { cache: "no-store" })),
-  get: async (id: string) => readApi<{ chat: ChatSummary }>(await fetch(`/api/chats/${encodeURIComponent(id)}`, { cache: "no-store" })),
+  page: async (page: number) => readApi<PageResponse<ChatSummary>>(await api().fetch(`/chats?page=${page}`, { cache: "no-store" })),
+  get: async (id: string) => readApi<{ chat: ChatSummary }>(await api().fetch(`/chats/${encodeURIComponent(id)}`, { cache: "no-store" })),
   messages: async (id: string) =>
-    readApi<Page<StoredMessage>>(await fetch(`/api/chats/${encodeURIComponent(id)}/messages`, { cache: "no-store" })),
+    readApi<Page<StoredMessage>>(await api().fetch(`/chats/${encodeURIComponent(id)}/messages`, { cache: "no-store" })),
 };
 
 function partsOf(m: StoredMessage): MessagePart[] {

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   historyRouter,
@@ -15,13 +16,15 @@ import {
 import { expectUniqueIds } from "../support/ids.ts";
 import { renderWithPlatform } from "../support/renderWithPlatform.tsx";
 
-let navigate: ReturnType<typeof useNavigate>;
-let history: ReturnType<typeof usePlatformHistory>;
+const handles = {} as { navigate: ReturnType<typeof useNavigate>; history: ReturnType<typeof usePlatformHistory> };
 
 function Probe() {
-  navigate = useNavigate();
-  history = usePlatformHistory();
+  const navigate = useNavigate();
+  const history = usePlatformHistory();
   const params = useSearchParams();
+  useEffect(() => {
+    Object.assign(handles, { navigate, history });
+  }, [navigate, history]);
   return (
     <div id="probe">
       <p id="probe-path">{usePathname()}</p>
@@ -66,29 +69,29 @@ describe.each(factories)("$name", ({ name, make }) => {
 
   it("reflects push and replace from useNavigate", () => {
     renderWithPlatform(<Probe />, { router: make("/") });
-    act(() => navigate.push("/chats?page=2"));
+    act(() => handles.navigate.push("/chats?page=2"));
     expect(shown()).toEqual({ path: "/chats", search: "page=2", q: "" });
-    act(() => navigate.replace("/search?q=sur"));
+    act(() => handles.navigate.replace("/search?q=sur"));
     expect(shown()).toEqual({ path: "/search", search: "q=sur", q: "sur" });
   });
 
   it("reflects history.push, history.replace and history.back, and keeps the state", async () => {
     renderWithPlatform(<Probe />, { router: make("/chats/a") });
-    act(() => history.push({ oaReport: "r1" }, "/chats/a?report=r1"));
+    act(() => handles.history.push({ oaReport: "r1" }, "/chats/a?report=r1"));
     expect(shown()).toEqual({ path: "/chats/a", search: "report=r1", q: "" });
-    expect(history.state()).toEqual({ oaReport: "r1" });
-    act(() => history.replace(null, "/chats/a?report=r2"));
+    expect(handles.history.state()).toEqual({ oaReport: "r1" });
+    act(() => handles.history.replace(null, "/chats/a?report=r2"));
     expect(shown().search).toBe("report=r2");
-    expect(history.state()).toBeNull();
-    act(() => history.back());
+    expect(handles.history.state()).toBeNull();
+    act(() => handles.history.back());
     await waitFor(() => expect(shown()).toEqual({ path: "/chats/a", search: "", q: "" }));
   });
 
   it("reflects a back navigation as popstate", async () => {
     const router = make("/");
     renderWithPlatform(<Probe />, { router });
-    act(() => navigate.push("/reports"));
-    act(() => navigate.push("/search?q=abc"));
+    act(() => handles.navigate.push("/reports"));
+    act(() => handles.navigate.push("/search?q=abc"));
     if (name === "historyRouter") {
       act(() => {
         window.history.pushState(null, "", "/chats?page=3");
@@ -96,7 +99,7 @@ describe.each(factories)("$name", ({ name, make }) => {
       });
       expect(shown()).toEqual({ path: "/chats", search: "page=3", q: "" });
     }
-    act(() => history.back());
+    act(() => handles.history.back());
     await waitFor(() => expect(shown().path).toBe(name === "historyRouter" ? "/search" : "/reports"));
   });
 
@@ -129,12 +132,12 @@ describe("memoryRouter entries", () => {
   it("push appends, replace overwrites, back steps and a push after back drops the forward entries", () => {
     const router = memoryRouter("/");
     renderWithPlatform(<Probe />, { router });
-    act(() => navigate.push("/a"));
-    act(() => navigate.push("/b"));
-    act(() => navigate.replace("/c"));
+    act(() => handles.navigate.push("/a"));
+    act(() => handles.navigate.push("/b"));
+    act(() => handles.navigate.replace("/c"));
     expect(router.entries).toEqual(["/", "/a", "/c"]);
-    act(() => history.back());
-    act(() => navigate.push("/d"));
+    act(() => handles.history.back());
+    act(() => handles.navigate.push("/d"));
     expect(router.entries).toEqual(["/", "/a", "/d"]);
     expect(shown().path).toBe("/d");
   });
@@ -146,9 +149,9 @@ describe("historyRouter", () => {
     const replaceState = window.history.replaceState;
     const router = historyRouter();
     renderWithPlatform(<Probe />, { router });
-    act(() => navigate.push("/reports"));
+    act(() => handles.navigate.push("/reports"));
     expect(window.location.pathname).toBe("/reports");
-    act(() => history.replace({ k: 1 }, "/reports?page=2"));
+    act(() => handles.history.replace({ k: 1 }, "/reports?page=2"));
     expect(window.location.search).toBe("?page=2");
     expect(window.history.state).toEqual({ k: 1 });
     expect(window.history.pushState).toBe(pushState);

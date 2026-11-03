@@ -8,6 +8,7 @@ import { noteAuthFailure, resetAuthState, useAuthState } from "@/lib/authState";
 import type { Step } from "@/lib/turns";
 
 import { expectUniqueIds, htmlIds } from "../support/ids";
+import { renderWithPlatform } from "../support/platform";
 
 describe("Markdown", () => {
   it("gives every element a unique id and opens links in a new tab", () => {
@@ -83,7 +84,7 @@ describe("session notices", () => {
   afterEach(() => resetAuthState());
 
   it("render unique ids", () => {
-    const { container } = render(
+    const { container } = renderWithPlatform(
       <>
         <SignedOutBanner />
         <AccessDisabled />

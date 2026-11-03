@@ -1,5 +1,6 @@
 "use client";
 
+import { usePlatformHistory } from "@oab/ui/platform";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { ModelMenu } from "@/components/profile/ModelMenu";
@@ -65,6 +66,7 @@ function useHistoryLoader(threadId: string, status: string, attempt: number) {
 export function ChatPane(props: { threadId: string; active: boolean; visible: boolean }) {
   const { threadId, active, visible } = props;
   const shell = useShell();
+  const history = usePlatformHistory();
   const { dispatch, persona, profile, models, open, newChat, running, takeFocusRequest, report, overlay } = shell;
   const thread = shell.chats.threads[threadId];
   const panel = shell.chats.panels[threadId];
@@ -105,9 +107,9 @@ export function ChatPane(props: { threadId: string; active: boolean; visible: bo
       if (!draftRef.current) return;
       dispatch({ type: "claimed", id: threadId, title: firstText });
       chatIndex.addOptimistic(threadId, firstText);
-      if (activeRef.current && window.location.pathname === "/") window.history.replaceState(null, "", `/chats/${threadId}`);
+      if (activeRef.current && window.location.pathname === "/") history.replace(null, `/chats/${threadId}`);
     },
-    [dispatch, threadId],
+    [dispatch, threadId, history],
   );
   const onRunEnd = useCallback(() => void chatIndex.refresh(), []);
   const onReports = useCallback((next: ReportRef[]) => setReports((prev) => (sameReports(prev, next) ? prev : next)), []);

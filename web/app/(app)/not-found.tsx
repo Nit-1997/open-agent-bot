@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 
 export default function ShellNotFound() {
   return (
