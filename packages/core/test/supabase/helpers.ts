@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { readEnvFile } from "../../evals/auth.js";
+import { readEnvFile } from "../../evals/auth/hosted.js";
 import { createAuthAdmin } from "../../src/hosted/admin/authAdmin.js";
 import { deleteAccount } from "../../src/hosted/admin/deleteAccount.js";
 import { createAdminRepo } from "../../src/hosted/store/admin.js";

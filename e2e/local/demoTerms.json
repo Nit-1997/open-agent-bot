@@ -1,0 +1,8 @@
+{
+  "long": "Write a 500-word essay about lamplighter traditions at lighthouses, in plain paragraphs.",
+  "followUp": "Reply with one short sentence about the sea.",
+  "report": "Create a short report titled \"Lamplighter field guide\" about historic lighthouse keepers. Keep it under 200 words.",
+  "reportTitle": "Lamplighter field guide",
+  "afterRestart": "Reply with one short sentence about tides.",
+  "search": "lamplighter"
+}

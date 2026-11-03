@@ -80,15 +80,15 @@ export async function completeLocalOnboarding(page: Page, baseUrl: string): Prom
 
 export type Marker = { word: string; chatId: string; reportId: string; reportTitle: string };
 
-const markerPath = (origin: string) => resolve(LOCAL_DIR, `marker-${new URL(origin).port}.json`);
+const markerPath = (origin: string, name: string) => resolve(LOCAL_DIR, `${name}-${new URL(origin).port}.json`);
 
-export function saveMarker(origin: string, marker: Marker): void {
+export function saveMarker(origin: string, marker: Marker, name = "marker"): void {
   mkdirSync(LOCAL_DIR, { recursive: true });
-  writeFileSync(markerPath(origin), `${JSON.stringify(marker)}\n`);
+  writeFileSync(markerPath(origin, name), `${JSON.stringify(marker)}\n`);
 }
 
-export function readMarker(origin: string): Marker {
-  return JSON.parse(readFileSync(markerPath(origin), "utf8")) as Marker;
+export function readMarker(origin: string, name = "marker"): Marker {
+  return JSON.parse(readFileSync(markerPath(origin, name), "utf8")) as Marker;
 }
 
 export async function waitForReplyDone(page: Page, timeout = 120_000): Promise<void> {

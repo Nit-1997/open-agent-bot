@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { evaluateAll } from "../../evals/assert.js";
 import { renderReport, summarize } from "../../evals/report.js";
-import { readEnvFile } from "../../evals/auth.js";
+import { readEnvFile } from "../../evals/auth/hosted.js";
 import { buildInput, createTurnCollector, loadScenarios, pool, rescore, runScenario } from "../../evals/run.js";
 import type { RunRecord, Scenario } from "../../evals/types.js";
 

@@ -102,9 +102,13 @@ describe("stub model", () => {
 
   it("answers 404 elsewhere", async () => assert.equal((await fetch(`http://127.0.0.1:${PORT}/admin`)).status, 404));
 
-  it("refuses model calls without its API key", async () => {
-    assert.equal((await fetch(`${stub.url}/models`)).status, 401);
-    assert.equal((await fetch(`${stub.url}/models`, { headers: { authorization: "Bearer wrong" } })).status, 401);
+  it("lists models without a key, so reachability checks need none", async () => assert.equal((await fetch(`${stub.url}/models`)).status, 200));
+
+  it("refuses completions without its API key", async () => {
+    const post = (headers: Record<string, string>) =>
+      fetch(`${stub.url}/chat/completions`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: "{}" });
+    assert.equal((await post({})).status, 401);
+    assert.equal((await post({ authorization: "Bearer wrong" })).status, 401);
   });
 });
 

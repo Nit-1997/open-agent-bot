@@ -1,0 +1,213 @@
+name: Images
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build ${{ matrix.image }} ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { image: open-agent, arch: amd64, platform: linux/amd64, runner: ubuntu-24.04, context: ., dockerfile: packages/core/Dockerfile, content: /app }
+          - { image: open-agent, arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm, context: ., dockerfile: packages/core/Dockerfile, content: /app }
+          - { image: open-agent-search, arch: amd64, platform: linux/amd64, runner: ubuntu-24.04, context: local/searxng, dockerfile: local/searxng/Dockerfile, content: /opt/open-agent }
+          - { image: open-agent-search, arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm, context: local/searxng, dockerfile: local/searxng/Dockerfile, content: /opt/open-agent }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Version and revision
+        id: meta
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_TYPE" = tag ]; then echo "version=$REF_NAME" >> "$GITHUB_OUTPUT"; else echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"; fi
+          echo "revision=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - name: Build for the content check (never pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            OPEN_AGENT_VERSION=${{ steps.meta.outputs.version }}
+            OPEN_AGENT_REVISION=${{ steps.meta.outputs.revision }}
+          tags: ${{ matrix.image }}:check
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+      - name: No env files, keys or factory evidence in the image
+        env:
+          IMAGE: ${{ matrix.image }}:check
+          CONTENT_DIR: ${{ matrix.content }}
+        run: |
+          found="$(docker run --rm --entrypoint sh "$IMAGE" -c "find '$CONTENT_DIR' \( -name '.env*' -o -name '*.pem' -o -name .factory \) -print")"
+          echo "forbidden files in $IMAGE under $CONTENT_DIR: $(printf '%s' "$found" | grep -c . || true)"
+          test -z "$found"
+      - name: Labels carry the version and revision
+        env:
+          IMAGE: ${{ matrix.image }}:check
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          labels="$(docker image inspect "$IMAGE" --format '{{json .Config.Labels}}')"
+          test "$(printf '%s' "$labels" | jq -r '."org.opencontainers.image.version"')" = "$VERSION"
+          test "$(printf '%s' "$labels" | jq -r '."org.opencontainers.image.revision"')" = "$GITHUB_SHA"
+
+  push:
+    name: push ${{ matrix.image }} ${{ matrix.platform }}
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { image: open-agent, arch: amd64, platform: linux/amd64, runner: ubuntu-24.04, context: ., dockerfile: packages/core/Dockerfile, content: /app }
+          - { image: open-agent, arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm, context: ., dockerfile: packages/core/Dockerfile, content: /app }
+          - { image: open-agent-search, arch: amd64, platform: linux/amd64, runner: ubuntu-24.04, context: local/searxng, dockerfile: local/searxng/Dockerfile, content: /opt/open-agent }
+          - { image: open-agent-search, arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm, context: local/searxng, dockerfile: local/searxng/Dockerfile, content: /opt/open-agent }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Name, version and revision
+        id: meta
+        env:
+          IMAGE: ${{ matrix.image }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          {
+            echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$IMAGE"
+            echo "version=$REF_NAME"
+            echo "revision=$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - name: Build for the content check
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            OPEN_AGENT_VERSION=${{ steps.meta.outputs.version }}
+            OPEN_AGENT_REVISION=${{ steps.meta.outputs.revision }}
+          tags: ${{ matrix.image }}:check
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+      - name: No env files, keys or factory evidence in the image
+        env:
+          IMAGE: ${{ matrix.image }}:check
+          CONTENT_DIR: ${{ matrix.content }}
+        run: |
+          found="$(docker run --rm --entrypoint sh "$IMAGE" -c "find '$CONTENT_DIR' \( -name '.env*' -o -name '*.pem' -o -name .factory \) -print")"
+          echo "forbidden files in $IMAGE under $CONTENT_DIR: $(printf '%s' "$found" | grep -c . || true)"
+          test -z "$found"
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push by digest with provenance and an SBOM
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            OPEN_AGENT_VERSION=${{ steps.meta.outputs.version }}
+            OPEN_AGENT_REVISION=${{ steps.meta.outputs.revision }}
+          outputs: type=image,name=${{ steps.meta.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.meta.outputs.name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Record the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge ${{ matrix.image }}
+    needs: push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        image: [open-agent, open-agent-search]
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create the multi-arch manifest lists
+        id: merge
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ matrix.image }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          name="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$IMAGE"
+          refs=()
+          for digest in *; do refs+=("$name@sha256:$digest"); done
+          test "${#refs[@]}" = 2
+          docker buildx imagetools create -t "$name:$REF_NAME" -t "$name:sha-${GITHUB_SHA::7}" "${refs[@]}"
+          digest="$(docker buildx imagetools inspect "$name:$REF_NAME" --format '{{json .Manifest}}' | jq -r .digest)"
+          docker buildx imagetools inspect "$name:$REF_NAME" --format '{{json .Manifest}}' | jq -r '.manifests[] | .platform | "\(.os)/\(.architecture)"' | grep -v unknown | sort
+          { echo "name=$name"; echo "digest=$digest"; } >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.merge.outputs.name }}
+          subject-digest: ${{ steps.merge.outputs.digest }}
+          push-to-registry: true

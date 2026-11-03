@@ -122,16 +122,38 @@ describe("images.yml", () => {
     assert.match(text, /push-to-registry: true/);
   });
 
-  it("passes only the version and revision as build args", () => {
-    const args = [...text.matchAll(/^\s+(OPEN_AGENT_[A-Z_]+)=/gm)].map((m) => m[1]);
-    assert.ok(args.length > 0);
-    assert.deepEqual([...new Set(args)].sort(), ["OPEN_AGENT_REVISION", "OPEN_AGENT_VERSION"]);
-    assert.equal(/build-args:[\s\S]*secrets\./.test(text), false);
+  it("passes only the version and revision as build args, never secrets", () => {
+    const builds = Object.values(wf.jobs).flatMap((job) => job.steps.filter((s) => String(s.uses ?? "").startsWith("docker/build-push-action@")));
+    assert.equal(builds.length, 3);
+    for (const step of builds) {
+      const args = String(step.with["build-args"]).trim().split("\n");
+      assert.deepEqual(args.map((a) => a.split("=")[0]), ["OPEN_AGENT_VERSION", "OPEN_AGENT_REVISION"]);
+      assert.equal(JSON.stringify(step.with).includes("secrets."), false);
+      assert.equal(step.with.secrets, undefined);
+    }
   });
 
-  it("checks the image content before any push", () => {
-    assert.match(text, /find \/app/);
-    for (const name of ["'.env*'", "'*.pem'", ".factory"]) assert.ok(text.includes(name), name);
+  it("checks the image content (/app for the agent) in the build job and before the push", () => {
+    const agentDirs = (job) => job.strategy.matrix.include.filter((l) => l.image === "open-agent").map((l) => l.content);
+    for (const name of ["build", "push"]) {
+      const job = wf.jobs[name];
+      assert.deepEqual([...new Set(agentDirs(job))], ["/app"], name);
+      const steps = job.steps.map((s) => s.run ?? "").join("\n");
+      assert.match(steps, /find '\$CONTENT_DIR' \\\( -name '\.env\*' -o -name '\*\.pem' -o -name \.factory \\\) -print/, name);
+      assert.match(steps, /test -z "\$found"/, name);
+    }
+    const push = wf.jobs.push.steps;
+    const check = push.findIndex((s) => (s.run ?? "").includes("find '$CONTENT_DIR'"));
+    const pushed = push.findIndex((s) => String(s.with?.outputs ?? "").includes("push=true"));
+    assert.ok(check >= 0 && pushed > check);
+  });
+
+  it("never pushes from the build job", () => {
+    for (const step of wf.jobs.build.steps) {
+      if (!String(step.uses ?? "").startsWith("docker/build-push-action@")) continue;
+      assert.equal(step.with.push, false);
+      assert.equal(String(step.with.outputs ?? "").includes("push=true"), false);
+    }
   });
 
   it("builds both images", () => {
@@ -155,4 +177,17 @@ describe("evals-local.yml", () => {
     assert.match(text, /OPENROUTER_API_KEY/);
     assert.match(text, /--target local/);
   });
+});
+
+describe("OCI labels", () => {
+  for (const file of ["packages/core/Dockerfile", "local/searxng/Dockerfile"]) {
+    it(`${file} labels the version and revision from build args`, () => {
+      const text = readFileSync(join(ROOT, file), "utf8");
+      assert.match(text, /^ARG OPEN_AGENT_VERSION=dev$/m);
+      assert.match(text, /^ARG OPEN_AGENT_REVISION=unknown$/m);
+      assert.match(text, /org\.opencontainers\.image\.version="\$\{OPEN_AGENT_VERSION\}"/);
+      assert.match(text, /org\.opencontainers\.image\.revision="\$\{OPEN_AGENT_REVISION\}"/);
+      assert.match(text, /org\.opencontainers\.image\.licenses="MIT"/);
+    });
+  }
 });

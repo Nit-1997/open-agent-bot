@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-
-export type AuthHeaders = () => Promise<Record<string, string>>;
+import type { AuthHeaders } from "../types.js";
 
 export function readEnvFile(path: string): Record<string, string> {
   let text: string;

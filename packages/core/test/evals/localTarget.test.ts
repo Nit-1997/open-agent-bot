@@ -1,6 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,10 +62,18 @@ describe("evals target selection", () => {
   it("local needs --origin and reads the key from the named env variable", async () => {
     const { calls, fetch } = fakeFetch();
     await expect(transportFor({ target: "local", url: "", repoRoot: CORE, env: {}, fetch })).rejects.toThrow(/--origin/);
-    await expect(transportFor({ target: "local", url: "", origin: ORIGIN, keyEnv: "EVAL_KEY", repoRoot: CORE, env: {}, fetch })).rejects.toThrow(
-      /EVAL_KEY is empty or unset/,
-    );
-    const t = await transportFor({ target: "local", url: "", origin: ORIGIN, keyEnv: "EVAL_KEY", repoRoot: CORE, env: { EVAL_KEY: KEY }, fetch });
+    await expect(
+      transportFor({ target: "local", url: "", origin: ORIGIN, keyEnv: "EVAL_KEY", repoRoot: CORE, env: {}, fetch }),
+    ).rejects.toThrow(/EVAL_KEY is empty or unset/);
+    const t = await transportFor({
+      target: "local",
+      url: "",
+      origin: ORIGIN,
+      keyEnv: "EVAL_KEY",
+      repoRoot: CORE,
+      env: { EVAL_KEY: KEY },
+      fetch,
+    });
     expect(t.url).toBe(`${ORIGIN}/api/copilotkit/agent/openagent/run`);
     expect(calls.map((c) => c.url)).toEqual([`${ORIGIN}/api/providers/openrouter/key`]);
   });
@@ -104,7 +111,11 @@ try {
 console.log("supabase loads:", globalThis.__supabaseLoads);
 `,
   );
-  const run = spawnSync(process.execPath, ["--import", hook, "--import", "tsx", probe], { cwd: CORE, encoding: "utf8", env: { ...process.env, NODE_OPTIONS: "" } });
+  const run = spawnSync(process.execPath, ["--import", hook, "--import", "tsx", probe], {
+    cwd: CORE,
+    encoding: "utf8",
+    env: { ...process.env, NODE_OPTIONS: "" },
+  });
   const out = `${run.stdout}${run.stderr}`;
   const loads = Number(/supabase loads: (\d+)/.exec(out)?.[1] ?? Number.NaN);
   if (Number.isNaN(loads)) throw new Error(`the module-graph probe did not report: ${out}`);
