@@ -12,6 +12,7 @@ COPY web/package.json web/
 COPY e2e/package.json e2e/
 RUN npm ci -w web --include-workspace-root
 COPY packages/shared ./packages/shared
+COPY packages/bff ./packages/bff
 COPY packages/ui ./packages/ui
 COPY web ./web
 ARG NEXT_PUBLIC_SUPABASE_URL
