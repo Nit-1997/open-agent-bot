@@ -1,7 +1,6 @@
 import { emptyProfile } from "@oab/shared/profile";
 import { act, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runtimeUrls } from "./support/copilot.tsx";
 import { mockViewport } from "./support/media.ts";
 
 vi.mock("@copilotkit/react-core/v2", async () => (await import("./support/copilot.tsx")).copilotMock());
@@ -16,7 +15,6 @@ function respond(url: string): Response {
 
 beforeEach(() => {
   vi.resetModules();
-  runtimeUrls.length = 0;
   localStorage.clear();
   document.documentElement.classList.remove("dark");
   mockViewport(1440);
@@ -44,6 +42,7 @@ describe("main bootstrap", { timeout: 20000 }, () => {
     expect(document.documentElement).toHaveClass("dark");
     const { api } = await import("@oab/ui/platform/api");
     expect(api().url("/chats")).toBe("/api/chats");
+    const { runtimeUrls } = await import("./support/copilot.tsx");
     expect(runtimeUrls.at(-1)).toBe("/api/copilotkit");
     const urls = vi.mocked(fetch).mock.calls.map(([url]) => String(url));
     expect(urls.length).toBeGreaterThan(0);

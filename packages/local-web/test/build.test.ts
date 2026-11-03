@@ -2,6 +2,7 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { ARTIFACT_CSP } from "@oab/shared/artifacts";
 import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -62,9 +63,17 @@ describe("vite build", () => {
   });
 
   it("loads nothing from Google Fonts or any other host", () => {
-    for (const path of built().filter((p) => /\.(html|css|js)$/.test(p))) expect(read(path), path).not.toContain("fonts.googleapis");
-    expect(css()).not.toMatch(/@import\s+url\(\s*["']?https?:/);
+    for (const path of built().filter((p) => /\.(html|css)$/.test(p))) expect(read(path), path).not.toContain("fonts.googleapis");
+    const reportFramePolicy = ARTIFACT_CSP.split("; ").find((d) => d.includes("fonts.googleapis"));
+    expect(reportFramePolicy).toBeDefined();
+    for (const path of built().filter((p) => p.endsWith(".js")))
+      expect(read(path).replaceAll(reportFramePolicy!, ""), path).not.toContain("fonts.googleapis");
     expect(css()).not.toMatch(/url\(\s*["']?https?:/);
+  });
+
+  it("leaves CopilotKit's development-only inspector out of the build", () => {
+    for (const path of built().filter((p) => p.endsWith(".js")))
+      for (const marker of ["CPK-Inspector-Panel", "cpk-inspector-brand-fonts"]) expect(read(path), path).not.toContain(marker);
   });
 
   it("bundles the fonts and the backdrop", () => {

@@ -1,4 +1,7 @@
 import { emptyProfile, type Profile } from "@oab/shared/profile";
+import { resetAuthState } from "@oab/ui/lib/authState.ts";
+import { chatIndex } from "@oab/ui/lib/chatIndex.ts";
+import { resetProfileStore } from "@oab/ui/lib/profile.ts";
 import { historyRouter } from "@oab/ui/platform";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,6 +57,9 @@ function expectNoCloudChrome() {
 
 beforeEach(() => {
   profile = ONBOARDED;
+  resetProfileStore();
+  resetAuthState();
+  chatIndex.reset();
   localStorage.clear();
   vi.stubGlobal(
     "fetch",
