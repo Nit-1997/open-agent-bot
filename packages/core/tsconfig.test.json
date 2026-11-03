@@ -7,7 +7,6 @@
     "types": ["node"],
     "paths": {
       "@oab/core/*": ["./src/*"],
-      "@oab/bff": ["../bff/src/index.ts"],
       "typebox": ["../../node_modules/typebox/build/index.d.mts"],
       "typebox/value": ["../../node_modules/typebox/build/value/index.d.mts"]
     }

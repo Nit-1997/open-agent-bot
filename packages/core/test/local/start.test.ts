@@ -147,16 +147,24 @@ describe("startLocal end to end, in process", () => {
     expect(chats.items.map((c) => c.id)).toContain(thread);
   });
 
-  it("ends the model call when the browser disconnects mid-stream", async () => {
+  it("keeps the run going after the browser disconnects, as hosted does, and Stop still ends it", async () => {
     const before = model.aborted;
+    const thread = randomUUID();
     const run = await stream(local.port, RUN, {
       method: "POST",
       headers: { accept: "text/event-stream" },
-      body: runInput(randomUUID(), "custom/stub"),
+      body: runInput(thread, "custom/stub"),
     });
     await waitFor(() => textDeltas(run.text()) >= 3);
+    const seen = model.completions;
     run.disconnect();
+    await run.ended;
+    expect((await call(local.port, "/health")).status).toBe(200);
+    expect(model.open).toBe(1);
+    const stop = await call(local.port, STOP(thread), { method: "POST", headers: { accept: "application/json" } });
+    expect(stop.status).toBeLessThan(300);
     await waitFor(() => model.aborted > before && model.open === 0);
+    expect(model.completions).toBe(seen);
   });
 
   it("logs requests without queries or secrets", async () => {
@@ -217,12 +225,13 @@ describe("startLocal across a restart", () => {
   it("closes the front and the store on close(), leaving no listener", async () => {
     const r = localRoot();
     try {
+      await waitFor(() => tcpServers() === 0, 5000);
       const before = tcpServers();
       const local = await startLocal(localEnv(r));
       expect(tcpServers()).toBe(before + 1);
       await local.close();
       await local.close();
-      expect(tcpServers()).toBe(before);
+      await waitFor(() => tcpServers() === before, 2000);
       expect(existsSync(join(r.data, "open-agent.db-wal"))).toBe(false);
       await expect(call(local.port, "/health")).rejects.toThrow();
     } finally {
@@ -256,7 +265,7 @@ describe("startLocal refusals in process", () => {
     const before = tcpServers();
     const err = await refusal(startLocal(localEnv(r), { identity: () => hosted }));
     expect(err.code).toBe("identity");
-    expect(tcpServers()).toBe(before);
+    await waitFor(() => tcpServers() === before, 2000);
     expect(existsSync(join(r.data, "open-agent.db-wal"))).toBe(false);
   });
 
