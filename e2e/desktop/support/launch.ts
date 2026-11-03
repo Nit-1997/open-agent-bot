@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -13,7 +13,8 @@ export type ShellEnv = Readonly<{
   stateDir: string;
   project: string;
   portRange: string;
-  attachPort?: number;
+  docker?: string;
+  services?: string;
   externalLog: string;
   savePath: string;
   extra?: Record<string, string>;
@@ -38,7 +39,8 @@ export function shellEnv(o: ShellEnv): Record<string, string> {
     OPEN_AGENT_SHELL_PORT_RANGE: o.portRange,
     OPEN_AGENT_SHELL_EXTERNAL_LOG: o.externalLog,
     OPEN_AGENT_SHELL_SAVE_PATH: o.savePath,
-    ...(o.attachPort ? { OPEN_AGENT_SHELL_ATTACH_PORT: String(o.attachPort) } : {}),
+    ...(o.docker ? { OPEN_AGENT_SHELL_DOCKER: o.docker } : {}),
+    ...(o.services ? { OPEN_AGENT_SHELL_SERVICES: o.services } : {}),
     ...o.extra,
   };
 }
@@ -49,6 +51,9 @@ export type Shell = Readonly<{
   appPage(): Promise<Page>;
   log(): string;
   externalLog(): string[];
+  stack(): { port: number; launchToken: string } | undefined;
+  status(): { screen: string; phase: string; port?: number } | undefined;
+  waitScreen(id: string, timeout?: number): Promise<Page>;
 }>;
 
 const byUrl = async (app: ElectronApplication, prefix: string): Promise<Page> => {
@@ -58,20 +63,42 @@ const byUrl = async (app: ElectronApplication, prefix: string): Promise<Page> =>
   return page;
 };
 
-export async function launchShell(env: ShellEnv, info: TestInfo): Promise<Shell> {
+export function ensureStaged(): void {
+  if (existsSync(join(DESKTOP, "build/stack/docker-compose.yml"))) return;
+  const r = spawnSync(process.execPath, [join(DESKTOP, "scripts/stage-stack.mjs")], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`stage-stack failed: ${r.stderr}`);
+}
+
+export async function launchShell(env: ShellEnv, info: TestInfo, o: { video?: string } = {}): Promise<Shell> {
   if (!existsSync(join(DESKTOP, "dist/main.cjs"))) throw new Error("apps/desktop is not built: run npm run build -w @oab/desktop");
+  ensureStaged();
   const app = await _electron.launch({
     executablePath: ELECTRON,
     args: [DESKTOP],
     env: shellEnv(env),
-    recordVideo: { dir: info.outputPath("video"), size: { width: 1200, height: 800 } },
+    recordVideo: { dir: info.outputPath(o.video ?? "video"), size: { width: 1200, height: 800 } },
   });
+  const json = <T>(p: string): T | undefined => {
+    try {
+      return JSON.parse(readFileSync(p, "utf8")) as T;
+    } catch {
+      return undefined;
+    }
+  };
+  const shellPage = () => byUrl(app, "oa-shell://screens/");
   return {
     app,
-    shellPage: () => byUrl(app, "oa-shell://screens/"),
-    appPage: () => byUrl(app, `http://127.0.0.1:${env.attachPort}/`),
+    shellPage,
+    appPage: () => byUrl(app, "http://127.0.0.1:"),
     log: () => readIf(join(env.stateDir, "logs/shell.log")),
     externalLog: () => readIf(env.externalLog).split("\n").filter(Boolean),
+    stack: () => json(join(env.stateDir, "stack.json")),
+    status: () => json(join(env.stateDir, "status.json")),
+    waitScreen: async (id, timeout = 30_000) => {
+      const page = await shellPage();
+      await expect(page.locator(`#${id}`)).toBeVisible({ timeout });
+      return page;
+    },
   };
 }
 

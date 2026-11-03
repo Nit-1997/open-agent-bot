@@ -1,0 +1,9 @@
+{
+ "OperatingSystem": "Docker Desktop",
+ "Name": "docker-desktop",
+ "MemTotal": 12528578560,
+ "OSType": "linux",
+ "Architecture": "aarch64",
+ "ServerVersion": "29.3.1",
+ "NCPU": 10
+}

@@ -1,10 +1,14 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { createServer } from "node:http";
 
 const port = Number(process.env.OPEN_AGENT_PORT);
 const version = process.env.FAKE_AGENT_VERSION ?? "0.0.0-fake";
 const stackFile = process.env.FAKE_STACK_FILE;
+const fakeHome = process.env.FAKE_HOME;
+const fakeProject = process.env.FAKE_PROJECT;
+let unhealthy = process.env.FAKE_UNHEALTHY === "1";
 if (!Number.isInteger(port) || port < 1024 || port > 65535) {
   process.stderr.write("fake-agent: OPEN_AGENT_PORT must be a port\n");
   process.exit(2);
@@ -107,6 +111,7 @@ const server = createServer((req, res) => {
   };
   switch (url.pathname) {
     case "/health":
+      if (unhealthy) return send(res, 503, "application/json", JSON.stringify({ ok: false }));
       return send(res, 200, "application/json", JSON.stringify({ ok: true, app: "open-agent", version, schema: 1 }));
     case "/":
       return send(res, 200, "text/html; charset=utf-8", HOME);
@@ -140,4 +145,44 @@ const server = createServer((req, res) => {
 });
 
 server.listen(port, "127.0.0.1", () => process.stdout.write(`fake-agent listening ${port}\n`));
-for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => server.close(() => process.exit(0)));
+
+function updateAgent(patch, log) {
+  if (!fakeHome || !fakeProject) return;
+  const file = join(fakeHome, "state.json");
+  try {
+    const state = JSON.parse(readFileSync(file, "utf8"));
+    const agent = state.containers?.[fakeProject]?.agent;
+    if (!agent) return;
+    Object.assign(agent, patch);
+    if (log) agent.logs = [...(agent.logs ?? []), log];
+    const tmp = `${file}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(state, null, 1));
+    renameSync(tmp, file);
+  } catch {}
+}
+
+const REFUSAL_LINES = {
+  82: "[startup] refused code=kek_missing the credential key /keys/kek is missing but the database holds 1 saved model key sealed with it. Restore the keys volume, or start once with OPEN_AGENT_RESET_CREDENTIALS=1 to delete them and re-enter them in Models",
+};
+
+const after = process.env.FAKE_AFTER_READY;
+if (after) {
+  setTimeout(
+    () => {
+      if (after === "daemonDown") {
+        if (fakeHome) writeFileSync(join(fakeHome, "daemon.txt"), "down");
+        updateAgent({ status: "exited", exitCode: 0, health: "", pid: undefined });
+        process.exit(0);
+      } else if (after.startsWith("agentExit:")) {
+        const code = Number(after.slice(10));
+        updateAgent({ status: "exited", exitCode: code, health: "", pid: undefined }, REFUSAL_LINES[code] ?? `fatal: exiting with ${code}`);
+        process.exit(code);
+      } else if (after === "unhealthy") {
+        unhealthy = true;
+        updateAgent({ health: "unhealthy" });
+      }
+    },
+    Number(process.env.FAKE_AFTER_MS ?? 2500),
+  );
+}
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => process.exit(0));

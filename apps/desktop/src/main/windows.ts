@@ -35,7 +35,9 @@ export type MainWindow = Readonly<{
   appView: WebContentsView;
   showShell(): void;
   showApp(port: number): Promise<void>;
+  hideApp(): void;
   reloadApp(): void;
+  setTitle(title: string): void;
   sendState(s: ShellState): void;
   focus(): void;
 }>;
@@ -50,7 +52,23 @@ export type WindowDeps = Readonly<{
   getState: () => ShellState;
   act: (a: ShellAction) => Promise<ActResult>;
   onOpenServices: () => void;
+  onMismatchHint: () => void;
+  onUiCrashed: () => void;
+  now?: () => number;
 }>;
+
+export const MISMATCH_PROBE_INTERVAL_MS = 10_000;
+export const AUTO_RELOAD_WINDOW_MS = 60_000;
+
+export function isLaunchRequired(status: number, body: string): boolean {
+  if (status !== 401) return false;
+  try {
+    const v = JSON.parse(body) as { error?: unknown };
+    return v.error === "launch_required";
+  } catch {
+    return false;
+  }
+}
 
 export function createMainWindow(d: WindowDeps): MainWindow {
   const window = new BaseWindow({ width: 1200, height: 800, minWidth: 900, minHeight: 600, title: d.title, show: true });
@@ -102,14 +120,56 @@ export function createMainWindow(d: WindowDeps): MainWindow {
       webPreferences: { ...HARDENED, devTools: d.devTools, partition: APP_PARTITION },
     });
     nameView(report.webContents, "report");
+    watchCrashes(report.webContents, "report");
     reports.add(report);
     report.on("closed", () => reports.delete(report));
     lockdown(report.webContents, "report");
     void report.loadURL(url).catch((e: Error) => d.log.warn(`[report] load failed ${e.message.split(" ")[0]}`));
   };
 
+  const now = d.now ?? Date.now;
+  const lastAutoReload = new WeakMap<WebContents, number>();
+  function watchCrashes(contents: WebContents, view: "app" | "report") {
+    contents.on("render-process-gone", (_e, details) => {
+      const last = lastAutoReload.get(contents) ?? Number.NEGATIVE_INFINITY;
+      d.log.warn(`[app] ${view} renderer gone reason=${details.reason}`);
+      if (now() - last > AUTO_RELOAD_WINDOW_MS) {
+        lastAutoReload.set(contents, now());
+        d.log.info(`[app] ${view} reloaded after renderer crash`);
+        contents.reload();
+        return;
+      }
+      d.onUiCrashed();
+    });
+  }
+
   lockdown(shellView.webContents, "shell");
   lockdown(appView.webContents, "app");
+  watchCrashes(appView.webContents, "app");
+  shellView.webContents.on("render-process-gone", (_e, details) => {
+    d.log.warn(`[shell] renderer gone reason=${details.reason}; reloaded`);
+    shellView.webContents.reload();
+  });
+
+  let lastProbe = Number.NEGATIVE_INFINITY;
+  const appSession = appView.webContents.session;
+  appSession.webRequest.onCompleted((details) => {
+    const origin = d.appOrigin();
+    if (details.statusCode !== 401 || !origin || originOf(details.url) !== origin) return;
+    if (!new URL(details.url).pathname.startsWith("/api/")) return;
+    const t = now();
+    if (t - lastProbe < MISMATCH_PROBE_INTERVAL_MS) return;
+    lastProbe = t;
+    d.log.info("[app] 401 from the app; probing the launch cookie");
+    void appSession
+      .fetch(`${origin}/api/chats`, { credentials: "include", cache: "no-store" })
+      .then(async (r) => {
+        const body = await r.text();
+        if (isLaunchRequired(r.status, body.slice(0, 4096))) d.onMismatchHint();
+        else d.log.info(`[app] probe status=${r.status}; ignored`);
+      })
+      .catch((e: Error) => d.log.warn(`[app] probe failed ${e.message.split(" ")[0]}`));
+  });
 
   const isShellSender = (e: IpcMainInvokeEvent) =>
     e.sender === shellView.webContents &&
@@ -156,6 +216,7 @@ export function createMainWindow(d: WindowDeps): MainWindow {
     ipcMain.removeAllListeners("app:open-services");
   });
 
+  void appView.webContents.loadURL("about:blank").catch(() => {});
   void shellView.webContents.loadURL(SHELL_URL).catch((e: Error) => d.log.error(`[shell] load failed ${e.message.split(" ")[0]}`));
 
   return {
@@ -168,10 +229,19 @@ export function createMainWindow(d: WindowDeps): MainWindow {
       shellView.webContents.focus();
     },
     showApp: async (port) => {
-      await appView.webContents.loadURL(`http://127.0.0.1:${port}/`);
+      const url = `http://127.0.0.1:${port}/`;
+      if (originOf(appView.webContents.getURL()) === originOf(url) && !appView.webContents.isCrashed()) appView.webContents.reload();
+      else await appView.webContents.loadURL(url);
       appView.setVisible(true);
       shellView.setVisible(false);
       appView.webContents.focus();
+    },
+    hideApp: () => {
+      appView.setVisible(false);
+      shellView.setVisible(true);
+    },
+    setTitle: (title) => {
+      if (!window.isDestroyed()) window.setTitle(title);
     },
     reloadApp: () => {
       if (appView.getVisible()) appView.webContents.reload();

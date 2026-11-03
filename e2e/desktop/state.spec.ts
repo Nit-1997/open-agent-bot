@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { startFakeAgent } from "./support/fakeDocker";
+import { createFakeDocker, fakeServices } from "./support/fakeDocker";
 import { launchShell, newStateDir, seedStack } from "./support/launch";
 
 const PORT = 18422;
@@ -15,12 +15,13 @@ test("a group-readable stack.json is distrusted: warn, rotate the token, rewrite
   const old = randomBytes(32).toString("hex");
   seedStack(stateDir, { project: PROJECT, port: PORT, token: old });
   chmodSync(stackFile, 0o644);
-  const agent = await startFakeAgent({ port: PORT, stackFile });
+  const fake = await createFakeDocker("state");
   const env = {
     stateDir,
     project: PROJECT,
-    portRange: "18420-18429",
-    attachPort: PORT,
+    portRange: `${PORT}-${PORT}`,
+    docker: fake.bin,
+    services: fakeServices(stateDir),
     externalLog: join(stateDir, "external.log"),
     savePath: join(stateDir, "saved.bin"),
   };
@@ -37,7 +38,7 @@ test("a group-readable stack.json is distrusted: warn, rotate the token, rewrite
     for (const t of [old, rotated]) expect(shell.log()).not.toContain(t);
   } finally {
     await shell.app.close().catch(() => {});
-    await agent.stop();
+    await fake.cleanup();
     rmSync(stateDir, { recursive: true, force: true });
   }
 });

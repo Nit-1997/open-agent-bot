@@ -1,0 +1,345 @@
+[
+    {
+        "Id": "b064203361ee9f0118504545033c7f4e2c366a1c0f9e70d6686eb35e73b0db55",
+        "Created": "2026-11-03T17:04:44.089305709Z",
+        "Path": "node",
+        "Args": [
+            "dist/local/main.js"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 68621,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-11-03T17:04:49.74271767Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2026-11-03T17:04:54.837074256Z",
+                        "End": "2026-11-03T17:04:54.919411589Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-11-03T17:04:59.926094841Z",
+                        "End": "2026-11-03T17:05:00.013644133Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-11-03T17:05:05.019976177Z",
+                        "End": "2026-11-03T17:05:05.097951469Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:909976625c22b0f309218e876f5b974723fdec33f9bf13d28df29a6961430ac9",
+        "ResolvConfPath": "/var/lib/docker/containers/b064203361ee9f0118504545033c7f4e2c366a1c0f9e70d6686eb35e73b0db55/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/b064203361ee9f0118504545033c7f4e2c366a1c0f9e70d6686eb35e73b0db55/hostname",
+        "HostsPath": "/var/lib/docker/containers/b064203361ee9f0118504545033c7f4e2c366a1c0f9e70d6686eb35e73b0db55/hosts",
+        "LogPath": "/var/lib/docker/containers/b064203361ee9f0118504545033c7f4e2c366a1c0f9e70d6686eb35e73b0db55/b064203361ee9f0118504545033c7f4e2c366a1c0f9e70d6686eb35e73b0db55-json.log",
+        "Name": "/oab-factory-m4-2-agent-1",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "oab-factory-m4-2-data:/data:rw",
+                "oab-factory-m4-2-keys:/keys:rw",
+                "oab-factory-m4-2_renderer-key:/run/open-agent/renderer:rw"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "oab-factory-m4-2_default",
+            "PortBindings": {
+                "3000/tcp": [
+                    {
+                        "HostIp": "127.0.0.1",
+                        "HostPort": "18451"
+                    }
+                ]
+            },
+            "RestartPolicy": {
+                "Name": "on-failure",
+                "MaximumRetryCount": 3
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": [
+                "ALL"
+            ],
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [
+                "host.docker.internal:host-gateway"
+            ],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": true,
+            "SecurityOpt": [
+                "no-new-privileges:true"
+            ],
+            "Tmpfs": {
+                "/home/pwuser": "size=128m,uid=1001,gid=1001,mode=0700",
+                "/tmp": "size=512m,mode=1777"
+            },
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "b064203361ee9f0118504545033c7f4e2c366a1c0f9e70d6686eb35e73b0db55",
+                "LowerDir": "/var/lib/docker/overlay2/41f78415288f67a8bf1aafe79a283a830eef61ac1f5b80c41f007e31d1db25a4-init/diff:/var/lib/docker/overlay2/jvf2emupqs68sqcq88pgxcq11/diff:/var/lib/docker/overlay2/vj8cnzlec0rx2vex681yaw8ah/diff:/var/lib/docker/overlay2/jampxi41k18mjme8qulsvo8uu/diff:/var/lib/docker/overlay2/xvz2o0widqgfle24xlycxw857/diff:/var/lib/docker/overlay2/nhigbiv3vf3wjmxebbi6f2jnr/diff:/var/lib/docker/overlay2/wu9fpqrtk9birf5t54wlc0g9z/diff:/var/lib/docker/overlay2/uwjv6mjsdzlsv0gkl3bj9k8lc/diff:/var/lib/docker/overlay2/wssj0s90lmmrspbd8hj1iu9xq/diff:/var/lib/docker/overlay2/vzge2u0mipj6i0ovxdixam9vj/diff:/var/lib/docker/overlay2/v3oidzknnp9p5np3aqv5oa6s0/diff:/var/lib/docker/overlay2/b6h66sotc4cbcyhcpjjbxk1i5/diff:/var/lib/docker/overlay2/pun14bml3zcxg307j6nnvjs7z/diff:/var/lib/docker/overlay2/vlzr21cxhnpjs8hd6y77f8vc9/diff:/var/lib/docker/overlay2/8v5em2az1hqo8v11g0et8m22x/diff:/var/lib/docker/overlay2/k1e5ni04s24wxim9lskuppjom/diff:/var/lib/docker/overlay2/y3xq83i1cu0kc40kvngidbsyr/diff:/var/lib/docker/overlay2/cqosnk2r9jhml4tvo0x00wuu8/diff:/var/lib/docker/overlay2/o9a6u3d7ek4vcqjg6rucglufi/diff:/var/lib/docker/overlay2/pqeex1b8wzvfp6sobweg1jbxq/diff:/var/lib/docker/overlay2/406dgk9x77d68pmna7zkgit6j/diff:/var/lib/docker/overlay2/v3wmxwvnw3q5lpnhcolstc2bg/diff:/var/lib/docker/overlay2/vaw45nc0s4j298w1idhe9iya4/diff:/var/lib/docker/overlay2/q4nhe4h90zumiqqqy5t21ufvn/diff:/var/lib/docker/overlay2/odf9xhqe8i86parb9a3q8pu9f/diff:/var/lib/docker/overlay2/rb9m39m2xbw3eavm4xbauey20/diff:/var/lib/docker/overlay2/i8gxi6ou3lcn22f213h3tn3n9/diff:/var/lib/docker/overlay2/83b5b0fadf2009e15fda1902935d2c911a5f5df534706c2fbce35691dba07827/diff:/var/lib/docker/overlay2/373c4ba015ccea5616931c02dd90a701de8e33a78abe5d7c22f10b8430117dc7/diff:/var/lib/docker/overlay2/5ac8d4a8ba8c7edf09dfe795bac1410826a675cbf760381b35ae17ebf599e6e3/diff:/var/lib/docker/overlay2/e1d0522cd4d647b2d404adad54506d01b9e04061bd282b7a0499113e31a9e19c/diff:/var/lib/docker/overlay2/3fad2d2c88206fc0dc666cc779b3bbf102b88f850f05cd1a1eecd94be46aaed4/diff:/var/lib/docker/overlay2/5e6beb18b283b6b9339e38bcacc5b2c4f4132f4d8ffb948994a495ebda1e4f50/diff:/var/lib/docker/overlay2/7ee9f703735e66742af1824a2f5e788b3fecd251b17667ed94c1f1c4d4e6a1ae/diff",
+                "MergedDir": "/var/lib/docker/overlay2/41f78415288f67a8bf1aafe79a283a830eef61ac1f5b80c41f007e31d1db25a4/merged",
+                "UpperDir": "/var/lib/docker/overlay2/41f78415288f67a8bf1aafe79a283a830eef61ac1f5b80c41f007e31d1db25a4/diff",
+                "WorkDir": "/var/lib/docker/overlay2/41f78415288f67a8bf1aafe79a283a830eef61ac1f5b80c41f007e31d1db25a4/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "oab-factory-m4-2-data",
+                "Source": "/var/lib/docker/volumes/oab-factory-m4-2-data/_data",
+                "Destination": "/data",
+                "Driver": "local",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "oab-factory-m4-2-keys",
+                "Source": "/var/lib/docker/volumes/oab-factory-m4-2-keys/_data",
+                "Destination": "/keys",
+                "Driver": "local",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "oab-factory-m4-2_renderer-key",
+                "Source": "/var/lib/docker/volumes/oab-factory-m4-2_renderer-key/_data",
+                "Destination": "/run/open-agent/renderer",
+                "Driver": "local",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+        "Config": {
+            "Hostname": "b064203361ee",
+            "Domainname": "",
+            "User": "pwuser",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "3000/tcp": {},
+                "8000/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "OPEN_AGENT_PORT=18451",
+                "OPEN_AGENT_RESET_CREDENTIALS=",
+                "OPEN_AGENT_LAUNCH_TOKEN=0000000000000000000000000000000000000000000000000000000000000000",
+                "COPILOTKIT_TELEMETRY_DISABLED=true",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "LC_ALL=C.UTF-8",
+                "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright",
+                "ELECTRON_SKIP_BINARY_DOWNLOAD=1",
+                "NODE_ENV=production",
+                "OPEN_AGENT_VERSION=0.0.0-m42a"
+            ],
+            "Cmd": [
+                "node",
+                "dist/local/main.js"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD",
+                    "node",
+                    "-e",
+                    "fetch('http://127.0.0.1:3000/health').then((r) =\u003e process.exit(r.ok ? 0 : 1), () =\u003e process.exit(1))"
+                ],
+                "Interval": 5000000000,
+                "Timeout": 5000000000,
+                "StartPeriod": 30000000000,
+                "Retries": 3
+            },
+            "Image": "oab-m4-2-agent:a",
+            "Volumes": null,
+            "WorkingDir": "/app/packages/core",
+            "Entrypoint": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "50552907d175fa86183551211038658e0408dd8301b9a21f2a33bad792b83f79",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "search:service_healthy:false",
+                "com.docker.compose.image": "sha256:909976625c22b0f309218e876f5b974723fdec33f9bf13d28df29a6961430ac9",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "oab-factory-m4-2",
+                "com.docker.compose.project.config_files": "/Users/tester/PycharmProjects/open-agent-revamp/docker-compose.yml",
+                "com.docker.compose.project.environment_file": "/dev/null",
+                "com.docker.compose.project.working_dir": "/Users/tester/PycharmProjects/open-agent-revamp",
+                "com.docker.compose.service": "agent",
+                "com.docker.compose.version": "5.1.1",
+                "org.opencontainers.image.licenses": "MIT",
+                "org.opencontainers.image.revision": "4c22715",
+                "org.opencontainers.image.source": "https://github.com/Nit-1997/open-agent-bot",
+                "org.opencontainers.image.title": "Open Agent",
+                "org.opencontainers.image.version": "0.0.0-m42a"
+            },
+            "StopTimeout": 1
+        },
+        "NetworkSettings": {
+            "SandboxID": "8e1cddc3405a6b21eecb6a13593f7984eb7874a6243e0b5e8021ffb1fa5c71f0",
+            "SandboxKey": "/var/run/docker/netns/8e1cddc3405a",
+            "Ports": {
+                "3000/tcp": [
+                    {
+                        "HostIp": "127.0.0.1",
+                        "HostPort": "18451"
+                    }
+                ]
+            },
+            "Networks": {
+                "oab-factory-m4-2_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "oab-factory-m4-2-agent-1",
+                        "agent"
+                    ],
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "5b3c53f22fde47ea91ae51f7d0e521bc8eec6cb2be2fd233c57ef2268986de7e",
+                    "EndpointID": "1b91749c5493a3ea93077424807fd5f7911b3afc1fd6ba495b28e34130fb5442",
+                    "Gateway": "172.24.0.1",
+                    "IPAddress": "172.24.0.3",
+                    "MacAddress": "d2:c5:af:25:66:a0",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "oab-factory-m4-2-agent-1",
+                        "agent",
+                        "b064203361ee"
+                    ]
+                },
+                "oab-factory-m4-2_render": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "oab-factory-m4-2-agent-1",
+                        "agent"
+                    ],
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "f689b8bf6fe4872446f97964680e3a22c9b7f16fef5fc224a690cb30cd78be50",
+                    "EndpointID": "f25402493ef707d2f66563e3f63b4e5b8a135f6dd2660475dbfdadc3dac72fa7",
+                    "Gateway": "",
+                    "IPAddress": "172.22.0.2",
+                    "MacAddress": "52:85:01:51:4c:3c",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "oab-factory-m4-2-agent-1",
+                        "agent",
+                        "b064203361ee"
+                    ]
+                }
+            }
+        }
+    }
+]

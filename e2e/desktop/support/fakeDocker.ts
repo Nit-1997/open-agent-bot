@@ -1,5 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -61,4 +64,121 @@ export async function startRecorder(port: number, host = "127.0.0.1"): Promise<R
         server.close(() => res());
       }),
   };
+}
+
+export type FakeScenario = Record<string, unknown>;
+export type CallRecord = Readonly<{
+  argv: string[];
+  envNames: string[];
+  pid: number;
+  port?: number;
+  tokenFp?: string;
+  reset?: boolean;
+  images?: { agent?: string; search?: string };
+  exitCode?: number;
+  signal?: string;
+  phase?: string;
+}>;
+
+export type FakeDocker = Readonly<{
+  home: string;
+  bin: string;
+  scenario(patch: FakeScenario): void;
+  daemon(v: "up" | "down"): void;
+  calls(): CallRecord[];
+  composeCalls(): CallRecord[];
+  state(): {
+    containers: Record<string, Record<string, Record<string, unknown>>>;
+    images: Record<string, string>;
+    removedVolumes?: string[];
+  };
+  writeState(v: unknown): void;
+  cleanup(): Promise<void>;
+}>;
+
+const MUTATING = new Set(["up", "start", "stop", "down", "run", "exec", "rm", "pull", "create", "restart", "kill"]);
+
+export const subOf = (r: CallRecord) => {
+  if (r.argv[0] !== "compose") return r.argv[0];
+  const i = r.argv.indexOf("never");
+  return r.argv[i + 1];
+};
+export const isMutating = (r: CallRecord) =>
+  (r.argv[0] === "compose" && MUTATING.has(subOf(r) ?? "")) ||
+  ["pull", "volume", "run", "rm", "kill", "stop", "start"].includes(r.argv[0] ?? "");
+
+export async function createFakeDocker(label: string, scenario: FakeScenario = {}): Promise<FakeDocker> {
+  const home = mkdtempSync(join(tmpdir(), `oab-fd-${label}-`));
+  const bin = join(home, "bin");
+  mkdirSync(bin, { mode: 0o755 });
+  const docker = join(bin, "docker");
+  writeFileSync(
+    docker,
+    `#!${process.execPath}\nimport(${JSON.stringify(join(FAKE_DIR, "docker.mjs"))}).then((m) => m.main(${JSON.stringify(home)}, process.argv.slice(2)));\n`,
+    { mode: 0o755 },
+  );
+  writeFileSync(join(home, "scenario.json"), JSON.stringify(scenario));
+  const sock = createServer();
+  await new Promise<void>((res) => sock.listen(join(home, "d.sock"), () => res()));
+  const read = <T>(p: string, f: T): T => {
+    try {
+      return JSON.parse(readFileSync(p, "utf8")) as T;
+    } catch {
+      return f;
+    }
+  };
+  const calls = () =>
+    (existsSync(join(home, "calls.jsonl")) ? readFileSync(join(home, "calls.jsonl"), "utf8") : "")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as CallRecord)
+      .filter((r) => r.phase !== "start");
+  const self: FakeDocker = {
+    home,
+    bin: docker,
+    scenario: (patch) => writeFileSync(join(home, "scenario.json"), JSON.stringify({ ...read(join(home, "scenario.json"), {}), ...patch })),
+    daemon: (v) => writeFileSync(join(home, "daemon.txt"), v),
+    calls,
+    composeCalls: () => calls().filter((r) => r.argv[0] === "compose" && subOf(r) !== undefined),
+    state: () => ({ containers: {}, images: {}, ...read(join(home, "state.json"), {}) }),
+    writeState: (v) => writeFileSync(join(home, "state.json"), JSON.stringify(v)),
+    cleanup: async () => {
+      for (const project of Object.values(self.state().containers))
+        for (const c of Object.values(project)) {
+          const pid = c.pid as number | undefined;
+          if (pid)
+            try {
+              process.kill(pid, "SIGTERM");
+            } catch {}
+        }
+      await new Promise<void>((res) => sock.close(() => res()));
+      rmSync(home, { recursive: true, force: true });
+    },
+  };
+  return self;
+}
+
+export const ROOT = resolve(DESKTOP, "../..");
+export const composeSha = () =>
+  createHash("sha256")
+    .update(readFileSync(join(ROOT, "docker-compose.yml")))
+    .digest("hex");
+
+export function fakeServices(dir: string, o: { version?: string; pull?: boolean; agent?: string; search?: string } = {}): string {
+  const file = join(dir, "services.json");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      schema: 1,
+      kind: "dev",
+      version: o.version ?? "0.0.0-fake",
+      composeSha256: composeSha(),
+      images: {
+        agent: o.agent ?? `127.0.0.1:18467/oab-fake-agent@sha256:${"a".repeat(64)}`,
+        search: o.search ?? `127.0.0.1:18467/oab-fake-search@sha256:${"b".repeat(64)}`,
+      },
+      pull: o.pull ?? true,
+    }),
+  );
+  return file;
 }
