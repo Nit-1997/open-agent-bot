@@ -3,7 +3,7 @@ import { isPlanKind } from "@oab/shared/workspace";
 import type { ArtifactStore } from "../artifacts/store.js";
 import { FrameBus } from "../browser/frames.js";
 import type { BrowserPool } from "../browser/pool.js";
-import { type AgentConfig, hasCap } from "../config.js";
+import { type CoreConfig, hasCap } from "../config.js";
 import type { UserRepos } from "../store/types.js";
 import { Evidence } from "../grounding/evidence.js";
 import { type Judge, scopeJudge } from "../judge/index.js";
@@ -23,7 +23,7 @@ import { WorkspaceStore } from "../workspace/store.js";
 import { type CreateSession, sessionKey } from "./sessionStore.js";
 
 type SessionDeps = {
-  cfg: AgentConfig;
+  cfg: CoreConfig;
   hubs: UserHubs;
   repos: (userId: string) => UserRepos;
   artifacts: ArtifactStore;

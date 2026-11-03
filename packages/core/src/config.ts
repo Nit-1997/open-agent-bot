@@ -26,6 +26,19 @@ export type AgentConfig = {
   rendererSecret: string;
 };
 
+export type CoreConfig = Pick<
+  AgentConfig,
+  | "port"
+  | "searxngUrl"
+  | "jevModels"
+  | "jevConcurrency"
+  | "logLevel"
+  | "modelCaps"
+  | "runTimeLimitSeconds"
+  | "rendererUrl"
+  | "rendererSecret"
+>;
+
 type ModelCap = "codemode";
 
 export const JEV_MODELS = ["typesafe/jev-latest", "openrouter/typesafe/jev-1.14"];

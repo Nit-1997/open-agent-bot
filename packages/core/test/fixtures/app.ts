@@ -1,12 +1,13 @@
-import { createAccessService } from "../../src/hosted/access/service.js";
+import { type AccessService, createAccessService } from "../../src/hosted/access/service.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/hosted/admin/authAdmin.js";
 import { createAdminService } from "../../src/hosted/admin/service.js";
 import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
 import { createSupabaseIdentity } from "../../src/hosted/identity/supabaseIdentity.js";
+import { hostedRoutes } from "../../src/hosted/routes.js";
 import { type AppDeps, createApp } from "../../src/app.js";
 import { ArtifactStore, type Renderer } from "../../src/artifacts/store.js";
 import { UserStatusCache } from "../../src/hosted/identity/status.js";
-import { AuthError } from "../../src/hosted/identity/verify.js";
+import { AuthError, type Verifier } from "../../src/hosted/identity/verify.js";
 import { parseCredentialKeys } from "../../src/config.js";
 import { createGuards } from "../../src/identity/guards.js";
 import type { Principal } from "../../src/identity/types.js";
@@ -180,17 +181,33 @@ export class FakeAccounts {
 
 export type Harness = Awaited<ReturnType<typeof makeApp>>;
 
-export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; render?: Renderer; renderThumb?: Renderer } = {}) {
+export type IdentitySeams = {
+  verify?: Verifier;
+  statusOf?: (id: string) => Promise<UserStatus | undefined>;
+  isLiveAdmin?: (u: Principal) => Promise<boolean>;
+};
+
+export async function makeApp(
+  over: Partial<AppDeps> & {
+    fetch?: typeof fetch;
+    render?: Renderer;
+    renderThumb?: Renderer;
+    seams?: IdentitySeams;
+    access?: AccessService;
+  } = {},
+) {
   const db = new MemoryDb();
   const accounts = new FakeAccounts();
   for (const u of [ALICE, BOB, ADMIN]) accounts.add(u);
   const users = new Map([ALICE, BOB, ADMIN].map((u) => [tokenFor(u), u]));
-  const verify = async (token: string) => {
+  const fakeVerify = async (token: string) => {
     const u = users.get(token);
     if (!u) throw new AuthError("invalid_token");
     return verified(u);
   };
-  const status = new UserStatusCache((id) => accounts.repo().users.status(id));
+  const verify = over.seams?.verify ?? fakeVerify;
+  const status = new UserStatusCache(over.seams?.statusOf ?? ((id) => accounts.repo().users.status(id)));
+  const isLiveAdmin = over.seams?.isLiveAdmin ?? (async (u: Principal) => !!accounts.users.get(u.id)?.account.isAdmin);
   const identity = createSupabaseIdentity({ serviceSecret: TEST_SECRET, verify, status });
   const limiter = new RateLimiter();
   const repos = (id: string) => db.forUser(id);
@@ -236,11 +253,9 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
       return {};
     },
   });
+  const { access: accessOver, fetch: _fetch, render: _render, renderThumb: _thumb, seams: _seams, ...appOver } = over;
   const deps: AppDeps = {
-    guards: {
-      ...createGuards(identity),
-      requireAdmin: createAdminGuard({ identity, isLiveAdmin: async (u) => !!accounts.users.get(u.id)?.account.isAdmin }),
-    },
+    guards: createGuards(identity),
     limiter,
     gate: new ConcurrencyGate(RUN_CONCURRENCY),
     store,
@@ -260,9 +275,13 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
     logins,
     artifacts,
     onboarding: {},
-    access,
-    admin,
-    ...over,
+    mounts: hostedRoutes({
+      access: accessOver ?? access,
+      admin,
+      adminGuard: createAdminGuard({ isLiveAdmin }),
+      limiter: appOver.limiter ?? limiter,
+    }),
+    ...appOver,
   };
   const app = createApp(deps);
   const call = (user: Principal | null, path: string, init: RequestInit & { secret?: string | null } = {}) => {
@@ -277,5 +296,5 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
       },
     });
   };
-  return { app, call, db, accounts, status, hubs, logins, limiter, artifacts, deps, queue };
+  return { app, call, db, accounts, status, hubs, logins, limiter, artifacts, deps, queue, identity };
 }

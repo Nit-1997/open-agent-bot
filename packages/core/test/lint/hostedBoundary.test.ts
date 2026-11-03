@@ -91,12 +91,16 @@ describe("hosted boundary rules on fixture trees", () => {
     expect(boundaryViolations(tree)).toEqual([]);
   });
 
-  it("keeps B1 exceptions narrow and has no B3 exceptions", () => {
+  it("keeps B1 exceptions to the two entries and has no B3 exceptions", () => {
     expect(ENTRIES).toEqual(["server.ts", "scripts/rotateCredentials.ts"]);
-    expect(B1_EXCEPTIONS).toEqual([...ENTRIES, "app.ts"]);
+    expect(B1_EXCEPTIONS).toEqual(ENTRIES);
     expect(B3_EXCEPTIONS).toEqual([]);
     expect(boundaryViolations({ "app.ts": 'import { adminRoutes } from "./hosted/http/admin.js";\nimport "jose";\n' })).toEqual([
+      { rule: "B1", file: "app.ts", specifier: "./hosted/http/admin.js" },
       { rule: "B3", file: "app.ts", specifier: "jose" },
+    ]);
+    expect(boundaryViolations({ "startAgent.ts": 'import { hostedRoutes } from "./hosted/routes.js";\n' })).toEqual([
+      { rule: "B1", file: "startAgent.ts", specifier: "./hosted/routes.js" },
     ]);
   });
 });
@@ -112,9 +116,9 @@ describe("hosted boundary on src/", () => {
     expect(boundaryViolations(tree)).toEqual([]);
   });
 
-  it("still needs every temporary exception", () => {
+  it("needs no temporary exception", () => {
     const strict = boundaryViolations(tree, { b1: ENTRIES, b3: [] });
-    expect(new Set(strict.map((v) => `${v.rule} ${v.file}`))).toEqual(new Set(["B1 app.ts"]));
+    expect(strict).toEqual([]);
   });
 });
 
@@ -130,6 +134,8 @@ describe("Biome enforces B1, B3, B4 and B6", () => {
     ["src/lib/x.ts", 'import { UserError } from "@oab/core/lib/errors.js";\nexport default UserError;\n'],
     ["src/lib/x.ts", 'import x from "@oab/core";\nexport default x;\n'],
     ["src/auth/verify.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
+    ["src/app.ts", 'import { adminRoutes } from "./hosted/http/admin.js";\nexport default adminRoutes;\n'],
+    ["src/startAgent.ts", 'import { hostedRoutes } from "./hosted/routes.js";\nexport default hostedRoutes;\n'],
   ];
 
   const lintAllowed: Array<[string, string]> = [
@@ -137,7 +143,6 @@ describe("Biome enforces B1, B3, B4 and B6", () => {
     ["src/hosted/store/client.ts", 'import { createClient } from "@supabase/supabase-js";\nexport default createClient;\n'],
     ["src/server.ts", 'import "./hosted/main.js";\n'],
     ["src/scripts/rotateCredentials.ts", 'import { rotateStale } from "../hosted/secrets/rotate.js";\nexport default rotateStale;\n'],
-    ["src/app.ts", 'import { adminRoutes } from "./hosted/http/admin.js";\nexport default adminRoutes;\n'],
     ["src/hosted/identity/verify.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
     ["src/http/chats.ts", 'import type { UserRepos } from "../store/types.js";\nexport type R = UserRepos;\n'],
   ];

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
+import { createGuards } from "../../src/identity/guards.js";
 import type { AuthEnv, AuthOutcome, Identity, Principal } from "../../src/identity/types.js";
 import { UserError } from "../../src/lib/errors.js";
 
@@ -8,19 +9,20 @@ const ADMIN: Principal = { id: "33333333-3333-4333-8333-333333333333", email: "a
 const USER: Principal = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test", isAdmin: false };
 
 function harness(outcome: AuthOutcome, isLiveAdmin: (p: Principal) => Promise<boolean> = async () => true) {
-  const identity: Identity = { kind: "hosted", admitCaller: () => undefined, authenticate: vi.fn(async () => outcome) };
+  const authenticate = vi.fn(async () => outcome);
+  const identity: Identity = { kind: "hosted", admitCaller: () => undefined, authenticate };
   const live = vi.fn(isLiveAdmin);
   const handler = vi.fn();
   const app = new Hono<AuthEnv>();
-  app.use("/admin/*", createAdminGuard({ identity, isLiveAdmin: live }));
+  app.use("/admin/*", createGuards(identity).requireUser, createAdminGuard({ isLiveAdmin: live }));
   app.get("/admin/users", (c) => {
     handler(c.get("user"));
     return c.json({ ok: true });
   });
-  return { call: () => app.request("/admin/users"), live, handler };
+  return { call: () => app.request("/admin/users"), live, handler, authenticate };
 }
 
-describe("createAdminGuard", () => {
+describe("createAdminGuard behind the core requireUser", () => {
   it("lets a live admin through with the principal on the context", async () => {
     const { call, live, handler } = harness({ ok: true, principal: ADMIN });
     expect((await call()).status).toBe(200);
@@ -57,6 +59,22 @@ describe("createAdminGuard", () => {
     const res = await call();
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "signed_out", message: "You were signed out. Sign in again." });
+    expect(live).not.toHaveBeenCalled();
+  });
+
+  it("never authenticates on its own", async () => {
+    const { call, authenticate } = harness({ ok: true, principal: ADMIN });
+    expect((await call()).status).toBe(200);
+    expect(authenticate).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers 404 when no principal reached it", async () => {
+    const live = vi.fn(async () => true);
+    const app = new Hono<AuthEnv>();
+    app.get("/admin/users", createAdminGuard({ isLiveAdmin: live }), (c) => c.json({ ok: true }));
+    const res = await app.request("/admin/users");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found", message: "Not found." });
     expect(live).not.toHaveBeenCalled();
   });
 });

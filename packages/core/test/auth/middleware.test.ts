@@ -24,12 +24,12 @@ function app(
   });
   const guards = {
     ...createGuards(identity),
-    requireAdmin: createAdminGuard({ identity, isLiveAdmin: async () => opts.liveAdmin ?? true }),
+    requireAdmin: createAdminGuard({ isLiveAdmin: async () => opts.liveAdmin ?? true }),
   };
   const a = new Hono<AuthEnv>();
   a.use("*", guards.requireService);
   a.get("/user", guards.requireUser, (c) => c.json({ id: c.get("user").id }));
-  a.get("/admin", guards.requireAdmin, (c) => c.json({ ok: true }));
+  a.get("/admin", guards.requireUser, guards.requireAdmin, (c) => c.json({ ok: true }));
   const call = (path: string, headers: Record<string, string> = {}) =>
     a.request(path, { headers: { "x-agent-secret": TEST_SECRET, authorization: "Bearer tok.en.x", ...headers } });
   return { call, verify };

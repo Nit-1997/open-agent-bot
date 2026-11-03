@@ -48,7 +48,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts", "!src/app.ts"],
+      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts"],
       "linter": {
         "rules": {
           "style": {
