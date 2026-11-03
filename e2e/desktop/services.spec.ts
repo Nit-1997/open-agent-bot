@@ -29,7 +29,7 @@ const setup = async (scenario: FakeScenario = {}, video = "services") => {
     project: PROJECT,
     portRange: RANGE,
     docker: fake.bin,
-    services: fakeServices(stateDir),
+    services: fakeServices(stateDir, { version: "0.0.0-m43a" }),
     externalLog: join(stateDir, "external.log"),
     savePath: join(stateDir, "saved.out"),
   };
@@ -78,7 +78,7 @@ test("the account menu item opens Services & data: status, versions from labels,
   await expect(page.locator("#screen-services-data-reports-value")).toHaveText("2");
   await expect(page.locator("#screen-services-telemetry")).toHaveText("Telemetry: none");
   await expect(page.locator("#screen-services-update")).toBeDisabled();
-  await expect(page.locator("#screen-services-update")).toHaveText("Up to date (0.0.0-fake)");
+  await expect(page.locator("#screen-services-update")).toHaveText("Up to date (0.0.0-m43a)");
   await everyElementHasUniqueId(page);
   const stats = fake.calls().find((c) => c.argv[0] === "run");
   expect(stats?.argv.join(" ")).toMatch(

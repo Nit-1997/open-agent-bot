@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -72,9 +73,7 @@ describe("zipStream", () => {
     const { out, bytes } = collect();
     const zip = createZipWriter(out, { now: NOW, limits: { maxBytes: 4096 } });
     await zip.addBuffer("a", Buffer.from("small"));
-    await expect(zip.addStream("b", Readable.from([Buffer.from(Math.random().toString(36).repeat(4000))]))).rejects.toBeInstanceOf(
-      ZipTooLargeError,
-    );
+    await expect(zip.addStream("b", Readable.from([randomBytes(20_000)]))).rejects.toBeInstanceOf(ZipTooLargeError);
     await expect(zip.finish()).rejects.toBeInstanceOf(ZipTooLargeError);
     expect(() => readZip(bytes())).toThrow(/no end of central directory/);
   });

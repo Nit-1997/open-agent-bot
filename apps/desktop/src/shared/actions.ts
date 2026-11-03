@@ -54,6 +54,13 @@ export type PullRow = Readonly<{
   done: boolean;
 }>;
 export type ServiceRow = Readonly<{ service: string; state: string; health: string }>;
+export type ServiceInfoRow = Readonly<{ service: string; label: string; state: string; version: string }>;
+export type ServicesInfo = Readonly<{
+  rows: readonly ServiceInfoRow[];
+  data?: Readonly<{ volume: string; dbBytes: number; reports: number; chats: number }>;
+  dataProblem?: string;
+}>;
+export type Notice = Readonly<{ tone: "info" | "error"; text: string }>;
 export type EngineInfo = Readonly<{
   cli: string;
   context: string;
@@ -96,12 +103,14 @@ export type ShellState = Readonly<{
   stopping?: Readonly<{ what: string }>;
   stopped?: Readonly<{ reason: string; exitCode?: number; tail?: string }>;
   logs?: Readonly<{ text: string }>;
-  confirm?: Readonly<{ count?: number; dataVolume: string; keysVolume: string }>;
+  confirm?: Readonly<{ count?: number; dataVolume: string; keysVolume: string; noExport?: boolean }>;
   pendingDelete?: Readonly<{
     stored: Readonly<{ project: string; dataVolume: string; keysVolume: string }>;
     current: Readonly<{ project: string; dataVolume: string; keysVolume: string }>;
   }>;
   settings?: Readonly<{ stopOnQuit: boolean; checkForUpdates: boolean }>;
+  servicesInfo?: ServicesInfo;
+  notice?: Notice;
 }>;
 
 export type ShellBridge = Readonly<{

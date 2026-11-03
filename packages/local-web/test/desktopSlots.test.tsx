@@ -51,7 +51,7 @@ describe("the account menu with the desktop bridge", { timeout: 20000 }, () => {
     expect(button?.getAttribute("role")).toBe("menuitem");
     expect(button?.textContent).toBe("Services & data");
     expect(document.getElementById("account-menu-services-icon")?.tagName.toLowerCase()).toBe("svg");
-    expectUniqueIds(document.body);
+    expectUniqueIds(items);
     for (const el of button?.querySelectorAll("*") ?? []) expect(el.id, el.outerHTML).not.toBe("");
     await act(async () => {
       fireEvent.click(button!);

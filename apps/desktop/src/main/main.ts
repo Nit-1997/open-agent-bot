@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, statfsSync } from "node:fs";
 import { join } from "node:path";
 import { app, dialog, Menu, protocol, session, shell } from "electron";
 import { createCompose } from "./compose.ts";
@@ -15,6 +15,7 @@ import { needsMovePrompt } from "./moveToApplications.ts";
 import { APP_PARTITION, hardenSession, hardenWebContents } from "./permissions.ts";
 import { createPortPicker } from "./portPicker.ts";
 import { registerShellProtocol } from "./screens.ts";
+import type { SavePath } from "./servicesData.ts";
 import { effectivePins, validatePins } from "./services.ts";
 import { createSettingsStore } from "./settings.ts";
 import { loadShellConfig, type ShellConfig, ShellConfigError, windowTitle } from "./shellConfig.ts";
@@ -114,6 +115,21 @@ function start(cfg: ShellConfig): void {
 
   const appSessionRef = () => session.fromPartition(APP_PARTITION);
 
+  const savePath: SavePath = async ({ defaultName, message }) => {
+    if (cfg.test) return cfg.savePath;
+    const options = {
+      defaultPath: join(app.getPath("downloads"), defaultName),
+      message,
+      properties: ["createDirectory", "showOverwriteConfirmation"] as ("createDirectory" | "showOverwriteConfirmation")[],
+    };
+    const r = main ? await dialog.showSaveDialog(main.window, options) : await dialog.showSaveDialog(options);
+    return r.canceled || !r.filePath ? undefined : r.filePath;
+  };
+  const freeBytes = (dir: string) => {
+    const st = statfsSync(dir);
+    return st.bavail * st.bsize;
+  };
+
   manager = createStackManager({
     cfg,
     paths,
@@ -175,12 +191,15 @@ function start(cfg: ShellConfig): void {
       app.relaunch();
       app.exit(0);
     },
+    savePath,
+    freeBytes,
   });
   const mgr = manager;
 
   mgr.on((s) => {
     main?.sendState(s);
     if (s.screen !== "app") main?.showShell();
+    else if (appPort !== undefined) main?.revealApp();
     try {
       writeStatus(s, s.servicesVersion);
     } catch (e) {
@@ -223,7 +242,10 @@ function start(cfg: ShellConfig): void {
     const menuHandlers = {
       packaged: app.isPackaged,
       appName: APP_NAME,
-      onServices: () => log.info("[menu] services"),
+      onServices: () => {
+        log.info("[menu] services");
+        mgr.openServices();
+      },
       onCheckUpdates: () => log.info("[menu] check-updates"),
       onReloadApp: () => main?.reloadApp(),
       onOpenLink: (link: keyof typeof LINKS) => openExternal(LINKS[link]),
@@ -249,7 +271,10 @@ function start(cfg: ShellConfig): void {
         }
         return mgr.act(a);
       },
-      onOpenServices: () => log.info("[app] open-services"),
+      onOpenServices: () => {
+        log.info("[app] open-services");
+        mgr.openServices();
+      },
       onMismatchHint: () => mgr.launchMismatch(),
       onUiCrashed: () => mgr.uiCrashed(),
     });

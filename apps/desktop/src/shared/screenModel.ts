@@ -1,4 +1,6 @@
 import type { PullRow, ShellAction, ShellState } from "./actions.ts";
+import { servicesModel } from "./servicesModel.ts";
+import { EXPORT_WORDING } from "./wording.ts";
 
 export type StepState = "pending" | "active" | "done" | "failed";
 export type Step = Readonly<{
@@ -14,8 +16,25 @@ export type Block =
   | Readonly<{ kind: "list"; key: string; items: readonly Readonly<{ key: string; text: string }>[] }>
   | Readonly<{ kind: "steps"; key: string; steps: readonly Step[] }>
   | Readonly<{ kind: "rows"; key: string; rows: readonly Readonly<{ key: string; label: string; value: string }>[] }>
-  | Readonly<{ kind: "input"; key: string; label: string; expect: string }>;
-export type Button = Readonly<{ key: string; label: string; action: ShellAction; tone?: "primary" | "danger"; needsInput?: string }>;
+  | Readonly<{ kind: "input"; key: string; label: string; expect: string }>
+  | Readonly<{
+      kind: "table";
+      key: string;
+      columns: readonly Readonly<{ key: string; label: string }>[];
+      rows: readonly Readonly<{ key: string; cells: Readonly<Record<string, string>> }>[];
+    }>
+  | Readonly<{ kind: "toggle"; key: string; label: string; checked: boolean; setting: "stopOnQuit" }>
+  | Readonly<{ kind: "port"; key: string; label: string; value?: number; warning: string }>
+  | Readonly<{ kind: "logs"; key: string; text: string }>;
+export type Button = Readonly<{
+  key: string;
+  label: string;
+  action: ShellAction;
+  tone?: "primary" | "danger";
+  needsInput?: string;
+  disabled?: boolean;
+  confirm?: string;
+}>;
 export type ScreenModel = Readonly<{ id: string; title: string; badge?: string; blocks: readonly Block[]; buttons: readonly Button[] }>;
 
 const GB = 1024 ** 3;
@@ -60,6 +79,7 @@ const RESTART = btn("restart", "Restart services", { type: "restartServices" }, 
 const QUIT = btn("quit", "Quit", { type: "quit" });
 const RETRY = btn("retry", "Retry", { type: "retry" }, "primary");
 const DELETE = btn("delete", "Delete all data…", { type: "confirmDelete" }, "danger");
+const EXPORT = btn("export", "Export data", { type: "exportData" });
 const STARTUP_ERRORS = btn("startup-errors", "Startup errors", { type: "openLink", link: "startup-errors" });
 
 function progressModel(s: ShellState): ScreenModel {
@@ -120,7 +140,7 @@ function refusalModel(s: ShellState): ScreenModel {
   let buttons: Button[];
   switch (r.code) {
     case "config":
-      buttons = [RESTART, LOGS, STARTUP_ERRORS];
+      buttons = [RESTART, LOGS, STARTUP_ERRORS, EXPORT];
       break;
     case "db_corrupt":
       blocks.push({
@@ -132,10 +152,10 @@ function refusalModel(s: ShellState): ScreenModel {
       buttons = [DELETE, LOGS];
       break;
     case "db_newer":
-      buttons = [btn("latest", "Get the latest version", { type: "openLink", link: "release-page" }, "primary")];
+      buttons = [btn("latest", "Get the latest version", { type: "openLink", link: "release-page" }, "primary"), EXPORT];
       break;
     case "db_migration":
-      buttons = [RESTART, LOGS];
+      buttons = [RESTART, EXPORT, LOGS];
       break;
     case "kek_missing":
       blocks.unshift({
@@ -143,14 +163,14 @@ function refusalModel(s: ShellState): ScreenModel {
         key: "count",
         text: `${r.count ?? "Some"} saved model key${r.count === 1 ? "" : "s"} can't be unlocked because the key file is gone.`,
       });
-      buttons = [btn("reset", "Reset saved model keys…", { type: "confirmReset" }, "danger"), LOGS];
+      buttons = [btn("reset", "Reset saved model keys…", { type: "confirmReset" }, "danger"), EXPORT, LOGS];
       break;
     case "keyfile_invalid":
-      buttons = [LOGS, STARTUP_ERRORS, DELETE];
+      buttons = [LOGS, STARTUP_ERRORS, EXPORT, DELETE];
       break;
     case "ui_missing":
     case "identity":
-      buttons = [btn("update", "Re-download services", { type: "updateServices" }, "primary"), LOGS];
+      buttons = [btn("update", "Re-download services", { type: "updateServices" }, "primary"), EXPORT, LOGS];
       break;
     case "listen":
       buttons = [btn("pick-port", "Pick another port", { type: "pickAnotherPort" }, "primary"), LOGS];
@@ -179,6 +199,7 @@ const FAILURE_TEXT: Readonly<Record<string, string>> = {
   inspect_failed: "Docker didn't answer",
   not_linux: "This Docker engine can't run Linux containers",
   delete_failed: "Deleting your data failed",
+  export_invalid: "The export didn't pass its checks and was deleted",
 };
 
 function failureModel(s: ShellState): ScreenModel {
@@ -235,6 +256,13 @@ function failureModel(s: ShellState): ScreenModel {
 const SEARCHED_NOTE = "Docker Desktop is free for personal use and small businesses; OrbStack and Colima are alternatives.";
 
 export function screenModel(s: ShellState): ScreenModel {
+  const m = baseModel(s);
+  if (!s.notice) return m;
+  const notice: Block = { kind: "p", key: "notice", text: s.notice.text, ...(s.notice.tone === "error" ? { tone: "warn" as const } : {}) };
+  return { ...m, blocks: [...m.blocks, notice] };
+}
+
+function baseModel(s: ShellState): ScreenModel {
   switch (s.screen) {
     case "app":
     case "screen-progress":
@@ -411,9 +439,23 @@ export function screenModel(s: ShellState): ScreenModel {
             key: "what",
             text: `This permanently deletes all chats, reports, your profile and saved model keys (volumes ${s.confirm?.dataVolume ?? "?"}, ${s.confirm?.keysVolume ?? "?"}).`,
           },
+          s.confirm?.noExport
+            ? {
+                kind: "p",
+                key: "export-note",
+                tone: "muted",
+                text: "Export isn't available for a damaged database in this version.",
+              }
+            : {
+                kind: "p",
+                key: "export-note",
+                tone: "muted",
+                text: `Export your chats and reports first if you want to keep them. ${EXPORT_WORDING}`,
+              },
           { kind: "input", key: "type", label: "Type delete to confirm", expect: "delete" },
         ],
         buttons: [
+          ...(s.confirm?.noExport ? [] : [btn("export", "Export first (.zip)", { type: "exportData" })]),
           { ...btn("confirm", "Delete all data", { type: "deleteData", confirm: "delete" }, "danger"), needsInput: "delete" },
           btn("cancel", "Cancel", { type: "back" }),
         ],
@@ -465,12 +507,18 @@ export function screenModel(s: ShellState): ScreenModel {
           btn("keep", "Keep it here", { type: "keepHere" }),
         ],
       };
+    case "screen-services":
+      return servicesModel(s);
     case "screen-logs":
       return {
         id: s.screen,
         title: "Service logs",
-        blocks: [{ kind: "pre", key: "text", text: s.logs?.text ?? "" }],
-        buttons: [btn("refresh", "Refresh", { type: "showLogs" }), btn("back", "Back", { type: "back" }, "primary")],
+        blocks: [{ kind: "logs", key: "text", text: s.logs?.text ?? "" }],
+        buttons: [
+          btn("refresh", "Refresh", { type: "showLogs" }),
+          btn("save", "Save logs…", { type: "saveLogs" }),
+          btn("back", "Back", { type: "back" }, "primary"),
+        ],
       };
     default:
       if (s.screen.startsWith("screen-refusal-")) return refusalModel(s);
