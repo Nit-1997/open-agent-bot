@@ -1,6 +1,6 @@
 import { emptyProfile, type Profile } from "@oab/shared/profile";
 import type { Platform } from "@oab/ui/platform";
-import { act, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 export { nav } from "./navigation";
 import { vi } from "vitest";
@@ -31,5 +31,3 @@ export function renderShell(ui: ReactNode, opts: { profile?: Profile; save?: (p:
   const utils = render(wrap(ui));
   return { ...utils, rerender: (next: ReactNode) => utils.rerender(wrap(next)), save };
 }
-
-export const flush = () => act(async () => {});

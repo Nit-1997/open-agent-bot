@@ -92,12 +92,11 @@ supabase/
   migrations/          SQL applied in order with the Supabase MCP (file name = recorded version)
   scripts/             configure-auth (auth config as code), bootstrap-admin, dev-link, cleanup-e2e
   templates/           invite and magic-link email templates
-web/
-  proxy.ts             session refresh, route rules and the nonce CSP on every request
-  app/                 login, request-access, auth confirm/callback/signout, admin
-  app/(app)/           the shell routes: /, /chats, /chats/[id], /reports, /reports/[id],
-                       /search; one layout keeps the shell and chats mounted
-  app/api/             thin proxies to the agent with the user's token (lib/agentServer.ts)
+packages/ui/src/        the @oab/ui package: the chat UI with no Next, Supabase or cloud imports; consumed
+                       as TypeScript source (`@oab/ui/platform`, `@oab/ui/components/<path>.tsx`,
+                       `@oab/ui/lib/<path>.ts`, `@oab/ui/views/<path>.tsx`, `@oab/ui/styles/<file>.css`)
+  platform/            PlatformProvider (router, Link, history, user, cloud slots), the API client
+                       (api.ts), historyRouter/memoryRouter, ChatRuntime (CopilotKit provider)
   components/shell/    app shell: rail, sidebar, phone top bar, tabs and drawer, account menu and sheet,
                        overlays (focus trap, Escape, inert background), ShellProvider (chat controller)
   components/agent/    the agent's orb, name, look and tone pickers
@@ -108,6 +107,18 @@ web/
                        profile drawer, model management
   lib/                 pure helpers (turn building, sources, onboarding, persona), profile client,
                        API clients, lib/shell/ (breakpoints, chat controller, sidebar preference)
+  views/RouteView.tsx  a Route from @oab/shared/routes → its section view
+  styles/              theme.css (tokens, base layer, utilities) and fonts.css (self-hosted fonts)
+web/
+  proxy.ts             session refresh, route rules and the nonce CSP on every request
+  app/                 login, request-access, auth confirm/callback/signout, admin
+  app/(app)/           the shell routes: /, /chats, /chats/[id], /reports, /reports/[id],
+                       /search; each validates its params and renders RouteView; one layout keeps
+                       the shell and chats mounted
+  app/api/             one-line adapters to the @oab/bff handler (lib/bff.ts)
+  app/globals.css      imports tailwindcss and @oab/ui's styles; `@source` scans packages/ui/src
+  components/          cloud-only UI: admin, landing, auth, session (the hosted platform slots)
+  lib/                 hosted platform (platform/hosted.tsx), Supabase auth, route rules, CSP, env
 e2e/                   Playwright demo and preview checks against a preview stack (see README "End-to-end demo")
 ```
 

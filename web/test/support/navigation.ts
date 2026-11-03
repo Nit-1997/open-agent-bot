@@ -40,31 +40,3 @@ export const navigationMock = () => {
     },
   };
 };
-
-export function syncHistory(): { visit(path: string): void; restore(): void } {
-  const replace = window.history.replaceState.bind(window.history);
-  const push = window.history.pushState.bind(window.history);
-  const here = () => `${window.location.pathname}${window.location.search}`;
-  const onPop = () => nav.go(here());
-  const replaceSpy = vi.spyOn(window.history, "replaceState").mockImplementation((data, unused, url) => {
-    replace(data, unused, url);
-    nav.go(here());
-  });
-  const pushSpy = vi.spyOn(window.history, "pushState").mockImplementation((data, unused, url) => {
-    push(data, unused, url);
-    nav.go(here());
-  });
-  window.addEventListener("popstate", onPop);
-  return {
-    visit(path: string) {
-      replace(null, "", path);
-      nav.go(path);
-    },
-    restore() {
-      window.removeEventListener("popstate", onPop);
-      replaceSpy.mockRestore();
-      pushSpy.mockRestore();
-      replace(null, "", "/");
-    },
-  };
-}
