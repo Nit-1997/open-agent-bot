@@ -1,4 +1,4 @@
-import { emptyProfile, type Profile } from "@shared/profile";
+import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { readApi } from "@/lib/api";
 

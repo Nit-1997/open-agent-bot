@@ -1,4 +1,4 @@
-import { emptyProfile, type Profile } from "@shared/profile";
+import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { groupByDate, groupItems } from "@/lib/dateGroups";
 import { isolate, knowsSummary, rememberLine } from "@/lib/persona";

@@ -1,4 +1,4 @@
-import { ARTIFACT_CSP, ARTIFACT_ID_RE } from "@shared/artifacts";
+import { ARTIFACT_CSP, ARTIFACT_ID_RE } from "@oab/shared/artifacts";
 import { agentFetch, authFailure, jsonError, unreachableUnlessMisconfigured } from "@/lib/agentServer";
 import { artifactErrorPage, type Format, formatOf, isFramedReport } from "@/lib/artifactFrame";
 import { type AgentAuth, getAgentAuth } from "@/lib/auth";

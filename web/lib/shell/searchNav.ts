@@ -1,4 +1,4 @@
-import { SEARCH_MAX, type SearchScope } from "@shared/lists";
+import { SEARCH_MAX, type SearchScope } from "@oab/shared/lists";
 
 export function searchHref(raw: string, scope: SearchScope = "all", page = 1): string {
   const params = new URLSearchParams();

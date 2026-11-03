@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { authInput, authPrimary } from "@/components/auth/AuthCard";
-import { EMAIL_MAX } from "@shared/email";
+import { EMAIL_MAX } from "@oab/shared/email";
 import { type AccessRequestState, NAME_MAX, NOTE_MAX } from "@/lib/authForms";
 import { submitAccessRequest } from "./actions";
 

@@ -1,5 +1,5 @@
 import { type BaseEvent, EventType } from "@ag-ui/core";
-import { type MessagePart, SAVED_TOOLS } from "../../../shared/chats.js";
+import { type MessagePart, SAVED_TOOLS } from "@oab/shared/chats";
 
 export const PART_RESULT_CHARS = 2000;
 export const PARTS_CHARS = 500_000;

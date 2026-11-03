@@ -1,5 +1,5 @@
-import { validateWidget } from "@shared/widgets";
-import type { CartEdits, PlanEdits } from "@shared/workspace";
+import { validateWidget } from "@oab/shared/widgets";
+import type { CartEdits, PlanEdits } from "@oab/shared/workspace";
 import { AskCard } from "./AskCard";
 import { CartCard } from "./CartCard";
 import { FlightList } from "./FlightList";

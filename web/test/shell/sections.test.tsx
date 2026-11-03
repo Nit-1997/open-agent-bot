@@ -6,7 +6,7 @@ import { ReportDetail } from "@/components/reports/ReportDetail";
 import { ReportsView } from "@/components/reports/ReportsView";
 import { highlightParts } from "@/components/search/Highlight";
 import { SearchView } from "@/components/search/SearchView";
-import { DEFAULT_AGENT } from "@shared/profile";
+import { DEFAULT_AGENT } from "@oab/shared/profile";
 import { expectUniqueIds } from "../support/ids";
 import { mockViewport } from "../support/media";
 import { nav } from "../support/navigation";

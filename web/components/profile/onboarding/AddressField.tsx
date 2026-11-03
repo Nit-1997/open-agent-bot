@@ -1,7 +1,7 @@
 "use client";
 
-import type { Place } from "@shared/onboarding";
-import type { Home } from "@shared/profile";
+import type { Place } from "@oab/shared/onboarding";
+import type { Home } from "@oab/shared/profile";
 import { MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { homeFromPlace } from "@/lib/onboarding";

@@ -3,7 +3,7 @@
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { isSearchScope, SEARCH_MAX } from "@shared/lists";
+import { isSearchScope, SEARCH_MAX } from "@oab/shared/lists";
 import { SEARCH_DEBOUNCE_MS, searchHref } from "@/lib/shell/searchNav";
 
 export function useSearchField() {

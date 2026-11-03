@@ -1,7 +1,7 @@
 "use client";
 
 import { SignOutForm } from "@/components/auth/SignOutForm";
-import type { Profile } from "@shared/profile";
+import type { Profile } from "@oab/shared/profile";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { AgentSection } from "@/components/agent/AgentSection";

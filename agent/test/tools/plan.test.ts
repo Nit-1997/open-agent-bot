@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyPatch } from "../../../shared/workspace.js";
+import { applyPatch } from "@oab/shared/workspace";
 import { planTool } from "../../src/tools/plan.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { UiBlock, UiWidget } from "@shared/widgets";
+import type { UiBlock, UiWidget } from "@oab/shared/widgets";
 import { useState } from "react";
 import { ExternalLink } from "./ExternalLink";
 import { CardRow, ImageBlock } from "./CardRow";

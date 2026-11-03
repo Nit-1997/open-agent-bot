@@ -1,7 +1,7 @@
 "use client";
 
-import type { UiBlock } from "@shared/widgets";
-import { safeHttpUrl } from "@shared/workspace";
+import type { UiBlock } from "@oab/shared/widgets";
+import { safeHttpUrl } from "@oab/shared/workspace";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink } from "./ExternalLink";
 

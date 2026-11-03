@@ -1,5 +1,5 @@
-import { isSearchScope } from "@shared/lists";
-import { parsePage } from "@shared/pages";
+import { isSearchScope } from "@oab/shared/lists";
+import { parsePage } from "@oab/shared/pages";
 import { SearchView } from "@/components/search/SearchView";
 
 type Search = Promise<{ q?: string | string[]; scope?: string | string[]; page?: string | string[] }>;

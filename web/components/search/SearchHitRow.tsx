@@ -1,4 +1,4 @@
-import type { SearchHit } from "@shared/lists";
+import type { SearchHit } from "@oab/shared/lists";
 import { FileText, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { UNTITLED } from "@/components/chat/ChatHeader";

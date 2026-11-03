@@ -13,7 +13,7 @@ import {
 } from "../../src/agui/runHandler.js";
 import { UserError } from "../../src/lib/errors.js";
 import { MemoryProfileStore } from "../../src/profile/store.js";
-import { type AgentPersona, DEFAULT_AGENT, emptyProfile } from "../../../shared/profile.js";
+import { type AgentPersona, DEFAULT_AGENT, emptyProfile } from "@oab/shared/profile";
 import { FrameBus } from "../../src/browser/frames.js";
 import { ActiveCart } from "../../src/shop/cart.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";

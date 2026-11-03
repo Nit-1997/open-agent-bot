@@ -1,6 +1,6 @@
 "use server";
 
-import { normalizeEmail } from "@shared/email";
+import { normalizeEmail } from "@oab/shared/email";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { agentFetch } from "@/lib/agentServer";

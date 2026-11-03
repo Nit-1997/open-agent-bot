@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_AGENT } from "../../../shared/profile.js";
+import { DEFAULT_AGENT } from "@oab/shared/profile";
 import { defaultModelRef, joinNotes, pickModel, sessionFactory } from "../../src/session/createSession.js";
 import { WorkspaceStore } from "../../src/workspace/store.js";
 import { testConfig } from "../fixtures/config.js";

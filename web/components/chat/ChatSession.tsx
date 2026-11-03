@@ -2,7 +2,7 @@
 
 import { EventType } from "@ag-ui/client";
 import { useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
-import type { AgentPersona } from "@shared/profile";
+import type { AgentPersona } from "@oab/shared/profile";
 import { ArrowDown } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -14,7 +14,7 @@ import { parseArtifactId, REPORT_TOOLS, type ReportRef, reportsIn, reportTitleIn
 import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
-import type { CartEdits, PlanEdits, WorkspaceEdits } from "@shared/workspace";
+import type { CartEdits, PlanEdits, WorkspaceEdits } from "@oab/shared/workspace";
 import { withCartEdits, withPlanEdits, workspaceContextValue } from "@/lib/workspaceEdits";
 import { useAgentMessages } from "@/lib/useAgentMessages";
 import { threadAgentId, useThreadContext } from "@/lib/useThreadContext";

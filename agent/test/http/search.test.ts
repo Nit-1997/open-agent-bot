@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { SearchResponse } from "../../../shared/lists.js";
+import type { SearchResponse } from "@oab/shared/lists";
 import { UserError } from "../../src/lib/errors.js";
 import { LIMITS } from "../../src/lib/rateLimit.js";
 import { makeApp } from "../fixtures/app.js";

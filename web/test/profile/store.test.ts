@@ -1,4 +1,4 @@
-import { emptyProfile } from "@shared/profile";
+import { emptyProfile } from "@oab/shared/profile";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearedProfile, initials, loadProfile, resetProfileStore, saveProfile } from "@/lib/profile";
 

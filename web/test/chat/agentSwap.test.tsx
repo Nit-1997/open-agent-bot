@@ -1,5 +1,5 @@
 import { AbstractAgent, type BaseEvent } from "@ag-ui/client";
-import { agentPersona } from "@shared/profile";
+import { agentPersona } from "@oab/shared/profile";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, useReducer, useState } from "react";
 import { EMPTY, type Observable } from "rxjs";

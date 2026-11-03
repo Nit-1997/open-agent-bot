@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateWidget } from "../../../shared/widgets.js";
+import { validateWidget } from "@oab/shared/widgets";
 import { showUiTool } from "../../src/tools/showWidget.js";
 import { validWidgets } from "../fixtures/widgets.js";
 

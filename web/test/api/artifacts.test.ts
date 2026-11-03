@@ -1,4 +1,4 @@
-import { ARTIFACT_CSP } from "@shared/artifacts";
+import { ARTIFACT_CSP } from "@oab/shared/artifacts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/artifacts/[id]/route";
 import { AUTH, headersOf, SERVICE_SECRET, stubAgentEnv } from "../support/agentEnv";

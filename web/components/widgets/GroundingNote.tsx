@@ -1,4 +1,4 @@
-import type { GroundingNote as GroundingNoteData } from "@shared/widgets";
+import type { GroundingNote as GroundingNoteData } from "@oab/shared/widgets";
 import { widgetId } from "./widgetId";
 
 export function GroundingNote({ toolCallId, idPrefix, widget }: { toolCallId: string; idPrefix?: string; widget: GroundingNoteData }) {

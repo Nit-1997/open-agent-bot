@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
+import { ARTIFACT_ID_RE } from "@oab/shared/artifacts";
 import type { UserRepos } from "../db/types.js";
 import { createLimiter, type Limiter } from "../lib/concurrency.js";
 import { UserError } from "../lib/errors.js";

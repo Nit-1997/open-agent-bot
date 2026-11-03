@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agentPersona, checkAgentName, DEFAULT_AGENT, emptyProfile, parseProfile, withoutInvalidAgent } from "../../../shared/profile.js";
+import { agentPersona, checkAgentName, DEFAULT_AGENT, emptyProfile, parseProfile, withoutInvalidAgent } from "@oab/shared/profile";
 
 describe("parseProfile", () => {
   it("fills missing sections so a partial profile is still valid", () => {

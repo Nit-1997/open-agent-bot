@@ -1,4 +1,4 @@
-import type { Place } from "../../../shared/onboarding.js";
+import type { Place } from "@oab/shared/onboarding";
 
 const PHOTON = "https://photon.komoot.io/api/";
 const LIMIT = 5;

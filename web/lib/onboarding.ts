@@ -8,9 +8,9 @@ import {
   type Place,
   SHOPPING_STYLES,
   TRAVEL_STYLES,
-} from "@shared/onboarding";
-import { agentPersona, type Home, type Profile, type Section } from "@shared/profile";
-import { TAG_MAX } from "@shared/profile";
+} from "@oab/shared/onboarding";
+import { agentPersona, type Home, type Profile, type Section } from "@oab/shared/profile";
+import { TAG_MAX } from "@oab/shared/profile";
 
 export type SlideId = "agent" | "model" | "you" | "travel" | "shopping" | "jev" | "summary";
 

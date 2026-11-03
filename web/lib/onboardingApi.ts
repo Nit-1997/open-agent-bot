@@ -1,7 +1,7 @@
 "use client";
 
-import type { OnboardingOptions, Place } from "@shared/onboarding";
-import type { Home } from "@shared/profile";
+import type { OnboardingOptions, Place } from "@oab/shared/onboarding";
+import type { Home } from "@oab/shared/profile";
 import { useEffect, useState } from "react";
 import { readApi } from "@/lib/api";
 import { noteAuthFailure } from "@/lib/authState";

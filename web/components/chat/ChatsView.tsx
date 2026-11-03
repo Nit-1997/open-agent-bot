@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChatSummary } from "@shared/chats";
+import type { ChatSummary } from "@oab/shared/chats";
 import { useCallback } from "react";
 import { ListState } from "@/components/ui/ListState";
 import { Pager } from "@/components/ui/Pager";

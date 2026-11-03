@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateWidget } from "../../../shared/widgets.js";
+import { validateWidget } from "@oab/shared/widgets";
 import { renderData } from "../../src/render/registry.js";
 import { flightsTool, priceBasis } from "../../src/tools/flights.js";
 import { AIRPORTS, driveRoute, milesBetween, nearbyAirports } from "../../src/tools/geo.js";

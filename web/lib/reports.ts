@@ -1,5 +1,5 @@
-import type { ReportSummary } from "@shared/lists";
-import type { PageResponse } from "@shared/pages";
+import type { ReportSummary } from "@oab/shared/lists";
+import type { PageResponse } from "@oab/shared/pages";
 import { readApi } from "@/lib/api";
 
 export const reportsApi = {

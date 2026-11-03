@@ -1,4 +1,4 @@
-import type { CartEntity, EntityKind, EventEntity, ShortlistEntity, TripEntity } from "../../../shared/workspace.js";
+import type { CartEntity, EntityKind, EventEntity, ShortlistEntity, TripEntity } from "@oab/shared/workspace";
 import { ActiveCart } from "../shop/cart.js";
 import { currencyOf, formatMoney } from "../shop/currency.js";
 import { bestValue } from "../shop/rank.js";

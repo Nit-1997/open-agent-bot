@@ -1,5 +1,5 @@
-import { KIDS_ANY, NO_AIRLINE, NO_DELIVERY, NO_FOOD_RULES, PETS_ANY } from "../../../shared/onboarding.js";
-import { homePlace } from "../../../shared/profile.js";
+import { KIDS_ANY, NO_AIRLINE, NO_DELIVERY, NO_FOOD_RULES, PETS_ANY } from "@oab/shared/onboarding";
+import { homePlace } from "@oab/shared/profile";
 import type { ProfileOverride } from "../prompt/userContext.js";
 
 const list = (xs: string[] | undefined) => (xs ?? []).join(", ");

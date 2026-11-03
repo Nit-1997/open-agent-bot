@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { normalizeQuery } from "../../../shared/lists.js";
-import { safeHttpUrl } from "../../../shared/workspace.js";
+import { normalizeQuery } from "@oab/shared/lists";
+import { safeHttpUrl } from "@oab/shared/workspace";
 
 describe("normalizeQuery", () => {
   it("removes control and format characters, normalises and collapses whitespace", () => {

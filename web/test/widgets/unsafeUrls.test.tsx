@@ -1,6 +1,6 @@
 import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { StayList as StayListWidget, UiWidget } from "@shared/widgets";
+import type { StayList as StayListWidget, UiWidget } from "@oab/shared/widgets";
 import { SourcesRow } from "@/components/chat/SourcesRow";
 import { CartCard } from "@/components/widgets/CartCard";
 import { StayList } from "@/components/widgets/StayList";

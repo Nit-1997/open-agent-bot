@@ -1,7 +1,7 @@
-import { ARTIFACT_ID_RE } from "../../../shared/artifacts.js";
-import type { MessagePart, MessageRole, MessageStatus } from "../../../shared/chats.js";
-import { isUuid } from "../../../shared/ids.js";
-import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "../../../shared/lists.js";
+import { ARTIFACT_ID_RE } from "@oab/shared/artifacts";
+import type { MessagePart, MessageRole, MessageStatus } from "@oab/shared/chats";
+import { isUuid } from "@oab/shared/ids";
+import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "@oab/shared/lists";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { CredentialKind } from "../crypto/envelope.js";

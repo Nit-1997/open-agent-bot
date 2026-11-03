@@ -1,4 +1,4 @@
-import type { EntityKind } from "../../../shared/workspace.js";
+import type { EntityKind } from "@oab/shared/workspace";
 import { VersionConflict, WorkspaceFull } from "./conflict.js";
 import { summarize } from "./summary.js";
 

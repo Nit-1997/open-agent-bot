@@ -1,4 +1,4 @@
-import { AGENT_TONES, type AgentTone } from "@shared/profile";
+import { AGENT_TONES, type AgentTone } from "@oab/shared/profile";
 
 const LABEL: Record<AgentTone, string> = { brief: "Brief", warm: "Warm", thorough: "Thorough" };
 const HINT: Record<AgentTone, string> = {

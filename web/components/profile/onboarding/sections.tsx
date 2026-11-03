@@ -15,8 +15,8 @@ import {
   SHOPPING_STYLES,
   STAY_CHOICES,
   TRAVEL_STYLES,
-} from "@shared/onboarding";
-import type { Profile } from "@shared/profile";
+} from "@oab/shared/onboarding";
+import type { Profile } from "@oab/shared/profile";
 import { addTag, detectedLine, toggle } from "@/lib/onboarding";
 import { AddressField } from "./AddressField";
 import { AddChip, Chip, type ChipOption, ChipRow, Row, SingleRow } from "./Chips";

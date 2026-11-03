@@ -1,4 +1,4 @@
-import type { AgentPersona } from "@shared/profile";
+import type { AgentPersona } from "@oab/shared/profile";
 import { Check } from "lucide-react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { ReportCard } from "@/components/reports/ReportCard";
@@ -8,7 +8,7 @@ import type { Turn } from "@/lib/turns";
 import { ActivitySteps } from "./ActivitySteps";
 import { Followups } from "./Followups";
 import { type BrowserFrame, LiveBrowser } from "./LiveBrowser";
-import type { CartEdits, PlanEdits } from "@shared/workspace";
+import type { CartEdits, PlanEdits } from "@oab/shared/workspace";
 import { Markdown } from "./Markdown";
 import { SourcesRow } from "./SourcesRow";
 

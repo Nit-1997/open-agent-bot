@@ -1,4 +1,4 @@
-import { ARTIFACT_ID_RE } from "@shared/artifacts";
+import { ARTIFACT_ID_RE } from "@oab/shared/artifacts";
 import { forwardToAgent, jsonError } from "@/lib/agentServer";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

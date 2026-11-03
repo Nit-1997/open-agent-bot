@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, customFetch, decodeProtectedHeader, errors, type JWTPayload, jwtVerify } from "jose";
-import { normalizeId } from "../../../shared/ids.js";
+import { normalizeId } from "@oab/shared/ids";
 import type { AgentConfig } from "../config.js";
 import { log } from "../lib/log.js";
 

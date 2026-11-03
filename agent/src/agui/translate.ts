@@ -1,6 +1,6 @@
 import type { BaseEvent } from "@ag-ui/core";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import { fitWidget, type UiWidget, validateWidget } from "../../../shared/widgets.js";
+import { fitWidget, type UiWidget, validateWidget } from "@oab/shared/widgets";
 import { Evidence } from "../grounding/evidence.js";
 import { groundUi } from "../grounding/groundUi.js";
 import { renderData } from "../render/registry.js";

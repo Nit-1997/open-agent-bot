@@ -10,7 +10,7 @@ import {
   rideOneWay,
   TIME_OPTIONS,
   type TimeBucket,
-} from "../../../shared/flights.js";
+} from "@oab/shared/flights";
 import type { AirportResult, FlightOption, FlightsData } from "../render/data.js";
 import { registry } from "../sources/index.js";
 import { type Browse, type FlightSource, googleFlightsUrl, parseGoogleFlights, priceBasis } from "../sources/flights/google.js";

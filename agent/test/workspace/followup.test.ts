@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MessagePart } from "../../../shared/chats.js";
-import type { Cart } from "../../../shared/widgets.js";
+import type { MessagePart } from "@oab/shared/chats";
+import type { Cart } from "@oab/shared/widgets";
 import type { Tile } from "../../src/shop/extract.js";
 import type { Store } from "../../src/shop/stores.js";
 import { type Job, type JobResult, shopTool } from "../../src/tools/shop.js";

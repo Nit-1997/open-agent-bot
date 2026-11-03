@@ -5,7 +5,7 @@ import { ListState } from "@/components/ui/ListState";
 import { useChatIndex, chatIndex } from "@/lib/chatIndex";
 import { DATE_GROUP_LABEL, groupItems } from "@/lib/dateGroups";
 import { useRoute } from "@/lib/shell/useRoute";
-import type { ChatSummary } from "@shared/chats";
+import type { ChatSummary } from "@oab/shared/chats";
 import { ChatListGroup } from "./ChatListGroup";
 
 export const DRAWER_ROWS = 5;

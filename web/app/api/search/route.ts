@@ -1,5 +1,5 @@
-import { isSearchScope, normalizeQuery, SEARCH_MAX, SEARCH_MIN, searchOffsetOk } from "@shared/lists";
-import { parsePage } from "@shared/pages";
+import { isSearchScope, normalizeQuery, SEARCH_MAX, SEARCH_MIN, searchOffsetOk } from "@oab/shared/lists";
+import { parsePage } from "@oab/shared/pages";
 import { forwardToAgent, jsonError } from "@/lib/agentServer";
 
 export function GET(req: Request) {

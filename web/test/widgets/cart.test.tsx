@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { Cart } from "@shared/widgets";
+import type { Cart } from "@oab/shared/widgets";
 import { CartCard } from "@/components/widgets/CartCard";
 
 const pick = (title: string, price: number, size?: string) => ({

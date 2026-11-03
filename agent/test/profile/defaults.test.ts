@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyProfile, type Profile } from "../../../shared/profile.js";
+import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { shopDefaults, staysDefaults } from "../../src/profile/defaults.js";
 import { createRegistry } from "../../src/sources/index.js";
 import { STAY_SOURCES } from "../../src/sources/stays/index.js";

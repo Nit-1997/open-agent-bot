@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`agent`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `agent`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -12,7 +12,7 @@ npm ci && npx playwright install chromium
 
 To run the whole stack, follow **Run** in the [README](README.md). To work on one side, run the other in Docker and point at it:
 
-- Agent: `cd agent && npm run build && set -a && . ../deploy-config/.env-agent && set +a && npm start` (settings in the README's reference table)
+- Agent: `cd agent && npm run build && set -a && . ../deploy-config/.env-agent && set +a && npm start` (`tsc -b` builds `@oab/shared` and then the agent into `agent/dist/`; settings in the README's reference table)
 - Web: `cd web && set -a && . ../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see **Run** in the README). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
@@ -23,6 +23,7 @@ CI runs these on every pull request. Run them from the repo root before you push
 
 | Package | Commands |
 | --- | --- |
+| `@oab/shared` | `npm run build -w @oab/shared` (also built by the agent's `tsc -b`) |
 | `agent` | `npm run lint -w agent && npm run format:check -w agent && npm run typecheck -w agent && npm test -w agent && npm run build -w agent` |
 | `web` | `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web` |
 
@@ -71,10 +72,11 @@ agent/src/
                        with the egress lock-down (chromium.ts, sanitize.ts), behind a shared secret (server.ts)
   lib/                 small shared helpers with no tool dependencies: net.ts (URL guard,
                        safe fetch), retry, fx, concurrency, rate limits, keyed mutex, log redaction
-shared/                schemas used by both agent and web: widgets, workspace edits, the profile and
-                       the agent persona (profile.ts), curated onboarding lists per country (onboarding.ts),
-                       flights, list and search types (lists.ts), shell URL parsing (routes.ts);
-                       relative imports use the .ts extension (the agent build rewrites them)
+packages/shared/src/   the @oab/shared package: schemas used by both agent and web: widgets, workspace
+                       edits, the profile and the agent persona (profile.ts), curated onboarding lists per
+                       country (onboarding.ts), flights, list and search types (lists.ts), shell URL parsing
+                       (routes.ts); import as `@oab/shared/<file>`; relative imports use the .ts extension
+                       (`tsc -b` rewrites them); the agent runs the built dist, web and tests read the source
 supabase/
   migrations/          SQL applied in order with the Supabase MCP (file name = recorded version)
   scripts/             configure-auth (auth config as code), bootstrap-admin, dev-link, cleanup-e2e
@@ -103,7 +105,7 @@ e2e/                   Playwright demo against the local stack (see README "End-
 1. Add `agent/src/tools/<name>.ts` that exports a factory returning `defineTool({...})`. Take network access (`fetch`) and other services as injectable deps so tests can fake them.
 2. Validate URLs from the model with `publicHttpUrlError` and fetch them with `fetchPublic` from `lib/net.ts`. Never call `fetch` on a model-supplied URL directly.
 3. Register it in `tools/index.ts`. Wrap it in `withBudget` if it costs a network round trip.
-4. If it returns structured data for a card, add a renderer in `render/registry.ts` and a schema in `shared/widgets.ts`.
+4. If it returns structured data for a card, add a renderer in `render/registry.ts` and a schema in `packages/shared/src/widgets.ts`.
 5. Add a step label in `web/lib/steps.ts` and tests under `agent/test/tools/`.
 
 ## Adding a source
@@ -136,7 +138,7 @@ Export a `FlightSource` like `sources/flights/google.ts` and register it. The `f
 
 ## Adding a country to onboarding
 
-Onboarding chips come from `shared/onboarding.ts`: one `CURATED` entry per country code (airlines, hotel chains, extra booking sites, groceries, other shops, delivery apps), with `"*"` as the fallback. Adding a country is adding an entry. Travel sites read by a source in `agent/src/sources/` are tagged "searched" automatically; the rest are "linked". Nearby grocery stores come from Overpass and fall back to the country's list.
+Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` entry per country code (airlines, hotel chains, extra booking sites, groceries, other shops, delivery apps), with `"*"` as the fallback. Adding a country is adding an entry. Travel sites read by a source in `agent/src/sources/` are tagged "searched" automatically; the rest are "linked". Nearby grocery stores come from Overpass and fall back to the country's list.
 
 ## Conventions
 

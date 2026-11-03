@@ -1,7 +1,7 @@
 import type { RunAgentInput } from "@ag-ui/core";
 import { EventEncoder } from "@ag-ui/encoder";
 import { Hono } from "hono";
-import { isUuid } from "../../../shared/ids.js";
+import { isUuid } from "@oab/shared/ids";
 import { handleRun, type RunContext } from "../agui/runHandler.js";
 import type { AuthEnv } from "../auth/middleware.js";
 import type { AuthUser } from "../auth/verify.js";

@@ -1,4 +1,4 @@
-import { safeHttpUrl } from "@shared/workspace";
+import { safeHttpUrl } from "@oab/shared/workspace";
 
 export function ExternalLink(props: { id: string; href: string | undefined; className?: string; children: React.ReactNode }) {
   const href = safeHttpUrl(props.href);

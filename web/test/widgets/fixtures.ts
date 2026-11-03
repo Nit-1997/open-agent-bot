@@ -1,4 +1,4 @@
-import type { FlightList, GroundingNote, UiWidget, WeatherCard } from "@shared/widgets";
+import type { FlightList, GroundingNote, UiWidget, WeatherCard } from "@oab/shared/widgets";
 
 export const validWidgets: {
   weather_card: WeatherCard;

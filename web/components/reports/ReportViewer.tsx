@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReportSummary } from "@shared/lists";
-import { hrefFor } from "@shared/routes";
+import type { ReportSummary } from "@oab/shared/lists";
+import { hrefFor } from "@oab/shared/routes";
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, X } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, type Ref, useEffect, useState } from "react";

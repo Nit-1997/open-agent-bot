@@ -1,4 +1,4 @@
-import { parsePage } from "@shared/pages";
+import { parsePage } from "@oab/shared/pages";
 import { forwardToAgent, jsonError } from "@/lib/agentServer";
 
 export function GET(req: Request) {

@@ -62,7 +62,7 @@ services:
     build:
       context: .
       dockerfile: agent/Dockerfile
-    command: ["node", "dist/agent/src/renderer/main.js"]
+    command: ["node", "dist/renderer/main.js"]
     env_file:
       - path: deploy-config/.env-renderer
         required: true

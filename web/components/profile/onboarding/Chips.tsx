@@ -1,6 +1,6 @@
 "use client";
 
-import type { Access } from "@shared/onboarding";
+import type { Access } from "@oab/shared/onboarding";
 import { Check, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { addTag, cleanTag } from "@/lib/onboarding";

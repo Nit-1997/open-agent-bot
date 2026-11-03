@@ -10,8 +10,8 @@ import {
   rankAirports,
   TIME_OPTIONS,
   type TimeBucket,
-} from "@shared/flights";
-import type { FlightList as FlightListData } from "@shared/widgets";
+} from "@oab/shared/flights";
+import type { FlightList as FlightListData } from "@oab/shared/widgets";
 import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import { ExternalLink } from "./ExternalLink";

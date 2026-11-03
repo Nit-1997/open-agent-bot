@@ -1,8 +1,8 @@
 "use client";
 
 import { ExternalLink } from "./ExternalLink";
-import type { Cart } from "@shared/widgets";
-import type { CartEdits } from "@shared/workspace";
+import type { Cart } from "@oab/shared/widgets";
+import type { CartEdits } from "@oab/shared/workspace";
 import { Info, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { cardDate } from "@/lib/dates";

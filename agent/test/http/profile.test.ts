@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { type SessionEntry, SessionStore } from "../../src/session/sessionStore.js";
-import { DEFAULT_AGENT } from "../../../shared/profile.js";
+import { DEFAULT_AGENT } from "@oab/shared/profile";
 import { makeApp } from "../fixtures/app.js";
 import { ALICE } from "../fixtures/users.js";
 

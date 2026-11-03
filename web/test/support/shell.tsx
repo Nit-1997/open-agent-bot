@@ -1,4 +1,4 @@
-import { emptyProfile, type Profile } from "@shared/profile";
+import { emptyProfile, type Profile } from "@oab/shared/profile";
 import { act, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 export { nav } from "./navigation";

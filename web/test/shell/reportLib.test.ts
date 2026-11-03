@@ -1,4 +1,4 @@
-import type { StoredMessage } from "@shared/chats";
+import type { StoredMessage } from "@oab/shared/chats";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toHistory } from "@/lib/chats";
 import { parseArtifactId, reportsIn, reportTitleIn } from "@/lib/reportRefs";

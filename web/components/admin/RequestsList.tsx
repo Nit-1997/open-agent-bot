@@ -1,7 +1,7 @@
 "use client";
 
-import { type AccessRequestView, REQUEST_FILTERS, type RequestFilter } from "@shared/admin";
-import type { PageResponse } from "@shared/pages";
+import { type AccessRequestView, REQUEST_FILTERS, type RequestFilter } from "@oab/shared/admin";
+import type { PageResponse } from "@oab/shared/pages";
 import { useState } from "react";
 import { decideRequest, listRequests } from "@/app/admin/actions";
 import { ghost, solid } from "@/components/profile/models/styles";

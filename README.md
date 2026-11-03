@@ -55,7 +55,7 @@ Agent settings live in `deploy-config/.env-agent` (git-ignored).
 | --- | --- | --- |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | required | The Supabase project; the secret key is the agent's own `sb_secret_…` key |
 | `AGENT_SERVICE_SECRET` | required | 64 hex chars shared with the web app |
-| `CREDENTIAL_KEYS` | required | Master keys for stored provider keys, `v2:<base64>,v1:<base64>`, first is current. Rotate with `docker compose exec agent node dist/agent/src/scripts/rotateCredentials.js` |
+| `CREDENTIAL_KEYS` | required | Master keys for stored provider keys, `v2:<base64>,v1:<base64>`, first is current. Rotate with `docker compose exec agent node dist/scripts/rotateCredentials.js` |
 | `ACCESS_REQUEST_PEPPER` | required | Base64 of 32 bytes; hashes visitor IPs |
 | `APP_ORIGIN` | required | The web app's origin, used for email links |
 | `RUN_TIME_LIMIT_SECONDS` | `280` | A run ends cleanly after this long |

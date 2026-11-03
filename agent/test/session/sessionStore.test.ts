@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { SessionCapacityError, type SessionEntry, type SessionOwner, SessionStore } from "../../src/session/sessionStore.js";
-import { DEFAULT_AGENT } from "../../../shared/profile.js";
+import { DEFAULT_AGENT } from "@oab/shared/profile";
 import { WorkspaceStore } from "../../src/workspace/store.js";
 import { ALICE, BOB } from "../fixtures/users.js";
 

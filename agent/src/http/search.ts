@@ -10,7 +10,7 @@ import {
   type SearchScope,
   SNIPPET_CHARS,
   searchOffsetOk,
-} from "../../../shared/lists.js";
+} from "@oab/shared/lists";
 import type { AuthEnv } from "../auth/middleware.js";
 import type { SearchRow, UserRepos } from "../db/types.js";
 import { UserError } from "../lib/errors.js";

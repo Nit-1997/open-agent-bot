@@ -4,11 +4,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts/postinstall.mjs ./scripts/
 COPY patches ./patches
+COPY packages/shared/package.json packages/shared/
 COPY agent/package.json agent/
 COPY web/package.json web/
 COPY e2e/package.json e2e/
 RUN npm ci -w web --include-workspace-root
-COPY shared ./shared
+COPY packages/shared ./packages/shared
 COPY web ./web
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY

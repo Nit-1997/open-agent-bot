@@ -1,5 +1,5 @@
-import type { AccessRequestView, AdminUser, ProfileView, RequestFilter } from "../../../shared/admin.js";
-import type { Page } from "../../../shared/pages.js";
+import type { AccessRequestView, AdminUser, ProfileView, RequestFilter } from "@oab/shared/admin";
+import type { Page } from "@oab/shared/pages";
 import type { AuthUser } from "../auth/verify.js";
 import type { AdminRepo } from "../db/admin.js";
 import { UserError } from "../lib/errors.js";

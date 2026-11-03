@@ -1,10 +1,10 @@
 "use client";
 
 import { ExternalLink } from "./ExternalLink";
-import type { Plan } from "@shared/widgets";
+import type { Plan } from "@oab/shared/widgets";
 import { Minus, Plus } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type { PlanEdits } from "@shared/workspace";
+import type { PlanEdits } from "@oab/shared/workspace";
 import { cardDate } from "@/lib/dates";
 import { widgetId } from "./widgetId";
 

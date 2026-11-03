@@ -1,4 +1,4 @@
-import { validateWidget, type WidgetPayload } from "../../../shared/widgets.js";
+import { validateWidget, type WidgetPayload } from "@oab/shared/widgets";
 import { MAX_CART_STORES, toCartStore } from "./cart.js";
 import type { FlightsData, StaysData, WeatherData } from "./data.js";
 

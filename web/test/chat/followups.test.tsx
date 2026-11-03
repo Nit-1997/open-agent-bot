@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TurnView } from "@/components/chat/TurnView";
 import type { Turn } from "@/lib/turns";
-import { DEFAULT_AGENT } from "@shared/profile";
+import { DEFAULT_AGENT } from "@oab/shared/profile";
 
 const turn: Turn = {
   id: "t1",

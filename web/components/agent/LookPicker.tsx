@@ -1,4 +1,4 @@
-import { AGENT_LOOKS, type AgentLook } from "@shared/profile";
+import { AGENT_LOOKS, type AgentLook } from "@oab/shared/profile";
 
 const LABEL: Record<AgentLook, string> = { mist: "Mist", ember: "Ember", moss: "Moss", dusk: "Dusk" };
 

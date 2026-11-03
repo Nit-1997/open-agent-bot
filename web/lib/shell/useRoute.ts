@@ -1,6 +1,6 @@
 "use client";
 
-import { parseRoute, type Route } from "@shared/routes";
+import { parseRoute, type Route } from "@oab/shared/routes";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 

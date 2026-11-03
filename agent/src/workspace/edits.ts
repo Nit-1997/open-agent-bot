@@ -1,4 +1,4 @@
-import { type CartEdits, type EntityKind, type PlanEdits, validateEntity, type WorkspaceEdits } from "../../../shared/workspace.js";
+import { type CartEdits, type EntityKind, type PlanEdits, validateEntity, type WorkspaceEdits } from "@oab/shared/workspace";
 import { clip, oneLine } from "./summary.js";
 import type { WorkspaceStore } from "./store.js";
 

@@ -27,8 +27,8 @@
       "@/*": [
         "./*"
       ],
-      "@shared/*": [
-        "../shared/*"
+      "@oab/shared/*": [
+        "../packages/shared/src/*"
       ],
       "typebox": [
         "../node_modules/typebox"
@@ -44,8 +44,7 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    "../shared/**/*.ts"
+    "**/*.mts"
   ],
   "exclude": [
     "node_modules"

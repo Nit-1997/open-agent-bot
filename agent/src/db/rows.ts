@@ -1,4 +1,4 @@
-import { PAGE_SIZE } from "../../../shared/pages.js";
+import { PAGE_SIZE } from "@oab/shared/pages";
 
 export function oneOf<T extends string>(allowed: readonly T[], value: string, column: string): T {
   if ((allowed as readonly string[]).includes(value)) return value as T;

@@ -3,7 +3,7 @@
 import { FileText, MessageSquare, Plus, Search } from "lucide-react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { AccountMenu } from "@/components/AccountMenu";
-import { hrefFor } from "@shared/routes";
+import { hrefFor } from "@oab/shared/routes";
 import { useBreakpoint } from "@/lib/shell/breakpoints";
 import { SEARCH_INPUT_ID } from "@/lib/shell/searchNav";
 import { navSectionOf, useRoute } from "@/lib/shell/useRoute";

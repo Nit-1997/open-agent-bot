@@ -1,4 +1,4 @@
-import type { AccessRequestView, RequestFilter } from "@shared/admin";
+import type { AccessRequestView, RequestFilter } from "@oab/shared/admin";
 
 export type RequestAction = "approve" | "reject" | "resend";
 export type UserAction = "deactivate" | "reactivate";
