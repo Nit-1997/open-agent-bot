@@ -31,10 +31,10 @@
         "../shared/*"
       ],
       "typebox": [
-        "./node_modules/typebox"
+        "../node_modules/typebox"
       ],
       "typebox/value": [
-        "./node_modules/typebox/build/value/index.d.mts"
+        "../node_modules/typebox/build/value/index.d.mts"
       ]
     }
   },

@@ -1,5 +1,15 @@
+import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { openaiChatGPTOAuth } from "../../node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-chatgpt.js";
+
+const PI_AI = "@earendil-works/pi-ai";
+const piAiDir = (createRequire(import.meta.url).resolve.paths(PI_AI) ?? [])
+  .map((dir) => join(dir, PI_AI))
+  .find((dir) => existsSync(join(dir, "package.json")));
+if (!piAiDir) throw new Error(`${PI_AI} is not installed`);
+const { openaiChatGPTOAuth } = await import(pathToFileURL(join(piAiDir, "dist/auth/oauth/openai-chatgpt.js")).href);
 
 const DEVICE_ID = "00000000-0000-4000-8000-000000000000";
 

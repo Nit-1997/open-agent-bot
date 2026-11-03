@@ -21,8 +21,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname, ".."),
     resolveAlias: {
-      typebox: "./node_modules/typebox/build/index.mjs",
-      "typebox/value": "./node_modules/typebox/build/value/index.mjs",
+      typebox: "../node_modules/typebox/build/index.mjs",
+      "typebox/value": "../node_modules/typebox/build/value/index.mjs",
     },
     rules: {
       "*.css": {

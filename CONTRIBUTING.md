@@ -4,11 +4,10 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`agent`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
 
 ```bash
-cd agent && npm ci && npx playwright install chromium
-cd ../web && npm ci
+npm ci && npx playwright install chromium
 ```
 
 To run the whole stack, follow **Run** in the [README](README.md). To work on one side, run the other in Docker and point at it:
@@ -20,12 +19,12 @@ Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see **Run** in
 
 ## Checks
 
-CI runs these on every pull request. Run them before you push (`npm run format` fixes formatting):
+CI runs these on every pull request. Run them from the repo root before you push (`npm run format -w <package>` fixes formatting); `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` runs all of them across the workspaces.
 
 | Package | Commands |
 | --- | --- |
-| `agent` | `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` |
-| `web` | `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` |
+| `agent` | `npm run lint -w agent && npm run format:check -w agent && npm run typecheck -w agent && npm test -w agent && npm run build -w agent` |
+| `web` | `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web` |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `test/supabase/` run against the real Supabase project with `npm run test:supabase`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
 

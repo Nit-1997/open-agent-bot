@@ -11,42 +11,40 @@ permissions:
 jobs:
   agent:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: agent
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: agent/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - run: npm run lint -w agent
+      - run: npm run format:check -w agent
+      - run: npm run typecheck -w agent
+      - run: npm test -w agent
+      - run: npm run build -w agent
 
   web:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - run: npm run lint -w web
+      - run: npm run format:check -w web
+      - run: npm run typecheck -w web
+      - run: npm test -w web
+      - run: npm run build -w web
         env:
           COPILOTKIT_TELEMETRY_DISABLED: "true"
 
