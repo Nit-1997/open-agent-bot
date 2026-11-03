@@ -48,7 +48,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts", "!src/app.ts", "!src/auth/verify.ts"],
+      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts", "!src/app.ts"],
       "linter": {
         "rules": {
           "style": {
@@ -87,6 +87,10 @@
                   {
                     "group": ["@oab/core/hosted", "@oab/core/hosted/**"],
                     "message": "Hosted files import other hosted files by relative path."
+                  },
+                  {
+                    "group": ["@oab/core/identity/local*", "@oab/core/identity/local*/**"],
+                    "message": "Hosted code must not use a local identity."
                   }
                 ]
               }
