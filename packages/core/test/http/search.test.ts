@@ -70,6 +70,19 @@ describe("GET /search", () => {
     expect(cleaned.total).toBe(1);
   });
 
+  it("refuses a 2-character query before the store is called, though the store floor is 2", async () => {
+    const h = await seeded();
+    const repos = h.deps.repos;
+    const search = vi.fn(async () => ({ items: [], total: 0, chats: 0, reports: 0 }));
+    const { call } = await makeApp({ repos: (id) => ({ ...repos(id), search: { search } }) });
+    const res = await call(ALICE, "/search?q=ab");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "invalid", message: "Search for 3 to 100 characters." });
+    expect(search).not.toHaveBeenCalled();
+    expect((await call(ALICE, "/search?q=abc")).status).toBe(200);
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
   it("maps a 22023 from the database to 400", async () => {
     const h = await seeded();
     const repos = h.deps.repos;
