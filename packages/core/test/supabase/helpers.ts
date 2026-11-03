@@ -75,11 +75,46 @@ export function track(id: string, email: string): void {
   created.push({ id, email });
 }
 
-export async function deleteCreatedUsers(): Promise<string[]> {
-  const gone = created.splice(0);
-  for (const u of gone) await deleteUser(u.id, u.email);
-  return gone.map((u) => u.email);
+export type CleanupFailure = { email: string; error: { code: string; message: string } };
+export type CleanupReport = { deleted: string[]; failed: CleanupFailure[] };
+type CleanupOptions = { remove?: (id: string, email: string) => Promise<void>; retries?: number; backoffMs?: number };
+
+const SECRET_LIKE = /eyJ[\w-]+\.[\w-]+\.[\w-]*|sb_(?:secret|publishable)_[\w-]+|bearer\s+\S+/gi;
+
+function reduceError(e: unknown): CleanupFailure["error"] {
+  const raw = e as { code?: unknown; status?: unknown; message?: unknown };
+  const code = typeof raw?.code === "string" ? raw.code : raw?.status !== undefined ? String(raw.status) : "unknown";
+  const message = (typeof raw?.message === "string" ? raw.message : String(e)).replace(SECRET_LIKE, "[redacted]").slice(0, 300);
+  return { code, message };
 }
+
+async function deleteWithRetry(user: { id: string; email: string }, opts: Required<CleanupOptions>): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await opts.remove(user.id, user.email);
+    } catch (e) {
+      const error = reduceError(e);
+      console.warn(`[supabase cleanup] ${user.email} attempt ${attempt} failed: ${error.code} ${error.message}`);
+      if (attempt > opts.retries) throw Object.assign(new Error(error.message), { reduced: error });
+      await new Promise((r) => setTimeout(r, opts.backoffMs));
+    }
+  }
+}
+
+export async function deleteCreatedUsers(options: CleanupOptions = {}): Promise<CleanupReport> {
+  const opts = { remove: deleteUser, retries: 3, backoffMs: 1000, ...options };
+  const gone = created.splice(0);
+  const results = await Promise.allSettled(gone.map((u) => deleteWithRetry(u, opts)));
+  const report: CleanupReport = { deleted: [], failed: [] };
+  results.forEach((r, i) => {
+    const email = gone[i]!.email;
+    if (r.status === "fulfilled") report.deleted.push(email);
+    else report.failed.push({ email, error: (r.reason as { reduced: CleanupFailure["error"] }).reduced });
+  });
+  return report;
+}
+
+export const cleanedEmails = (report: CleanupReport): string[] => [...report.deleted, ...report.failed.map((f) => f.email)];
 
 export async function remainingRows(emails: string[]): Promise<number> {
   if (!emails.length) return 0;

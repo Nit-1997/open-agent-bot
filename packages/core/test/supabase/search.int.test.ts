@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { forUser } from "../../src/db/users.js";
-import { createBareUser, deleteCreatedUsers, enabled, managementQuery, remainingRows, service } from "./helpers.js";
+import { cleanedEmails, createBareUser, deleteCreatedUsers, enabled, managementQuery, remainingRows, service } from "./helpers.js";
 
 describe.skipIf(!enabled)("search_user_content (live project)", () => {
   let a: { id: string };
@@ -47,7 +47,7 @@ describe.skipIf(!enabled)("search_user_content (live project)", () => {
   }, 60_000);
 
   afterAll(async () => {
-    expect(await remainingRows(await deleteCreatedUsers())).toBe(0);
+    expect(await remainingRows(cleanedEmails(await deleteCreatedUsers()))).toBe(0);
   }, 60_000);
 
   it("matches titles, messages and report titles, newest first, with stable counts per scope", async () => {

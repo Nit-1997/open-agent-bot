@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { anon, createTestUser, deleteCreatedUsers, enabled, remainingRows, service, testEmail, track } from "./helpers.js";
+import { anon, cleanedEmails, createTestUser, deleteCreatedUsers, enabled, remainingRows, service, testEmail, track } from "./helpers.js";
 
 describe.skipIf(!enabled)("sign-up gates (live project)", () => {
   afterAll(async () => {
-    expect(await remainingRows(await deleteCreatedUsers())).toBe(0);
+    expect(await remainingRows(cleanedEmails(await deleteCreatedUsers()))).toBe(0);
   }, 60_000);
 
   it("records that admin createUser bypasses the hook, so only trusted scripts may call it", async () => {

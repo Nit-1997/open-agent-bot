@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteCreatedUsers, enabled, env, remainingRows, sessionFor, type TestUser } from "./helpers.js";
+import { cleanedEmails, createTestUser, deleteCreatedUsers, enabled, env, remainingRows, sessionFor, type TestUser } from "./helpers.js";
 
 const AUTH = { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } as const;
 
@@ -18,7 +18,7 @@ describe.skipIf(!enabled)("auth settings (live project)", () => {
   }, 60_000);
 
   afterAll(async () => {
-    expect(await remainingRows(await deleteCreatedUsers())).toBe(0);
+    expect(await remainingRows(cleanedEmails(await deleteCreatedUsers()))).toBe(0);
   }, 60_000);
 
   it("never turns a password set with a stolen access token into a working sign-in", async () => {
