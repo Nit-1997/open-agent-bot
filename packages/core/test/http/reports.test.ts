@@ -30,7 +30,9 @@ describe("report routes", () => {
 
   it("reports a deleted chat as nulls", async () => {
     const { call, db } = await makeApp();
+    await db.forUser(ALICE.id).chats.claim(chat(7), {});
     await db.forUser(ALICE.id).artifacts.insert({ id: id(1), chatId: chat(7), title: "Orphan", sizeBytes: 5 });
+    db.chats.delete(chat(7));
     const body = (await (await call(ALICE, `/reports/${id(1)}`)).json()) as { report: { chatId: null; chatTitle: null } };
     expect(body.report).toMatchObject({ id: id(1), title: "Orphan", chatId: null, chatTitle: null, pdfReady: false, sizeBytes: 5 });
   });

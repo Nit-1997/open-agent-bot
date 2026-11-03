@@ -2,7 +2,17 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { forUser } from "../../src/db/users.js";
-import { anon, createTestUser, deleteCreatedUsers, enabled, managementQuery, remainingRows, service, type TestUser } from "./helpers.js";
+import {
+  anon,
+  cleanedEmails,
+  createTestUser,
+  deleteCreatedUsers,
+  enabled,
+  managementQuery,
+  remainingRows,
+  service,
+  type TestUser,
+} from "./helpers.js";
 
 const TABLES = [
   "profiles",
@@ -38,7 +48,7 @@ describe.skipIf(!enabled)("RLS and grants (live project)", () => {
   }, 60_000);
 
   afterAll(async () => {
-    expect(await remainingRows(await deleteCreatedUsers())).toBe(0);
+    expect(await remainingRows(cleanedEmails(await deleteCreatedUsers()))).toBe(0);
   }, 60_000);
 
   it("lets nobody read any table through PostgREST, not even their own rows", async () => {

@@ -362,7 +362,7 @@ export function describeStoreContract(name: string, setup: () => Promise<Contrac
         const r = await repos();
         const id = artifactId();
         await r.storage.upload(id, "html", FILES.html);
-        await expect(r.storage.upload(id, "html", Buffer.from("<p>other</p>"))).rejects.toBeInstanceOf(UserError);
+        await expectUserError(r.storage.upload(id, "html", Buffer.from("<p>other</p>")), "upstream");
         expect((await r.storage.download(id, "html"))?.equals(FILES.html)).toBe(true);
         for (const file of ["pdf", "jpg"] as const) {
           const next = Buffer.concat([FILES[file], Buffer.from("-v2")]);

@@ -9,6 +9,7 @@ import { SupabaseProfileStore } from "../../src/profile/store.js";
 import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
 import {
   adminRepo,
+  cleanedEmails,
   createBareUser,
   createTestUser,
   deleteCreatedUsers,
@@ -16,8 +17,8 @@ import {
   env,
   remainingRows,
   service,
-  type TestUser,
   testEmail,
+  type TestUser,
 } from "./helpers.js";
 
 const wrapper = new LocalKeyWrapper(parseCredentialKeys(`v1:${randomBytes(32).toString("base64")}`));
@@ -31,7 +32,7 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
   }, 60_000);
 
   afterAll(async () => {
-    expect(await remainingRows(await deleteCreatedUsers())).toBe(0);
+    expect(await remainingRows(cleanedEmails(await deleteCreatedUsers()))).toBe(0);
   }, 60_000);
 
   it("verifies a real access token with the agent's verifier", async () => {
