@@ -22,13 +22,24 @@ import {
   tsvRow,
   versionProblems,
 } from "../docs/doc-commands.mjs";
-import { createRunner, parseRunnerArgs, preflight, SCRATCH, scratchEnv, writeDockerConfig } from "../docs/run-doc-commands.mjs";
+import {
+  createRunner,
+  fileContext,
+  parseRunnerArgs,
+  preflight,
+  SCRATCH,
+  scratchEnv,
+  teardownClone,
+  writeDockerConfig,
+} from "../docs/run-doc-commands.mjs";
+import { fillDigests, resetDigests } from "../docs/fill-digests.mjs";
 import { notes } from "../release/releaseLib.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const FIX = join(ROOT, "scripts/test/fixtures/docs");
 const fixture = (n) => readFileSync(join(FIX, n), "utf8");
-const INSTALL = readFileSync(join(ROOT, "docs/INSTALL.md"), "utf8");
+const read = (f) => readFileSync(join(ROOT, f), "utf8");
+const INSTALL = read("docs/INSTALL.md");
 const D = (c) => c.repeat(64);
 const DIR = "/private/tmp/oab-docs-scratch";
 const REPO = "/work/repo";
@@ -73,7 +84,7 @@ describe("extractCommands", () => {
 describe("manifest", () => {
   const manifest = loadManifest();
   it("covers every shell line in the covered docs exactly once and names nothing else", () => {
-    assert.deepEqual(COVERED_FILES, ["docs/INSTALL.md"]);
+    assert.deepEqual(COVERED_FILES, ["README.md", "docs/INSTALL.md"]);
     const extracted = COVERED_FILES.flatMap((f) => extractCommands(readFileSync(join(ROOT, f), "utf8"), f));
     const { missing, extra } = coverage(extracted, manifest, COVERED_FILES);
     assert.deepEqual(missing, []);
@@ -87,8 +98,8 @@ describe("manifest", () => {
     assert.deepEqual(r.extra, ["docs/INSTALL.md: echo gone"]);
   });
   it("refuses entries for files outside the covered set", () => {
-    const m = { commands: [{ file: "README.md", command: "echo x", mode: "owner", reason: "x" }] };
-    assert.deepEqual(coverage([], m, ["docs/INSTALL.md"]).extra, ["README.md: echo x"]);
+    const m = { commands: [{ file: "docs/hosted.md", command: "echo x", mode: "owner", reason: "x" }] };
+    assert.deepEqual(coverage([], m, COVERED_FILES).extra, ["docs/hosted.md: echo x"]);
   });
   for (const [name, entry, want] of [
     ["unknown mode", { mode: "maybe" }, /unknown mode maybe/],
@@ -107,20 +118,39 @@ describe("manifest", () => {
     const e = { file: "docs/INSTALL.md", command: "echo x", mode: "owner", reason: "x" };
     assert.match(manifestProblems({ commands: [e, e] }, []).join("\n"), /listed twice: docs\/INSTALL.md: echo x/);
   });
-  it("every entry declared run, env or subst stays runnable in document order", () => {
-    let cwd = CTX.dir;
+  for (const file of COVERED_FILES)
+    it(`every ${file} entry declared run, env or subst stays runnable in document order in its own workspace`, () => {
+      const ctx = fileContext(CTX, file);
+      const rules = substitutionRules(ctx);
+      let cwd = ctx.work;
+      const byKey = new Map(manifest.commands.map((e) => [`${e.file}\0${e.command}`, e]));
+      let runnable = 0;
+      for (const c of extractCommands(read(file), file)) {
+        const e = byKey.get(`${c.file}\0${c.command}`);
+        if (e.mode === "owner") continue;
+        const s = substitute(c.command, e.subst ?? [], rules);
+        assert.deepEqual(s.missing, [], c.command);
+        const at = e.cwd === "downloads" ? ctx.downloads : cwd;
+        const r = classify(s.text, ctx, at);
+        assert.ok(r.runnable, `${c.command}: ${r.reason}`);
+        assert.equal(forbiddenNames(r.asRun, ctx), undefined, c.command);
+        if (e.cwd !== "downloads") cwd = r.cwdAfter;
+        runnable++;
+      }
+      assert.ok(runnable >= 3, `${file} has only ${runnable} runnable commands`);
+    });
+  it("runs the README's browser-only lines: clone, cd and build", () => {
     const byKey = new Map(manifest.commands.map((e) => [`${e.file}\0${e.command}`, e]));
-    for (const c of extractCommands(INSTALL, "docs/INSTALL.md")) {
-      const e = byKey.get(`${c.file}\0${c.command}`);
-      if (e.mode === "owner") continue;
-      const s = substitute(c.command, e.subst ?? [], RULES);
-      assert.deepEqual(s.missing, [], c.command);
-      const at = e.cwd === "downloads" ? CTX.downloads : cwd;
-      const r = classify(s.text, CTX, at);
-      assert.ok(r.runnable, `${c.command}: ${r.reason}`);
-      assert.equal(forbiddenNames(r.asRun, CTX), undefined, c.command);
-      if (e.cwd !== "downloads") cwd = r.cwdAfter;
-    }
+    const modes = extractCommands(read("README.md"), "README.md").map((c) => [c.command, byKey.get(`README.md\0${c.command}`)?.mode]);
+    for (const line of [
+      "git clone --branch v1.0.0 --depth 1 https://github.com/Nit-1997/open-agent-bot",
+      "cd open-agent-bot",
+      "docker compose up -d --build",
+    ])
+      assert.ok(
+        modes.some(([c, m]) => c === line && m !== "owner"),
+        `README.md: ${line} is not runnable`,
+      );
   });
 });
 
@@ -525,6 +555,77 @@ describe("runner", () => {
   });
 });
 
+describe("workspaces", () => {
+  it("gives each covered file its own clone inside the scratch dir and keeps shared folders", () => {
+    const a = fileContext(CTX, "README.md");
+    const b = fileContext(CTX, "docs/INSTALL.md");
+    assert.equal(a.work, `${DIR}/work/README`);
+    assert.equal(a.clone, `${DIR}/work/README/open-agent-bot`);
+    assert.equal(b.work, `${DIR}/work/INSTALL`);
+    assert.equal(b.clone, `${DIR}/work/INSTALL/open-agent-bot`);
+    for (const c of [a, b]) {
+      assert.equal(c.dir, DIR);
+      assert.equal(c.downloads, CTX.downloads);
+      assert.equal(c.installApp, CTX.installApp);
+    }
+  });
+  it("starts each file's runner in its workspace, and the clone line lands in that workspace", () => {
+    const ctx = fileContext(CTX, "README.md");
+    const runner = createRunner({ ctx, env: {}, manifest: { commands: [] }, exec: () => ({}), log: () => {} });
+    assert.equal(runner.cwd, ctx.work);
+    const line = "git clone --branch v1.0.0 --depth 1 https://github.com/Nit-1997/open-agent-bot";
+    const s = substitute(line, ["clone-url", "clone-branch"], substitutionRules(ctx));
+    const r = classify(s.text, ctx, ctx.work);
+    assert.ok(r.runnable, r.reason);
+    assert.equal(classify("cd open-agent-bot", ctx, ctx.work).cwdAfter, ctx.clone);
+  });
+  const teardownHarness = (name) => {
+    const calls = [];
+    const exec = (cmd, args, o = {}) => {
+      calls.push([cmd, ...args, o.cwd]);
+      if (args[1] === "config") return { status: 0, stdout: JSON.stringify({ name, services: {}, volumes: {} }), stderr: "" };
+      if (cmd === "jq") return { status: 0, stdout: `${JSON.parse(o.input).name}\n`, stderr: "" };
+      return { status: 0, stdout: "", stderr: "" };
+    };
+    return { calls, exec };
+  };
+  it("tears a file's clone down with down -v after a preflight", () => {
+    const ctx = fileContext(CTX, "README.md");
+    const { calls, exec } = teardownHarness(CTX.project);
+    const log = [];
+    teardownClone(
+      ctx,
+      {},
+      exec,
+      (s) => log.push(s),
+      () => true,
+    );
+    assert.deepEqual(calls.at(-1), ["docker", "compose", "down", "-v", "--remove-orphans", ctx.clone]);
+    assert.match(log.join(""), /teardown .*README.*down -v/);
+  });
+  it("skips the teardown when the preflight fails or there is no clone", () => {
+    const ctx = fileContext(CTX, "README.md");
+    const wrong = teardownHarness("open-agent");
+    teardownClone(
+      ctx,
+      {},
+      wrong.exec,
+      () => {},
+      () => true,
+    );
+    assert.ok(!wrong.calls.some((c) => c.includes("down")));
+    const none = teardownHarness(CTX.project);
+    teardownClone(
+      ctx,
+      {},
+      none.exec,
+      () => {},
+      () => false,
+    );
+    assert.equal(none.calls.length, 0);
+  });
+});
+
 describe("runner arguments", () => {
   const tmp = realpathSync(tmpdir());
   it("refuses a scratch dir outside the temp dir and .factory", () => {
@@ -555,8 +656,8 @@ describe("guide checks", () => {
   it("reads the guide version", () => {
     assert.equal(guideVersion(INSTALL), "1.0.0");
   });
-  it("uses one version for every file name and tag in README and INSTALL", () => {
-    const docs = ["README.md", "docs/INSTALL.md"].map((f) => ({ name: f, text: readFileSync(join(ROOT, f), "utf8") }));
+  it("uses one version for every file name and tag in README, INSTALL and SECURITY", () => {
+    const docs = ["README.md", "docs/INSTALL.md", "SECURITY.md"].map((f) => ({ name: f, text: read(f) }));
     assert.deepEqual(versionProblems(docs, guideVersion(INSTALL)), []);
   });
   it("fails on mixed versions", () => {
@@ -569,6 +670,8 @@ describe("guide checks", () => {
   });
   it("pins every gh attestation verify", () => {
     assert.deepEqual(attestationProblems(INSTALL, "1.0.0"), []);
+    assert.deepEqual(attestationProblems(read("SECURITY.md"), "1.0.0"), []);
+    assert.deepEqual(attestationProblems(read("docs/RELEASING.md"), "1.0.0", { tagVariable: "$TAG" }), []);
     assert.match(
       attestationProblems(fixture("bare-attest.md"), "1.0.0").join("\n"),
       /--signer-workflow.*--source-ref.*--deny-self-hosted-runners/s,
@@ -583,8 +686,18 @@ describe("guide checks", () => {
     assert.deepEqual(attestationProblems(generated, "1.0.0"), []);
     assert.match(attestationProblems(generated, "1.0.1").join("\n"), /--source-ref refs\/tags\/v1.0.1/);
   });
+  it("pins a runbook line through the tag variable only when asked to", () => {
+    const line =
+      'gh attestation verify "$f" --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref "refs/tags/$TAG" --deny-self-hosted-runners';
+    assert.deepEqual(attestationProblems(line, "1.0.0", { tagVariable: "$TAG" }), []);
+    assert.match(attestationProblems(line, "1.0.0").join("\n"), /--source-ref refs\/tags\/v1.0.0/);
+    const bare = 'gh attestation verify "$f" --repo Nit-1997/open-agent-bot --source-ref "refs/tags/$TAG"';
+    assert.match(attestationProblems(bare, "1.0.0", { tagVariable: "$TAG" }).join("\n"), /--signer-workflow.*--deny-self-hosted-runners/);
+  });
   it("has no raw HTML outside code", () => {
     assert.deepEqual(htmlProblems(INSTALL), []);
+    for (const f of ["README.md", "docs/RELEASING.md", "docs/hosted.md", "SECURITY.md", "CONTRIBUTING.md"])
+      assert.deepEqual(htmlProblems(read(f)), [], f);
     assert.deepEqual(htmlProblems(fixture("html-in-code.md")), []);
     assert.deepEqual(htmlProblems(fixture("html.md")), ['line 3: <div id="x">', "line 3: </div>"]);
   });
@@ -671,7 +784,7 @@ describe("INSTALL content", () => {
       "git clone --branch v1.0.0 --depth 1 https://github.com/Nit-1997/open-agent-bot",
       "docker compose up -d --build",
       "http://127.0.0.1:3000",
-      PRINTF,
+      "OPEN_AGENT_SEARCH_IMAGE=ghcr.io/nit-1997/open-agent-search@sha256:",
       "docker compose pull agent search",
       "docker compose up -d --no-build",
       "open-agent-services.json",
@@ -682,5 +795,359 @@ describe("INSTALL content", () => {
       "SECURITY.md",
     ])
       has(s);
+  });
+});
+
+const README = read("README.md");
+const linesOf = (text) => text.split("\n");
+const lineOf = (text, needle) => linesOf(text).findIndex((l) => l.includes(needle)) + 1;
+const inOrder = (text, needles) => {
+  const at = needles.map((n) => text.indexOf(n));
+  assert.ok(
+    at.every((i) => i >= 0),
+    `missing: ${needles.filter((_, i) => at[i] < 0).join(" | ")}`,
+  );
+  assert.deepEqual(
+    [...at].sort((x, y) => x - y),
+    at,
+    `out of order: ${needles.join(" | ")}`,
+  );
+};
+
+describe("README first screen", () => {
+  const items = [
+    "Open Agent is a research and planning agent that runs on your computer",
+    "**Mac app.**",
+    "**No Mac app**",
+    "**Security.**",
+    "A hosted demo will be linked here later.",
+  ];
+  it("opens with the title and the five items in order within 40 lines, before the first ## heading", () => {
+    assert.equal(linesOf(README)[0], "# Open Agent");
+    const first = linesOf(README).slice(0, 40).join("\n");
+    inOrder(first, items);
+    const firstH2 = linesOf(README).findIndex((l) => l.startsWith("## ")) + 1;
+    assert.ok(firstH2 > lineOf(README, items.at(-1)), `first ## at line ${firstH2}`);
+    assert.ok(firstH2 <= 41, `first ## at line ${firstH2}`);
+  });
+  it("says what it is: chat, widgets, reports, your keys or a local model", () => {
+    const what = linesOf(README).find((l) => l.startsWith(items[0]));
+    for (const s of ["chat", "widgets", "reports", "model keys", "local model"]) assert.ok(what.includes(s), `lacks ${s}`);
+  });
+  it("links the Mac app download, names both DMGs, Open Anyway and the install guide", () => {
+    const mac = linesOf(README).find((l) => l.startsWith(items[1]));
+    for (const s of [
+      "https://github.com/Nit-1997/open-agent-bot/releases/latest",
+      "`Open-Agent-1.0.0-arm64.dmg`",
+      "`Open-Agent-1.0.0-x64.dmg`",
+      '"Open Anyway"',
+      "(docs/INSTALL.md)",
+      "Docker",
+    ])
+      assert.ok(mac.includes(s), `Mac app line lacks ${s}`);
+  });
+  it("gives the three browser-only lines and the local URL", () => {
+    const first = linesOf(README).slice(0, 40).join("\n");
+    assert.ok(
+      first.includes(
+        "```bash\ngit clone --branch v1.0.0 --depth 1 https://github.com/Nit-1997/open-agent-bot\ncd open-agent-bot\ndocker compose up -d --build\n```",
+      ),
+    );
+    assert.ok(first.includes("http://127.0.0.1:3000"));
+  });
+  it("states local-only, no account, no telemetry and the residual local-process risk", () => {
+    const sec = linesOf(README).find((l) => l.startsWith(items[3]));
+    for (const s of ["127.0.0.1", "no account", "no telemetry", "other programs", "other user accounts", "launch key", "(SECURITY.md)"])
+      assert.ok(sec.includes(s), `Security line lacks ${s}`);
+  });
+  it("keeps the anchors the app and INSTALL link to", () => {
+    assert.match(README, /^### Startup errors$/m);
+  });
+});
+
+describe("hosted docs moved out of the README", () => {
+  const HOSTED = read("docs/hosted.md");
+  const moved = [
+    "Run the hosted stack",
+    "Deploy",
+    "Optional: Ollama in Docker",
+    "Optional: LiteLLM gateway",
+    "Settings reference",
+    "End-to-end demo",
+    "Evals",
+  ];
+  it("says what it is and where it goes in M6", () => {
+    assert.equal(linesOf(HOSTED)[0].startsWith("# "), true);
+    assert.ok(HOSTED.includes("This is the invite-only hosted deployment. It moves to `cloud/README.md` in M6."));
+  });
+  it("holds every hosted heading that left the README", () => {
+    for (const h of moved) {
+      assert.match(HOSTED, new RegExp(`^#{2,3} ${h}$`, "m"), `docs/hosted.md lacks ${h}`);
+      assert.doesNotMatch(README, new RegExp(`^#{2,3} ${h}$`, "m"), `README still has ${h}`);
+    }
+  });
+  it("keeps the hosted text verbatim", () => {
+    for (const s of [
+      "Every hosted command needs `-f compose.hosted.yml`",
+      "`docker compose -f compose.hosted.yml --env-file deploy-config/.env-nextjs --profile local up -d --build`",
+      "`docker compose -f compose.hosted.yml cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt",
+      "`CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose -f compose.hosted.yml up -d --build`",
+      "`docker compose -f compose.hosted.yml --profile ollama up -d`",
+      "`docker compose -f compose.hosted.yml exec agent node dist/scripts/rotateCredentials.js`",
+      "npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w e2e",
+      "`cd packages/core && npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5`",
+    ])
+      assert.ok(HOSTED.includes(s), `docs/hosted.md lacks ${s}`);
+  });
+  it("targets the hosted project in every compose command", () => {
+    const spans = [
+      ...[...HOSTED.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]),
+      ...extractCommands(HOSTED, "docs/hosted.md").map((c) => c.command),
+    ];
+    const compose = spans.filter((c) => /\bdocker compose\b/.test(c));
+    assert.ok(compose.length >= 6);
+    for (const c of compose)
+      assert.ok(
+        c.includes("-f compose.hosted.yml") ||
+          /docker compose -p oab-/.test(c) ||
+          c === "docker compose config --format json | jq -r .name",
+        `untargeted: ${c}`,
+      );
+  });
+  it("leaves no hosted command in the README and links docs/hosted.md once", () => {
+    for (const s of ["compose.hosted.yml", "SUPABASE_", "deploy-config/.env-agent", "app.localhost"])
+      assert.ok(!README.includes(s), `README still names ${s}`);
+    assert.equal(README.split("(docs/hosted.md)").length - 1, 1);
+  });
+});
+
+describe("SECURITY", () => {
+  const SEC = read("SECURITY.md");
+  it("has its sections in order", () => {
+    inOrder(SEC, [
+      "## Reporting a vulnerability",
+      "## Supported versions",
+      "## Verifying a download",
+      "## Local stack",
+      "## Mac app",
+      "## Hosted service",
+    ]);
+  });
+  it("supports the latest release only and splits corruption from authenticity", () => {
+    const sv = SEC.slice(SEC.indexOf("## Supported versions"), SEC.indexOf("## Verifying a download"));
+    for (const s of ["latest release", "Prereleases", "not supported"]) assert.ok(sv.includes(s), `Supported versions lacks ${s}`);
+    const vd = SEC.slice(SEC.indexOf("## Verifying a download"), SEC.indexOf("## Local stack"));
+    for (const s of [
+      "shasum -a 256 -c SHA256SUMS --ignore-missing",
+      "corruption",
+      "authenticity",
+      "gh attestation verify Open-Agent-1.0.0-arm64.dmg",
+      "gh attestation verify open-agent-services.json",
+      "gh attestation verify oci://ghcr.io/nit-1997/open-agent@sha256:",
+    ])
+      assert.ok(vd.includes(s), `Verifying a download lacks ${s}`);
+  });
+  it("keeps the local stack, Mac app and hosted sections and adds the release facts", () => {
+    for (const s of [
+      "- **Host allowlist.**",
+      "- **Accepted residual risk: local callers.**",
+      "- **Launch token and cookie.**",
+      "- **Docker discovery fails closed.**",
+      "- **Loopback firewall and navigation lockdown.**",
+      "- **Fuses and signing.**",
+      "- **Export without keys.**",
+      "- **Residual risks.**",
+      "- **Invite-only accounts.**",
+      "- **Stale admin capabilities.**",
+      "pinned by digest",
+      "only from attested digests",
+      "immutable once published",
+      "not the app's JavaScript",
+    ])
+      assert.ok(SEC.includes(s), `SECURITY.md lacks ${s}`);
+  });
+});
+
+describe("CONTRIBUTING", () => {
+  const C = read("CONTRIBUTING.md");
+  it("has Releases with the runbook, the dry run and the scripts rule", () => {
+    assert.match(C, /^## Releases$/m);
+    const r = C.slice(C.indexOf("## Releases"));
+    for (const s of [
+      "(docs/RELEASING.md)",
+      "OPEN_AGENT_SHELL_TEST=1 npm run release:dry-run -- --version 0.0.0-dryrun.1 --registry 127.0.0.1:18501 --builder oab-factory-m5-builder --out .factory/m5/release-dry-run/0.0.0-dryrun.1",
+      "scripts/release/",
+      "npm run lint:workflows",
+      "scripts/test/release.test.mjs",
+    ])
+      assert.ok(r.includes(s), `Releases lacks ${s}`);
+  });
+  it("has the base-pin rule and the docs-commands rule", () => {
+    for (const s of ["scripts/test/basePins.test.mjs", "scripts/docs/doc-commands.json", "node scripts/docs/run-doc-commands.mjs"])
+      assert.ok(C.includes(s), `CONTRIBUTING.md lacks ${s}`);
+  });
+  it("lists the release, docs and demo scripts in Layout", () => {
+    const layout = C.slice(C.indexOf("## Layout"));
+    for (const s of ["scripts/release/", "scripts/docs/", "scripts/demo/"]) assert.ok(layout.includes(s), `Layout lacks ${s}`);
+  });
+  it("points at docs/hosted.md for the hosted stack, not the README", () => {
+    assert.ok(C.includes("(docs/hosted.md)"));
+    assert.ok(!/README[^\n]*(reference table|"End-to-end demo"|\*\*Run\*\*)/.test(C));
+  });
+});
+
+describe("RELEASING", () => {
+  const R = read("docs/RELEASING.md");
+  const section = (from, to) => {
+    const a = R.indexOf(from);
+    assert.ok(a >= 0, `RELEASING lacks ${from}`);
+    const b = to ? R.indexOf(to, a) : R.length;
+    return R.slice(a, b < 0 ? R.length : b);
+  };
+  it("has its sections in order", () => {
+    inOrder(R, [
+      "## Prerequisites",
+      "## Repository settings",
+      "## Dry run",
+      "## Gate 4",
+      "## Watching a run",
+      "## Gate 5a",
+      "## Gate 5b",
+      "## Checklist",
+      "## Rollback",
+    ]);
+  });
+  it("names the prerequisites and the gh version the commands were checked with", () => {
+    const p = section("## Prerequisites", "## Repository settings");
+    for (const s of ["brew upgrade gh", "gh auth status", "read:packages", "gh auth refresh -s read:packages", "jq", "2.44.1"])
+      assert.ok(p.includes(s), `Prerequisites lacks ${s}`);
+  });
+  it("has the seven settings with GitHub's labels", () => {
+    const st = section("## Repository settings", "## Dry run");
+    for (const s of [
+      "public",
+      "**Actions permissions**",
+      "Allow actions created by GitHub",
+      "`docker/*`",
+      "**Workflow permissions**",
+      '"Read repository contents and packages permissions"',
+      "**New tag ruleset**",
+      '"Restrict creations"',
+      '"Restrict updates"',
+      '"Restrict deletions"',
+      "**New branch ruleset**",
+      '"Require review from Code Owners"',
+      '"Block force pushes"',
+      "`.github/CODEOWNERS`",
+      "**New environment**",
+      '"Required reviewers"',
+      '"Prevent self-review"',
+      '"Selected branches and tags"',
+      '"Enable release immutability"',
+      "required before `v1.0.0`",
+      '"Manage Actions access"',
+      "`ubuntu-24.04-arm`",
+      "`macos-15`",
+    ])
+      assert.ok(st.includes(s), `settings lack ${s}`);
+    for (let n = 1; n <= 7; n++) assert.match(st, new RegExp(`^${n}\\. `, "m"), `settings lack step ${n}`);
+  });
+  it("has the watch loop, the four approvals and how to see a waiting run", () => {
+    const w = section("## Watching a run", "## Gate 5a");
+    for (const s of [
+      `until id=$(gh run list --workflow release.yml --event push --branch "$TAG" --limit 1 --json databaseId -q '.[0].databaseId') && [ -n "$id" ]; do sleep 5; done`,
+      'gh run watch --exit-status "$id"',
+      "four approvals",
+      '"Review deployments"',
+      '"Approve and deploy"',
+      '"Waiting for review"',
+      `gh api "repos/Nit-1997/open-agent-bot/actions/runs/$id/pending_deployments" --jq '.[].environment.name'`,
+      'gh run rerun "$id" --failed',
+      'gh release delete "$TAG" --yes',
+    ])
+      assert.ok(w.includes(s), `Watching a run lacks ${s}`);
+  });
+  it("has the Gate 4 and Gate 5a commands", () => {
+    assert.ok(section("## Gate 4", "## Watching a run").includes("npm run dist:local -w @oab/desktop"));
+    const a = section("## Gate 5a", "## Gate 5b");
+    for (const s of [
+      `TAG=v1.0.0-rc.1; git fetch origin && git tag -a "$TAG" -m "Open Agent 1.0.0-rc.1" origin/main && git push origin "$TAG"`,
+      'gh release view "$TAG"',
+      'mkdir -p /tmp/oa-rc1 && gh release download "$TAG" -D /tmp/oa-rc1',
+      "shasum -a 256 -c SHA256SUMS",
+      '"Change visibility"',
+      "docker logout ghcr.io",
+      'docker pull "$(jq -r .images.agent /tmp/oa-rc1/open-agent-services.json)"',
+      'gh attestation verify "oci://$(jq -r .images.agent /tmp/oa-rc1/open-agent-services.json)"',
+      '"Open Anyway"',
+    ])
+      assert.ok(a.includes(s), `Gate 5a lacks ${s}`);
+  });
+  it("verifies again immediately before publishing and fills the real digests into INSTALL", () => {
+    const b = section("## Gate 5b", "## Checklist");
+    const verify = b.indexOf('rm -rf /tmp/oa-100 && mkdir /tmp/oa-100 && gh release download "$TAG" -D /tmp/oa-100');
+    const publish = b.indexOf('gh release edit "$TAG" --draft=false --latest');
+    assert.ok(verify >= 0 && publish > verify, "5b must verify before publishing");
+    assert.ok(b.slice(verify, publish).includes("gh attestation verify"));
+    for (const s of [
+      'TAG=v1.0.0; git tag -a "$TAG" -m "Open Agent 1.0.0"',
+      "node scripts/docs/fill-digests.mjs --manifest /tmp/oa-100/open-agent-services.json",
+      "curl -s https://api.github.com/repos/Nit-1997/open-agent-bot/releases/latest | jq -r .tag_name",
+    ])
+      assert.ok(b.includes(s), `Gate 5b lacks ${s}`);
+  });
+  it("has the checklist and rollback with the re-push rule and retention", () => {
+    const c = section("## Checklist", "## Rollback");
+    assert.ok((c.match(/^- \[ \] /gm) ?? []).length >= 10);
+    for (const s of ["immutability", "kind=release version=1.0.0", "verify-dmgs", "anonymously", "Version in this guide"])
+      assert.ok(c.includes(s), `Checklist lacks ${s}`);
+    const r = section("## Rollback");
+    for (const s of [
+      'git push origin :refs/tags/$TAG && git tag -d "$TAG"',
+      "no release (draft or published) was ever created",
+      'gh release delete "$TAG" --yes --cleanup-tag',
+      "v1.0.1",
+      "gh auth refresh -s read:packages,delete:packages",
+      "gh api -X DELETE /user/packages/container/open-agent/versions/<id>",
+      "Never delete untagged versions",
+    ])
+      assert.ok(r.includes(s), `Rollback lacks ${s}`);
+  });
+});
+
+describe("fill-digests", () => {
+  const manifest = {
+    version: "1.0.0",
+    images: { agent: `ghcr.io/nit-1997/open-agent@sha256:${D("a")}`, search: `ghcr.io/nit-1997/open-agent-search@sha256:${D("b")}` },
+  };
+  const filled = fillDigests(INSTALL, manifest);
+  it("writes both release refs into every placeholder and keeps the guide valid", () => {
+    assert.ok(
+      filled.includes(`printf 'OPEN_AGENT_IMAGE=${manifest.images.agent}\\nOPEN_AGENT_SEARCH_IMAGE=${manifest.images.search}\\n' > .env`),
+    );
+    assert.ok(filled.includes(`gh attestation verify oci://${manifest.images.agent} `));
+    assert.ok(!filled.includes("<agent-digest>") && !filled.includes("<search-digest>"));
+    assert.deepEqual(imageTagProblems(filled), []);
+    assert.deepEqual(attestationProblems(filled, "1.0.0"), []);
+    assert.equal(guideVersion(filled), "1.0.0");
+  });
+  it("replaces earlier digests, is idempotent and resets to placeholders", () => {
+    const next = { ...manifest, images: { agent: manifest.images.agent.replace(D("a"), D("e")), search: manifest.images.search } };
+    const again = fillDigests(filled, next);
+    assert.ok(again.includes(next.images.agent) && !again.includes(manifest.images.agent));
+    assert.equal(fillDigests(again, next), again);
+    assert.equal(resetDigests(filled), INSTALL);
+  });
+  it("refuses a manifest for another version, a tag ref, a local ref or a missing image", () => {
+    for (const [m, want] of [
+      [{ ...manifest, version: "1.0.1" }, /version 1.0.1.*1.0.0/],
+      [{ ...manifest, images: { ...manifest.images, agent: "ghcr.io/nit-1997/open-agent:1.0.0" } }, /agent/],
+      [{ ...manifest, images: { ...manifest.images, search: `127.0.0.1:18501/oab-m5-open-agent-search@sha256:${D("b")}` } }, /search/],
+      [{ ...manifest, images: { agent: manifest.images.agent } }, /search/],
+    ])
+      assert.throws(() => fillDigests(INSTALL, m), want);
+  });
+  it("refuses a guide without the §9 refs", () => {
+    assert.throws(() => fillDigests("Version in this guide: 1.0.0\n", manifest), /no image refs/);
   });
 });
