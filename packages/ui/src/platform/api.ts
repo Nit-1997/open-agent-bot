@@ -4,9 +4,17 @@ export type ApiClient = Readonly<{
 }>;
 
 const DEFAULT_BASE = "/api";
+const DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i;
+
+const hasDotSegment = (path: string) =>
+  path
+    .split(/[?#]/, 1)[0]
+    .split("/")
+    .some((segment) => DOT_SEGMENT.test(segment));
 
 function guard(path: string): string {
-  if (path.startsWith("//") || path.includes("\\")) throw new TypeError(`Refusing an API path that could leave the origin: ${path}`);
+  if (path.startsWith("//") || path.includes("\\") || hasDotSegment(path))
+    throw new TypeError(`Refusing an API path that could leave the origin or the API base: ${path}`);
   return path;
 }
 
@@ -37,9 +45,4 @@ export function configureApi(client: ApiClient): void {
 
 export function api(): ApiClient {
   return current;
-}
-
-export function resetApiForTests(): void {
-  current = createApiClient({ baseUrl: DEFAULT_BASE });
-  configuredBase = null;
 }

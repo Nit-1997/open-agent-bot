@@ -1,12 +1,14 @@
 {
   "name": "@oab/ui",
   "version": "1.0.0",
+  "description": "The Open Agent chat UI as TypeScript source: platform adapters, components, client lib, views and styles, with no Next, Supabase or cloud imports",
   "private": true,
   "license": "MIT",
   "type": "module",
   "exports": {
     "./platform": "./src/platform/index.ts",
     "./platform/api": "./src/platform/api.ts",
+    "./platform/chat": "./src/platform/chat.ts",
     "./components/*": "./src/components/*",
     "./lib/*": "./src/lib/*",
     "./views/*": "./src/views/*",
@@ -32,8 +34,7 @@
     "@oab/shared": "1.0.0",
     "lucide-react": "0.525.0",
     "react-markdown": "10.1.0",
-    "remark-gfm": "4.0.1",
-    "typebox": "^1.4.3"
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
