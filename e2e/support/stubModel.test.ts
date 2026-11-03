@@ -1,13 +1,28 @@
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, it } from "node:test";
-import { REPORT_MARKER, STUB_API_KEY, STUB_MODEL, STUB_REPORT_TITLE, type StubModel, startStubModel, stubPortProblem, stubReport } from "./stubModel.ts";
+import {
+  REPORT_MARKER,
+  STUB_API_KEY,
+  STUB_MODEL,
+  STUB_REPORT_TITLE,
+  type StubModel,
+  startStubModel,
+  stubPortProblem,
+  stubReport,
+} from "./stubModel.ts";
 
 const AUTH = { authorization: `Bearer ${STUB_API_KEY}` };
 
 const PORT = 18961;
 
-type Chunk = { choices: Array<{ delta?: { content?: string; tool_calls?: Array<{ function: { name: string; arguments: string } }> }; finish_reason: string | null }>; usage?: object };
+type Chunk = {
+  choices: Array<{
+    delta?: { content?: string; tool_calls?: Array<{ function: { name: string; arguments: string } }> };
+    finish_reason: string | null;
+  }>;
+  usage?: object;
+};
 
 async function stream(url: string, messages: object[]): Promise<{ chunks: Chunk[]; done: boolean }> {
   const res = await fetch(`${url}/chat/completions`, {
@@ -52,7 +67,10 @@ describe("stub model", () => {
   it("lists stub-1 at /v1/models", async () => {
     const res = await fetch(`${stub.url}/models`, { headers: AUTH });
     assert.equal(res.status, 200);
-    assert.deepEqual(((await res.json()) as { data: Array<{ id: string }> }).data.map((m) => m.id), [STUB_MODEL]);
+    assert.deepEqual(
+      ((await res.json()) as { data: Array<{ id: string }> }).data.map((m) => m.id),
+      [STUB_MODEL],
+    );
   });
 
   it("streams a deterministic reply in several chunks, then stop, usage and [DONE]", async () => {
@@ -84,7 +102,11 @@ describe("stub model", () => {
   it("answers with text after the tool result", async () => {
     const { chunks } = await stream(stub.url, [
       { role: "user", content: `make a report ${REPORT_MARKER}` },
-      { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "create_artifact", arguments: "{}" } }] },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [{ id: "c1", type: "function", function: { name: "create_artifact", arguments: "{}" } }],
+      },
       { role: "tool", tool_call_id: "c1", content: "artifact a1 created" },
     ]);
     assert.match(contents(chunks).join(""), /report is ready/);
@@ -102,7 +124,8 @@ describe("stub model", () => {
 
   it("answers 404 elsewhere", async () => assert.equal((await fetch(`http://127.0.0.1:${PORT}/admin`)).status, 404));
 
-  it("lists models without a key, so reachability checks need none", async () => assert.equal((await fetch(`${stub.url}/models`)).status, 200));
+  it("lists models without a key, so reachability checks need none", async () =>
+    assert.equal((await fetch(`${stub.url}/models`)).status, 200));
 
   it("refuses completions without its API key", async () => {
     const post = (headers: Record<string, string>) =>

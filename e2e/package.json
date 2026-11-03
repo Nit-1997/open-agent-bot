@@ -8,6 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "format": "biome format --write",
+    "format:check": "biome format",
     "test": "node --test --disable-warning=ExperimentalWarning support/*.test.ts scripts/*.test.ts",
     "e2e": "playwright test --project=desktop --project=tablet --project=phone",
     "smoke": "playwright test --project=smoke",

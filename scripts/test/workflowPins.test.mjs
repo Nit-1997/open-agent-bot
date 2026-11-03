@@ -124,7 +124,7 @@ describe("images.yml", () => {
 
   it("passes only the version and revision as build args, never secrets", () => {
     const builds = Object.values(wf.jobs).flatMap((job) => job.steps.filter((s) => String(s.uses ?? "").startsWith("docker/build-push-action@")));
-    assert.equal(builds.length, 3);
+    assert.equal(builds.length, 2);
     for (const step of builds) {
       const args = String(step.with["build-args"]).trim().split("\n");
       assert.deepEqual(args.map((a) => a.split("=")[0]), ["OPEN_AGENT_VERSION", "OPEN_AGENT_REVISION"]);
@@ -133,7 +133,7 @@ describe("images.yml", () => {
     }
   });
 
-  it("checks the image content (/app for the agent) in the build job and before the push", () => {
+  it("checks the image content (/app for the agent) in the build job and on the exact digest it pushed", () => {
     const agentDirs = (job) => job.strategy.matrix.include.filter((l) => l.image === "open-agent").map((l) => l.content);
     for (const name of ["build", "push"]) {
       const job = wf.jobs[name];
@@ -143,9 +143,12 @@ describe("images.yml", () => {
       assert.match(steps, /test -z "\$found"/, name);
     }
     const push = wf.jobs.push.steps;
-    const check = push.findIndex((s) => (s.run ?? "").includes("find '$CONTENT_DIR'"));
     const pushed = push.findIndex((s) => String(s.with?.outputs ?? "").includes("push=true"));
-    assert.ok(check >= 0 && pushed > check);
+    const check = push.findIndex((s) => (s.run ?? "").includes("find '$CONTENT_DIR'"));
+    const attest = push.findIndex((s) => String(s.uses ?? "").startsWith("actions/attest-build-provenance@"));
+    assert.ok(pushed >= 0 && check > pushed && attest > check);
+    assert.equal(push.filter((s) => String(s.uses ?? "").startsWith("docker/build-push-action@")).length, 1);
+    assert.match(push[check].env.IMAGE, /steps\.meta\.outputs\.name \}\}@\$\{\{ steps\.build\.outputs\.digest/);
   });
 
   it("never pushes from the build job", () => {

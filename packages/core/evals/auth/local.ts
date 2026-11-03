@@ -2,6 +2,7 @@ import type { Transport } from "../types.js";
 
 const RUN_PATH = "/api/copilotkit/agent/openagent/run";
 const KEY_PATH = "/api/providers/openrouter/key";
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
 function originOf(raw: string): string {
   let url: URL | undefined;
@@ -13,6 +14,7 @@ function originOf(raw: string): string {
       `--origin must be an http(s) origin with no path, e.g. http://127.0.0.1:18330; got '${raw.replace(/\/\/[^/@]*@/, "//***@")}'`,
     );
   }
+  if (!LOOPBACK_HOSTS.has(url.hostname)) throw new Error(`--target local only talks to 127.0.0.1 or localhost; got '${url.hostname}'`);
   return url.origin;
 }
 

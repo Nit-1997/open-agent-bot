@@ -17,16 +17,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { log } from "../../src/lib/log.js";
-import {
-  loadLocalKeys,
-  loadOrCreateSecretFile,
-  newAgentSecret,
-  newHexSecret,
-  newKekFile,
-  parseHexSecret,
-  parseKekFile,
-} from "../../src/local/keyFiles.js";
-import { REFUSAL_EXIT, type RefusalCode, StartupRefusal } from "../../src/local/refusal.js";
+import { loadOrCreateSecretFile, newHexSecret, parseHexSecret, SecretFileError } from "../../src/lib/secretFile.js";
+import { loadLocalKeys, newAgentSecret, newKekFile, parseKekFile } from "../../src/local/keyFiles.js";
+import { REFUSAL_EXIT, type RefusalCode, refusalOf as toRefusal, StartupRefusal } from "../../src/local/refusal.js";
 import { EnvelopeCredentialStore } from "../../src/secrets/credentialStore.js";
 import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
 import { parseCredentialKeys } from "../../src/secrets/keys.js";
@@ -63,7 +56,7 @@ function refusalOf(fn: () => unknown): StartupRefusal {
   try {
     fn();
   } catch (err) {
-    if (err instanceof StartupRefusal) return err;
+    if (err instanceof StartupRefusal || err instanceof SecretFileError) return toRefusal(err) as StartupRefusal;
     throw err;
   }
   throw new Error("expected a StartupRefusal");
@@ -357,8 +350,10 @@ describe("refuse()", () => {
     ["keyfile_invalid", 83],
     ["ui_missing", 84],
     ["identity", 85],
+    ["listen", 86],
   ];
-  const LINE = /^\[startup\] refused code=(config|db_corrupt|db_newer|db_migration|kek_missing|keyfile_invalid|ui_missing|identity) /;
+  const LINE =
+    /^\[startup\] refused code=(config|db_corrupt|db_newer|db_migration|kek_missing|keyfile_invalid|ui_missing|identity|listen) /;
   const child = (...args: string[]) =>
     spawnSync(process.execPath, [TSX, join(import.meta.dirname, "fixtures/refuseChild.ts"), ...args], {
       encoding: "utf8",

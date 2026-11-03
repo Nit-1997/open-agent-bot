@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/playwright:v1.64.1-noble AS ui
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f AS ui
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -17,7 +17,7 @@ COPY packages/ui/src packages/ui/src
 COPY packages/local-web packages/local-web
 RUN npm run build -w @oab/local-web && test -f packages/local-web/dist/index.html
 
-FROM mcr.microsoft.com/playwright:v1.64.1-noble
+FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -52,6 +52,7 @@ LABEL org.opencontainers.image.source="https://github.com/Nit-1997/open-agent-bo
 USER pwuser
 ENV NODE_ENV=production
 ENV COPILOTKIT_TELEMETRY_DISABLED=true
+ENV OPEN_AGENT_VERSION=${OPEN_AGENT_VERSION}
 WORKDIR /app/packages/core
 EXPOSE 8000
 CMD ["node", "dist/server.js"]

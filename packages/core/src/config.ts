@@ -87,9 +87,19 @@ function httpUrl(raw: string): string | undefined {
   }
 }
 
+export type CoreSettings = Omit<CoreConfig, "rendererSecret">;
+
 export function coreConfigFrom(env: NodeJS.ProcessEnv, problems: string[]): CoreConfig {
+  const rendererSecret = requireEnv(env, problems)(
+    "RENDERER_SECRET",
+    (v) => (/^[0-9a-f]{64}$/.test(v) ? v : undefined),
+    "must be 64 hex characters",
+  );
+  return { ...coreSettingsFrom(env, problems), rendererSecret };
+}
+
+export function coreSettingsFrom(env: NodeJS.ProcessEnv, problems: string[]): CoreSettings {
   const need = requireEnv(env, problems);
-  const rendererSecret = need("RENDERER_SECRET", (v) => (/^[0-9a-f]{64}$/.test(v) ? v : undefined), "must be 64 hex characters");
   const rendererUrl = httpUrl(env.RENDERER_URL?.trim() || "http://renderer:8100");
   if (!rendererUrl) problems.push("RENDERER_URL must be an http(s) URL");
   const rawLimit = env.RUN_TIME_LIMIT_SECONDS?.trim();
@@ -111,7 +121,6 @@ export function coreConfigFrom(env: NodeJS.ProcessEnv, problems: string[]): Core
     logLevel: (LOG_LEVELS as readonly string[]).includes(env.LOG_LEVEL ?? "") ? (env.LOG_LEVEL as LogLevel) : "info",
     runTimeLimitSeconds,
     rendererUrl: rendererUrl as string,
-    rendererSecret,
     copilotConnectsPerUser: copilotConnectsPerUser as number,
     copilotConnectMaxMs: copilotConnectMaxMs as number,
   };

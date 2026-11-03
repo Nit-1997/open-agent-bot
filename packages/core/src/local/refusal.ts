@@ -11,6 +11,7 @@ export const REFUSAL_EXIT = Object.freeze({
   keyfile_invalid: 83,
   ui_missing: 84,
   identity: 85,
+  listen: 86,
 } as const);
 
 export type RefusalCode = keyof typeof REFUSAL_EXIT;

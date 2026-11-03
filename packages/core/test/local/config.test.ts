@@ -3,11 +3,10 @@ import { describe, expect, it } from "vitest";
 import { ConfigError } from "../../src/config.js";
 import { loadLocalConfig } from "../../src/local/config.js";
 
-const RENDERER = "c".repeat(64);
 const TOKEN = "0123456789abcdef".repeat(4);
 const BASE: NodeJS.ProcessEnv = { COPILOTKIT_TELEMETRY_DISABLED: "true" };
 
-const load = (env: NodeJS.ProcessEnv = {}) => loadLocalConfig({ ...BASE, ...env }, { rendererSecret: RENDERER });
+const load = (env: NodeJS.ProcessEnv = {}) => loadLocalConfig({ ...BASE, ...env });
 
 function problemsOf(env: NodeJS.ProcessEnv): string[] {
   try {
@@ -30,7 +29,7 @@ describe("loadLocalConfig defaults", () => {
       listenHost: "0.0.0.0",
       listenPort: 3000,
       resetCredentials: false,
-      rendererSecret: RENDERER,
+      version: "dev",
       searxngUrl: "http://search:8080",
       rendererUrl: "http://renderer:8100",
     });
@@ -41,8 +40,10 @@ describe("loadLocalConfig defaults", () => {
     expect(load().uiDir).toBe(resolve(import.meta.dirname, "../../../local-web/dist"));
   });
 
-  it("never requires RENDERER_SECRET from the env", () => {
-    expect(() => load()).not.toThrow();
+  it("never requires RENDERER_SECRET from the env and holds no renderer secret of its own", () => {
+    const cfg = load();
+    expect(cfg).not.toHaveProperty("rendererSecret");
+    expect(JSON.stringify(cfg)).not.toMatch(/[0-9a-f]{64}/);
   });
 
   it("reads every local setting", () => {
@@ -70,6 +71,10 @@ describe("loadLocalConfig defaults", () => {
     });
   });
 
+  it.each(["0.4.0", "1.2.3-rc.1", "v1.0.0+abc"])("reads OPEN_AGENT_VERSION=%s for /health", (version) => {
+    expect(load({ OPEN_AGENT_VERSION: version }).version).toBe(version);
+  });
+
   it("treats an empty launch token and an empty reset as off", () => {
     const cfg = load({ OPEN_AGENT_LAUNCH_TOKEN: "", OPEN_AGENT_RESET_CREDENTIALS: "" });
     expect(cfg.launchToken).toBeUndefined();
@@ -86,8 +91,16 @@ describe("loadLocalConfig refusals", () => {
     expect(problemsOf({ OPEN_AGENT_RESET_CREDENTIALS: v }).join()).toContain("OPEN_AGENT_RESET_CREDENTIALS");
   });
 
-  it.each(["0", "70000", "abc", "-1", "3000.5", "1e3"])("refuses OPEN_AGENT_PORT=%s", (port) => {
+  it.each(["0", "80", "443", "1023", "70000", "abc", "-1", "3000.5", "1e3"])("refuses OPEN_AGENT_PORT=%s", (port) => {
     expect(problemsOf({ OPEN_AGENT_PORT: port }).join()).toContain("OPEN_AGENT_PORT");
+  });
+
+  it("accepts OPEN_AGENT_PORT=1024, the lowest port that keeps an explicit port in the Host header", () => {
+    expect(load({ OPEN_AGENT_PORT: "1024" }).publicPort).toBe(1024);
+  });
+
+  it.each(["has space", "<script>", "x".repeat(65)])("refuses OPEN_AGENT_VERSION=%j", (version) => {
+    expect(problemsOf({ OPEN_AGENT_VERSION: version }).join()).toContain("OPEN_AGENT_VERSION");
   });
 
   it.each(["70000", "abc", "-1"])("refuses OPEN_AGENT_LISTEN_PORT=%s", (port) => {
@@ -122,7 +135,7 @@ describe("loadLocalConfig refusals", () => {
   it.each([[undefined], ["false"], [""], ["1"]])("refuses COPILOTKIT_TELEMETRY_DISABLED=%j", (v) => {
     const problems = (() => {
       try {
-        loadLocalConfig({ COPILOTKIT_TELEMETRY_DISABLED: v }, { rendererSecret: RENDERER });
+        loadLocalConfig({ COPILOTKIT_TELEMETRY_DISABLED: v });
       } catch (err) {
         return (err as ConfigError).problems;
       }

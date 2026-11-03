@@ -28,7 +28,10 @@ describe("local probes target guard", () => {
         sent += 1;
         return { status: 200, acao: 0 };
       };
-      await assert.rejects(runLocalProbes(target, () => {}, send), /refusing to probe/);
+      await assert.rejects(
+        runLocalProbes(target, () => {}, send),
+        /refusing to probe/,
+      );
       assert.equal(sent, 0);
     });
   }
@@ -39,7 +42,8 @@ describe("local probes target guard", () => {
       (err: Error) => !err.message.includes("secret") && err.message.includes("***@"),
     ));
 
-  it("accepts 127.0.0.1 on an 18xxx port", () => assert.deepEqual(probeTarget("http://127.0.0.1:18340"), { origin: "http://127.0.0.1:18340", port: 18340 }));
+  it("accepts 127.0.0.1 on an 18xxx port", () =>
+    assert.deepEqual(probeTarget("http://127.0.0.1:18340"), { origin: "http://127.0.0.1:18340", port: 18340 }));
 
   it("the script exits 2 without sending anything for app.localhost", () => {
     const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", SCRIPT], {

@@ -7,8 +7,9 @@ import { importSpecifiers, readSourceTree, type SourceTree } from "./boundary.js
 const SRC = join(import.meta.dirname, "../../src");
 const SQLITE_MESSAGE = "node:sqlite is used only inside src/local/store.";
 const LOCAL_MESSAGE = "Hosted code must not use the local store.";
+const LOCAL_ONLY_MESSAGE = "Only src/local may import local modules.";
 
-type LocalRule = "B7" | "B8";
+type LocalRule = "B7" | "B8" | "B9";
 type LocalViolation = { rule: LocalRule; file: string; specifier: string };
 
 const isSqlite = (s: string) => s === "node:sqlite" || s === "sqlite";
@@ -27,6 +28,7 @@ function localViolations(tree: SourceTree): LocalViolation[] {
       const to = resolveTarget(file, specifier);
       if (isSqlite(specifier) && !file.startsWith("local/store/")) out.push({ rule: "B8", file, specifier });
       if (hosted && (isSqlite(specifier) || to?.toLowerCase().startsWith("local/"))) out.push({ rule: "B7", file, specifier });
+      if (!hosted && !file.startsWith("local/") && to?.startsWith("local/")) out.push({ rule: "B9", file, specifier });
     }
   }
   return out;
@@ -42,6 +44,9 @@ describe("local store boundary rules on fixture trees", () => {
     ["B7", { "hosted/deps.ts": 'import "@oab/core/local/store/sqliteStore.js";\n' }, "@oab/core/local/store/sqliteStore.js"],
     ["B7", { "hosted/x.ts": 'import "../local/keyFiles.js";\n' }, "../local/keyFiles.js"],
     ["B7", { "hosted/x.ts": 'import "node:sqlite";\n' }, "node:sqlite"],
+    ["B9", { "renderer/server.ts": 'import "../local/keyFiles.js";\n' }, "../local/keyFiles.js"],
+    ["B9", { "server.ts": 'import "./local/start.js";\n' }, "./local/start.js"],
+    ["B9", { "lib/x.ts": 'import "@oab/core/local/refusal.js";\n' }, "@oab/core/local/refusal.js"],
   ])("%s blocks %j", (rule, tree, specifier) => {
     const [file] = Object.keys(tree);
     expect(localViolations(tree)).toContainEqual({ rule, file, specifier });
@@ -50,6 +55,8 @@ describe("local store boundary rules on fixture trees", () => {
   it.each<[string, SourceTree]>([
     ["the store using node:sqlite", { "local/store/sqliteStore.ts": 'import { DatabaseSync } from "node:sqlite";\n' }],
     ["core using the local store", { "local/main.ts": 'import "./store/sqliteStore.js";\n' }],
+    ["local using shared lib code", { "local/keyFiles.ts": 'import "../lib/secretFile.js";\n' }],
+    ["the renderer using the shared secret file reader", { "renderer/server.ts": 'import "../lib/secretFile.js";\n' }],
     ["hosted names that only start like local", { "hosted/x.ts": 'import "@oab/core/localeTools.js";\n' }],
   ])("allows %s", (_name, tree) => {
     expect(localViolations(tree)).toEqual([]);
@@ -59,7 +66,7 @@ describe("local store boundary rules on fixture trees", () => {
 describe("local store boundary on src/", () => {
   const tree = readSourceTree(SRC);
 
-  it("has the store and no B7/B8 violations", () => {
+  it("has the store and no B7/B8/B9 violations", () => {
     expect(Object.keys(tree).filter((f) => f.startsWith("local/store/")).length).toBeGreaterThan(3);
     expect(localViolations(tree)).toEqual([]);
   });
@@ -77,7 +84,7 @@ describe("local store boundary on src/", () => {
   });
 });
 
-describe("Biome enforces B7 and B8", () => {
+describe("Biome enforces B7, B8 and B9", () => {
   const { lint, dispose } = biomeFixtures("local-boundary-");
   afterAll(dispose);
   const real = (file: string) => readFileSync(join(SRC, file), "utf8");
@@ -87,6 +94,8 @@ describe("Biome enforces B7 and B8", () => {
     ["src/local/main.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n', SQLITE_MESSAGE],
     ["src/hosted/deps.ts", 'import "@oab/core/local/store/sqliteStore.js";\n', LOCAL_MESSAGE],
     ["src/hosted/x.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n', LOCAL_MESSAGE],
+    ["src/renderer/server.ts", 'import { refuse } from "../local/refusal.js";\nexport default refuse;\n', LOCAL_ONLY_MESSAGE],
+    ["src/server.ts", 'import { startLocal } from "./local/start.js";\nexport default startLocal;\n', LOCAL_ONLY_MESSAGE],
   ])("blocks %s: %s", (file, code, message) => {
     const r = lint("core", file, code);
     expect(r.out).toContain(message);

@@ -1,0 +1,42 @@
+{
+  "$schema": "../node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": [
+      "local/**/*.ts",
+      "local/**/*.json",
+      "playwright.local.config.ts",
+      "support/localStack.ts",
+      "support/onboarding.ts",
+      "support/stubModel.ts",
+      "support/stubModel.test.ts",
+      "scripts/local-probes.mts",
+      "scripts/local-probes.test.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "performance": {
+        "useDomNodeTextContent": "off"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true
+  }
+}

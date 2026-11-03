@@ -1,9 +1,9 @@
-import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { expect, type Page, test } from "@playwright/test";
 import { env } from "../support/env.ts";
-import { completeOnboardingIfShown } from "../support/onboarding.ts";
 import { lastReplyLength, noAlertFor, readMarker, saveMarker, send, status, stopButton, waitForReplyDone } from "../support/localStack.ts";
+import { completeOnboardingIfShown } from "../support/onboarding.ts";
 import terms from "./demoTerms.json" with { type: "json" };
 
 const EVIL_PORT = 18399;
@@ -17,7 +17,7 @@ const REPORT_SETTLE_MS = 20_000;
 type ReportItem = { id: string; title: string };
 
 function evilPage(app: string): string {
-  return `<!doctype html><html><head><title>Another website</title></head><body style="font:16px system-ui;padding:32px">
+  return `<!doctype html><html id="evil-html"><head id="evil-head"><title id="evil-page-title">Another website</title></head><body id="evil-body" style="font:16px system-ui;padding:32px">
 <h1 id="evil-title"></h1>
 <p id="evil-result-fetch">fetch /api/chats → …</p>
 <p id="evil-result-form">form POST → …</p>
@@ -26,7 +26,7 @@ function evilPage(app: string): string {
 <button id="evil-form-submit" type="submit">Post a key from this page</button>
 </form>
 <iframe id="evil-sink" name="evil-sink" style="width:480px;height:80px"></iframe>
-<script>
+<script id="evil-script">
 document.getElementById("evil-title").textContent = "Foreign page at " + location.origin;
 fetch("${app}/api/chats", { credentials: "include" }).then(
   (r) => { document.getElementById("evil-result-fetch").textContent = "fetch /api/chats → readable " + r.status; },
@@ -106,12 +106,18 @@ async function downloadPdf(page: Page): Promise<number> {
   return bytes.length;
 }
 
-test("local demo: no login, onboarding, streaming and stop, a report and its PDF, search, and foreign pages refused", async ({ page, baseURL }) => {
+test("local demo: no login, onboarding, streaming and stop, a report and its PDF, search, and foreign pages refused", async ({
+  page,
+  baseURL,
+}) => {
   test.setTimeout(900_000);
   const app = baseURL as string;
 
   await test.step("0. The OpenRouter key is saved through the API, same origin, before the UI opens", async () => {
-    const res = await page.request.post("/api/providers/openrouter/key", { data: { apiKey: env("E2E_OPENROUTER_KEY") }, headers: { origin: app } });
+    const res = await page.request.post("/api/providers/openrouter/key", {
+      data: { apiKey: env("E2E_OPENROUTER_KEY") },
+      headers: { origin: app },
+    });
     expect(res.status()).toBe(200);
   });
 
@@ -163,7 +169,9 @@ test("local demo: no login, onboarding, streaming and stop, a report and its PDF
     await startNewChat(page);
     await send(page, terms.report);
     await expect(page).toHaveURL(CHAT_URL, { timeout: 60_000 });
-    await expect(status(page)).toBeVisible({ timeout: 30_000 }).catch(() => undefined);
+    await expect(status(page))
+      .toBeVisible({ timeout: 30_000 })
+      .catch(() => undefined);
     await waitForReplyDone(page, REPLY_MS);
     reportId = await newReportId(page, known, REPORT_SETTLE_MS);
     if (!reportId) {
@@ -207,7 +215,7 @@ test("local demo: no login, onboarding, streaming and stop, a report and its PDF
         expect(status403).toBe(403);
         await page.waitForTimeout(HOLD_MS);
         await expect(page.locator("#evil-result-fetch")).toContainText("blocked");
-        console.log(`${foreign}: ${await page.locator("#evil-result-fetch").innerText()}; form POST → ${status403}`);
+        console.log(`${foreign}: ${await page.locator("#evil-result-fetch").textContent()}; form POST → ${status403}`);
       }
     } finally {
       await new Promise<void>((ok) => server.close(() => ok()));

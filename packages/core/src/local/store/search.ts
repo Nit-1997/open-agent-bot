@@ -16,7 +16,7 @@ const SEARCH_DB_MIN = 2;
 const SEARCH_DB_MAX = 100;
 const SNIPPET_LEAD = 60;
 
-export const caseFold = (text: string): string => text.toLowerCase();
+export const caseFold = (text: string): string => Array.from(text, (c) => c.toLowerCase()).join("");
 
 export function registerSearchFunctions(db: DatabaseSync): void {
   db.function("oab_contains", { deterministic: true, varargs: false }, (haystack, needle) =>
@@ -66,11 +66,18 @@ type Row = {
 };
 
 export function snippetOf(content: string, query: string): { snippet: string; snippetStart: number; contentLength: number } {
-  const folded = caseFold(content);
-  const unit = folded.indexOf(caseFold(query));
-  const position = unit < 0 ? 0 : Array.from(folded.slice(0, unit)).length + 1;
-  const start = Math.max(1, position - SNIPPET_LEAD);
   const chars = Array.from(content);
+  const starts: number[] = [];
+  let folded = "";
+  for (const c of chars) {
+    starts.push(folded.length);
+    folded += c.toLowerCase();
+  }
+  const unit = folded.indexOf(caseFold(query));
+  let index = 0;
+  while (index + 1 < starts.length && starts[index + 1]! <= unit) index++;
+  const position = unit < 0 ? 0 : index + 1;
+  const start = Math.max(1, position - SNIPPET_LEAD);
   return { snippet: chars.slice(start - 1, start - 1 + SNIPPET_CHARS).join(""), snippetStart: start, contentLength: chars.length };
 }
 
