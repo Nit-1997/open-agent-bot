@@ -20,6 +20,7 @@ import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
 import { UserError } from "../../src/lib/errors.js";
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "../../src/lib/rateLimit.js";
+import { LocalRunPolicy } from "../../src/policy/localRunPolicy.js";
 import { RepoProfileStore } from "../../src/profile/store.js";
 import { hubFactory } from "../../src/providers/hubFactory.js";
 import { UserHubs } from "../../src/providers/hubs.js";
@@ -259,7 +260,7 @@ export async function makeApp(
   const deps: AppDeps = {
     guards: createGuards(identity),
     limiter,
-    gate: new ConcurrencyGate(RUN_CONCURRENCY),
+    runPolicy: new LocalRunPolicy({ limiter, gate: new ConcurrencyGate(RUN_CONCURRENCY) }),
     store,
     runContext: (user) => {
       const r = repos(user.id);
