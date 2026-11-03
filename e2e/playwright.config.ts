@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { env } from "./support/env";
+import { appOrigin } from "./support/origin";
 import { DEMO_USER, storageFor } from "./support/users";
 
 const desktop = { width: 1440, height: 900 };
@@ -18,7 +19,12 @@ export default defineConfig({
   globalSetup: "./global-setup.ts",
   globalTeardown: "./global-teardown.ts",
   use: {
-    baseURL: env("APP_ORIGIN"),
+    baseURL: appOrigin({
+      argv: process.argv,
+      explicit: process.env.APP_ORIGIN,
+      fallback: env("APP_ORIGIN", true),
+      inWorker: process.env.TEST_WORKER_INDEX !== undefined,
+    }),
     ignoreHTTPSErrors: true,
     storageState: storageFor(DEMO_USER),
     launchOptions: { slowMo: Number(process.env.DEMO_SLOWMO ?? 0) },

@@ -20,9 +20,9 @@ import { UserError } from "../../src/lib/errors.js";
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "../../src/lib/rateLimit.js";
 import { RepoProfileStore } from "../../src/profile/store.js";
-import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
-import { ProviderHub } from "../../src/providers/hub.js";
+import { hubFactory } from "../../src/providers/hubFactory.js";
 import { UserHubs } from "../../src/providers/hubs.js";
+import type { GatewayLike } from "../../src/startAgent.js";
 import { LoginFlows } from "../../src/providers/logins.js";
 import { SessionStore } from "../../src/session/sessionStore.js";
 import { TEST_KEY_B64, TEST_SECRET } from "./config.js";
@@ -47,7 +47,7 @@ export class FakeAccounts {
       email: u.email,
       status,
       createdAt: new Date(1_700_000_000_000 + this.users.size * 1000).toISOString(),
-      account: { id: u.id, email: u.email, isAdmin: u.isAdmin, bannedUntil: null, lastSignInAt: null, providers: ["email"] },
+      account: { id: u.id, email: u.email, isAdmin: u.capabilities.admin, bannedUntil: null, lastSignInAt: null, providers: ["email"] },
     });
   }
 
@@ -194,6 +194,7 @@ export async function makeApp(
     renderThumb?: Renderer;
     seams?: IdentitySeams;
     access?: AccessService;
+    gateway?: GatewayLike;
   } = {},
 ) {
   const db = new MemoryDb();
@@ -211,18 +212,18 @@ export async function makeApp(
   const identity = createSupabaseIdentity({ serviceSecret: TEST_SECRET, verify, status });
   const limiter = new RateLimiter();
   const repos = (id: string) => db.forUser(id);
-  const hubs = new UserHubs((user) => {
-    const r = repos(user.id);
-    return ProviderHub.create({
-      userId: user.id,
-      isAdmin: user.isAdmin,
-      settings: r.providerSettings,
-      credentials: new EnvelopeCredentialStore(user.id, r.credentials, wrapper),
-      fetch: over.fetch ?? fakeFetch([]),
-      userFetch: createSafeFetch(over.fetch ?? fakeFetch([])),
-      lookup: async () => ["93.184.216.34"],
-    });
-  });
+  const hubs = new UserHubs(
+    hubFactory({
+      repos,
+      keyWrapper: wrapper,
+      gateway: over.gateway,
+      network: {
+        fetch: over.fetch ?? fakeFetch([]),
+        userFetch: createSafeFetch(over.fetch ?? fakeFetch([])),
+        lookup: async () => ["93.184.216.34"],
+      },
+    }),
+  );
   const store = new SessionStore({
     idleMs: 60_000,
     create: async () => {
@@ -253,7 +254,7 @@ export async function makeApp(
       return {};
     },
   });
-  const { access: accessOver, fetch: _fetch, render: _render, renderThumb: _thumb, seams: _seams, ...appOver } = over;
+  const { access: accessOver, fetch: _fetch, render: _render, renderThumb: _thumb, seams: _seams, gateway: _gateway, ...appOver } = over;
   const deps: AppDeps = {
     guards: createGuards(identity),
     limiter,

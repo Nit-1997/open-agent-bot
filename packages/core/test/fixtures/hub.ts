@@ -4,7 +4,7 @@ import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js"
 import { wrapper } from "./app.js";
 import { fakeFetch } from "./fakeFetch.js";
 import { MemoryDb } from "./memoryRepos.js";
-import { ADMIN } from "./users.js";
+import { ADMIN, ALL_CAPABILITIES } from "./users.js";
 
 type Extra = Partial<Omit<Parameters<typeof ProviderHub.create>[0], "settings" | "credentials">>;
 
@@ -13,7 +13,7 @@ export async function testHub(extra: Extra = {}, db = new MemoryDb()) {
   const repos = db.forUser(userId);
   const hub = await ProviderHub.create({
     userId,
-    isAdmin: true,
+    capabilities: ALL_CAPABILITIES,
     settings: repos.providerSettings,
     credentials: new EnvelopeCredentialStore(userId, repos.credentials, wrapper),
     fetch: fakeFetch([]),

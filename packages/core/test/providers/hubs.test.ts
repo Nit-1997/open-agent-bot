@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Principal } from "../../src/identity/types.js";
-import type { ProviderHub } from "../../src/providers/hub.js";
+import { NO_CAPABILITIES, type Principal } from "../../src/identity/types.js";
+import { HUB_CAPABILITY_KEYS, type ProviderHub } from "../../src/providers/hub.js";
 import { UserHubs } from "../../src/providers/hubs.js";
-import { ADMIN, ALICE, BOB } from "../fixtures/users.js";
+import { ADMIN, ALICE, ALL_CAPABILITIES, BOB } from "../fixtures/users.js";
 
 const hubFor = (user: Principal) => ({ user }) as unknown as ProviderHub;
 
@@ -64,7 +64,7 @@ describe("UserHubs", () => {
 
   it("keeps admin and member hubs apart and invalidates both", async () => {
     const { hubs, build } = setup();
-    const promoted = { ...ALICE, isAdmin: true };
+    const promoted = { ...ALICE, capabilities: ALL_CAPABILITIES };
     const member = await hubs.get(ALICE);
     const admin = await hubs.get(promoted);
     expect(admin).not.toBe(member);
@@ -76,5 +76,30 @@ describe("UserHubs", () => {
     hubs.invalidate(ALICE.id);
     await hubs.get(BOB);
     expect(build).toHaveBeenCalledTimes(5);
+  });
+
+  it("keys hubs by every capability the hub reads", async () => {
+    expect(HUB_CAPABILITY_KEYS).toEqual(["privateNetworkModels", "operatorGateway"]);
+    for (const key of HUB_CAPABILITY_KEYS) {
+      const { hubs, build } = setup();
+      const plain = { ...ALICE, capabilities: NO_CAPABILITIES };
+      const flipped = { ...ALICE, capabilities: Object.freeze({ ...NO_CAPABILITIES, [key]: true }) };
+      const before = await hubs.get(plain);
+      const after = await hubs.get(flipped);
+      expect(after, key).not.toBe(before);
+      expect(build, key).toHaveBeenCalledTimes(2);
+      expect(await hubs.get(plain), key).toBe(before);
+      hubs.invalidate(ALICE.id);
+      await hubs.get(flipped);
+      expect(build, key).toHaveBeenCalledTimes(3);
+    }
+  });
+
+  it("shares a hub across capability sets that differ only in fields the hub does not read", async () => {
+    const { hubs, build } = setup();
+    const member = await hubs.get({ ...ALICE, capabilities: NO_CAPABILITIES });
+    const admin = await hubs.get({ ...ALICE, capabilities: Object.freeze({ ...NO_CAPABILITIES, admin: true }) });
+    expect(admin).toBe(member);
+    expect(build).toHaveBeenCalledTimes(1);
   });
 });

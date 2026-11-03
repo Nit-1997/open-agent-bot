@@ -2,10 +2,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { AuthError } from "../src/hosted/identity/verify.js";
-import type { Principal } from "../src/identity/types.js";
+import { NO_CAPABILITIES, type Principal } from "../src/identity/types.js";
 import { makeApp, tokenFor } from "./fixtures/app.js";
 import { TEST_SECRET } from "./fixtures/config.js";
-import { ADMIN, ALICE, BOB, CHAT_1, verified } from "./fixtures/users.js";
+import { ADMIN, ALICE, ALL_CAPABILITIES, BOB, CHAT_1, verified } from "./fixtures/users.js";
 
 const MATRIX_FILE = join(import.meta.dirname, "fixtures/route-matrix.json");
 const HEADERS = ["content-type", "cache-control", "content-security-policy", "x-content-type-options", "content-disposition"] as const;
@@ -13,7 +13,7 @@ const HEADERS = ["content-type", "cache-control", "content-security-policy", "x-
 const principal = (n: number, name: string, isAdmin: boolean): Principal => ({
   id: `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`,
   email: `${name}@example.test`,
-  isAdmin,
+  capabilities: isAdmin ? ALL_CAPABILITIES : NO_CAPABILITIES,
 });
 
 const DEACTIVATED = principal(4, "deactivated", false);
@@ -148,7 +148,7 @@ async function harnessFor() {
         if (id === DEACTIVATED.id) return "deactivated";
         return KNOWN.some((u) => u.id === id) ? "active" : undefined;
       },
-      isLiveAdmin: async (u) => (live.get(u.id) ?? (async () => u.isAdmin))(),
+      isLiveAdmin: async (u) => (live.get(u.id) ?? (async () => u.capabilities.admin))(),
     },
   });
   for (const u of [DEACTIVATED, STATUS_THROWS, ADMIN_NOT_LIVE, ADMIN_LIVE_THROWS]) h.accounts.add(u);

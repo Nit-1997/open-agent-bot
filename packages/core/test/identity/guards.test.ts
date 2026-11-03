@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createGuards } from "../../src/identity/guards.js";
-import type { AuthEnv, AuthOutcome, Identity, Principal } from "../../src/identity/types.js";
+import { type AuthEnv, type AuthOutcome, type Identity, NO_CAPABILITIES, type Principal } from "../../src/identity/types.js";
 import { UserError } from "../../src/lib/errors.js";
 
-const PRINCIPAL: Principal = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test", isAdmin: false };
+const PRINCIPAL: Principal = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test", capabilities: NO_CAPABILITIES };
 
 function harness(opts: { admit?: UserError; outcome?: AuthOutcome } = {}) {
   const identity: Identity = {

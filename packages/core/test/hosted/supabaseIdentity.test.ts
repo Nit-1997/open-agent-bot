@@ -4,6 +4,7 @@ import { UserStatusCache } from "../../src/hosted/identity/status.js";
 import { AuthError, type VerifiedUser } from "../../src/hosted/identity/verify.js";
 import { UserError } from "../../src/lib/errors.js";
 import { TEST_SECRET } from "../fixtures/config.js";
+import { ALL_CAPABILITIES } from "../fixtures/users.js";
 
 const VERIFIED: VerifiedUser = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -49,7 +50,7 @@ describe("createSupabaseIdentity", () => {
 
   it("maps a VerifiedUser to a Principal without the sessionId", async () => {
     const outcome = await identity().id.authenticate(request({ authorization: "Bearer tok.en.x" }));
-    expect(outcome).toEqual({ ok: true, principal: { id: VERIFIED.id, email: VERIFIED.email, isAdmin: true } });
+    expect(outcome).toEqual({ ok: true, principal: { id: VERIFIED.id, email: VERIFIED.email, capabilities: ALL_CAPABILITIES } });
     expect(outcome.ok && outcome.principal).not.toHaveProperty("sessionId");
   });
 

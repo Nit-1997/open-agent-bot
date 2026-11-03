@@ -1,5 +1,5 @@
 import type { Principal } from "../identity/types.js";
-import type { ProviderHub } from "./hub.js";
+import { HUB_CAPABILITY_KEYS, type ProviderHub } from "./hub.js";
 
 type Entry = { hub: Promise<ProviderHub>; usedAt: number };
 
@@ -19,7 +19,7 @@ export class UserHubs {
   }
 
   get(user: Principal): Promise<ProviderHub> {
-    const key = `${user.id}:${user.isAdmin ? "admin" : "user"}`;
+    const key = `${user.id}:${HUB_CAPABILITY_KEYS.map((k) => (user.capabilities[k] ? 1 : 0)).join("")}`;
     const hit = this.entries.get(key);
     if (hit && this.now() - hit.usedAt < this.idleMs) {
       this.entries.delete(key);
