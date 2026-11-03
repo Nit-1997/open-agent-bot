@@ -26,7 +26,7 @@ describe("skills directory", () => {
     const root = mkdtempSync(join(tmpdir(), "pkg-"));
     writeFileSync(join(root, "package.json"), "{}");
     const src = join(root, "src", "skills");
-    const dist = join(root, "dist", "agent", "src", "skills");
+    const dist = join(root, "dist", "skills");
     mkdirSync(src, { recursive: true });
     mkdirSync(dist, { recursive: true });
     expect(skillsDir({}, src)).toBe(join(root, "skills"));
