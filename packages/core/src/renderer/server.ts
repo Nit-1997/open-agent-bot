@@ -3,18 +3,48 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { MAX_ARTIFACT_BYTES } from "../artifacts/store.js";
 import { createLimiter } from "../lib/concurrency.js";
 import { log } from "../lib/log.js";
+import { parseHexSecret, readSecretFile } from "../local/keyFiles.js";
+import { StartupRefusal } from "../local/refusal.js";
 
 export const MAX_RENDER_BYTES = MAX_ARTIFACT_BYTES;
 const RENDER_SLOTS = 2;
 const TYPES = { pdf: "application/pdf", thumb: "image/jpeg" } as const;
 const SECRET_NAME = /SECRET|_KEY|KEYS|TOKEN|PASSWORD|PEPPER|CREDENTIAL|^SUPABASE_/i;
 
+const ALLOWED_SECRET_NAMES = new Set(["RENDERER_SECRET", "RENDERER_SECRET_FILE"]);
+
 export type RenderEngine = { pdf(html: string): Promise<Buffer>; thumb(html: string): Promise<Buffer> };
+
+export type RendererStartup = { ok: true; secret: string } | { ok: false; message: string };
 
 export function forbiddenEnv(env: NodeJS.ProcessEnv): string[] {
   return Object.keys(env)
-    .filter((name) => name !== "RENDERER_SECRET" && SECRET_NAME.test(name))
+    .filter((name) => !ALLOWED_SECRET_NAMES.has(name) && SECRET_NAME.test(name))
     .sort();
+}
+
+function secretFrom(env: NodeJS.ProcessEnv): RendererStartup {
+  const inline = env.RENDERER_SECRET?.trim() ?? "";
+  const file = env.RENDERER_SECRET_FILE?.trim() ?? "";
+  if (inline && file) return { ok: false, message: "set either RENDERER_SECRET or RENDERER_SECRET_FILE, not both" };
+  if (!file)
+    return /^[0-9a-f]{64}$/.test(inline)
+      ? { ok: true, secret: inline }
+      : { ok: false, message: "RENDERER_SECRET must be 64 hex characters" };
+  try {
+    return { ok: true, secret: readSecretFile({ path: file, parse: parseHexSecret, label: "renderer secret" }) };
+  } catch (err) {
+    if (err instanceof StartupRefusal) return { ok: false, message: err.message };
+    throw err;
+  }
+}
+
+export function rendererStartup(env: NodeJS.ProcessEnv): RendererStartup {
+  const resolved = secretFrom(env);
+  if (!resolved.ok) return resolved;
+  const leaked = forbiddenEnv(env);
+  if (leaked.length) return { ok: false, message: `refusing to start: the renderer must hold no other secrets (${leaked.join(", ")})` };
+  return resolved;
 }
 
 const digest = (v: string) => createHash("sha256").update(v, "utf8").digest();

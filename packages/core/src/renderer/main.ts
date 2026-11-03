@@ -1,6 +1,6 @@
 import { log, setLogLevel } from "../lib/log.js";
 import { ChromiumRenderer } from "./chromium.js";
-import { createRendererServer, forbiddenEnv } from "./server.js";
+import { createRendererServer, rendererStartup } from "./server.js";
 
 const PORT = 8100;
 
@@ -9,10 +9,9 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-const secret = process.env.RENDERER_SECRET?.trim() ?? "";
-if (!/^[0-9a-f]{64}$/.test(secret)) fail("RENDERER_SECRET must be 64 hex characters");
-const leaked = forbiddenEnv(process.env);
-if (leaked.length) fail(`refusing to start: the renderer must hold no other secrets (${leaked.join(", ")})`);
+const startup = rendererStartup(process.env);
+if (!startup.ok) fail(startup.message);
+const { secret } = startup;
 if (process.env.LOG_LEVEL === "debug") setLogLevel("debug");
 
 const engine = new ChromiumRenderer({ sandbox: true });
