@@ -1,0 +1,68 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": ["src/**", "test/**", "scripts/**", "*.ts", "*.mts", "!test/fixtures"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "html": {
+    "formatter": { "enabled": false }
+  },
+  "css": {
+    "formatter": { "enabled": false }
+  },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": { "noNonNullAssertion": "off" },
+      "performance": { "useDomNodeTextContent": "off" }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**",
+                      "!electron",
+                      "!node:*",
+                      "!./**",
+                      "!../**",
+                      "**/packages/**",
+                      "**/web/**",
+                      "**/cloud/**",
+                      "**/e2e/**",
+                      "**/node_modules/**"
+                    ],
+                    "message": "B11: the desktop shell imports only electron, node:* and its own files."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

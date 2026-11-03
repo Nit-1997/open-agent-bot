@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+import { appendFileSync } from "node:fs";
+import { join } from "node:path";
+
+const argv = process.argv.slice(2);
+const home = process.env.FAKE_DOCKER_HOME;
+if (home) appendFileSync(join(home, "calls.jsonl"), `${JSON.stringify({ argv, envNames: Object.keys(process.env).sort() })}\n`);
+
+if (argv[0] === "version") {
+  process.stdout.write(`${JSON.stringify({ Client: { Version: "29.3.1", Os: "darwin", Arch: "arm64" }, Server: { Version: "29.3.1", Os: "linux", Arch: "arm64" } })}\n`);
+  process.exit(0);
+}
+process.stderr.write(`fake docker: '${argv[0] ?? ""}' is not emulated yet\n`);
+process.exit(64);

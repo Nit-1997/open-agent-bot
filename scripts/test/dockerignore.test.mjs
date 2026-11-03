@@ -51,7 +51,11 @@ describe(".dockerignore", () => {
     it(`lists ${rule}`, () => assert.ok(RULES.includes(rule) || RULES.includes(`${rule}/`), rule));
   }
 
-  for (const name of ["packages/core/src/local/main.ts", "packages/local-web/index.html", "deploy-config/env.examples/agent.env.example", "package-lock.json"]) {
+  for (const name of ["apps/desktop/release/Open-Agent-0.0.0-dev-arm64.dmg", "apps/desktop/release/mac-arm64/Open Agent.app/Contents/Info.plist", "apps/desktop/build/stack/docker-compose.yml"]) {
+    it(`excludes ${name}`, () => assert.equal(ignored(name), true));
+  }
+
+  for (const name of ["apps/desktop/package.json", "packages/core/src/local/main.ts", "packages/local-web/index.html", "deploy-config/env.examples/agent.env.example", "package-lock.json"]) {
     it(`keeps ${name}`, () => assert.equal(ignored(name), false));
   }
 });

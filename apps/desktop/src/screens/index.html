@@ -1,0 +1,36 @@
+<!doctype html>
+<html id="shell-html" lang="en">
+  <head id="shell-head">
+    <meta id="shell-meta-charset" charset="utf-8">
+    <meta id="shell-meta-csp" http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'">
+    <meta id="shell-meta-viewport" name="viewport" content="width=device-width, initial-scale=1">
+    <title id="shell-title">Open Agent</title>
+    <link id="shell-stylesheet" rel="stylesheet" href="screens.css">
+    <script id="shell-script" src="screens.js" defer></script>
+  </head>
+  <body id="shell-body">
+    <p id="test-mode-label" class="test-mode" hidden>TEST MODE</p>
+    <main id="shell-main" class="shell">
+      <section id="screen-progress" class="screen" aria-labelledby="screen-progress-title">
+        <h1 id="screen-progress-title" class="title">Getting your agent ready</h1>
+        <ol id="screen-progress-steps" class="steps">
+          <li id="screen-progress-docker" class="step" data-state="pending">
+            <span id="screen-progress-docker-mark" class="mark" aria-hidden="true"></span>
+            <span id="screen-progress-docker-label" class="label">Docker</span>
+            <span id="screen-progress-docker-detail" class="detail">Checking Docker</span>
+          </li>
+          <li id="screen-progress-download" class="step" data-state="pending">
+            <span id="screen-progress-download-mark" class="mark" aria-hidden="true"></span>
+            <span id="screen-progress-download-label" class="label">Downloading services</span>
+            <span id="screen-progress-download-detail" class="detail">agent, search, renderer</span>
+          </li>
+          <li id="screen-progress-start" class="step" data-state="pending">
+            <span id="screen-progress-start-mark" class="mark" aria-hidden="true"></span>
+            <span id="screen-progress-start-label" class="label">Starting</span>
+            <span id="screen-progress-start-detail" class="detail">waiting for the agent to report healthy</span>
+          </li>
+        </ol>
+      </section>
+    </main>
+  </body>
+</html>

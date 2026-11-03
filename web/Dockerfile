@@ -10,6 +10,7 @@ COPY packages/core/package.json packages/core/
 COPY packages/ui/package.json packages/ui/
 COPY packages/local-web/package.json packages/local-web/
 COPY web/package.json web/
+COPY apps/desktop/package.json apps/desktop/
 COPY e2e/package.json e2e/
 RUN npm ci -w web --include-workspace-root
 COPY packages/shared ./packages/shared

@@ -8,7 +8,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const json = (path) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
 const DOCKERFILES = ["web/Dockerfile", "packages/core/Dockerfile"];
 const CHECKED_PACKAGES = ["packages/ui", "packages/bff"];
-const BUNDLED_APPS = ["packages/local-web"];
+const BUNDLED_APPS = ["packages/local-web", "apps/desktop"];
 
 function workspaces() {
   return json("package.json").workspaces.flatMap((pattern) => {
@@ -79,8 +79,16 @@ describe("workspace layout", () => {
     });
   }
 
-  it("finds the local-web workspace", () => {
+  it("finds the local-web and desktop workspaces", () => {
     assert.ok(all.includes("packages/local-web"));
+    assert.ok(all.includes("apps/desktop"));
+  });
+
+  it("apps/desktop has no runtime dependencies", () => {
+    const pkg = json("apps/desktop/package.json");
+    assert.deepEqual(pkg.dependencies ?? {}, {});
+    assert.deepEqual(pkg.optionalDependencies ?? {}, {});
+    assert.deepEqual(pkg.peerDependencies ?? {}, {});
   });
 
   for (const ws of BUNDLED_APPS) {
