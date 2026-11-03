@@ -82,14 +82,20 @@ async function fakeTarget(): Promise<Target> {
 async function realTarget(): Promise<Target> {
   const loc = locateDocker({ test: false });
   if (loc.kind !== "found") throw new Error("no trusted docker CLI");
+  const agentImage = process.env.DESKTOP_REAL_AGENT_IMAGE ?? "";
+  const searchImage = process.env.DESKTOP_REAL_SEARCH_IMAGE ?? "";
+  if (!agentImage || !searchImage)
+    throw new Error(
+      "DESKTOP_REAL_AGENT_IMAGE and DESKTOP_REAL_SEARCH_IMAGE must name locally built agent and search images (for example oab-dev-agent:dev and oab-dev-search:dev)",
+    );
   const root = mkdtempSync(join(tmpdir(), "oab-contract-real-"));
   const project = process.env.DESKTOP_REAL_PROJECT ?? "oab-factory-m4-2-contract";
   if (!/^oab-[a-z0-9-]+$/.test(project)) throw new Error("the real contract project must be oab-*");
   const vars: ComposeVars = {
     port: Number(process.env.DESKTOP_REAL_PORT ?? 18452),
     token: randomBytes(32).toString("hex"),
-    agentImage: process.env.DESKTOP_REAL_AGENT_IMAGE ?? "oab-m4-2-agent:a",
-    searchImage: process.env.DESKTOP_REAL_SEARCH_IMAGE ?? "oab-m4-2-search:a",
+    agentImage,
+    searchImage,
     dataVolume: `${project}-data`,
     keysVolume: `${project}-keys`,
   };

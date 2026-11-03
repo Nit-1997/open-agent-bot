@@ -82,9 +82,11 @@ node -e 'const c=require("node:crypto").createHash("sha256").update(require("nod
 cd e2e && DESKTOP_REAL_DOCKER=1 DESKTOP_REAL_SERVICES=/tmp/oab-dev-services.json DESKTOP_REAL_PROJECT=oab-dev-desktop \
   DESKTOP_REAL_RANGE=18480-18482 DESKTOP_LOCAL_RANGE=18484-18485 STUB_PORT=18483 DESKTOP_REAL_AGENT_IMAGE=oab-dev-agent:dev \
   npx playwright test -c playwright.desktop.config.ts --project desktop-real
+cd .. && DESKTOP_REAL_DOCKER=1 DESKTOP_REAL_AGENT_IMAGE=oab-dev-agent:dev DESKTOP_REAL_SEARCH_IMAGE=oab-dev-search:dev \
+  DESKTOP_REAL_PROJECT=oab-dev-contract DESKTOP_REAL_PORT=18487 npm test -w @oab/desktop -- compose.contract
 ```
 
-The same packaged smoke runs against real Docker with `--docker /usr/local/bin/docker --services /tmp/oab-dev-services.json` (project `oab-smoke-<arch>`, port 18486). Afterwards remove the dev images with `docker image rm oab-dev-agent:dev oab-dev-search:dev`. On Linux CI the engine socket belongs to root, so the `desktop-real` job also sets `OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET=1`, `DESKTOP_REAL_DOCKER_CLI=/usr/bin/docker`, `DESKTOP_REAL_ENGINE=Docker` and `STUB_BIND=0.0.0.0` (the agent container reaches the stub through `host.docker.internal`).
+The compose contract test needs both image variables and fails without them. The same packaged smoke runs against real Docker with `--docker /usr/local/bin/docker --services /tmp/oab-dev-services.json` (project `oab-smoke-<arch>`, port 18486). Afterwards remove the dev images with `docker image rm oab-dev-agent:dev oab-dev-search:dev`. On Linux CI the engine socket belongs to root, so the `desktop-real` job also sets `OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET=1`, `DESKTOP_REAL_DOCKER_CLI=/usr/bin/docker`, `DESKTOP_REAL_ENGINE=Docker` and `STUB_BIND=0.0.0.0` (the agent container reaches the stub through `host.docker.internal`).
 
 **Local build (Gate 4: dogfood the DMG before any GHCR publish).** `npm run dist:local -w @oab/desktop` builds `open-agent:local` and `open-agent-search:local` from your checkout with plain `docker build` (no compose project is created), writes a `kind:"local"` lock with their image Ids, and packages a DMG for your Mac's arch. The app shows "Local build (local-<sha>)" and "Open Agent — Local build" in its title, and refuses to start (`local_images_changed`) if either image is later rebuilt or removed; run `dist:local` again then. "Update services" is not available for local builds.
 
