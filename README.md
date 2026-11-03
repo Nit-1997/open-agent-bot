@@ -3,7 +3,7 @@
 Personal, read-only research and planning agent: chat, widgets, and HTML artifacts.
 
 ```
-web (Next.js + CopilotKit) → AG-UI → agent (Node + pi SDK) → model providers you add in the app
+web (Next.js + @oab/ui) → @oab/bff (/api) → agent /copilotkit (CopilotKit runtime) → AG-UI run (Node + pi SDK) → model providers you add in the app
                                         ├─ search (SearXNG)
                                         ├─ Chromium (guest-mode browsing)
                                         └─ renderer (sandboxed Chromium: report thumbnails and PDFs, no secrets)
@@ -67,6 +67,9 @@ Agent settings live in `deploy-config/.env-agent` (git-ignored).
 | `AGENT_MODEL_CAPS` | Sonnet models get `codemode` | Per-model capabilities: `provider/model=codemode\|other=none` |
 | `JEV_MODEL` | `typesafe/jev-latest`, then `openrouter/typesafe/jev-1.14` | Pin the Jev classifier to one provider/model |
 | `JEV_CONCURRENCY` | `64` | Jev requests in flight across all chats |
+| `COPILOTKIT_TELEMETRY_DISABLED` | required, `true` | The agent refuses to start without it, so CopilotKit never sends telemetry. The agent image sets it; set it for a host-run agent, scripts and evals |
+| `COPILOT_CONNECTS_PER_USER` | `8` | Open `/copilotkit` connect streams per user (1–100); over the cap answers 429 `too_many_connections` |
+| `COPILOT_CONNECT_MAX_MS` | `1800000` (30 min) | Longest a connect stream stays open (60000–86400000 ms) |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs prompts, tool arguments and the profile |
 
 ## Search and pictures
@@ -91,7 +94,7 @@ Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`,
 
 `e2e/` drives a preview stack with Playwright on desktop, tablet and phone sizes. It creates `oab-e2e+shell@example.test` and `oab-e2e+other@example.test`, seeds chats, reports and saved cards, and removes them afterwards with `supabase/scripts/cleanup-e2e.mjs`. It reads `deploy-config/env-files/.env-supabase-admin` and needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e` (saved through the app's API, never typed or logged; the run uses DeepSeek V4 Flash).
 
-Every Playwright project (`desktop`, `tablet`, `phone`, `smoke`, `preview-m1`) needs `APP_ORIGIN` set on the command, and refuses anything but `http://localhost` or `http://127.0.0.1` on a port in 18000–19999. `APP_ORIGIN` and the opt-in below are never read from the env files. To target any other origin on purpose, also set `E2E_ALLOW_LIVE=1` on the command.
+Every Playwright project (`desktop`, `tablet`, `phone`, `smoke`, `preview-m1`, `preview-m2`) needs `APP_ORIGIN` set on the command, and refuses anything but `http://localhost` or `http://127.0.0.1` on a port in 18000–19999. `APP_ORIGIN` and the opt-in below are never read from the env files. To target any other origin on purpose, also set `E2E_ALLOW_LIVE=1` on the command.
 
 ```bash
 npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w e2e
@@ -112,6 +115,7 @@ The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fres
 - Install once from the repo root with `npm ci` (one workspace, one `package-lock.json`); `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` checks every package.
 - Agent: `npm run lint -w @oab/core && npm run format:check -w @oab/core && npm run typecheck -w @oab/core && npm test -w @oab/core && npm run build -w @oab/core` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test -w @oab/core`; Supabase integration tests against the real project: `npm run test:supabase -w @oab/core`)
 - Web: `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web`
+- Shared UI and API handler: the same five commands with `-w @oab/ui` (no build; consumed as source) and `-w @oab/bff`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, how to add a tool, and conventions. Report security issues as described in [SECURITY.md](SECURITY.md).
 

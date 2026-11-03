@@ -1,6 +1,7 @@
 {
   "name": "@oab/bff",
   "version": "1.0.0",
+  "description": "Framework-free handler for the Open Agent /api routes and the /api/copilotkit streaming proxy, shared by the hosted web app and the local app",
   "private": true,
   "license": "MIT",
   "type": "module",

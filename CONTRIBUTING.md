@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -12,20 +12,23 @@ npm ci && npx playwright install chromium
 
 To run the whole stack, follow **Run** in the [README](README.md). To work on one side, run the other in Docker and point at it:
 
-- Agent: `cd packages/core && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && npm start` (`tsc -b` builds `@oab/shared` and then the agent into `packages/core/dist/`; settings in the README's reference table)
+- Agent: `cd packages/core && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared` and then the agent into `packages/core/dist/`; settings in the README's reference table). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
 - Web: `cd web && set -a && . ../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see **Run** in the README). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
 
 ## Checks
 
-CI runs these on every pull request. Run them from the repo root before you push (`npm run format -w <package>` fixes formatting); `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` runs all of them across the workspaces.
+CI runs these on every pull request. Run them from the repo root before you push (`npm run format -w <package>` fixes formatting); `npm run lint && npm run format:check && npm run typecheck && COPILOTKIT_TELEMETRY_DISABLED=true npm test && COPILOTKIT_TELEMETRY_DISABLED=true npm run build` runs all of them across the workspaces.
 
 | Package | Commands |
 | --- | --- |
 | `@oab/shared` | `npm run build -w @oab/shared` (also built by the agent's `tsc -b`) |
 | `@oab/core` | `npm run lint -w @oab/core && npm run format:check -w @oab/core && npm run typecheck -w @oab/core && npm test -w @oab/core && npm run build -w @oab/core` |
+| `@oab/ui` | `npm run lint -w @oab/ui && npm run format:check -w @oab/ui && npm run typecheck -w @oab/ui && npm test -w @oab/ui` (no build: consumed as TypeScript source) |
+| `@oab/bff` | `npm run lint -w @oab/bff && npm run format:check -w @oab/bff && npm run typecheck -w @oab/bff && npm test -w @oab/bff && npm run build -w @oab/bff` |
 | `web` | `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web` |
+| root | `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, and the unique-id scan over `packages/ui/src`, `web/app` and `web/components`; `node scripts/ids-static.mjs` prints `ids: N/N`) |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `test/supabase/` run against the real Supabase project with `npm run test:supabase`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
 
@@ -55,10 +58,13 @@ packages/core/src/
     http/              the access and admin routes
     secrets/           credential key rotation
   http/                artifacts, chats, providers (model admin), profile, settings, onboarding
-                       (places, chip options), reports, search, agui (chat stream); handlers.ts
-                       holds shared helpers
-  agui/                run lifecycle (runHandler), input parsing, pi events → AG-UI events,
-                       typed event builders (events.ts), run stats
+                       (places, chip options), reports, search, agui (chat stream), copilotkit (the
+                       CopilotKit runtime at /copilotkit: allowlist, owner checks, connect cap, heartbeat);
+                       handlers.ts holds shared helpers
+  copilot/             the in-process CopilotKit agent (CoreRunAgent), thread owners and connect slots,
+                       the caller-scoped runner, the SSE heartbeat
+  agui/                run lifecycle (runHandler, startRun shared by /agui and CoreRunAgent), input
+                       parsing, pi events → AG-UI events, typed event builders (events.ts), run stats
   pi/                  creating and disposing pi agent sessions
   providers/           model provider catalog, per-user hubs (LRU) with capability-gated private
                        networks and gateway, OAuth sign-in flows bound to their user
@@ -93,10 +99,14 @@ supabase/
   scripts/             configure-auth (auth config as code), bootstrap-admin, dev-link, cleanup-e2e
   templates/           invite and magic-link email templates
 packages/ui/src/        the @oab/ui package: the chat UI with no Next, Supabase or cloud imports; consumed
-                       as TypeScript source (`@oab/ui/platform`, `@oab/ui/components/<path>.tsx`,
-                       `@oab/ui/lib/<path>.ts`, `@oab/ui/views/<path>.tsx`, `@oab/ui/styles/<file>.css`)
+                       as TypeScript source (`@oab/ui/platform`, `@oab/ui/platform/api`,
+                       `@oab/ui/platform/chat`, `@oab/ui/components/<path>.tsx`, `@oab/ui/lib/<path>.ts`,
+                       `@oab/ui/views/<path>.tsx`, `@oab/ui/styles/<file>.css`); imports into
+                       `@oab/shared` stay extensionless, so every consumer aliases
+                       `@oab/shared/<file>` → `packages/shared/src/<file>`
   platform/            PlatformProvider (router, Link, history, user, cloud slots), the API client
-                       (api.ts), historyRouter/memoryRouter, ChatRuntime (CopilotKit provider)
+                       (api.ts, `@oab/ui/platform/api`), historyRouter/memoryRouter; ChatRuntime
+                       (the CopilotKit provider) is its own entry, `@oab/ui/platform/chat`
   components/shell/    app shell: rail, sidebar, phone top bar, tabs and drawer, account menu and sheet,
                        overlays (focus trap, Escape, inert background), ShellProvider (chat controller)
   components/agent/    the agent's orb, name, look and tone pickers
@@ -108,7 +118,13 @@ packages/ui/src/        the @oab/ui package: the chat UI with no Next, Supabase 
   lib/                 pure helpers (turn building, sources, onboarding, persona), profile client,
                        API clients, lib/shell/ (breakpoints, chat controller, sidebar preference)
   views/RouteView.tsx  a Route from @oab/shared/routes → its section view
-  styles/              theme.css (tokens, base layer, utilities) and fonts.css (self-hosted fonts)
+  styles/              theme.css (tokens, base layer, utilities, the backdrop.jpg it references) and
+                       fonts.css (self-hosted fonts)
+packages/bff/src/      the @oab/bff package: the framework-free /api handler (createBff) for the API
+                       routes: route table (routes.ts), same-origin, body cap, timeout and passthrough
+                       (forward.ts), artifact formats and the framed error page (artifacts.ts), the
+                       /api/copilotkit streaming proxy and its allowlist (copilotkit.ts), Next-compatible
+                       params (params.ts); built with `tsc -b` to dist
 web/
   proxy.ts             session refresh, route rules and the nonce CSP on every request
   app/                 login, request-access, auth confirm/callback/signout, admin
@@ -116,7 +132,8 @@ web/
                        /search; each validates its params and renders RouteView; one layout keeps
                        the shell and chats mounted
   app/api/             one-line adapters to the @oab/bff handler (lib/bff.ts)
-  app/globals.css      imports tailwindcss and @oab/ui's styles; `@source` scans packages/ui/src
+  app/globals.css      imports tailwindcss with `source(none)` and @oab/ui's styles; `@source` lists
+                       exactly app/, components/, lib/ and packages/ui/src (never tests or fixtures)
   components/          cloud-only UI: admin, landing, auth, session (the hosted platform slots)
   lib/                 hosted platform (platform/hosted.tsx), Supabase auth, route rules, CSP, env
 e2e/                   Playwright demo and preview checks against a preview stack (see README "End-to-end demo")
@@ -137,7 +154,7 @@ Core never depends on the hosted implementation; the hosted code depends on core
 2. Validate URLs from the model with `publicHttpUrlError` and fetch them with `fetchPublic` from `lib/net.ts`. Never call `fetch` on a model-supplied URL directly.
 3. Register it in `tools/index.ts`. Wrap it in `withBudget` if it costs a network round trip.
 4. If it returns structured data for a card, add a renderer in `render/registry.ts` and a schema in `packages/shared/src/widgets.ts`.
-5. Add a step label in `web/lib/steps.ts` and tests under `packages/core/test/tools/`.
+5. Add a step label in `packages/ui/src/lib/steps.ts` and tests under `packages/core/test/tools/`.
 
 ## Adding a source
 
@@ -175,7 +192,7 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 
 - TypeScript strict mode everywhere. Prefer small pure functions; keep I/O at the edges.
 - Code explains itself through names. Add a comment only for a non-obvious reason.
-- Every rendered HTML element in `web/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
+- Every rendered HTML element in `web/` and `packages/ui/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
 - Context for an agent run goes through `useThreadContext` (scoped to one chat's agent). `useAgentContext` is blocked by lint because it reaches every mounted chat.
 - Keys are added in the app and stored encrypted by the agent. Settings live in `deploy-config/.env-*` and `deploy-config/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `deploy-config/env.examples/`.
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
