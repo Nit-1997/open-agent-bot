@@ -11,7 +11,7 @@ const notFound = () => new UserError("Not found.", "not_found");
 export function createAdminGuard(deps: { isLiveAdmin: AdminCheck }): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
     const user = c.get("user");
-    if (!user?.isAdmin) return errorResponse(c, notFound());
+    if (!user?.capabilities.admin) return errorResponse(c, notFound());
     let live: boolean;
     try {
       live = await deps.isLiveAdmin(user);

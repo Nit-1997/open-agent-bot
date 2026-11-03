@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { hostedCapabilities } from "./capabilities.js";
 import type { UserStatusCache } from "./status.js";
 import { AuthError, type Verifier, type VerifiedUser } from "./verify.js";
 import type { AuthOutcome, Identity, Principal } from "@oab/core/identity/types.js";
@@ -21,7 +22,8 @@ const disabled = () => new UserError("Your access has been turned off.", "forbid
 
 const refuse = (error: UserError): AuthOutcome => ({ ok: false, error });
 
-export const principalOf = ({ id, email, isAdmin }: VerifiedUser): Principal => Object.freeze({ id, email, isAdmin });
+export const principalOf = ({ id, email, isAdmin }: VerifiedUser): Principal =>
+  Object.freeze({ id, email, capabilities: hostedCapabilities(isAdmin) });
 
 export function createSupabaseIdentity(deps: { serviceSecret: string; verify: Verifier; status: UserStatusCache }): Identity {
   return {

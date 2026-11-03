@@ -3,6 +3,7 @@ import { streamSimple as openAiCompletions } from "@earendil-works/pi-ai/api/ope
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { keyHint } from "../crypto/hint.js";
+import type { Capabilities } from "../identity/types.js";
 import type { CredentialListing, ProviderSettingsRepo } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
@@ -106,9 +107,13 @@ function priceNote(m: AnyModel): string | undefined {
   return `${n(input)} in · ${n(output)} out per 1M tokens`;
 }
 
+export const HUB_CAPABILITY_KEYS = ["privateNetworkModels", "operatorGateway"] as const;
+
+export type HubCapabilities = Pick<Capabilities, (typeof HUB_CAPABILITY_KEYS)[number]>;
+
 export type HubOptions = {
   userId: string;
-  isAdmin: boolean;
+  capabilities: HubCapabilities;
   settings: ProviderSettingsRepo;
   credentials: HubCredentials;
   litellm?: { baseUrl: string; apiKey: string; models: SeedModel[] };
@@ -173,12 +178,12 @@ export class ProviderHub {
       keys,
       hints,
       stored.deviceId,
-      opts.isAdmin ? (opts.fetch ?? fetch) : (opts.userFetch ?? createSafeFetch()),
+      opts.capabilities.privateNetworkModels ? (opts.fetch ?? fetch) : (opts.userFetch ?? createSafeFetch()),
       opts.complete ?? ((m, c, o) => rt.completeSimple(m, c, o)),
       signedIn,
       stored.stamp,
     );
-    if (opts.isAdmin && opts.litellm && !settings.hidden.includes("litellm")) {
+    if (opts.capabilities.operatorGateway && opts.litellm && !settings.hidden.includes("litellm")) {
       const models = await withGatewayLimits(opts.fetch ?? fetch, opts.litellm);
       settings.custom.litellm = { kind: "litellm", label: "LiteLLM gateway", baseUrl: opts.litellm.baseUrl, models };
       keys.litellm = opts.litellm.apiKey;
@@ -196,7 +201,7 @@ export class ProviderHub {
   }
 
   private async targetAllowed(baseUrl: string): Promise<boolean> {
-    if (this.opts.isAdmin) return true;
+    if (this.opts.capabilities.privateNetworkModels) return true;
     if (publicHttpUrlError(baseUrl)) return false;
     return !(await resolvesInternal(new URL(baseUrl).hostname, this.opts.lookup));
   }
@@ -213,10 +218,11 @@ export class ProviderHub {
       baseUrl: c.baseUrl,
       apiKey: this.keys[id] || "none",
       api: "openai-completions",
-      ...(!this.opts.isAdmin && {
-        streamSimple: (model, context, options) =>
-          openAiCompletions(model as Model<"openai-completions">, context, { ...options, fetch: userFetch }),
-      }),
+      ...(!this.opts.capabilities.privateNetworkModels &&
+        id !== "litellm" && {
+          streamSimple: (model, context, options) =>
+            openAiCompletions(model as Model<"openai-completions">, context, { ...options, fetch: userFetch }),
+        }),
       models: c.models.map((m) => ({
         id: m.id,
         name: m.label,

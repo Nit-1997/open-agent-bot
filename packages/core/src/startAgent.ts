@@ -17,8 +17,8 @@ import { log, setLogLevel } from "./lib/log.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "./lib/rateLimit.js";
 import { nearbyGroceries } from "./onboarding/groceries.js";
 import { RepoProfileStore } from "./profile/store.js";
-import { EnvelopeCredentialStore } from "./providers/credentialStore.js";
-import { ProviderHub } from "./providers/hub.js";
+import type { ProviderHub } from "./providers/hub.js";
+import { type GatewayLike, hubFactory } from "./providers/hubFactory.js";
 import { UserHubs } from "./providers/hubs.js";
 import { LoginFlows } from "./providers/logins.js";
 import { sessionFactory } from "./session/createSession.js";
@@ -26,7 +26,7 @@ import { SessionStore } from "./session/sessionStore.js";
 import { registry } from "./sources/index.js";
 import type { Store } from "./store/types.js";
 
-export type GatewayLike = Readonly<{ baseUrl: string; apiKey: string; models: Array<{ id: string; label: string; note?: string }> }>;
+export type { GatewayLike };
 
 export type CoreHandles = Readonly<{
   limiter: RateLimiter;
@@ -82,18 +82,8 @@ export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
   const pool = new BrowserPool();
   const limiter = new RateLimiter();
   const jevLimiter = createLimiter(cfg.jevConcurrency);
-  const gateway = deps.gateway;
 
-  const hubs = new UserHubs((user) => {
-    const r = repos(user.id);
-    return ProviderHub.create({
-      userId: user.id,
-      isAdmin: user.isAdmin,
-      settings: r.providerSettings,
-      credentials: new EnvelopeCredentialStore(user.id, r.credentials, deps.keyWrapper),
-      ...(gateway && { litellm: { baseUrl: gateway.baseUrl, apiKey: gateway.apiKey, models: gateway.models } }),
-    });
-  });
+  const hubs = new UserHubs(hubFactory({ repos, keyWrapper: deps.keyWrapper, gateway: deps.gateway }));
 
   const judges = new WeakMap<ProviderHub, () => Promise<Judge>>();
   const judgeFor = (hub: ProviderHub) => {
