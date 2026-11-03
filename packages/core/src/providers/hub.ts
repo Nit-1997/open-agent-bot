@@ -3,7 +3,7 @@ import { streamSimple as openAiCompletions } from "@earendil-works/pi-ai/api/ope
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { keyHint } from "../crypto/hint.js";
-import type { CredentialListing, ProviderSettingsRepo } from "../db/types.js";
+import type { CredentialListing, ProviderSettingsRepo } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
 import { isBlockedError, type Lookup, publicHttpUrlError, resolvesInternal } from "../lib/net.js";

@@ -1,6 +1,6 @@
-import type { RotationCursor, StaleCredential } from "../db/rotation.js";
-import { CredentialIntegrityError, rewrap } from "./envelope.js";
-import type { KeyWrapper } from "./keyWrapper.js";
+import type { RotationCursor, StaleCredential } from "../store/rotation.js";
+import { CredentialIntegrityError, rewrap } from "../../crypto/envelope.js";
+import type { KeyWrapper } from "../../crypto/keyWrapper.js";
 
 export type RotationRepo = {
   stale(belowVersion: number, after?: RotationCursor): Promise<StaleCredential[]>;

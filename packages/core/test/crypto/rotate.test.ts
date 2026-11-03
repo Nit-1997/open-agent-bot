@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { parseCredentialKeys } from "../../src/config.js";
 import { open, type Sealed, seal } from "../../src/crypto/envelope.js";
 import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
-import { type RotationRepo, rotateStale } from "../../src/crypto/rotate.js";
-import { ROTATION_BATCH, type RotationCursor, type StaleCredential } from "../../src/db/rotation.js";
+import { type RotationRepo, rotateStale } from "../../src/hosted/secrets/rotate.js";
+import { ROTATION_BATCH, type RotationCursor, type StaleCredential } from "../../src/hosted/store/rotation.js";
 
 const k1 = randomBytes(32).toString("base64");
 const k2 = randomBytes(32).toString("base64");

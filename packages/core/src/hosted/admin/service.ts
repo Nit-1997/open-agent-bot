@@ -1,9 +1,9 @@
 import type { AccessRequestView, AdminUser, ProfileView, RequestFilter } from "@oab/shared/admin";
 import type { Page } from "@oab/shared/pages";
-import type { AuthUser } from "../auth/verify.js";
-import type { AdminRepo } from "../db/admin.js";
-import { UserError } from "../lib/errors.js";
-import { log } from "../lib/log.js";
+import type { AuthUser } from "../../auth/verify.js";
+import type { AdminRepo } from "../store/admin.js";
+import { UserError } from "../../lib/errors.js";
+import { log } from "../../lib/log.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "./authAdmin.js";
 import { deleteAccount } from "./deleteAccount.js";
 import { describeInviteFailure } from "./inviteCopy.js";

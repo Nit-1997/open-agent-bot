@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["src/**/*.ts", "!src/db/database.types.ts", "evals/**/*.ts", "test/**/*.ts"]
+    "includes": ["src/**/*.ts", "!src/hosted/store/database.types.ts", "evals/**/*.ts", "test/**/*.ts"]
   },
   "formatter": {
     "enabled": true,

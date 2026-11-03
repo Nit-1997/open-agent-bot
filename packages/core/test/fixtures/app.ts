@@ -1,6 +1,6 @@
-import { createAccessService } from "../../src/access/service.js";
-import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/admin/authAdmin.js";
-import { createAdminService } from "../../src/admin/service.js";
+import { createAccessService } from "../../src/hosted/access/service.js";
+import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/hosted/admin/authAdmin.js";
+import { createAdminService } from "../../src/hosted/admin/service.js";
 import { type AppDeps, createApp } from "../../src/app.js";
 import { ArtifactStore, type Renderer } from "../../src/artifacts/store.js";
 import { createGuards } from "../../src/auth/middleware.js";
@@ -10,7 +10,7 @@ import { parseCredentialKeys } from "../../src/config.js";
 import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
 import { PAGE_SIZE } from "@oab/shared/pages";
-import type { AdminRepo } from "../../src/db/admin.js";
+import type { AdminRepo } from "../../src/hosted/store/admin.js";
 import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
 import { UserError } from "../../src/lib/errors.js";
 import { createSafeFetch } from "../../src/lib/safeFetch.js";

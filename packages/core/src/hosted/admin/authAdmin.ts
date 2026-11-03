@@ -1,6 +1,6 @@
 import type { User } from "@supabase/supabase-js";
-import type { Db } from "../db/client.js";
-import { UserError } from "../lib/errors.js";
+import type { Db } from "../store/client.js";
+import { UserError } from "../../lib/errors.js";
 
 export type AuthAccount = {
   id: string;

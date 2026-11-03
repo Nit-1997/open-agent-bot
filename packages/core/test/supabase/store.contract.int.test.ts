@@ -1,5 +1,5 @@
 import { describe, expect } from "vitest";
-import { forUser } from "../../src/db/users.js";
+import { forUser } from "../../src/hosted/store/users.js";
 import { describeStoreContract } from "../contract/store.js";
 import { authAdmin, createBareUser, deleteCreatedUsers, enabled, remainingRows, service } from "./helpers.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAccessService, hashIp, normalizeEmail, readRequest } from "../../src/access/service.js";
+import { createAccessService, hashIp, normalizeEmail, readRequest } from "../../src/hosted/access/service.js";
 import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
 import { RateLimiter } from "../../src/lib/rateLimit.js";
 

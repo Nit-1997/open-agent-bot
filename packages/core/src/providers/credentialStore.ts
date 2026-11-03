@@ -2,7 +2,7 @@ import type { Credential, CredentialInfo, CredentialStore } from "@earendil-work
 import { type CredentialContext, CredentialIntegrityError, type CredentialKind, open, seal } from "../crypto/envelope.js";
 import { keyHint, oauthHint } from "../crypto/hint.js";
 import type { KeyWrapper } from "../crypto/keyWrapper.js";
-import type { CredentialListing, CredentialRepo, CredentialRow } from "../db/types.js";
+import type { CredentialListing, CredentialRepo, CredentialRow } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
 import { KeyedMutex } from "../lib/mutex.js";

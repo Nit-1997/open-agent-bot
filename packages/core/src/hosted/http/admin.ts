@@ -3,10 +3,10 @@ import { isRequestFilter } from "@oab/shared/admin";
 import { normalizeId } from "@oab/shared/ids";
 import { PAGE_SIZE } from "@oab/shared/pages";
 import type { AdminService } from "../admin/service.js";
-import type { AuthEnv } from "../auth/middleware.js";
-import { UserError } from "../lib/errors.js";
-import type { RateLimiter } from "../lib/rateLimit.js";
-import { body, limitBy, pageParam, safe } from "./handlers.js";
+import type { AuthEnv } from "../../auth/middleware.js";
+import { UserError } from "../../lib/errors.js";
+import type { RateLimiter } from "../../lib/rateLimit.js";
+import { body, limitBy, pageParam, safe } from "../../http/handlers.js";
 
 const idParam = (c: Context<AuthEnv>, what: string): string => {
   const id = normalizeId(c.req.param("id"));

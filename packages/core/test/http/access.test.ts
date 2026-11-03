@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAccessService } from "../../src/access/service.js";
+import { createAccessService } from "../../src/hosted/access/service.js";
 import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
 import { RateLimiter } from "../../src/lib/rateLimit.js";
 import { makeApp } from "../fixtures/app.js";

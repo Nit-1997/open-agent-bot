@@ -1,4 +1,4 @@
-import type { AdminRepo } from "../db/admin.js";
+import type { AdminRepo } from "../store/admin.js";
 import type { AuthAdmin } from "./authAdmin.js";
 
 export const DELETE_STEPS = ["storage", "requests", "auth_user"] as const;

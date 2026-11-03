@@ -4,8 +4,8 @@ import { isUuid } from "@oab/shared/ids";
 import { CHATS_PAGE_SIZE, REPORTS_PAGE_SIZE, SEARCH_MAX, SEARCH_MIN, SEARCH_PAGE_SIZE } from "@oab/shared/lists";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import type { CredentialKind } from "../crypto/envelope.js";
-import { UserError } from "../lib/errors.js";
+import type { CredentialKind } from "../../crypto/envelope.js";
+import { UserError } from "../../lib/errors.js";
 import { fromBytea, toBytea } from "./bytea.js";
 import type { Db } from "./client.js";
 import type { Json, Tables } from "./database.types.js";
@@ -27,7 +27,7 @@ import {
   type SearchRepo,
   type SearchResult,
   type UserRepos,
-} from "./types.js";
+} from "../../store/types.js";
 
 const CONTENT_TYPE: Record<ArtifactFile, string> = { html: "text/html", pdf: "application/pdf", jpg: "image/jpeg" };
 const HISTORY_LIMIT = 200;

@@ -1,11 +1,11 @@
 import { createHash, createHmac } from "node:crypto";
 import { normalizeEmail as parseEmail } from "@oab/shared/email";
-import type { SubmitOutcome } from "../db/admin.js";
-import type { BackgroundQueue } from "../lib/backgroundQueue.js";
-import { UserError } from "../lib/errors.js";
-import { ipKey } from "../lib/ipKey.js";
-import { log } from "../lib/log.js";
-import { LIMITS, type RateLimiter } from "../lib/rateLimit.js";
+import type { SubmitOutcome } from "../store/admin.js";
+import type { BackgroundQueue } from "../../lib/backgroundQueue.js";
+import { UserError } from "../../lib/errors.js";
+import { ipKey } from "../../lib/ipKey.js";
+import { log } from "../../lib/log.js";
+import { LIMITS, type RateLimiter } from "../../lib/rateLimit.js";
 
 export type AccessDeps = {
   pepper: Buffer;

@@ -11,7 +11,7 @@ import {
   SNIPPET_CHARS,
 } from "@oab/shared/lists";
 import { emptyProfile } from "@oab/shared/profile";
-import type { ArtifactFile, ArtifactListRow, ArtifactRow, CredentialRow, NewMessage, SearchRow, UserRepos } from "../../src/db/types.js";
+import type { ArtifactFile, ArtifactListRow, ArtifactRow, CredentialRow, NewMessage, SearchRow, UserRepos } from "../../src/store/types.js";
 import { UserError } from "../../src/lib/errors.js";
 
 const TITLE_MAX = 200;

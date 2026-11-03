@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { forUser } from "../../src/db/users.js";
+import { forUser } from "../../src/hosted/store/users.js";
 import { cleanedEmails, createBareUser, deleteCreatedUsers, enabled, managementQuery, remainingRows, service } from "./helpers.js";
 
 describe.skipIf(!enabled)("search_user_content (live project)", () => {
