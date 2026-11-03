@@ -149,6 +149,26 @@ describe("startAgent", () => {
     expect(await portFree(agent.port)).toBe(true);
   });
 
+  it("serves in process with no listener when listen is false", async () => {
+    const listen = vi.spyOn(Server.prototype, "listen");
+    const store: Store = Object.assign(new MemoryDb(), { close: vi.fn(async () => {}) });
+    const agent = await startAgent(coreDeps({ store, listen: false }));
+    expect(listen).not.toHaveBeenCalled();
+    expect(agent.port).toBe(0);
+    expect(agent.host).toBe("");
+    expect(await (await agent.app.request("/health")).json()).toEqual({ ok: true });
+    expect((await agent.app.request("/chats")).status).toBe(200);
+    await agent.close();
+    await agent.close();
+    expect(store.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("listens when listen is true", async () => {
+    const agent = await start({ listen: true });
+    expect(agent.port).toBeGreaterThan(0);
+    expect((await fetch(`http://127.0.0.1:${agent.port}/health`)).status).toBe(200);
+  });
+
   it("starts with the hosted mounts", async () => {
     const agent = await start({ routes: () => hostedMounts() });
     const link = await agent.app.request("/auth/email-link", { method: "POST", body: JSON.stringify({ email: "a@example.test" }) });

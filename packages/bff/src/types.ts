@@ -1,6 +1,6 @@
 export type AuthOutcome =
   | { ok: true; headers: Readonly<Record<string, string>> }
-  | { ok: false; status: 401 | 503; error: "signed_out" | "auth_unavailable"; message: string };
+  | { ok: false; status: 401 | 403 | 503; error: "signed_out" | "auth_unavailable" | "bad_origin" | "launch_required"; message: string };
 
 export type BffDeps = Readonly<{
   agentUrl: string;

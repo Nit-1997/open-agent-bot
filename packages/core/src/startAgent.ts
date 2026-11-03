@@ -47,6 +47,7 @@ export type AgentDeps = Readonly<{
   routes?: (core: CoreHandles) => RouteMount[];
   host?: string;
   port?: number;
+  listen?: boolean;
 }>;
 
 export type RunningAgent = Readonly<{ app: Hono<AuthEnv>; port: number; host: string; handles: CoreHandles; close(): Promise<void> }>;
@@ -76,6 +77,13 @@ export const forgetter =
     parts.hubs.invalidate(userId);
     await parts.sessions.disposeUser(userId);
   };
+
+function listenOn(app: Hono<AuthEnv>, hostname: string, port: number): Promise<ReturnType<typeof serve>> {
+  return new Promise((resolve, reject) => {
+    const s = serve({ fetch: app.fetch, port, hostname }, () => resolve(s));
+    s.once("error", reject);
+  });
+}
 
 export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
   const cfg = deps.config;
@@ -147,12 +155,9 @@ export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
     },
   });
 
-  const server = await new Promise<ReturnType<typeof serve>>((resolve, reject) => {
-    const s = serve({ fetch: app.fetch, port: deps.port ?? cfg.port, hostname: deps.host ?? "127.0.0.1" }, () => resolve(s));
-    s.once("error", reject);
-  });
-  const address = server.address() as AddressInfo;
-  log.info(`agent listening on ${address.address}:${address.port}`);
+  const server = deps.listen === false ? undefined : await listenOn(app, deps.host ?? "127.0.0.1", deps.port ?? cfg.port);
+  const address = server?.address() as AddressInfo | undefined;
+  log.info(address ? `agent listening on ${address.address}:${address.port}` : "agent serving in process only");
 
   const sweeps = [setInterval(() => void sessions.sweep(), 60_000).unref(), setInterval(() => limiter.sweep(), 10 * 60_000).unref()];
 
@@ -160,13 +165,13 @@ export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
   const close = () =>
     (closing ??= (async () => {
       for (const t of sweeps) clearInterval(t);
-      const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+      const closed = server ? new Promise<void>((resolve) => server.close(() => resolve())) : Promise.resolve();
       await sessions.disposeAll();
       await pool.closeAll();
       await deps.store.close?.();
-      if ("closeAllConnections" in server) server.closeAllConnections();
+      if (server && "closeAllConnections" in server) server.closeAllConnections();
       await closed;
     })());
 
-  return Object.freeze({ app, port: address.port, host: address.address, handles, close });
+  return Object.freeze({ app, port: address?.port ?? 0, host: address?.address ?? "", handles, close });
 }

@@ -7,6 +7,7 @@ import type { BffContext, BffDeps, BffHandler } from "./types.ts";
 
 export { artifactErrorPage, isFramedReport } from "./artifacts.ts";
 export { isAllowedOrigin, jsonError } from "./forward.ts";
+export { localAuth } from "./local.ts";
 export { segmentsOf } from "./params.ts";
 export type { AuthOutcome, BffDeps, BffHandler } from "./types.ts";
 
