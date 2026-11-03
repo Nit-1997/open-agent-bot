@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSupabaseIdentity, serviceSecretMatches } from "../../src/hosted/identity/supabaseIdentity.js";
-import { UserStatusCache } from "../../src/auth/status.js";
-import { AuthError, type VerifiedUser } from "../../src/auth/verify.js";
+import { UserStatusCache } from "../../src/hosted/identity/status.js";
+import { AuthError, type VerifiedUser } from "../../src/hosted/identity/verify.js";
 import { UserError } from "../../src/lib/errors.js";
 import { TEST_SECRET } from "../fixtures/config.js";
 

@@ -1,4 +1,4 @@
-import type { VerifiedUser } from "../../src/auth/verify.js";
+import type { VerifiedUser } from "../../src/hosted/identity/verify.js";
 import type { Principal } from "../../src/identity/types.js";
 
 export const ALICE: Principal = {

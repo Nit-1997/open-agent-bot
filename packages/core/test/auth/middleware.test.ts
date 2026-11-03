@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { UserStatusCache } from "../../src/auth/status.js";
-import { AuthError } from "../../src/auth/verify.js";
+import { UserStatusCache } from "../../src/hosted/identity/status.js";
+import { AuthError } from "../../src/hosted/identity/verify.js";
 import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
 import { createSupabaseIdentity, serviceSecretMatches } from "../../src/hosted/identity/supabaseIdentity.js";
 import { createGuards } from "../../src/identity/guards.js";

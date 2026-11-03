@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, customFetch, decodeProtectedHeader, errors, type JWTPayload, jwtVerify } from "jose";
 import { normalizeId } from "@oab/shared/ids";
-import type { AgentConfig } from "../config.js";
-import { log } from "../lib/log.js";
+import type { AgentConfig } from "@oab/core/config.js";
+import { log } from "@oab/core/lib/log.js";
 
 export type VerifiedUser = { id: string; email: string; sessionId: string; isAdmin: boolean };
 

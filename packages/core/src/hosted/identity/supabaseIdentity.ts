@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { UserStatusCache } from "@oab/core/auth/status.js";
-import { AuthError, type Verifier, type VerifiedUser } from "@oab/core/auth/verify.js";
+import type { UserStatusCache } from "./status.js";
+import { AuthError, type Verifier, type VerifiedUser } from "./verify.js";
 import type { AuthOutcome, Identity, Principal } from "@oab/core/identity/types.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import { log } from "@oab/core/lib/log.js";

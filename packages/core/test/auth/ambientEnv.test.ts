@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ambientProviderEnv, providerEnvNames } from "../../src/auth/ambientEnv.js";
+import { ambientProviderEnv, providerEnvNames } from "../../src/hosted/ambientEnv.js";
 
 describe("ambient provider credentials", () => {
   it("collects every env name pi's built-in providers would fall back to", async () => {
