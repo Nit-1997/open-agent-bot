@@ -14,11 +14,11 @@ import type { Store } from "../src/store/types.js";
 import { FakeAccounts } from "./fixtures/app.js";
 import { TEST_KEY_B64, testConfig } from "./fixtures/config.js";
 import { MemoryDb } from "./fixtures/memoryRepos.js";
-import { ALICE } from "./fixtures/users.js";
+import { ALICE, CHAT_1 } from "./fixtures/users.js";
 import { createAccessService } from "../src/hosted/access/service.js";
 import { createAdminService } from "../src/hosted/admin/service.js";
 import { BackgroundQueue } from "../src/lib/backgroundQueue.js";
-import { RateLimiter } from "../src/lib/rateLimit.js";
+import { RateLimiter, rateLimitError } from "../src/lib/rateLimit.js";
 
 const localIdentity: Identity = {
   kind: "local",
@@ -201,5 +201,26 @@ describe("startAgent mount refusals", () => {
       ],
     });
     expect((await agent.app.request("/access-requests")).status).toBe(200);
+  });
+});
+
+describe("startAgent run policy", () => {
+  it("builds the run policy on the shared limiter and asks it before every run", async () => {
+    let given: RateLimiter | undefined;
+    const admit = vi.fn(async () => ({ ok: false as const, error: rateLimitError(9) }));
+    const agent = await start({
+      runPolicy: ({ limiter }) => {
+        given = limiter;
+        return { admit };
+      },
+    });
+    expect(given).toBe(agent.handles.limiter);
+    const res = await agent.app.request("/agui", {
+      method: "POST",
+      body: JSON.stringify({ threadId: CHAT_1, runId: "r1", messages: [] }),
+    });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "rate_limited", message: "Slow down: try again in 9 s.", retryAfter: 9 });
+    expect(admit).toHaveBeenCalledWith({ principal: ALICE, chatId: CHAT_1, runId: "r1" });
   });
 });
