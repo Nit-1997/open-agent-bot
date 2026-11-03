@@ -271,6 +271,24 @@ describe("docker CLI plugins (S3)", () => {
     expect(cliPluginsProblem({ fs, uid: UID, home: HOME })).toBeUndefined();
   });
 
+  it.each([
+    ["relative/x", "relative/x"],
+    [42, "42"],
+    [null, "null"],
+    [{ dir: "/opt/x" }, '{"dir":"/opt/x"}'],
+  ])("rejects a cliPluginsExtraDirs entry that is not an absolute path (%j)", (entry, path) => {
+    const fs = fakeFs({
+      ...BASE,
+      ...home,
+      [`${HOME}/.docker/config.json`]: {
+        kind: "file",
+        uid: UID,
+        text: JSON.stringify({ cliPluginsExtraDirs: ["/opt/homebrew/lib/docker/cli-plugins", entry] }),
+      },
+    });
+    expect(cliPluginsProblem({ fs, uid: UID, home: HOME })).toEqual({ path, reason: "cliPluginsExtraDirs entry is not an absolute path" });
+  });
+
   it("rejects a group-writable extra dir from config.json and a group-writable system dir", () => {
     const extra = fakeFs({
       ...BASE,

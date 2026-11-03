@@ -128,25 +128,32 @@ export const SYSTEM_PLUGIN_DIRS = [
   "/usr/libexec/docker/cli-plugins",
 ] as const;
 
-export function cliPluginDirs(o: { fs?: FsProbe; home?: string } = {}): string[] {
-  const fs = o.fs ?? realFs;
-  const docker = join(o.home ?? homedir(), ".docker");
-  let extra: string[] = [];
-  const text = fs.readText?.(join(docker, "config.json"));
-  if (text !== undefined) {
-    try {
-      const dirs = obj(JSON.parse(text))?.cliPluginsExtraDirs;
-      if (Array.isArray(dirs)) extra = dirs.filter((d): d is string => typeof d === "string" && isAbsolute(d));
-    } catch {
-      extra = [];
-    }
+const dockerDir = (home?: string) => join(home ?? homedir(), ".docker");
+
+function configExtraDirs(fs: FsProbe, home?: string): unknown[] {
+  const text = fs.readText?.(join(dockerDir(home), "config.json"));
+  if (text === undefined) return [];
+  try {
+    const dirs = obj(JSON.parse(text))?.cliPluginsExtraDirs;
+    return Array.isArray(dirs) ? dirs : [];
+  } catch {
+    return [];
   }
-  return [...new Set([join(docker, "cli-plugins"), ...extra, ...SYSTEM_PLUGIN_DIRS])];
+}
+
+const isAbsoluteDir = (d: unknown): d is string => typeof d === "string" && isAbsolute(d);
+
+export function cliPluginDirs(o: { fs?: FsProbe; home?: string } = {}): string[] {
+  const extra = configExtraDirs(o.fs ?? realFs, o.home).filter(isAbsoluteDir);
+  return [...new Set([join(dockerDir(o.home), "cli-plugins"), ...extra, ...SYSTEM_PLUGIN_DIRS])];
 }
 
 export function cliPluginsProblem(o: { fs?: FsProbe; uid?: number; home?: string } = {}): Rejected | undefined {
   const fs = o.fs ?? realFs;
   const uid = o.uid ?? currentUid();
+  const bad = configExtraDirs(fs, o.home).find((d) => !isAbsoluteDir(d));
+  if (bad !== undefined)
+    return { path: typeof bad === "string" ? bad : JSON.stringify(bad), reason: "cliPluginsExtraDirs entry is not an absolute path" };
   for (const dir of cliPluginDirs(o)) {
     if (!fs.lstat(dir)) continue;
     const t = trustedDir(dir, uid, fs);
