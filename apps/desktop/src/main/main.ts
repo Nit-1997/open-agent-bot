@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, statfsSync } from "node:fs";
+import { appendFileSync, existsSync, statfsSync } from "node:fs";
 import { join } from "node:path";
 import { app, dialog, Menu, protocol, session, shell } from "electron";
 import { createCompose } from "./compose.ts";
@@ -12,21 +12,25 @@ import { installLaunchCookie, removeLaunchCookie } from "./launchToken.ts";
 import { createLogger } from "./logger.ts";
 import { buildMenuTemplate } from "./menu.ts";
 import { needsMovePrompt } from "./moveToApplications.ts";
+import { sessionFetch } from "./netFetch.ts";
 import { APP_PARTITION, hardenSession, hardenWebContents } from "./permissions.ts";
 import { createPortPicker } from "./portPicker.ts";
 import { registerShellProtocol } from "./screens.ts";
 import type { SavePath } from "./servicesData.ts";
-import { effectivePins, validatePins } from "./services.ts";
+import { loadPins as readPins, writeAcceptedServices } from "./servicesFile.ts";
 import { createSettingsStore } from "./settings.ts";
 import { loadShellConfig, type ShellConfig, ShellConfigError, windowTitle } from "./shellConfig.ts";
 import { claimSingleInstance } from "./singleInstance.ts";
 import { bundledComposeSha, stageStack } from "./stackFiles.ts";
-import { createStackManager, type PinsLoad, type StackManager } from "./stackManager.ts";
+import { createStackManager, type StackManager } from "./stackManager.ts";
 import { ensurePrivateDir, resolvePaths } from "./statePaths.ts";
 import { createStatusWriter } from "./status.ts";
+import { checkForUpdates } from "./updateCheck.ts";
+import { createUpdates } from "./updates.ts";
 import { createMainWindow, type MainWindow, SHELL_PARTITION } from "./windows.ts";
 
 const APP_NAME = "Open Agent";
+const UPDATE_PARTITION = "update-check";
 
 protocol.registerSchemesAsPrivileged([{ scheme: "oa-shell", privileges: { standard: true, secure: true } }]);
 app.enableSandbox();
@@ -94,20 +98,70 @@ function start(cfg: ShellConfig): void {
   const writeStatus = createStatusWriter(paths.statusFile);
   const uid = currentUid();
 
-  const loadPins = (): PinsLoad => {
-    if (!existsSync(join(bundledDir, "docker-compose.yml"))) return { ok: false, reason: "stack_missing" };
-    const ctx = { test: cfg.test, composeSha256: bundledComposeSha(bundledDir), shellVersion: app.getVersion() };
-    const source = cfg.test && cfg.servicesOverride ? cfg.servicesOverride : join(bundledDir, "services.lock.json");
-    let raw: unknown;
-    try {
-      raw = JSON.parse(readFileSync(source, "utf8"));
-    } catch {
-      return { ok: false, reason: "unreadable" };
-    }
-    const bundled = validatePins(raw, ctx);
-    if (!bundled.ok) return bundled;
-    const pins = effectivePins(bundled.pins, undefined);
-    return pins ? { ok: true, pins } : { ok: false, reason: "no_pins" };
+  const loadPins = () =>
+    readPins({
+      bundledDir,
+      servicesOverride: cfg.servicesOverride,
+      servicesFile: paths.servicesFile,
+      test: cfg.test,
+      shellVersion: app.getVersion(),
+      log,
+    });
+
+  const releasesUrl = cfg.releasesUrl;
+  const updates = createUpdates({
+    appVersion: app.getVersion(),
+    settings,
+    now: Date.now,
+    log,
+    onChange: () => {
+      manager?.refresh();
+      setMenu();
+    },
+    openExternal: (url) => openExternal(url),
+    ...(releasesUrl
+      ? {
+          check: () => {
+            const pins = loadPins();
+            return checkForUpdates({
+              fetch: sessionFetch(session.fromPartition(UPDATE_PARTITION)),
+              url: releasesUrl,
+              shellVersion: app.getVersion(),
+              services: pins.ok ? pins.pins : undefined,
+              composeSha256: existsSync(join(bundledDir, "docker-compose.yml")) ? bundledComposeSha(bundledDir) : "",
+              test: cfg.test,
+            });
+          },
+        }
+      : {}),
+  });
+
+  let menuShown: string | undefined | null = null;
+  const setMenu = () => {
+    if (!app.isReady()) return;
+    const version = updates.menuVersion();
+    if (version === menuShown) return;
+    menuShown = version;
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(
+        buildMenuTemplate({
+          packaged: app.isPackaged,
+          appName: APP_NAME,
+          ...(version ? { update: version } : {}),
+          onUpdate: () => manager?.openServices("update-row"),
+          onServices: () => {
+            log.info("[menu] services");
+            manager?.openServices();
+          },
+          onCheckUpdates: () => {
+            manager?.openServices("screen-services-check");
+            void updates.manual();
+          },
+          onReloadApp: () => main?.reloadApp(),
+          onOpenLink: (link: keyof typeof LINKS) => openExternal(LINKS[link]),
+        }),
+      ),
+    );
   };
 
   const envFor = (cliPath: string, vars?: Parameters<typeof dockerEnv>[2]) =>
@@ -136,6 +190,14 @@ function start(cfg: ShellConfig): void {
     log,
     settings,
     tokens,
+    updates: {
+      view: () => updates.view(),
+      pending: () => updates.pending(),
+      accepted: (pins) => {
+        writeAcceptedServices(paths.servicesFile, pins, manager?.state().servicesVersion);
+        updates.accepted(pins);
+      },
+    },
     stage: () => stageStack({ bundledDir, stagedDir: join(paths.stateDir, "stack") }),
     pins: loadPins,
     locate: () => locateDocker(cfg),
@@ -236,21 +298,11 @@ function start(cfg: ShellConfig): void {
     hardenSession(session.defaultSession, { name: "default", appOrigin, log });
     hardenSession(shellSession, { name: SHELL_PARTITION, appOrigin, log });
     hardenSession(appSession, { name: APP_PARTITION, appOrigin, savePath: cfg.savePath, log });
+    hardenSession(session.fromPartition(UPDATE_PARTITION), { name: UPDATE_PARTITION, appOrigin, log });
     installFirewall(appSession, () => appPort, log);
     registerShellProtocol(shellSession, join(__dirname, "screens"));
 
-    const menuHandlers = {
-      packaged: app.isPackaged,
-      appName: APP_NAME,
-      onServices: () => {
-        log.info("[menu] services");
-        mgr.openServices();
-      },
-      onCheckUpdates: () => log.info("[menu] check-updates"),
-      onReloadApp: () => main?.reloadApp(),
-      onOpenLink: (link: keyof typeof LINKS) => openExternal(LINKS[link]),
-    };
-    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate(menuHandlers)));
+    setMenu();
 
     main = createMainWindow({
       title: windowTitle(cfg, mgr.state().localBuild),
@@ -269,7 +321,7 @@ function start(cfg: ShellConfig): void {
           openExternal(LINKS[a.link]);
           return Promise.resolve({ ok: true });
         }
-        return mgr.act(a);
+        return updates.act(a) ?? mgr.act(a);
       },
       onOpenServices: () => {
         log.info("[app] open-services");
@@ -286,6 +338,7 @@ function start(cfg: ShellConfig): void {
     mgr.on((s) => main?.setTitle(windowTitle(cfg, s.localBuild)));
     log.info("[app] ready");
     void mgr.boot();
+    void updates.auto();
   });
 }
 

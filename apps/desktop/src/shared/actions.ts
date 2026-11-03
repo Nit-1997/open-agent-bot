@@ -73,6 +73,17 @@ export type EngineInfo = Readonly<{
   memWarning: boolean;
 }>;
 
+export type UpdateView = Readonly<{
+  appVersion: string;
+  shell?: string;
+  dismissed?: boolean;
+  services?: string;
+  incompatible?: string;
+  error?: string;
+  checking?: boolean;
+  checked?: boolean;
+}>;
+
 export type ShellState = Readonly<{
   phase: string;
   screen: ScreenId;
@@ -111,6 +122,8 @@ export type ShellState = Readonly<{
   settings?: Readonly<{ stopOnQuit: boolean; checkForUpdates: boolean }>;
   servicesInfo?: ServicesInfo;
   notice?: Notice;
+  update?: UpdateView;
+  focus?: string;
 }>;
 
 export type ShellBridge = Readonly<{

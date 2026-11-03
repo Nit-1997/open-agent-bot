@@ -165,7 +165,7 @@ export const composeSha = () =>
     .digest("hex");
 
 export function fakeServices(dir: string, o: { version?: string; pull?: boolean; agent?: string; search?: string } = {}): string {
-  const file = join(dir, "services.json");
+  const file = join(dir, "dev-services.json");
   writeFileSync(
     file,
     JSON.stringify({

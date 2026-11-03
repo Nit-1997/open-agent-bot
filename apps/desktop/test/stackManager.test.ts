@@ -39,6 +39,7 @@ type World = {
   volumeRmFails: boolean;
   dockerDown: boolean;
   exportMode: "ok" | "slow";
+  versions: Record<string, string>;
 };
 
 let dir: string;
@@ -57,6 +58,7 @@ beforeEach(() => {
     volumeRmFails: false,
     dockerDown: false,
     exportMode: "ok",
+    versions: {},
   };
   managers = [];
 });
@@ -117,7 +119,11 @@ function fakeCompose(spec: ProjectSpec): Compose {
       const b = world.up;
       if (b === "noSpace") return fail("write /var/lib/docker: no space left on device");
       if (b === "portTaken") return fail("Bind for 127.0.0.1:18421 failed: port is already allocated");
-      world.containers = stack(spec.vars.token, spec.vars.port);
+      world.containers = stack(spec.vars.token, spec.vars.port, {
+        agent: { image: spec.vars.agentImage },
+        search: { image: spec.vars.searchImage },
+        renderer: { image: spec.vars.agentImage },
+      });
       if (b === "slow") {
         world.containers = world.containers.map((c) => ({ ...c, status: "created", health: "" }));
         return waitAbort(o.signal);
@@ -209,7 +215,7 @@ const cli: DockerCli = {
 const health = (port: number): Health | undefined => {
   const a = world.containers.find((c) => c.service === "agent");
   return a && a.status === "running" && a.port === port && a.health === "healthy"
-    ? { ok: true, app: "open-agent", version: "0.0.0-unit" }
+    ? { ok: true, app: "open-agent", version: world.versions[a.image] ?? "0.0.0-unit" }
     : undefined;
 };
 
@@ -246,6 +252,7 @@ function build(
     cfgEnv?: Record<string, string>;
     savePath?: string;
     log?: ManagerDeps["log"];
+    updates?: ManagerDeps["updates"];
   } = {},
 ): Built {
   const cfg = loadShellConfig({
@@ -302,6 +309,7 @@ function build(
     moveToApplications: () => {},
     openApp: () => {},
     relaunch: () => {},
+    ...(o.updates ? { updates: o.updates } : {}),
     savePath: async () => o.savePath ?? join(dir, "saved.zip"),
     freeBytes: () => 50 * 1024 ** 3,
     timings: {
@@ -858,5 +866,119 @@ describe("Services & data (4.3)", () => {
     world.calls = [];
     await b.m.quit();
     expect(mutations()).toEqual([]);
+  });
+});
+
+describe("service update (D12, 4.4)", () => {
+  const NEXT: ServicePins = {
+    kind: "dev",
+    version: "0.0.0-unit2",
+    composeSha256: "x",
+    images: { agent: `127.0.0.1:18467/oab-a@sha256:${"c".repeat(64)}`, search: `127.0.0.1:18467/oab-s@sha256:${"d".repeat(64)}` },
+    pull: true,
+  };
+  const offer = (pending: ServicePins | undefined) => {
+    const accepted: ServicePins[] = [];
+    let current = pending;
+    return {
+      accepted,
+      updates: {
+        view: () => ({ appVersion: "0.0.0-dev", ...(current ? { services: current.version } : {}) }),
+        pending: () => current,
+        accepted: (p: ServicePins) => {
+          accepted.push(p);
+          current = undefined;
+        },
+      },
+    };
+  };
+
+  it("pulls the new refs, recreates with a rotated token and the new images, waits for the new version, then saves it", async () => {
+    const o = offer(NEXT);
+    const b = build({ updates: o.updates });
+    await b.m.boot();
+    await b.m.idle();
+    const first = storedToken();
+    world.calls = [];
+    world.versions[NEXT.images.agent] = NEXT.version;
+    expect(b.m.state().update).toEqual({ appVersion: "0.0.0-dev", services: "0.0.0-unit2" });
+    expect(await b.m.act({ type: "updateServices" })).toEqual({ ok: true });
+    await b.m.idle();
+    expect(b.m.state()).toMatchObject({ phase: "ready", screen: "app", servicesVersion: "0.0.0-unit2" });
+    expect(mutations()).toEqual(["pull", "pull", "up"]);
+    expect(world.calls.filter((c) => c.kind === "pull").map((c) => c.args[1])).toEqual([NEXT.images.agent, NEXT.images.search]);
+    expect(world.calls.find((c) => c.kind === "up")?.force).toBe(true);
+    expect(storedToken()).not.toBe(first);
+    expect(world.containers.find((c) => c.service === "agent")?.image).toBe(NEXT.images.agent);
+    expect(o.accepted).toEqual([NEXT]);
+    expect(b.m.state().update).toEqual({ appVersion: "0.0.0-dev" });
+    expect(b.states.map((s) => s.phase)).toEqual(expect.arrayContaining(["pulling", "creating", "waitingHealth"]));
+  });
+
+  it("an update that never reports the new version is not saved", async () => {
+    const o = offer(NEXT);
+    const b = build({ updates: o.updates });
+    await b.m.boot();
+    await b.m.idle();
+    await b.m.act({ type: "updateServices" });
+    await b.m.idle();
+    expect(b.m.state()).toMatchObject({ screen: "screen-failed", failure: { reason: "health_timeout" } });
+    expect(o.accepted).toEqual([]);
+    expect(b.m.state().servicesVersion).toBe(PINS.version);
+  });
+
+  it("without an offer, Update services re-downloads the current pins", async () => {
+    const o = offer(undefined);
+    const b = build({ updates: o.updates });
+    await b.m.boot();
+    await b.m.idle();
+    world.calls = [];
+    await b.m.act({ type: "updateServices" });
+    await b.m.idle();
+    expect(world.calls.filter((c) => c.kind === "pull").map((c) => c.args[1])).toEqual([PINS.images.agent, PINS.images.search]);
+    expect(o.accepted).toEqual([]);
+    expect(b.m.state()).toMatchObject({ screen: "app", servicesVersion: PINS.version });
+  });
+
+  it("a local build never applies a manifest", async () => {
+    const local: ServicePins = {
+      kind: "local",
+      version: "local-abc1234",
+      composeSha256: "x",
+      images: { agent: "oab-m4-agent:local", search: "oab-m4-search:local" },
+      imageIds: { agent: ID_A, search: ID_S },
+      pull: false,
+    };
+    world.images = { [local.images.agent]: ID_A, [local.images.search]: ID_S };
+    const o = offer(NEXT);
+    const b = build({ pins: local, updates: o.updates });
+    await b.m.boot();
+    await b.m.idle();
+    expect(await b.m.act({ type: "updateServices" })).toEqual({ ok: false, error: "not_available" });
+    expect(o.accepted).toEqual([]);
+  });
+
+  it("openServices shows Services & data with a focus target; Back returns to the app", async () => {
+    const b = build({ updates: offer(undefined).updates });
+    await b.m.boot();
+    await b.m.idle();
+    b.m.openServices("update-row");
+    expect(b.m.state()).toMatchObject({ screen: "screen-services", focus: "update-row", update: { appVersion: "0.0.0-dev" } });
+    b.m.openServices();
+    expect(b.m.state().focus).toBeUndefined();
+    expect(await b.m.act({ type: "closeServices" })).toEqual({ ok: true });
+    expect(b.m.state().screen).toBe("app");
+  });
+
+  it("refresh re-emits the current screen with the latest update view", async () => {
+    let view = { appVersion: "0.0.0-dev" } as { appVersion: string; shell?: string };
+    const b = build({ updates: { view: () => view, pending: () => undefined, accepted: () => {} } });
+    await b.m.boot();
+    await b.m.idle();
+    const n = b.states.length;
+    view = { appVersion: "0.0.0-dev", shell: "99.0.0" };
+    b.m.refresh();
+    expect(b.states.length).toBe(n + 1);
+    expect(b.m.state()).toMatchObject({ screen: "app", update: { shell: "99.0.0" } });
   });
 });
