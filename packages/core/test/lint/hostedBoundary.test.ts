@@ -34,7 +34,7 @@ describe("import scanner", () => {
       '// import "../hosted/a.js";',
       '/* export * from "../hosted/b.js"; */',
       "const s = 'import \"../hosted/c.js\"';",
-      'const t = `import "../hosted/d.js" ${"x"}`;',
+      `const t = \`import "../hosted/d.js" \${"x"}\`;`,
       "const r = /from [\"'](x)[\"']/g;",
       'const u = import.meta.url; const v = "from";',
       'const w = a / b; const y = "import";',
@@ -56,6 +56,16 @@ const blocked: Array<[string, SourceTree, string]> = [
   ["B4", { "hosted/x.ts": 'import "@oab/core/hosted/store/client.js";\n' }, "@oab/core/hosted/store/client.js"],
   ["B4", { "lib/x.ts": 'import { UserError } from "@oab/core/lib/errors.js";\n' }, "@oab/core/lib/errors.js"],
   ["B4", { "server.ts": 'import "@oab/core/hosted/main.js";\n' }, "@oab/core/hosted/main.js"],
+  ["B4", { "hosted/x.ts": 'import "@oab/core/Hosted/store/client.js";\n' }, "@oab/core/Hosted/store/client.js"],
+  ["B4", { "hosted/x.ts": 'import "@oab/core/HOSTED/main.js";\n' }, "@oab/core/HOSTED/main.js"],
+  ["B4", { "hosted/x.ts": 'import "@oab/core/hosted";\n' }, "@oab/core/hosted"],
+  ["B4", { "hosted/x.ts": 'import "@oab/core/scripts/rotateCredentials.js";\n' }, "@oab/core/scripts/rotateCredentials.js"],
+  [
+    "B4",
+    { "hosted/x.ts": 'export const f = () => import("@oab/core/Scripts/rotateCredentials.js");\n' },
+    "@oab/core/Scripts/rotateCredentials.js",
+  ],
+  ["B4", { "hosted/admin/x.ts": 'export { r } from "@oab/core/SCRIPTS/x.js";\n' }, "@oab/core/SCRIPTS/x.js"],
   ["B6", { "hosted/deps.ts": 'import "@oab/core/identity/localIdentity.js";\n' }, "@oab/core/identity/localIdentity.js"],
   [
     "B6",
@@ -78,6 +88,10 @@ const allowed: Array<[string, SourceTree]> = [
   ["names that only contain hosted", { "lib/x.ts": 'import "./hostedLimits.js";\nimport "../unhosted/x.js";\n' }],
   ["core importing core", { "http/chats.ts": 'import type { UserRepos } from "../store/types.js";\n' }],
   ["hosted reaching the identity port", { "hosted/identity/x.ts": 'import type { Identity } from "@oab/core/identity/types.js";\n' }],
+  [
+    "core paths that only start like hosted or scripts",
+    { "hosted/x.ts": 'import "@oab/core/hostedLimits.js";\nimport "@oab/core/scriptsTool.js";\n' },
+  ],
   ["core reaching a local identity", { "app.ts": 'import "./identity/localIdentity.js";\n' }],
 ];
 
@@ -163,6 +177,22 @@ describe("Biome enforces B1, B3, B4 and B6", () => {
     const r = lint("core", "src/hosted/x.ts", 'import x from "@oab/core/hosted/store/client.js";\nexport default x;\n');
     expect(r.out).toContain("lint/style/noRestrictedImports");
     expect(r.status).not.toBe(0);
+  });
+
+  it("blocks @oab/core/scripts/* inside hosted files", () => {
+    const r = lint("core", "src/hosted/x.ts", 'import x from "@oab/core/scripts/rotateCredentials.js";\nexport default x;\n');
+    expect(r.out).toContain("Scripts are entry points; hosted code must not import them.");
+    expect(r.status).not.toBe(0);
+  });
+
+  it("allows core paths that only start like hosted or scripts inside hosted files", () => {
+    const r = lint(
+      "core",
+      "src/hosted/x.ts",
+      'import x from "@oab/core/hostedLimits.js";\nimport y from "@oab/core/scriptsTool.js";\nexport default [x, y];\n',
+    );
+    expect(r.out).not.toContain("noRestrictedImports");
+    expect(r.status).toBe(0);
   });
 
   it("blocks local identity modules inside hosted files", () => {
