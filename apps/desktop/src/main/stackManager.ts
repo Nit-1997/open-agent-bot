@@ -14,6 +14,7 @@ import { createPullParser, layerSizesFromManifest } from "./pullProgress.ts";
 import { readRefusal, type RefusalReading, savedKeyCount } from "./refusals.ts";
 import { redact } from "./redact.ts";
 import type { ServicePins } from "./services.ts";
+import { createServicesData, type DataOutcome, type SavePath } from "./servicesData.ts";
 import type { SettingsStore } from "./settings.ts";
 import type { ShellConfig } from "./shellConfig.ts";
 import { readStateFile, type ShellPaths, writeStateFile } from "./statePaths.ts";
@@ -50,6 +51,8 @@ export type ManagerDeps = Readonly<{
   openApp: (path: string) => void;
   relaunch: () => void;
   tokens: { current?: string; previous?: string };
+  savePath: SavePath;
+  freeBytes: (dir: string) => number;
   timings?: Partial<Timings>;
 }>;
 
@@ -61,6 +64,7 @@ export type Timings = Readonly<{
   healthGetMs: number;
   deleteWaitMs: number;
   settleMs: number;
+  servicesPollMs: number;
 }>;
 
 const DEFAULT_TIMINGS: Timings = {
@@ -71,6 +75,7 @@ const DEFAULT_TIMINGS: Timings = {
   healthGetMs: 2000,
   deleteWaitMs: 120_000,
   settleMs: 20_000,
+  servicesPollMs: 5000,
 };
 
 export type QuitOutcome = { kind: "done" } | { kind: "delete_unfinished" };
@@ -80,6 +85,7 @@ export interface StackManager {
   on(cb: (s: ShellState) => void): () => void;
   boot(): Promise<void>;
   act(a: ShellAction): Promise<ActResult>;
+  openServices(): void;
   quit(): Promise<QuitOutcome>;
   launchMismatch(): void;
   uiCrashed(): void;
@@ -105,6 +111,8 @@ const ENGINE_NAMES: Readonly<Record<string, string>> = {
   other: "Docker",
 };
 const FOUR_GIB = 4 * 1024 ** 3;
+const OVERLAYS = new Set(["screen-services", "screen-logs", "screen-confirm-delete", "screen-confirm-reset"]);
+const EXPORTABLE = new Set(["config", "db_newer", "db_migration", "kek_missing", "keyfile_invalid", "ui_missing", "identity"]);
 const PORT_TAKEN = /port is already allocated|address already in use/i;
 
 class Aborted extends Error {
@@ -134,7 +142,8 @@ export function createStackManager(d: ManagerDeps): StackManager {
   const { cfg, log } = d;
   const listeners = new Set<(s: ShellState) => void>();
   let s: ShellState = { phase: "checkingDocker", screen: "screen-progress", test: cfg.test, settings: settingsView() };
-  let back: ShellState | undefined;
+  let backStack: ShellState[] = [];
+  let servicesPoll: AbortController | undefined;
   let ctx: Ctx | undefined;
   let op: { name: string; ac: AbortController; done: Promise<void> } | undefined;
   let pullAc: AbortController | undefined;
@@ -169,8 +178,13 @@ export function createStackManager(d: ManagerDeps): StackManager {
       ...(port !== undefined ? { port } : {}),
       settings: settingsView(),
     };
+    if (!OVERLAYS.has(patch.screen)) backStack = [];
     s = keep ? { ...s, ...patch, settings: settingsView() } : { ...base, ...patch };
     emit();
+  };
+  const enter = (patch: Partial<ShellState> & { screen: string }) => {
+    backStack.push(s);
+    set({ phase: s.phase, ...patch });
   };
   const progress = (phase: Phase, extra: Partial<ShellState> = {}) => set({ phase, screen: "screen-progress", ...extra }, true);
 
@@ -383,6 +397,85 @@ export function createStackManager(d: ManagerDeps): StackManager {
     if (!ps) return undefined;
     const containers = await c.inspect(ps.map((r) => r.id).filter(Boolean));
     return { rows: ps.map((r) => ({ service: r.service, state: r.state, health: r.health })), containers };
+  };
+
+  const data = createServicesData({
+    paths: d.paths,
+    dataVolume: cfg.dataVolume,
+    log,
+    settings: d.settings,
+    savePath: d.savePath,
+    freeBytes: d.freeBytes,
+    docker: () => (ctx ? { cli: ctx.cli, env: ctx.env, agentRef: ctx.pins.images.agent } : undefined),
+    compose: () => compose(),
+    redact: redactText,
+  });
+
+  const onServices = () => s.screen === "screen-services";
+  const updateInfo = (patch: Partial<NonNullable<ShellState["servicesInfo"]>>) => {
+    if (!onServices()) return;
+    set({ phase: s.phase, screen: s.screen, servicesInfo: { rows: [], ...s.servicesInfo, ...patch } }, true);
+  };
+
+  const pollServices = () => {
+    servicesPoll?.abort();
+    const ac = new AbortController();
+    servicesPoll = ac;
+    void data.stats().then((st) => {
+      if (!ac.signal.aborted) updateInfo(st);
+    });
+    void (async () => {
+      while (!ac.signal.aborted && onServices()) {
+        const rows = await data.rows().catch(() => undefined);
+        if (ac.signal.aborted) return;
+        if (rows) updateInfo({ rows });
+        await sleep(t.servicesPollMs, ac.signal).catch(() => {});
+      }
+    })();
+  };
+
+  const restore = (prev: ShellState) => {
+    if (!OVERLAYS.has(prev.screen)) {
+      servicesPoll?.abort();
+      backStack = [];
+    }
+    if (prev.screen === "app") {
+      if (!appShown) return false;
+      set({ phase: "ready", screen: "app" });
+      return true;
+    }
+    s = { ...prev, settings: settingsView() };
+    emit();
+    if (onServices()) pollServices();
+    return true;
+  };
+
+  function openServices(): void {
+    if (!ctx) {
+      log.info("[services] not available before Docker is ready");
+      return;
+    }
+    if (op && s.phase !== "exporting") {
+      log.info(`[services] not opened while ${op.name} runs`);
+      return;
+    }
+    if (onServices()) return;
+    log.info("[services] open");
+    enter({ screen: "screen-services", servicesInfo: { rows: [] } });
+    pollServices();
+  }
+
+  const applyOutcome = (r: DataOutcome, phase: string) => {
+    if (r.kind === "notice") set({ phase, screen: s.screen, notice: r.notice }, true);
+    else if (r.kind === "failed") fail(r.reason, r.detail ? { detail: r.detail } : {});
+    else if (r.kind === "disk") diskFull(r.where, r.detail);
+    else if (s.phase === "exporting") set({ phase, screen: s.screen }, true);
+  };
+
+  const exportAllowed = () => {
+    if ([...backStack, s].some((x) => x.refusal?.code === "db_corrupt")) return false;
+    if (s.screen === "screen-services" || s.screen === "screen-confirm-delete") return true;
+    return s.screen.startsWith("screen-refusal-") && EXPORTABLE.has(s.refusal?.code ?? "");
   };
 
   function boot(o: { forceUp?: boolean } = {}): Promise<void> {
@@ -949,6 +1042,9 @@ export function createStackManager(d: ManagerDeps): StackManager {
         return { ok: true };
       case "setPort":
         if (!ctx) return { ok: false, error: "not_available" };
+        if (op) return { ok: false, error: "busy" };
+        if (!validPort(a.port) || (cfg.test && (a.port < 18000 || a.port > 19999)) || a.port === port)
+          return { ok: false, error: "invalid_port" };
         if (!(await d.ports.isFree(a.port))) return { ok: false, error: "invalid_port" };
         void runOp("changingPort", async (signal) => {
           watchdog.stop();
@@ -959,9 +1055,7 @@ export function createStackManager(d: ManagerDeps): StackManager {
         return { ok: true };
       case "confirmReset":
         if (s.refusal?.code !== "kek_missing") return { ok: false, error: "not_available" };
-        back = s;
-        set({
-          phase: s.phase,
+        enter({
           screen: "screen-confirm-reset",
           refusal: s.refusal,
           confirm: {
@@ -977,8 +1071,10 @@ export function createStackManager(d: ManagerDeps): StackManager {
         return { ok: true };
       case "confirmDelete":
         if (!ctx) return { ok: false, error: "not_available" };
-        back = s;
-        set({ phase: s.phase, screen: "screen-confirm-delete", confirm: { dataVolume: cfg.dataVolume, keysVolume: cfg.keysVolume } });
+        enter({
+          screen: "screen-confirm-delete",
+          confirm: { dataVolume: cfg.dataVolume, keysVolume: cfg.keysVolume, ...(exportAllowed() ? {} : { noExport: true }) },
+        });
         return { ok: true };
       case "deleteData":
         if (!confirmGate("screen-confirm-delete")) return { ok: false, error: "not_confirming" };
@@ -991,23 +1087,36 @@ export function createStackManager(d: ManagerDeps): StackManager {
         void boot();
         return { ok: true };
       case "back":
-      case "closeServices":
+      case "closeServices": {
+        let prev = backStack.pop();
+        if (a.type === "closeServices") while (prev && OVERLAYS.has(prev.screen)) prev = backStack.pop();
+        if (prev && restore(prev)) return { ok: true };
         if (appShown && s.screen !== "app") {
+          servicesPoll?.abort();
           set({ phase: "ready", screen: "app" });
           return { ok: true };
         }
-        if (back) {
-          s = back;
-          back = undefined;
-          emit();
-          return { ok: true };
-        }
         return { ok: false, error: "not_available" };
+      }
       case "showLogs": {
         if (!ctx) return { ok: false, error: "not_available" };
         const text = await compose().logs({ services: ["agent", "search", "renderer"], tail: 500, timestamps: true });
-        if (s.screen !== "screen-logs") back = s;
-        set({ phase: s.phase, screen: "screen-logs", logs: { text: redactText(text) } });
+        const patch = { screen: "screen-logs", logs: { text: redactText(text) } };
+        if (s.screen === "screen-logs") set({ phase: s.phase, ...patch }, true);
+        else enter(patch);
+        return { ok: true };
+      }
+      case "saveLogs": {
+        if (!ctx) return { ok: false, error: "not_available" };
+        applyOutcome(await data.saveLogs(), s.phase);
+        return { ok: true };
+      }
+      case "exportData": {
+        if (!ctx || !exportAllowed()) return { ok: false, error: "not_available" };
+        if (op) return { ok: false, error: "busy" };
+        const phase = s.phase;
+        set({ phase: "exporting", screen: s.screen, notice: { tone: "info", text: "Exporting your chats and reports…" } }, true);
+        void runOp("exporting", async (signal) => applyOutcome(await data.exportZip(signal), phase));
         return { ok: true };
       }
       case "setStopOnQuit":
@@ -1042,8 +1151,10 @@ export function createStackManager(d: ManagerDeps): StackManager {
     },
     boot: () => boot(),
     act,
+    openServices,
     quit: async () => {
       watchdog.stop();
+      servicesPoll?.abort();
       dockerPoll?.abort();
       const current = op;
       const phase = s.phase;
@@ -1053,7 +1164,12 @@ export function createStackManager(d: ManagerDeps): StackManager {
         return finished ? { kind: "done" } : { kind: "delete_unfinished" };
       }
       if (current) {
-        const what = phase === "pulling" ? "Stopping the download…" : "Stopping Open Agent's services…";
+        const what =
+          phase === "pulling"
+            ? "Stopping the download…"
+            : phase === "exporting"
+              ? "Stopping the export…"
+              : "Stopping Open Agent's services…";
         set({ phase: "stopping", screen: "screen-stopping", stopping: { what } }, true);
         current.ac.abort();
         pullAc?.abort();

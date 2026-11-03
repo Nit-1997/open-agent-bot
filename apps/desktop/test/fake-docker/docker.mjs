@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildZip } from "./zip.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REFUSAL_EXIT = {
@@ -434,6 +435,76 @@ async function composeCmd(home, sc, state, c, env, rec) {
   }
 }
 
+const DEFAULT_STATS = { schema: 1, dbBytes: 3 * 1024 * 1024, reports: 2, chats: 5, reportBytes: 40960 };
+
+async function fakeDb(home, withCredentials) {
+  const { DatabaseSync } = await import("node:sqlite");
+  const file = join(home, `export-${process.pid}.db`);
+  rmSync(file, { force: true });
+  const db = new DatabaseSync(file);
+  db.exec(
+    "CREATE TABLE chats (id TEXT PRIMARY KEY, title TEXT); CREATE TABLE provider_credentials (provider TEXT, ciphertext BLOB); PRAGMA user_version = 1;",
+  );
+  db.prepare("INSERT INTO chats (id, title) VALUES (?, ?)").run("c1", "Fake chat");
+  if (withCredentials)
+    db.prepare("INSERT INTO provider_credentials (provider, ciphertext) VALUES (?, ?)").run("openrouter", Buffer.from("CIPHER"));
+  db.close();
+  const bytes = readFileSync(file);
+  rmSync(file, { force: true });
+  return bytes;
+}
+
+async function runCmd(home, sc, argv, rec) {
+  const at = argv.indexOf("dist/local/dataTools.js");
+  if (at < 0 || !argv.includes("--network") || argv[argv.indexOf("--network") + 1] !== "none") {
+    err("fake docker: only the no-network dataTools run is emulated");
+    return 64;
+  }
+  const cmd = argv[at + 1];
+  rec.dataTools = cmd;
+  if (cmd === "stats") {
+    out(JSON.stringify(sc.stats ?? DEFAULT_STATS));
+    return 0;
+  }
+  if (cmd === "check") {
+    const mount = argv[argv.indexOf("-v") + 1] ?? "";
+    const host = mount.replace(/:\/check\/open-agent\.db:ro$/, "");
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(host, { readOnly: true });
+    const n = db.prepare("SELECT count(*) AS n FROM provider_credentials").get().n;
+    const schema = db.prepare("PRAGMA user_version").get().user_version;
+    db.close();
+    out(JSON.stringify({ credentials: n, schema }));
+    return 0;
+  }
+  if (cmd !== "export") {
+    err(`fake docker: dataTools ${cmd} is not emulated`);
+    return 64;
+  }
+  if (sc.noSpace === "export") {
+    err("[export] disk full: database or disk is full");
+    return 3;
+  }
+  const mode = sc.export ?? "ok";
+  const entries = [
+    {
+      name: "export.json",
+      data: Buffer.from(JSON.stringify({ app: "open-agent", version: sc.versions.agent, schema: 1, kind: "snapshot" })),
+    },
+    { name: "open-agent.db", data: await fakeDb(home, mode === "withCredentials") },
+    { name: "reports/00000000-0000-4000-8000-000000000001/AbCdEfGhIjKl.html", data: Buffer.from("<p id='r'>report</p>") },
+  ];
+  if (mode === "evil") entries.push({ name: "keys/kek", data: Buffer.from("KEK") });
+  const zip = buildZip(entries);
+  const write = (b) => new Promise((resolve) => process.stdout.write(b, resolve));
+  if (sc.slow.exportMs) {
+    await write(zip.subarray(0, 64));
+    await sleep(sc.slow.exportMs);
+    await write(zip.subarray(64));
+  } else await write(zip);
+  return 0;
+}
+
 function finish(home, rec) {
   appendFileSync(paths(home).calls, `${JSON.stringify(rec)}\n`);
 }
@@ -597,6 +668,9 @@ async function dispatch(home, sc, state, argv, env, rec) {
       out(JSON.stringify(found.map(inspectJson), null, 1));
       return found.length === argv.length - 1 ? 0 : 1;
     }
+    case "run":
+      if (!up) return down();
+      return runCmd(home, sc, argv, rec);
     case "volume": {
       if (!up) return down();
       if (argv[1] !== "rm") return 64;

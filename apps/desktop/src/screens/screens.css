@@ -238,3 +238,54 @@ body {
   margin-top: 8px;
   accent-color: var(--accent);
 }
+
+.table {
+  border-collapse: collapse;
+  margin: 0 0 18px;
+  min-width: 520px;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px 14px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.toggle,
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.inline input[type="number"] {
+  width: 110px;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.confirm .text {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.logs .log {
+  max-height: 460px;
+}

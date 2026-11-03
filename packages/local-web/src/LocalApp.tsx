@@ -5,9 +5,9 @@ import { ChatRuntime } from "@oab/ui/platform/chat";
 import { NotFoundView } from "@oab/ui/views/NotFoundView.tsx";
 import { RouteView } from "@oab/ui/views/RouteView.tsx";
 import { useMemo } from "react";
+import { desktopSlots } from "./desktopSlots.tsx";
 
 const LOCAL_USER = Object.freeze({ name: "", email: "" });
-const NO_SLOTS = Object.freeze({});
 
 function LocalRoute() {
   const route = parseRoute(usePathname(), useSearchParams());
@@ -16,7 +16,7 @@ function LocalRoute() {
 }
 
 export function LocalApp({ router }: { router: PlatformRouter }) {
-  const platform = useMemo<Platform>(() => ({ router, user: LOCAL_USER, slots: NO_SLOTS }), [router]);
+  const platform = useMemo<Platform>(() => ({ router, user: LOCAL_USER, slots: desktopSlots(window.openAgentDesktop) }), [router]);
   return (
     <PlatformProvider platform={platform}>
       <ChatRuntime>

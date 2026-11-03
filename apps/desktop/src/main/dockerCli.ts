@@ -225,13 +225,22 @@ export function createDockerCli(path: string, o: { log: Log; tokens: () => reado
           if (cb) for (const l of parts) cb(l);
           return rest;
         };
-        child.stdout.setEncoding("utf8");
+        const sink = r.stdoutTo;
+        if (sink) {
+          child.stdout.on("data", (d: Buffer) => {
+            if (!sink.write(d)) {
+              child.stdout.pause();
+              sink.once("drain", () => child.stdout.resume());
+            }
+          });
+        } else {
+          child.stdout.setEncoding("utf8");
+          child.stdout.on("data", (d: string) => {
+            stdout = tail(stdout + d, MAX_CAPTURE);
+            outBuf = lines(d, outBuf, r.onStdoutLine);
+          });
+        }
         child.stderr.setEncoding("utf8");
-        child.stdout.on("data", (d: string) => {
-          if (r.stdoutTo) r.stdoutTo.write(d);
-          else stdout = tail(stdout + d, MAX_CAPTURE);
-          outBuf = lines(d, outBuf, r.onStdoutLine);
-        });
         child.stderr.on("data", (d: string) => {
           stderr = tail(stderr + d, MAX_CAPTURE);
           errBuf = lines(d, errBuf, r.onStderrLine);

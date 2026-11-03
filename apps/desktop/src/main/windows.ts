@@ -36,6 +36,7 @@ export type MainWindow = Readonly<{
   showShell(): void;
   showApp(port: number): Promise<void>;
   hideApp(): void;
+  revealApp(): void;
   reloadApp(): void;
   setTitle(title: string): void;
   sendState(s: ShellState): void;
@@ -239,6 +240,13 @@ export function createMainWindow(d: WindowDeps): MainWindow {
     hideApp: () => {
       appView.setVisible(false);
       shellView.setVisible(true);
+    },
+    revealApp: () => {
+      const origin = d.appOrigin();
+      if (!origin || originOf(appView.webContents.getURL()) !== origin || appView.getVisible()) return;
+      appView.setVisible(true);
+      shellView.setVisible(false);
+      appView.webContents.focus();
     },
     setTitle: (title) => {
       if (!window.isDestroyed()) window.setTitle(title);
