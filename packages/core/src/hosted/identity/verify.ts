@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, customFetch, decodeProtectedHeader, errors, type JWTPayload, jwtVerify } from "jose";
 import { normalizeId } from "@oab/shared/ids";
-import type { AgentConfig } from "@oab/core/config.js";
 import { log } from "@oab/core/lib/log.js";
+import type { CloudConfig } from "../config.js";
 
 export type VerifiedUser = { id: string; email: string; sessionId: string; isAdmin: boolean };
 
@@ -34,7 +34,7 @@ const keySetUnreachable = (err: unknown) =>
 
 const usedPassword = (amr: unknown) => Array.isArray(amr) && amr.some((m) => (m as { method?: unknown } | null)?.method === "password");
 
-export function createVerifier(cfg: Pick<AgentConfig, "supabaseUrl">, opts: { fetch?: typeof fetch } = {}): Verifier {
+export function createVerifier(cfg: Pick<CloudConfig, "supabaseUrl">, opts: { fetch?: typeof fetch } = {}): Verifier {
   const jwks = createRemoteJWKSet(new URL(`${cfg.supabaseUrl}/auth/v1/.well-known/jwks.json`), {
     cacheMaxAge: 600_000,
     cooldownDuration: 30_000,

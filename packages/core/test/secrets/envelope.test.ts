@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseCredentialKeys } from "../../src/config.js";
-import { type CredentialContext, CredentialIntegrityError, open, rewrap, type Sealed, seal } from "../../src/crypto/envelope.js";
-import { keyHint, oauthHint } from "../../src/crypto/hint.js";
-import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
+import { parseCredentialKeys } from "../../src/hosted/config.js";
+import { type CredentialContext, CredentialIntegrityError, open, rewrap, type Sealed, seal } from "../../src/secrets/envelope.js";
+import { keyHint, oauthHint } from "../../src/secrets/hint.js";
+import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
 
 const key = (n: number) => Buffer.alloc(32, n).toString("base64");
 const v1 = new LocalKeyWrapper(parseCredentialKeys(`v1:${key(1)}`));

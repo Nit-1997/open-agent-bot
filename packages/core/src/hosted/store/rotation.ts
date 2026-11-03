@@ -1,4 +1,4 @@
-import type { CredentialKind, Sealed } from "@oab/core/crypto/envelope.js";
+import type { CredentialKind, Sealed } from "@oab/core/secrets/envelope.js";
 import { toBytea } from "./bytea.js";
 import type { Db } from "./client.js";
 import { must, read } from "./errors.js";

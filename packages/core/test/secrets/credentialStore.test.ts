@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
+import { EnvelopeCredentialStore } from "../../src/secrets/credentialStore.js";
 import { wrapper } from "../fixtures/app.js";
 import { MemoryDb } from "../fixtures/memoryRepos.js";
 import { ALICE, BOB } from "../fixtures/users.js";

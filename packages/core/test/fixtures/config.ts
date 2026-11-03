@@ -1,4 +1,4 @@
-import { type AgentConfig, loadConfig } from "../../src/config.js";
+import { type HostedConfig, loadHostedConfig } from "../../src/hosted/config.js";
 
 export const TEST_SECRET = "a".repeat(64);
 export const TEST_KEY_B64 = Buffer.alloc(32, 7).toString("base64");
@@ -14,4 +14,4 @@ export const TEST_ENV: NodeJS.ProcessEnv = {
   RENDERER_SECRET: "b".repeat(64),
 };
 
-export const testConfig = (extra: NodeJS.ProcessEnv = {}): AgentConfig => loadConfig({ ...TEST_ENV, ...extra });
+export const testConfig = (extra: NodeJS.ProcessEnv = {}): HostedConfig => loadHostedConfig({ ...TEST_ENV, ...extra });

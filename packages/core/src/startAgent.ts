@@ -7,7 +7,6 @@ import { remoteRenderer } from "./artifacts/remoteRenderer.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { BrowserPool } from "./browser/pool.js";
 import type { CoreConfig } from "./config.js";
-import type { KeyWrapper } from "./crypto/keyWrapper.js";
 import { createGuards } from "./identity/guards.js";
 import type { AuthEnv, Identity, RouteMount } from "./identity/types.js";
 import { pathCovered } from "./identity/userPaths.js";
@@ -21,6 +20,8 @@ import type { ProviderHub } from "./providers/hub.js";
 import { type GatewayLike, hubFactory } from "./providers/hubFactory.js";
 import { UserHubs } from "./providers/hubs.js";
 import { LoginFlows } from "./providers/logins.js";
+import type { KeyWrapper } from "./secrets/keyWrapper.js";
+import { secretsFor } from "./secrets/secretsFor.js";
 import { sessionFactory } from "./session/createSession.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { registry } from "./sources/index.js";
@@ -83,7 +84,7 @@ export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
   const limiter = new RateLimiter();
   const jevLimiter = createLimiter(cfg.jevConcurrency);
 
-  const hubs = new UserHubs(hubFactory({ repos, keyWrapper: deps.keyWrapper, gateway: deps.gateway }));
+  const hubs = new UserHubs(hubFactory({ repos, credentials: secretsFor(deps.store, deps.keyWrapper), gateway: deps.gateway }));
 
   const judges = new WeakMap<ProviderHub, () => Promise<Judge>>();
   const judgeFor = (hub: ProviderHub) => {

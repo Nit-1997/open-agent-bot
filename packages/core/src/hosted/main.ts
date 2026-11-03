@@ -1,6 +1,7 @@
-import { ConfigError, loadConfig } from "@oab/core/config.js";
+import { ConfigError } from "@oab/core/config.js";
 import { startAgent } from "@oab/core/startAgent.js";
 import { ambientProviderEnv } from "./ambientEnv.js";
+import { type HostedConfig, loadHostedConfig } from "./config.js";
 import { hostedAgentDeps } from "./deps.js";
 
 function fail(message: string): never {
@@ -8,9 +9,9 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-let cfg: ReturnType<typeof loadConfig>;
+let cfg: HostedConfig;
 try {
-  cfg = loadConfig(process.env);
+  cfg = loadHostedConfig(process.env);
 } catch (err) {
   fail(err instanceof ConfigError ? err.message : `agent configuration failed: ${String(err)}`);
 }

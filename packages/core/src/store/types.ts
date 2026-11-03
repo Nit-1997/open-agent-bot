@@ -1,7 +1,7 @@
 import type { ChatSummary, StoredMessage } from "@oab/shared/chats";
 import type { SearchScope } from "@oab/shared/lists";
 import type { Page } from "@oab/shared/pages";
-import type { CredentialKind, Sealed } from "../crypto/envelope.js";
+import type { CredentialKind, Sealed } from "../secrets/envelope.js";
 
 export type NewMessage = Omit<StoredMessage, "createdAt">;
 

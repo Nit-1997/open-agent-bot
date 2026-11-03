@@ -1,5 +1,5 @@
-import { CredentialIntegrityError, rewrap } from "@oab/core/crypto/envelope.js";
-import type { KeyWrapper } from "@oab/core/crypto/keyWrapper.js";
+import { CredentialIntegrityError, rewrap } from "@oab/core/secrets/envelope.js";
+import type { KeyWrapper } from "@oab/core/secrets/keyWrapper.js";
 import type { RotationCursor, StaleCredential } from "../store/rotation.js";
 
 export type RotationRepo = {
