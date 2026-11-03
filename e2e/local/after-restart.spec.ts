@@ -1,8 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
-import { lastReplyLength, readMarker, send, STUB_LABEL, waitForReplyDone } from "../support/localStack.ts";
+import { lastReplyLength, readMarker, STUB_LABEL, send, waitForReplyDone } from "../support/localStack.ts";
 
-test("after down and up: the chat, the report and the provider survive, and a new reply streams @after-restart", async ({ page, baseURL }) => {
+test("after down and up: the chat, the report and the provider survive, and a new reply streams @after-restart", async ({
+  page,
+  baseURL,
+}) => {
   test.setTimeout(240_000);
   const marker = readMarker(baseURL as string);
   console.log(`marker ${marker.word}: chat ${marker.chatId}, report ${marker.reportId}`);

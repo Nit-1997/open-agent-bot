@@ -59,7 +59,7 @@ beforeAll(() => {
   writeFileSync(join(root, "secret.txt"), OUTSIDE);
   symlinkSync(join(root, "secret.txt"), join(uiDir, "linked.txt"));
   symlinkSync(root, join(uiDir, "assets", "up"));
-  front = createLocalFront({ uiDir, port: P, bff, log: (line) => lines.push(line) });
+  front = createLocalFront({ uiDir, port: P, bff, health: () => ({ version: "1.2.3", schema: 1 }), log: (line) => lines.push(line) });
 });
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -203,7 +203,7 @@ describe("refusals", () => {
     for (const host of ["127.0.0.1:3000", "evil.example", `127.0.0.1:${P}`]) {
       const res = await call("/health", { host });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ ok: true });
+      expect(await res.json()).toEqual({ ok: true, app: "open-agent", version: "1.2.3", schema: 1 });
       expect(res.headers.get("cache-control")).toBe("no-store");
     }
     expect(lines).toEqual([]);
@@ -235,7 +235,7 @@ describe("startup", () => {
     try {
       let thrown: unknown;
       try {
-        createLocalFront({ uiDir: empty, port: P, bff });
+        createLocalFront({ uiDir: empty, port: P, bff, health: () => ({ version: "dev", schema: 1 }) });
       } catch (err) {
         thrown = err;
       }
@@ -247,6 +247,8 @@ describe("startup", () => {
   });
 
   it("refuses a missing UI directory", () => {
-    expect(() => createLocalFront({ uiDir: join(root, "nowhere"), port: P, bff })).toThrow(/UI build not found/);
+    expect(() => createLocalFront({ uiDir: join(root, "nowhere"), port: P, bff, health: () => ({ version: "dev", schema: 1 }) })).toThrow(
+      /UI build not found/,
+    );
   });
 });

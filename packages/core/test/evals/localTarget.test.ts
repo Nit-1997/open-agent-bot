@@ -49,6 +49,30 @@ describe("evals local transport", () => {
     expect(String(err)).not.toContain(KEY);
   });
 
+  for (const origin of ["http://localhost:18340", "https://127.0.0.1:18340", "http://127.0.0.1"]) {
+    it(`accepts the loopback origin '${origin}'`, async () => {
+      const { fetch } = fakeFetch();
+      expect((await localTransport({ origin, fetch })).url).toBe(`${origin}/api/copilotkit/agent/openagent/run`);
+    });
+  }
+
+  for (const origin of [
+    "https://app.example.com",
+    "http://10.0.0.5:18330",
+    "http://127.0.0.2:18330",
+    "http://localhost.evil.example:18330",
+    "http://[::1]:18330",
+    "http://0.0.0.0:18330",
+  ]) {
+    it(`refuses the non-loopback origin '${origin}' before any request`, async () => {
+      const { calls, fetch } = fakeFetch();
+      await expect(localTransport({ origin, fetch, openrouterKey: KEY })).rejects.toThrow(
+        /--target local only talks to 127\.0\.0\.1 or localhost/,
+      );
+      expect(calls).toHaveLength(0);
+    });
+  }
+
   for (const origin of ["", "127.0.0.1:18340", "http://127.0.0.1:18340/", "http://127.0.0.1:18340/api", "ftp://127.0.0.1:18340"]) {
     it(`refuses the origin '${origin}'`, async () => {
       const { calls, fetch } = fakeFetch();

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { loadOrCreateSecretFile, newKekFile, parseKekFile } from "../../../src/local/keyFiles.js";
+import { loadOrCreateSecretFile } from "../../../src/lib/secretFile.js";
+import { newKekFile, parseKekFile } from "../../../src/local/keyFiles.js";
 
 process.umask(0);
 const [path, startAt] = process.argv.slice(2);

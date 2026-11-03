@@ -23,7 +23,7 @@ docker compose up -d --build
 Then open http://127.0.0.1:3000 and go through onboarding. The first build takes several minutes. The stack is the project `open-agent`: `agent` (the app on one port: UI, API and chat stream), `search` (SearXNG) and `renderer` (thumbnails and PDFs).
 
 - **Models.** Add a cloud provider key in Models, or use a model server on this computer through `host.docker.internal`: Ollama `http://host.docker.internal:11434/v1`, LM Studio `http://host.docker.internal:1234/v1`, llama.cpp `http://host.docker.internal:8080/v1`.
-- **Port.** `OPEN_AGENT_PORT=3100 docker compose up -d` serves http://127.0.0.1:3100 instead. The port is always bound to 127.0.0.1.
+- **Port.** `OPEN_AGENT_PORT=3100 docker compose up -d` serves http://127.0.0.1:3100 instead (1024–65535). The port is always bound to 127.0.0.1. `GET /health` answers `{"ok":true,"app":"open-agent","version":…,"schema":…}`.
 - **Data.** Chats, reports and settings live in the Docker volume `open-agent-data` (a SQLite file plus a reports folder). The key that encrypts saved model keys lives in a second volume, `open-agent-keys`, mounted only into the agent. `docker compose down` keeps both; `docker compose down -v` deletes both, and with them everything.
 - **Back up the keys volume separately.** A backup of `open-agent-data` alone can't decrypt saved model keys, and a backup of both together holds everything needed to use them.
 - **Prebuilt images.** `OPEN_AGENT_IMAGE` and `OPEN_AGENT_SEARCH_IMAGE` select prebuilt images. Use them only with `docker compose up -d --no-build`: without `--no-build`, compose builds from source and tags the result with that name.
@@ -60,6 +60,7 @@ When the agent can't start safely it prints one line, `[startup] refused code=<c
 | `keyfile_invalid` | 83 | A key file is a symlink, not a regular file, readable by others, owned by someone else or malformed. Fix the path the message names (for example `chmod 600`); it is never replaced on its own |
 | `ui_missing` | 84 | The image has no UI build. Rebuild with `docker compose build` |
 | `identity` | 85 | Internal wiring error. Report it as a bug |
+| `listen` | 86 | The port is in use (or can't be opened). Stop whatever holds it, or pick another with `OPEN_AGENT_PORT` |
 
 ## Run the hosted stack
 
@@ -154,6 +155,27 @@ npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w e2e
 `make-demo.mjs` needs `ffmpeg` and joins the recordings into `~/Downloads/app-shell-demo.mp4`.
 
 The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fresh preview: `APP_ORIGIN=http://localhost:18300 npm run smoke -w e2e` signs in, completes onboarding, and checks that a reply streams and that Stop ends a run. `APP_ORIGIN=http://localhost:18300 npm run m1 -w e2e` runs the M1 preview checks.
+
+### Local stack
+
+`e2e/playwright.local.config.ts` drives the local stack (no Supabase, no sign-in) on a desktop viewport with video on. It has two projects:
+
+- `local`: the stub-model subset in `e2e/local/` (every spec but `demo.spec.ts`): onboarding, streaming and Stop, a report with its PDF, search and the shell.
+- `local-demo`: `e2e/local/demo.spec.ts`, the recorded demo on a real model, including the check that pages on other origins can't use the API.
+
+`APP_ORIGIN` must be set on the command to the local stack, and must be `http://127.0.0.1` or `http://localhost` on a port in 18000–19999 (this config has no `E2E_ALLOW_LIVE` opt-in). Run a separate stack on a test port with its own project and `oab-` volumes, so the run starts from an empty database and never touches your own:
+
+```bash
+OPEN_AGENT_PORT=18330 OPEN_AGENT_DATA_VOLUME=oab-e2e-data OPEN_AGENT_KEYS_VOLUME=oab-e2e-keys docker compose -p oab-e2e up -d --build --wait
+npx tsx e2e/support/stubModel.ts &
+APP_ORIGIN=http://127.0.0.1:18330 npm run local -w e2e
+```
+
+- **Stub model.** `e2e/support/stubModel.ts` is an OpenAI-compatible server that streams scripted replies and creates a report on request, so `local` needs no key and costs nothing. It listens on `STUB_PORT` (default 18341, 18000–19999 only) and binds `127.0.0.1` unless `STUB_BIND` says otherwise; set `STUB_BIND=0.0.0.0` where the agent container can't reach the host's loopback (Linux). The specs connect it in onboarding as a custom provider at `http://$STUB_HOST:$STUB_PORT/v1` (`STUB_HOST` defaults to `host.docker.internal`).
+- **After a restart.** `npm run local -w e2e` skips the tests tagged `@after-restart`. Run `docker compose -p oab-e2e down` and the same `up` command (the volumes are kept), then `APP_ORIGIN=http://127.0.0.1:18330 npm run local:after-restart -w e2e` checks that the chat, the report and the provider survived and that a new reply streams.
+- **Demo.** `APP_ORIGIN=http://127.0.0.1:18330 npm run local:demo -w e2e -- --grep-invert @after-restart` runs the demo on a fresh stack; after a down and up, `-- --grep @after-restart` runs its second part. It needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e`, which it saves through the API before the UI opens (never typed or logged). `DEMO_SLOWMO=<ms>` slows it down for recording.
+
+Remove the test stack and its volumes afterwards with `docker compose -p oab-e2e down -v`.
 
 ## Evals
 

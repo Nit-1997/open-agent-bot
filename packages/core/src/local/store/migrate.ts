@@ -101,7 +101,6 @@ export function migrate(db: DatabaseSync, o: MigrateOptions): number {
     } catch (e) {
       throw new StoreOpenError("db_migration", `Could not back up ${o.dbPath} before migrating: ${(e as Error).message}`);
     }
-    prune(o.backupsDir, o.backupsKept);
   }
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -119,5 +118,6 @@ export function migrate(db: DatabaseSync, o: MigrateOptions): number {
     );
     throw new StoreOpenError("db_migration", `Updating the database from v${current} to v${latest} failed and was rolled back.${kept}`);
   }
+  if (backupPath) prune(o.backupsDir, o.backupsKept);
   return latest;
 }

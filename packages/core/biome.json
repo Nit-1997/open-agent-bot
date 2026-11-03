@@ -67,6 +67,10 @@
                   {
                     "group": ["node:sqlite"],
                     "message": "node:sqlite is used only inside src/local/store."
+                  },
+                  {
+                    "group": ["**/local/**", "@oab/core/local", "@oab/core/local/**"],
+                    "message": "Only src/local may import local modules."
                   }
                 ]
               }
@@ -115,6 +119,10 @@
                   {
                     "group": ["node:sqlite"],
                     "message": "node:sqlite is used only inside src/local/store."
+                  },
+                  {
+                    "group": ["**/local/**", "@oab/core/local", "@oab/core/local/**"],
+                    "message": "Only src/local may import local modules."
                   }
                 ]
               }

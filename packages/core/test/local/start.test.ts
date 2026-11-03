@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createServer, type AddressInfo } from "node:net";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -65,7 +66,7 @@ describe("startLocal end to end, in process", () => {
   it("answers /health", async () => {
     const res = await call(local.port, "/health", { host: "127.0.0.1:3000" });
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.text)).toEqual({ ok: true });
+    expect(JSON.parse(res.text)).toEqual({ ok: true, app: "open-agent", version: "dev", schema: 1 });
   });
 
   it("serves the UI build", async () => {
@@ -274,6 +275,21 @@ describe("startLocal refusals in process", () => {
     const err = await refusal(startLocal(localEnv(r, { OPEN_AGENT_UI_DIR: ui })));
     expect(err).toMatchObject({ code: "ui_missing", message: `UI build not found at ${ui}` });
     expect(existsSync(join(r.data, "open-agent.db-wal"))).toBe(false);
+  });
+
+  it("refuses a port that is already in use with listen and closes the store", async () => {
+    const blocker = createServer();
+    await new Promise<void>((ok) => blocker.listen(0, "127.0.0.1", () => ok()));
+    try {
+      const { port } = blocker.address() as AddressInfo;
+      const err = await refusal(startLocal(localEnv(r, { OPEN_AGENT_LISTEN_PORT: String(port) })));
+      expect(err.code).toBe("listen");
+      expect(err.message).toContain(`127.0.0.1:${port}`);
+      expect(err.message).toContain("EADDRINUSE");
+      expect(existsSync(join(r.data, "open-agent.db-wal"))).toBe(false);
+    } finally {
+      await new Promise<void>((ok) => blocker.close(() => ok()));
+    }
   });
 
   it("refuses hosted settings before touching the data directory", async () => {

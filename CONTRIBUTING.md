@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -27,10 +27,23 @@ CI runs these on every pull request. Run them from the repo root before you push
 | `@oab/core` | `npm run lint -w @oab/core && npm run format:check -w @oab/core && npm run typecheck -w @oab/core && npm test -w @oab/core && npm run build -w @oab/core` |
 | `@oab/ui` | `npm run lint -w @oab/ui && npm run format:check -w @oab/ui && npm run typecheck -w @oab/ui && npm test -w @oab/ui` (no build: consumed as TypeScript source) |
 | `@oab/bff` | `npm run lint -w @oab/bff && npm run format:check -w @oab/bff && npm run typecheck -w @oab/bff && npm test -w @oab/bff && npm run build -w @oab/bff` |
+| `@oab/local-web` | `npm run lint -w @oab/local-web && npm run format:check -w @oab/local-web && npm run typecheck -w @oab/local-web && npm test -w @oab/local-web && npm run build -w @oab/local-web` (the Vite build lands in `packages/local-web/dist/`, which the local agent serves) |
 | `web` | `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web` |
-| root | `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, and the unique-id scan over `packages/ui/src`, `web/app` and `web/components`; `node scripts/ids-static.mjs` prints `ids: N/N`) |
+| root | `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, and the unique-id scan over `packages/ui/src`, `packages/local-web/src`, `web/app` and `web/components`; `node scripts/ids-static.mjs` prints `ids: N/N`) |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `test/supabase/` run against the real Supabase project with `npm run test:supabase`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
+
+The local stack's store uses `node:sqlite`. The host and CI run Node 22, but the agent image runs Node 24, so CI's `sqlite-node24` job also runs the SQLite store and local entry tests in the agent's base image (Node 24). Run the same check from the repo root before you change `src/local/`:
+
+```bash
+docker run --rm --user pwuser -v "$PWD":/src:ro -e ELECTRON_SKIP_BINARY_DOWNLOAD=1 -e COPILOTKIT_TELEMETRY_DISABLED=true mcr.microsoft.com/playwright:v1.64.1-noble sh -ec '
+  mkdir -p /tmp/repo && cd /src && tar --exclude=./node_modules --exclude="./*/node_modules" --exclude="./*/*/node_modules" --exclude=./.git --exclude=./.factory -cf - . | tar -C /tmp/repo -xf -
+  cd /tmp/repo && node --version
+  npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
+  cd packages/core && npx vitest run test/local test/store'
+```
+
+It copies the source without `node_modules` and runs `npm ci` inside the container, because the host's macOS `node_modules` don't run on Linux. It runs as `pwuser`, not root, because root can read the mode-0000 key files the tests expect to be refused.
 
 ## Layout
 
@@ -48,6 +61,33 @@ packages/core/src/
                        parsing (keys.ts), hints, the credential store and secretsFor(store, wrapper)
   policy/              the RunPolicy port and LocalRunPolicy (per-user rate limit and concurrency)
   scripts/             operator scripts run inside the container (credential key rotation)
+  local/               the local single-user stack (one container, SQLite, no Supabase)
+    main.ts            entry (Docker CMD node dist/local/main.js): sets umask 077 first, then startLocal,
+                       refuses with a fixed exit code, and closes on SIGINT/SIGTERM
+    start.ts           startLocal(env): opens the store, ensures the fixed local user, loads the key files,
+                       makes the agent secret in memory, starts the core with no listener and reaches it
+                       in process through @oab/bff (localAuth), then serves the front
+    config.ts          LocalConfig: data, keys, renderer and UI dirs, published and listen ports, launch
+                       token, credential reset; refuses hosted settings
+    front.ts           the front Hono app: GET /health, the Host guard, the request log, /api to the bff,
+                       the static UI build with the page CSP and headers (ui_missing without index.html)
+    hosts.ts           the Host allowlist and app origins derived from the published port (127.0.0.1:P,
+                       localhost:P); hostGuard answers 421 misdirected to anything else
+    keyFiles.ts        the credential key (/keys/kek) and the renderer secret, through lib/secretFile.ts;
+                       kek_missing over saved credentials and the OPEN_AGENT_RESET_CREDENTIALS path
+    refusal.ts         StartupRefusal, the refusal codes and exit codes, the one redacted refusal line
+    requestLog.ts      one `[http] METHOD path status ms` line per request, with no query and ids scrubbed
+    store/             the Store port over node:sqlite (the only place that imports it)
+      sqliteStore.ts   openSqliteStore: the data dir with reports/ and backups/, pragmas (WAL, foreign keys),
+                       integrity check and migrations, forUser, ensureUser, credential count and reset
+      schema.ts        the SQL migrations (STRICT tables with CHECKs that match the Postgres rules)
+      migrate.ts       user_version migrations in a transaction, a VACUUM INTO backup first, quick_check;
+                       db_corrupt, db_newer and db_migration
+      repos.ts         the per-user repositories (chats, messages, artifacts, profile, providers, credentials)
+      search.ts        chat, message and report search in SQL with a case-folding function and snippets
+      files.ts         report files (html, pdf, jpg) under reports/<user id>/, with checked ids and paths
+      errors.ts        StoreOpenError for the open-time refusals, and sqliteError (SQLite codes → user errors)
+      clock.ts         a monotonic ISO clock, so timestamps never repeat or go backwards
   hosted/              the hosted (Supabase) implementation; moves to cloud/agent in M6
     main.ts            entry: loadHostedConfig → hostedAgentDeps → startAgent → signals
     deps.ts, config.ts, gateway.ts, routes.ts, ambientEnv.ts
@@ -88,7 +128,9 @@ packages/core/src/
   renderer/            the separate renderer service (main.ts): sandboxed Chromium for thumbnails and PDFs
                        with the egress lock-down (chromium.ts, sanitize.ts), behind a shared secret (server.ts)
   lib/                 small shared helpers with no tool dependencies: net.ts (URL guard,
-                       safe fetch), retry, fx, concurrency, rate limits, keyed mutex, log redaction
+                       safe fetch), retry, fx, concurrency, rate limits, keyed mutex, log redaction,
+                       secretFile.ts (key files shared by the renderer and local/: created once, 0600 and
+                       exclusive, read with symlink, mode, owner and format checks; keyfile_invalid otherwise)
 packages/shared/src/   the @oab/shared package: schemas used by both agent and web: widgets, workspace
                        edits, the profile and the agent persona (profile.ts), curated onboarding lists per
                        country (onboarding.ts), flights, list and search types (lists.ts), shell URL parsing
@@ -125,6 +167,8 @@ packages/bff/src/      the @oab/bff package: the framework-free /api handler (cr
                        (forward.ts), artifact formats and the framed error page (artifacts.ts), the
                        /api/copilotkit streaming proxy and its allowlist (copilotkit.ts), Next-compatible
                        params (params.ts); built with `tsc -b` to dist
+packages/local-web/src/ the @oab/local-web package: the Vite app for the local UI (main.tsx, LocalApp.tsx,
+                       theme.ts); @oab/ui with no login or cloud slots, built to dist/ and served by the local agent
 web/
   proxy.ts             session refresh, route rules and the nonce CSP on every request
   app/                 login, request-access, auth confirm/callback/signout, admin

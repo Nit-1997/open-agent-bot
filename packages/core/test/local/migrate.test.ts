@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SCHEMA } from "../../src/local/store/schema.js";
 import { type Migration, openSqliteStore, StoreOpenError } from "../../src/local/store/sqliteStore.js";
 import { openWithUser, tempDir } from "./storeHarness.js";
@@ -145,6 +145,44 @@ describe("schema migrations", () => {
       "open-agent-v6-to-v7-20261103T100700Z.db",
       "open-agent-v7-to-v8-20261103T100800Z.db",
     ]);
+  });
+
+  it("never prunes older backups for a migration that fails (restart retries keep them all)", async () => {
+    const migrations: Migration[] = [...SCHEMA];
+    await openSqliteStore({ dir: tmp.dir, now: () => T0 }).close();
+    for (let n = 2; n <= 6; n++) {
+      migrations.push(v(n, `CREATE TABLE extra_${n} (x TEXT) STRICT;`));
+      await openSqliteStore({ dir: tmp.dir, migrations, now: () => T0 + n * 60_000 }).close();
+    }
+    const good = readdirSync(backups).sort();
+    expect(good).toHaveLength(5);
+    const broken = [...migrations, v(7, "BROKEN SQL")];
+    for (let attempt = 1; attempt <= 3; attempt++)
+      expect(openError(() => openSqliteStore({ dir: tmp.dir, migrations: broken, now: () => T0 + (10 + attempt) * 60_000 })).code).toBe(
+        "db_migration",
+      );
+    const after = readdirSync(backups).sort();
+    expect(after.filter((f) => good.includes(f))).toEqual(good);
+    expect(after.filter((f) => f.startsWith("open-agent-v6-to-v7-"))).toHaveLength(3);
+    await openSqliteStore({
+      dir: tmp.dir,
+      migrations: [...migrations, v(7, "CREATE TABLE extra_7 (x TEXT) STRICT;")],
+      now: () => T0 + 20 * 60_000,
+    }).close();
+    expect(readdirSync(backups)).toHaveLength(5);
+  });
+
+  it("closes the database when a step after the migrations fails to open the store", async () => {
+    await openSqliteStore({ dir: tmp.dir, now: () => T0 }).close();
+    const close = vi.spyOn(DatabaseSync.prototype, "close");
+    try {
+      expect(() => openSqliteStore({ dir: tmp.dir, migrations: [...SCHEMA, v(2, "DROP TABLE chat_messages;")], now: () => T0 })).toThrow(
+        /chat_messages/,
+      );
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      close.mockRestore();
+    }
   });
 
   it("creates the database, its WAL files and backups as 0600 under umask 077", async () => {

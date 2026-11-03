@@ -3,8 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { MAX_ARTIFACT_BYTES } from "../artifacts/store.js";
 import { createLimiter } from "../lib/concurrency.js";
 import { log } from "../lib/log.js";
-import { parseHexSecret, readSecretFile } from "../local/keyFiles.js";
-import { StartupRefusal } from "../local/refusal.js";
+import { parseHexSecret, readSecretFile, SecretFileError } from "../lib/secretFile.js";
 
 export const MAX_RENDER_BYTES = MAX_ARTIFACT_BYTES;
 const RENDER_SLOTS = 2;
@@ -34,7 +33,7 @@ function secretFrom(env: NodeJS.ProcessEnv): RendererStartup {
   try {
     return { ok: true, secret: readSecretFile({ path: file, parse: parseHexSecret, label: "renderer secret" }) };
   } catch (err) {
-    if (err instanceof StartupRefusal) return { ok: false, message: err.message };
+    if (err instanceof SecretFileError) return { ok: false, message: err.message };
     throw err;
   }
 }

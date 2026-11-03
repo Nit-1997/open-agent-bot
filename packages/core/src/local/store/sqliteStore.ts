@@ -73,6 +73,7 @@ export function openSqliteStore(opts: SqliteStoreOptions): SqliteStore {
 
   const db = openDatabase(dbPath);
   let version: number;
+  let largest: number;
   try {
     db.exec("PRAGMA busy_timeout = 5000");
     checkIntegrity(db, dbPath);
@@ -86,11 +87,12 @@ export function openSqliteStore(opts: SqliteStoreOptions): SqliteStore {
       now,
       backupsKept: opts.backupsKept ?? BACKUPS_KEPT,
     });
+    registerSearchFunctions(db);
+    largest = largestStamp(db);
   } catch (e) {
     db.close();
     throw e;
   }
-  registerSearchFunctions(db);
 
   const statements = new Map<string, StatementSync>();
   const stmt = (sql: string) => {
@@ -101,7 +103,7 @@ export function openSqliteStore(opts: SqliteStoreOptions): SqliteStore {
     }
     return s;
   };
-  const clock = monotonicClock(now, largestStamp(db));
+  const clock = monotonicClock(now, largest);
   const ctx: Ctx = Object.freeze({ db, stmt, now: clock, reportsDir });
   let closed = false;
 

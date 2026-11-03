@@ -11,6 +11,7 @@ export type LocalFrontOptions = Readonly<{
   uiDir: string;
   port: number;
   bff: (req: Request) => Promise<Response>;
+  health: () => { version: string; schema: number };
   log?: (line: string) => void;
 }>;
 
@@ -105,7 +106,7 @@ export function createLocalFront(o: LocalFrontOptions): Hono {
   };
 
   const app = new Hono();
-  app.get("/health", (c) => c.json({ ok: true }, 200, { "cache-control": NO_STORE }));
+  app.get("/health", (c) => c.json({ ok: true, app: "open-agent", ...o.health() }, 200, { "cache-control": NO_STORE }));
   app.use(hostGuard(o.port));
   app.use(requestLog(o.log));
   app.all("/api", (c) => o.bff(c.req.raw));
