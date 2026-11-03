@@ -17,7 +17,8 @@
     "format:check": "npm run format:check --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && node --test scripts/test/*.test.mjs",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "release:dry-run": "node scripts/release/dry-run.mjs"
   },
   "devDependencies": {
     "patch-package": "8.0.1",

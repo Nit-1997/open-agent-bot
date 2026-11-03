@@ -14,6 +14,8 @@ files:
 extraResources:
   - from: build/stack
     to: stack
+  - from: ../../LICENSE
+    to: LICENSE
 mac:
   target:
     - target: dmg

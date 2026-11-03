@@ -78,8 +78,8 @@ export function validatePins(v: unknown, ctx: { test: boolean; composeSha256: st
   let minShellVersion: string | undefined;
   if (r.minShellVersion !== undefined) {
     if (typeof r.minShellVersion !== "string" || !parseSemver(r.minShellVersion)) return { ok: false, reason: "min_shell_version" };
-    if (parseSemver(ctx.shellVersion) && compareSemver(r.minShellVersion, ctx.shellVersion) > 0)
-      return { ok: false, reason: "shell_too_old" };
+    const shell = parseSemver(ctx.shellVersion);
+    if (shell && compareSemver(r.minShellVersion, shell.core.join(".")) > 0) return { ok: false, reason: "shell_too_old" };
     minShellVersion = r.minShellVersion;
   }
   const base = {
@@ -90,7 +90,9 @@ export function validatePins(v: unknown, ctx: { test: boolean; composeSha256: st
   };
 
   if (kind === "release") {
-    if (!RELEASE_AGENT.test(agent) || !RELEASE_SEARCH.test(search)) return { ok: false, reason: "release_refs" };
+    const production = RELEASE_AGENT.test(agent) && RELEASE_SEARCH.test(search);
+    const testRegistry = ctx.test && TEST_REGISTRY.test(agent) && TEST_REGISTRY.test(search);
+    if (!production && !testRegistry) return { ok: false, reason: "release_refs" };
     if (r.pull === false) return { ok: false, reason: "release_pull" };
     return { ok: true, pins: { kind, ...base, pull: true } };
   }
