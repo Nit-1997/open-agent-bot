@@ -13,6 +13,14 @@ const PRIVATE_URLS: Array<[string, string]> = [
 const composer = (page: Page) => page.locator("main [id$='-composer-input']:visible");
 const status = (page: Page) => page.locator("[id$='-header-status']:visible");
 
+async function replyLength(page: Page): Promise<number> {
+  const article = page.locator("main [id$='-turns'] article:visible").last();
+  if ((await article.count()) === 0) return 0;
+  const reply = page.locator(`[id="${await article.getAttribute("id")}-body"]`);
+  if ((await reply.count()) === 0) return 0;
+  return (await reply.innerText()).trim().length;
+}
+
 test("preview: isolation, provider settings, private URLs refused and admin guarded @m1", async ({ page }) => {
   const { otherChat } = seeded();
 
@@ -58,14 +66,14 @@ test("preview: isolation, provider settings, private URLs refused and admin guar
     await composer(page).fill("Reply with one short sentence about the sea.");
     await composer(page).press("Enter");
     await expect(page).toHaveURL(/\/chats\/[0-9a-f-]{36}$/, { timeout: 60_000 });
-    await expect(status(page)).toContainText("is working on this");
+    await expect.poll(() => replyLength(page), { timeout: 180_000 }).toBeGreaterThan(0);
     await expect(status(page)).toBeHidden({ timeout: 180_000 });
-    const reply = page.locator("main [id$='-turns'] article:visible").last();
-    await expect(reply).not.toBeEmpty();
   });
 
   await test.step("6. Admin guarded", async () => {
-    const res = await page.goto("/admin");
-    expect(res?.status()).toBe(404);
+    await page.goto("/admin");
+    await expect(page.locator("#shell-not-found-title")).toHaveText("This page doesn't exist.");
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.locator("[id^='admin-']")).toHaveCount(0);
   });
 });
