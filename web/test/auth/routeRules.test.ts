@@ -31,7 +31,48 @@ describe("decideRoute", () => {
 
   it("hides admin routes from non-admins", () => {
     expect(decideRoute("/admin", user)).toEqual({ kind: "not_found_page" });
+    expect(decideRoute("/admin/users", user)).toEqual({ kind: "not_found_page" });
     expect(decideRoute("/admin", admin)).toEqual({ kind: "pass" });
-    expect(decideRoute("/administrator", user)).toEqual({ kind: "pass" });
+    expect(decideRoute("/administrator", user)).toEqual(decideRoute("/administrator", admin));
+  });
+
+  it("gives signed-in users the not-found page for every unknown page", () => {
+    const unknown = ["/nope", "/nope/deeper", "/chats/not-a-uuid", "/reports/BAD!", "/administrator", "/search/x", "/__not-found"];
+    for (const path of unknown) {
+      expect(decideRoute(path, user)).toEqual({ kind: "not_found_page" });
+      expect(decideRoute(path, admin)).toEqual({ kind: "not_found_page" });
+    }
+    expect(decideRoute("/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/extra", user)).toEqual({ kind: "not_found_page" });
+    expect(decideRoute("/reports/AbCdEf_-1234/x", user)).toEqual({ kind: "not_found_page" });
+    expect(decideRoute("/admin/users", admin)).toEqual({ kind: "not_found_page" });
+  });
+
+  it("lets signed-in users reach every app page", () => {
+    const pages = [
+      "/",
+      "/chats",
+      "/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "/chats/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+      "/reports",
+      "/reports/AbCdEf_-1234",
+      "/search",
+    ];
+    for (const path of pages) {
+      expect(decideRoute(path, user)).toEqual({ kind: "pass" });
+      expect(decideRoute(path, admin)).toEqual({ kind: "pass" });
+    }
+    expect(decideRoute("/admin", admin)).toEqual({ kind: "pass" });
+  });
+
+  it("leaves the API and the public pages to their own handlers when signed in", () => {
+    for (const path of ["/api/chats", "/api/nope", "/api", "/login", "/landing", "/auth/signout", "/_next/static/x.js"]) {
+      expect(decideRoute(path, user)).toEqual({ kind: "pass" });
+    }
+  });
+
+  it("still sends signed-out visitors of an unknown page to /login", () => {
+    for (const path of ["/nope", "/nope/deeper", "/chats/not-a-uuid", "/admin"]) {
+      expect(decideRoute(path, none)).toEqual({ kind: "login" });
+    }
   });
 });

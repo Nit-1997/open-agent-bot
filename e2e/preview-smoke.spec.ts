@@ -69,4 +69,14 @@ test("preview: onboarding, a streamed reply and stop @smoke", async ({ page }) =
     await page.waitForTimeout(2_000);
     expect(await lastReplyLength(page)).toBe(stoppedAt);
   });
+
+  await test.step("5. Stop is not an error", async () => {
+    const banner = page.locator("[id$='-error'][role=alert]");
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      expect(await banner.count()).toBe(0);
+      await page.waitForTimeout(250);
+    }
+    expect(await lastReplyLength(page)).toBeGreaterThan(0);
+  });
 });

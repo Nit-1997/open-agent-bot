@@ -13,6 +13,12 @@ export function classifyRunError(event: { error: Error; context?: Record<string,
   return PATTERNS.find(([, re]) => re.test(haystack))?.[0] ?? "UNKNOWN";
 }
 
+const ABORT_MESSAGE = "This operation was aborted";
+
+export function isUserStop(stopRequested: boolean, signal: { code?: string; name?: string; message?: string }): boolean {
+  return stopRequested && (signal.code === "abort" || signal.name === "AbortError" || signal.message === ABORT_MESSAGE);
+}
+
 export const errorMessage = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 export const NOT_SAVED_EVENT = "not_saved";
