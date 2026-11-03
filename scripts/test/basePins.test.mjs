@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -63,9 +63,7 @@ describe("base image pins (D11)", () => {
   });
 
   const release = ".github/workflows/release.yml";
-  it("release.yml pins the buildx version and a digest-pinned BuildKit image", {
-    skip: !existsSync(join(ROOT, release)) && "release.yml lands in PR 5.2",
-  }, () => {
+  it("release.yml pins the buildx version and a digest-pinned BuildKit image", () => {
     const wf = parse(read(release));
     const steps = Object.values(wf.jobs ?? {}).flatMap((j) => j.steps ?? []);
     const buildx = steps.filter((s) => String(s.uses ?? "").startsWith("docker/setup-buildx-action@"));
