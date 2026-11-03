@@ -1,15 +1,15 @@
-import { AppShell } from "@/components/shell/AppShell";
+import { AppShell } from "@oab/ui/components/shell/AppShell.tsx";
 import { requireUser } from "@/lib/auth";
 import { HostedPlatform } from "@/lib/platform/hosted";
-import { Providers } from "../providers";
+import { ChatRuntime } from "@oab/ui/platform";
 
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   return (
     <HostedPlatform user={{ email: user.email, name: user.name, isAdmin: user.isAdmin }}>
-      <Providers>
+      <ChatRuntime>
         <AppShell>{children}</AppShell>
-      </Providers>
+      </ChatRuntime>
     </HostedPlatform>
   );
 }

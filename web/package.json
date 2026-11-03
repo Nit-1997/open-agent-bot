@@ -17,11 +17,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ag-ui/client": "1.0.2",
-    "@copilotkit/react-core": "^1.83.0",
-    "@fontsource-variable/dm-sans": "5.3.0",
-    "@fontsource/dm-mono": "5.3.0",
-    "@fontsource/instrument-serif": "5.3.0",
     "@oab/bff": "1.0.0",
     "@oab/shared": "1.0.0",
     "@oab/ui": "1.0.0",
@@ -31,8 +26,6 @@
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-markdown": "10.1.0",
-    "remark-gfm": "4.0.1",
     "typebox": "^1.4.3"
   },
   "devDependencies": {

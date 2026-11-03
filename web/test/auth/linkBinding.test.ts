@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { requestEmailLink } from "@/app/login/actions";
 import { isBoundTo, linkBinding } from "@/lib/authCookies";
-import { errorCodeIn, noteRunFailure, resetAuthState } from "@/lib/authState";
-import { notSavedMessage } from "@/lib/errors";
+import { errorCodeIn, noteRunFailure, resetAuthState } from "@oab/ui/lib/authState.ts";
+import { notSavedMessage } from "@oab/ui/lib/errors.ts";
 import { stubAgentEnv } from "../support/agentEnv";
 
 const jar = new Map<string, { value: string; opts: Record<string, unknown> }>();

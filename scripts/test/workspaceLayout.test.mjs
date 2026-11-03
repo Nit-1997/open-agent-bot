@@ -34,14 +34,20 @@ function sources(dir) {
   });
 }
 
-const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'`]([^"'`]+)["'`]/g;
+const SPECIFIERS = [
+  /^\s*(?:import|export)\s+(?:type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+[\w$]+))?)\s*from\s*["']([^"']+)["']/gm,
+  /^\s*import\s*["']([^"']+)["']/gm,
+  /\bimport\(\s*["']([^"']+)["']\s*\)/g,
+  /^\s*@import\s+["']([^"']+)["']/gm,
+];
+
+const specifiersOf = (text) => SPECIFIERS.flatMap((re) => [...text.matchAll(re)].map(([, spec]) => spec));
 const packageName = (spec) => (spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0]);
 
 function bareImports(dir) {
   return new Set(
     sources(dir).flatMap((file) =>
-      [...readFileSync(file, "utf8").matchAll(SPECIFIER)]
-        .map(([, spec]) => spec)
+      specifiersOf(readFileSync(file, "utf8"))
         .filter((spec) => !spec.startsWith(".") && !spec.startsWith("node:"))
         .map(packageName),
     ),
@@ -71,6 +77,20 @@ describe("workspace layout", () => {
       assert.deepEqual(missing, []);
     });
   }
+
+  it("reads import, export, dynamic and CSS @import specifiers, and nothing from JSX text", () => {
+    const text = [
+      'import { a } from "pkg-a";',
+      'export { b } from "pkg-b";',
+      'import "pkg-side";',
+      'const c = () => import("pkg-dynamic");',
+      '@import "@scope/pkg-css/file.css";',
+      '<p label="Flying from" title={x ? "y" : "z"} />',
+    ].join("\n");
+    assert.deepEqual(specifiersOf(text).sort(), ["@scope/pkg-css/file.css", "pkg-a", "pkg-b", "pkg-dynamic", "pkg-side"]);
+    const ui = bareImports(join(ROOT, "packages/ui/src"));
+    for (const name of ["@fontsource/dm-mono", "@fontsource/instrument-serif", "@fontsource-variable/dm-sans"]) assert.ok(ui.has(name), name);
+  });
 
   it("the lockfile has an entry for every workspace", () => {
     const lock = json("package-lock.json").packages;

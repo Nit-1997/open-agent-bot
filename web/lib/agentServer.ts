@@ -1,6 +1,6 @@
 import { isAllowedOrigin, jsonError } from "@oab/bff";
 import { type AgentAuth, AuthUnavailable, SignedOut } from "@/lib/auth";
-import { AUTH_ERROR_COPY } from "@/lib/authErrors";
+import { AUTH_ERROR_COPY } from "@oab/ui/lib/authErrors.ts";
 import { agentBaseUrl, appOrigin, ConfigError, serviceSecret } from "@/lib/env";
 
 export { jsonError };

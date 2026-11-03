@@ -33,7 +33,19 @@ export default defineConfig([
   {
     files: ["src/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ group: BLOCKED, message: BOUNDARY }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@copilotkit/react-core/v2",
+              importNames: ["useAgentContext"],
+              message: "Context goes to every agent. Use useThreadContext so it reaches only this chat's runs.",
+            },
+          ],
+          patterns: [{ group: BLOCKED, message: BOUNDARY }],
+        },
+      ],
       "no-restricted-syntax": [
         "error",
         {

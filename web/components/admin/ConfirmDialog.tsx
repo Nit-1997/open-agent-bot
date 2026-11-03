@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ghost, input } from "@/components/profile/models/styles";
+import { ghost, input } from "@oab/ui/components/profile/models/styles.ts";
 
 const danger =
   "rounded-full bg-danger-bg px-3.5 py-1.5 text-[12px] font-medium text-danger-fg transition hover:opacity-85 disabled:opacity-40";

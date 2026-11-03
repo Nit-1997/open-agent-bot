@@ -4,12 +4,12 @@ import type { AdminUser } from "@oab/shared/admin";
 import type { PageResponse } from "@oab/shared/pages";
 import { useState } from "react";
 import { deleteUser, listUsers, setUserStatus } from "@/app/admin/actions";
-import { ghost, input } from "@/components/profile/models/styles";
-import { DetailList } from "@/components/ui/DetailList";
-import { Pager } from "@/components/ui/Pager";
+import { ghost, input } from "@oab/ui/components/profile/models/styles.ts";
+import { DetailList } from "@oab/ui/components/ui/DetailList.tsx";
+import { Pager } from "@oab/ui/components/ui/Pager.tsx";
 import type { ActionResult } from "@/lib/actionResult";
 import { SEARCH_MAX, type UserAction, userNotice } from "@/lib/admin";
-import { formatWhen } from "@/lib/chats";
+import { formatWhen } from "@oab/ui/lib/chats.ts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { usePagedAdminList } from "./usePagedAdminList";
 

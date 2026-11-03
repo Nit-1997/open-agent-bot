@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthCard, authPrimary, authSecondary } from "@/components/auth/AuthCard";
 import { getClaimsOrNull, safeNext } from "@/lib/auth";
-import { authErrorCopy } from "@/lib/authErrors";
+import { authErrorCopy } from "@oab/ui/lib/authErrors.ts";
 import { firstParam } from "@/lib/authForms";
 import { signInWithGoogle } from "./actions";
 import { EmailLinkForm } from "./EmailLinkForm";

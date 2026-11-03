@@ -4,12 +4,12 @@ import { type AccessRequestView, REQUEST_FILTERS, type RequestFilter } from "@oa
 import type { PageResponse } from "@oab/shared/pages";
 import { useState } from "react";
 import { decideRequest, listRequests } from "@/app/admin/actions";
-import { ghost, solid } from "@/components/profile/models/styles";
-import { DetailList } from "@/components/ui/DetailList";
-import { Pager } from "@/components/ui/Pager";
+import { ghost, solid } from "@oab/ui/components/profile/models/styles.ts";
+import { DetailList } from "@oab/ui/components/ui/DetailList.tsx";
+import { Pager } from "@oab/ui/components/ui/Pager.tsx";
 import type { ActionResult } from "@/lib/actionResult";
 import { EMPTY_REQUESTS, FILTER_LABELS, type RequestAction, requestNotice } from "@/lib/admin";
-import { formatWhen } from "@/lib/chats";
+import { formatWhen } from "@oab/ui/lib/chats.ts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { usePagedAdminList } from "./usePagedAdminList";
 

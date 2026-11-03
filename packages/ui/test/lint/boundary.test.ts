@@ -109,6 +109,12 @@ describe("packages/ui boundary", { timeout: 30000 }, () => {
     expect(await restricted(code)).toEqual([]);
   });
 
+  it("lint keeps agent context per thread: useAgentContext is blocked, useAgent is not", async () => {
+    const messages = await restricted('import { useAgentContext } from "@copilotkit/react-core/v2";\nexport default useAgentContext;\n');
+    expect(messages).toHaveLength(1);
+    expect(messages[0].message).toContain("Use useThreadContext");
+  });
+
   it("lint blocks a dynamic import of a forbidden module", async () => {
     const messages = await restricted('export const load = () => import("next/navigation");\n');
     expect(messages).toHaveLength(1);

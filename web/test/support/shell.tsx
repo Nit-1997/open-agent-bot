@@ -1,12 +1,12 @@
 import { emptyProfile, type Profile } from "@oab/shared/profile";
 import type { Platform } from "@oab/ui/platform";
-import { act, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 export { nav } from "./navigation";
 import { vi } from "vitest";
-import { ShellOverlays } from "@/components/shell/ShellOverlays";
-import { ShellProvider } from "@/components/shell/ShellProvider";
-import type { ModelList } from "@/lib/models";
+import { ShellOverlays } from "@oab/ui/components/shell/ShellOverlays.tsx";
+import { ShellProvider } from "@oab/ui/components/shell/ShellProvider.tsx";
+import type { ModelList } from "@oab/ui/lib/models.ts";
 import { hostedTestPlatform, withPlatform } from "./platform";
 
 export const models: ModelList = { default: "openrouter/a", models: [{ id: "openrouter/a", label: "Model A", provider: "OpenRouter" }] };
@@ -31,5 +31,3 @@ export function renderShell(ui: ReactNode, opts: { profile?: Profile; save?: (p:
   const utils = render(wrap(ui));
   return { ...utils, rerender: (next: ReactNode) => utils.rerender(wrap(next)), save };
 }
-
-export const flush = () => act(async () => {});

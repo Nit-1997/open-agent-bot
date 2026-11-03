@@ -7,5 +7,10 @@ export default defineConfig({
   resolve: {
     alias: [{ find: /^@oab\/shared\/(.*)$/, replacement: fileURLToPath(new URL("../shared/src/$1", import.meta.url)) }],
   },
-  test: { environment: "jsdom", include: ["test/**/*.test.{ts,tsx}"], setupFiles: ["./test/setup.ts"] },
+  test: {
+    environment: "jsdom",
+    include: ["test/**/*.test.{ts,tsx}"],
+    setupFiles: ["./test/setup.ts"],
+    server: { deps: { inline: [/@copilotkit\//] } },
+  },
 });
