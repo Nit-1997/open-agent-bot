@@ -1,18 +1,14 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { hostedCapabilities } from "./capabilities.js";
 import type { UserStatusCache } from "./status.js";
 import { AuthError, type Verifier, type VerifiedUser } from "./verify.js";
 import type { AuthOutcome, Identity, Principal } from "@oab/core/identity/types.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import { log } from "@oab/core/lib/log.js";
+import { secretMatches as serviceSecretMatches } from "@oab/core/lib/secretMatch.js";
 
 const BEARER = /^Bearer ([A-Za-z0-9._~+/=-]+)$/;
 
-const digest = (v: string) => createHash("sha256").update(v, "utf8").digest();
-
-export function serviceSecretMatches(given: string | undefined, expected: string): boolean {
-  return timingSafeEqual(digest(given ?? ""), digest(expected)) && given !== undefined;
-}
+export { serviceSecretMatches };
 
 const unauthorized = () => new UserError("Unauthorized.", "unauthorized");
 const signedOut = () => new UserError("You were signed out. Sign in again.", "unauthorized", { code: "signed_out" });
