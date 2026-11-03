@@ -15,5 +15,5 @@ export default defineConfig({
       { find: /^typebox$/, replacement: resolve("typebox") },
     ],
   },
-  test: { environment: "jsdom", include: ["test/**/*.test.{ts,tsx}"], setupFiles: ["./test/setup.ts"] },
+  test: { environment: "jsdom", env: { TZ: "UTC" }, include: ["test/**/*.test.{ts,tsx}"], setupFiles: ["./test/setup.ts"] },
 });
