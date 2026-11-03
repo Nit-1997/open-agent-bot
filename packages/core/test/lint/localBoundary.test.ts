@@ -1,0 +1,122 @@
+import { readFileSync } from "node:fs";
+import { join, posix } from "node:path";
+import { afterAll, describe, expect, it } from "vitest";
+import { biomeFixtures } from "./biomeFixture.js";
+import { importSpecifiers, readSourceTree, type SourceTree } from "./boundary.js";
+
+const SRC = join(import.meta.dirname, "../../src");
+const SQLITE_MESSAGE = "node:sqlite is used only inside src/local/store.";
+const LOCAL_MESSAGE = "Hosted code must not use the local store.";
+
+type LocalRule = "B7" | "B8";
+type LocalViolation = { rule: LocalRule; file: string; specifier: string };
+
+const isSqlite = (s: string) => s === "node:sqlite" || s === "sqlite";
+const resolveTarget = (file: string, s: string) =>
+  s.startsWith(".")
+    ? posix.normalize(posix.join(posix.dirname(file), s))
+    : s.startsWith("@oab/core/")
+      ? s.slice("@oab/core/".length)
+      : undefined;
+
+function localViolations(tree: SourceTree): LocalViolation[] {
+  const out: LocalViolation[] = [];
+  for (const [file, code] of Object.entries(tree)) {
+    const hosted = file.startsWith("hosted/");
+    for (const specifier of importSpecifiers(code)) {
+      const to = resolveTarget(file, specifier);
+      if (isSqlite(specifier) && !file.startsWith("local/store/")) out.push({ rule: "B8", file, specifier });
+      if (hosted && (isSqlite(specifier) || to?.toLowerCase().startsWith("local/"))) out.push({ rule: "B7", file, specifier });
+    }
+  }
+  return out;
+}
+
+const withAppended = (tree: SourceTree, file: string, line: string): SourceTree => ({ ...tree, [file]: `${tree[file]}${line}` });
+
+describe("local store boundary rules on fixture trees", () => {
+  it.each<[LocalRule, SourceTree, string]>([
+    ["B8", { "http/chats.ts": 'import "node:sqlite";\n' }, "node:sqlite"],
+    ["B8", { "local/main.ts": 'import { DatabaseSync } from "node:sqlite";\n' }, "node:sqlite"],
+    ["B8", { "lib/x.ts": 'export const f = () => import("node:sqlite");\n' }, "node:sqlite"],
+    ["B7", { "hosted/deps.ts": 'import "@oab/core/local/store/sqliteStore.js";\n' }, "@oab/core/local/store/sqliteStore.js"],
+    ["B7", { "hosted/x.ts": 'import "../local/keyFiles.js";\n' }, "../local/keyFiles.js"],
+    ["B7", { "hosted/x.ts": 'import "node:sqlite";\n' }, "node:sqlite"],
+  ])("%s blocks %j", (rule, tree, specifier) => {
+    const [file] = Object.keys(tree);
+    expect(localViolations(tree)).toContainEqual({ rule, file, specifier });
+  });
+
+  it.each<[string, SourceTree]>([
+    ["the store using node:sqlite", { "local/store/sqliteStore.ts": 'import { DatabaseSync } from "node:sqlite";\n' }],
+    ["core using the local store", { "local/main.ts": 'import "./store/sqliteStore.js";\n' }],
+    ["hosted names that only start like local", { "hosted/x.ts": 'import "@oab/core/localeTools.js";\n' }],
+  ])("allows %s", (_name, tree) => {
+    expect(localViolations(tree)).toEqual([]);
+  });
+});
+
+describe("local store boundary on src/", () => {
+  const tree = readSourceTree(SRC);
+
+  it("has the store and no B7/B8 violations", () => {
+    expect(Object.keys(tree).filter((f) => f.startsWith("local/store/")).length).toBeGreaterThan(3);
+    expect(localViolations(tree)).toEqual([]);
+  });
+
+  it("flags injected imports in real files without changing them", () => {
+    const before = { chats: readFileSync(join(SRC, "http/chats.ts"), "utf8"), deps: readFileSync(join(SRC, "hosted/deps.ts"), "utf8") };
+    expect(localViolations(withAppended(tree, "http/chats.ts", 'import "node:sqlite";\n'))).toEqual([
+      { rule: "B8", file: "http/chats.ts", specifier: "node:sqlite" },
+    ]);
+    expect(localViolations(withAppended(tree, "hosted/deps.ts", 'import "@oab/core/local/store/sqliteStore.js";\n'))).toEqual([
+      { rule: "B7", file: "hosted/deps.ts", specifier: "@oab/core/local/store/sqliteStore.js" },
+    ]);
+    expect(readFileSync(join(SRC, "http/chats.ts"), "utf8")).toBe(before.chats);
+    expect(readFileSync(join(SRC, "hosted/deps.ts"), "utf8")).toBe(before.deps);
+  });
+});
+
+describe("Biome enforces B7 and B8", () => {
+  const { lint, dispose } = biomeFixtures("local-boundary-");
+  afterAll(dispose);
+  const real = (file: string) => readFileSync(join(SRC, file), "utf8");
+
+  it.each([
+    ["src/http/chats.ts", 'import "node:sqlite";\n', SQLITE_MESSAGE],
+    ["src/local/main.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n', SQLITE_MESSAGE],
+    ["src/hosted/deps.ts", 'import "@oab/core/local/store/sqliteStore.js";\n', LOCAL_MESSAGE],
+    ["src/hosted/x.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n', LOCAL_MESSAGE],
+  ])("blocks %s: %s", (file, code, message) => {
+    const r = lint("core", file, code);
+    expect(r.out).toContain(message);
+    expect(r.status).not.toBe(0);
+  });
+
+  it("fails lint on the real files with an injected import", () => {
+    const chats = lint("core", "src/http/chats.ts", `${real("http/chats.ts")}import "node:sqlite";\n`);
+    expect(chats.out).toContain(SQLITE_MESSAGE);
+    expect(chats.status).not.toBe(0);
+    const deps = lint("core", "src/hosted/deps.ts", `${real("hosted/deps.ts")}import "@oab/core/local/store/sqliteStore.js";\n`);
+    expect(deps.out).toContain(LOCAL_MESSAGE);
+    expect(deps.status).not.toBe(0);
+  });
+
+  it("allows node:sqlite inside src/local/store and the store from core", () => {
+    for (const [file, code] of [
+      ["src/local/store/db.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n'],
+      ["src/local/main.ts", 'import { openSqliteStore } from "./store/sqliteStore.js";\nexport default openSqliteStore;\n'],
+    ] as const) {
+      const r = lint("core", file, code);
+      expect(r.out).not.toContain("noRestrictedImports");
+      expect(r.status).toBe(0);
+    }
+  });
+
+  it("still blocks hosted and cloud imports inside src/local/store", () => {
+    const hosted = lint("core", "src/local/store/x.ts", 'import x from "../../hosted/store/client.js";\nexport default x;\n');
+    expect(hosted.out).toContain("Core must not import hosted implementations.");
+    const cloud = lint("core", "src/local/store/x.ts", 'import x from "../../../cloud/x.ts";\nexport default x;\n');
+    expect(cloud.out).toContain("Nothing outside cloud/ may import from cloud/.");
+  });
+});
