@@ -1,43 +1,23 @@
-export const PREVIEW_PROJECTS = ["smoke", "preview-m1"] as const;
 export const PREVIEW_PORTS = { min: 18000, max: 19999 } as const;
+export const ALLOW_LIVE_ENV = "E2E_ALLOW_LIVE";
 
 const PREVIEW_HOSTS = new Set(["localhost", "127.0.0.1"]);
+const EXAMPLE = "APP_ORIGIN=http://localhost:18300";
 
-const pattern = (name: string) =>
-  new RegExp(`^${name.toLocaleLowerCase().replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*")}$`);
-
-function requestedProjects(argv: readonly string[]): string[] | undefined {
-  const names: string[] = [];
-  let seen = false;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--project=")) {
-      seen = true;
-      names.push(arg.slice("--project=".length));
-    } else if (arg === "--project") {
-      seen = true;
-      while (i + 1 < argv.length && !argv[i + 1].startsWith("-")) names.push(argv[++i]);
-    }
+function parse(value: string): URL | undefined {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
   }
-  return seen ? names : undefined;
-}
-
-export function runsPreviewProject(argv: readonly string[]): boolean {
-  const names = requestedProjects(argv);
-  if (!names) return true;
-  return names.some((name) => PREVIEW_PROJECTS.some((project) => pattern(name).test(project)));
 }
 
 export function previewOriginProblem(raw: string | undefined): string | undefined {
   const value = raw?.trim() ?? "";
-  if (!value) return "APP_ORIGIN is not set; preview runs need it explicitly, e.g. APP_ORIGIN=http://localhost:18300";
+  if (!value) return `APP_ORIGIN is not set; e2e runs need it explicitly, e.g. ${EXAMPLE}`;
   const rule = `APP_ORIGIN must be http://localhost or http://127.0.0.1 on a port in ${PREVIEW_PORTS.min}-${PREVIEW_PORTS.max}`;
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return `${rule}; got an invalid URL`;
-  }
+  const url = parse(value);
+  if (!url) return `${rule}; got an invalid URL`;
   const port = Number(url.port);
   const ok =
     url.protocol === "http:" &&
@@ -48,19 +28,25 @@ export function previewOriginProblem(raw: string | undefined): string | undefine
   return ok ? undefined : `${rule}; got ${value}`;
 }
 
-export function appOrigin(input: {
-  argv: readonly string[];
-  explicit: string | undefined;
-  fallback: string;
-  inWorker: boolean;
-}): string {
-  const explicit = input.explicit?.trim() ?? "";
-  if (!input.inWorker && runsPreviewProject(input.argv)) {
-    const problem = previewOriginProblem(explicit);
-    if (problem) throw new Error(`refusing to run the preview projects (${PREVIEW_PROJECTS.join(", ")}): ${problem}`);
-    return explicit;
+export function liveOriginProblem(raw: string | undefined): string | undefined {
+  const value = raw?.trim() ?? "";
+  if (!value) return `APP_ORIGIN is not set; e2e runs need it explicitly, e.g. ${EXAMPLE}`;
+  const url = parse(value);
+  const ok = url !== undefined && (url.protocol === "http:" || url.protocol === "https:") && value === url.origin;
+  return ok ? undefined : `APP_ORIGIN must be an http(s) origin with no path or trailing slash; got ${value}`;
+}
+
+export const allowLive = (env: Readonly<Record<string, string | undefined>>): boolean => env[ALLOW_LIVE_ENV] === "1";
+
+export function appOrigin(input: { explicit: string | undefined; allowLive: boolean }): string {
+  const origin = input.explicit?.trim() ?? "";
+  if (input.allowLive) {
+    const problem = liveOriginProblem(origin);
+    if (problem) throw new Error(`refusing to run e2e: ${problem}`);
+    return origin;
   }
-  const origin = explicit || input.fallback.trim();
-  if (!origin) throw new Error("missing APP_ORIGIN (deploy-config/env-files/.env-e2e)");
-  return origin;
+  const problem = previewOriginProblem(origin);
+  if (!problem) return origin;
+  const optIn = origin ? `; to target any other origin on purpose, also set ${ALLOW_LIVE_ENV}=1 in the command's environment` : "";
+  throw new Error(`refusing to run e2e: ${problem}${optIn}`);
 }

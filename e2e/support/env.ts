@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+const NEVER_FROM_FILES = new Set(["APP_ORIGIN", "E2E_ALLOW_LIVE"]);
+
 function readEnvFile(path: string): Record<string, string> {
   if (!existsSync(path)) return {};
   return Object.fromEntries(
@@ -14,14 +16,18 @@ function readEnvFile(path: string): Record<string, string> {
       .map((line) => {
         const at = line.indexOf("=");
         return [line.slice(0, at).trim(), line.slice(at + 1).trim().replace(/^["']|["']$/g, "")];
-      }),
+      })
+      .filter(([key]) => !NEVER_FROM_FILES.has(key)),
   );
 }
 
-const files = {
-  ...readEnvFile(resolve(ROOT, "deploy-config/env-files/.env-supabase-admin")),
-  ...readEnvFile(resolve(ROOT, "deploy-config/env-files/.env-e2e")),
-};
+export const readEnvFiles = (paths: readonly string[]): Record<string, string> =>
+  Object.assign({}, ...paths.map((path) => readEnvFile(path)));
+
+const files = readEnvFiles([
+  resolve(ROOT, "deploy-config/env-files/.env-supabase-admin"),
+  resolve(ROOT, "deploy-config/env-files/.env-e2e"),
+]);
 
 export const env = (name: string, optional = false): string => {
   const v = (process.env[name] ?? files[name] ?? "").trim();
