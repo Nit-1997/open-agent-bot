@@ -52,20 +52,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compose starts from a fresh clone with no env files
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Both stacks resolve from a fresh clone; the local one needs no env files
         run: |
           ls deploy-config/.env-* 2>/dev/null && exit 1
+          docker compose --env-file /dev/null config --quiet
           touch deploy-config/.env-agent deploy-config/.env-renderer deploy-config/.env-nextjs
-          docker compose config --quiet
-          docker compose --profile litellm --profile ollama config --quiet
+          docker compose -f compose.hosted.yml config --quiet
+          docker compose -f compose.hosted.yml --profile litellm --profile ollama config --quiet
           sh deploy-config/searxng/entrypoint.sh true
         env:
           SEARXNG_SECRET_FILE: /tmp/searxng-secret/secret
-      - name: Root compose has no project name; preview override is named and bound to 127.0.0.1
+      - name: Project names are pinned; the preview override is named and bound to 127.0.0.1
         run: |
-          if grep -qE '^name:' docker-compose.yml; then echo "docker-compose.yml must not set a project name"; exit 1; fi
-          preview="docker compose --env-file /dev/null --profile local -f docker-compose.yml -f deploy-config/compose.preview.yml config --format json"
+          test "$(docker compose --env-file /dev/null config --format json | jq -r .name)" = open-agent
+          test "$(docker compose --env-file /dev/null -f compose.hosted.yml config --format json | jq -r .name)" = open-agent-bot
+          preview="docker compose --env-file /dev/null --profile local -f compose.hosted.yml -f deploy-config/compose.preview.yml config --format json"
           test "$($preview | jq -r .name)" = oab-preview
           test "$($preview | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
           test "$($preview | jq '[.services[].ports[]? | .published | tonumber] | all(. >= 18000)')" = true
           test "$($preview | jq -c '[.services[].ports[]? | .published] | sort')" = '["18300","18800"]'
+      - name: Local stack is loopback-only, takes no env files, keeps its volume names and has no bind mounts
+        run: |
+          local="docker compose --env-file /dev/null config --format json"
+          test "$($local | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
+          test "$(docker compose --env-file /dev/null config --format json --no-env-resolution | jq '[.services[] | select(has("env_file"))] | length')" = 0
+          test "$($local | jq -r '.volumes.data.name')" = open-agent-data
+          test "$($local | jq -r '.volumes.keys.name')" = open-agent-keys
+          test "$($local | jq '[.services[].volumes[]? | select(.type == "bind")] | length')" = 0
+      - name: Compose layout, hosted config equivalence with 6986a4c, and preflight
+        run: node --test scripts/test/composeLayout.test.mjs scripts/test/preflight.test.mjs
