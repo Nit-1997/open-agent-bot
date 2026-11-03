@@ -31,6 +31,8 @@ export type LoginState = {
   error?: string;
 };
 
+const seg = encodeURIComponent;
+
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await api().fetch(`/providers${path}`, { ...init, cache: "no-store", headers: { "content-type": "application/json" } });
   return readApi<T>(res);
@@ -38,17 +40,17 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const providersApi = {
   list: () => call<{ providers: ProviderView[] }>("").then((r) => r.providers),
-  saveKey: (id: string, apiKey: string) => call(`/${id}/key`, { method: "POST", body: JSON.stringify({ apiKey }) }),
-  remove: (id: string) => call(`/${id}`, { method: "DELETE" }),
+  saveKey: (id: string, apiKey: string) => call(`/${seg(id)}/key`, { method: "POST", body: JSON.stringify({ apiKey }) }),
+  remove: (id: string) => call(`/${seg(id)}`, { method: "DELETE" }),
   addLocal: (input: { kind: string; baseUrl: string; apiKey?: string; label?: string }) =>
     call<{ provider: ProviderView }>("/local", { method: "POST", body: JSON.stringify(input) }).then((r) => r.provider),
-  models: (id: string) => call<{ models: ProviderModel[] }>(`/${id}/models`).then((r) => r.models),
-  setEnabled: (id: string, enabled: string[]) => call(`/${id}/models`, { method: "PUT", body: JSON.stringify({ enabled }) }),
+  models: (id: string) => call<{ models: ProviderModel[] }>(`/${seg(id)}/models`).then((r) => r.models),
+  setEnabled: (id: string, enabled: string[]) => call(`/${seg(id)}/models`, { method: "PUT", body: JSON.stringify({ enabled }) }),
   test: (model: string) => call<TestResult>("/test", { method: "POST", body: JSON.stringify({ model }) }),
-  startLogin: (id: string) => call<{ flow: string }>(`/${id}/login`, { method: "POST" }).then((r) => r.flow),
-  loginState: (flow: string) => call<LoginState>(`/logins/${flow}`),
-  answerLogin: (flow: string, value: string) => call(`/logins/${flow}/answer`, { method: "POST", body: JSON.stringify({ value }) }),
-  cancelLogin: (flow: string) => call(`/logins/${flow}`, { method: "DELETE", keepalive: true }),
+  startLogin: (id: string) => call<{ flow: string }>(`/${seg(id)}/login`, { method: "POST" }).then((r) => r.flow),
+  loginState: (flow: string) => call<LoginState>(`/logins/${seg(flow)}`),
+  answerLogin: (flow: string, value: string) => call(`/logins/${seg(flow)}/answer`, { method: "POST", body: JSON.stringify({ value }) }),
+  cancelLogin: (flow: string) => call(`/logins/${seg(flow)}`, { method: "DELETE", keepalive: true }),
 };
 
 export function contextLabel(tokens: number): string {

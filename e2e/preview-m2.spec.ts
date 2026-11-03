@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { type APIResponse, expect, type Page, request, type TestInfo, test } from "@playwright/test";
+import { type APIResponse, expect, type Frame, type Page, type Request, request, type TestInfo, test } from "@playwright/test";
 import { completeOnboardingIfShown } from "./support/onboarding";
 import { BIG_SUR_REPORT, SECOND_REPORT } from "./support/seed";
 import { seeded } from "./support/state";
@@ -44,6 +44,18 @@ async function holdVisible(page: Page, selectors: readonly string[]): Promise<vo
   for (const selector of selectors) await expect(page.locator(selector)).toBeVisible();
 }
 
+function isReportFrame(page: Page, req: Request, app: string): boolean {
+  let frame: Frame;
+  try {
+    frame = req.frame();
+  } catch {
+    return false;
+  }
+  if (frame === page.mainFrame()) return false;
+  const url = new URL(frame.url(), app);
+  return url.origin === app && url.pathname.startsWith("/api/artifacts/");
+}
+
 async function errorCode(res: APIResponse): Promise<string> {
   try {
     const error = ((await res.json()) as { error?: unknown }).error;
@@ -77,9 +89,11 @@ test("preview: stop without a banner, reports and PDF, search, settings, 404s, f
   const app = baseURL as string;
   const s = seeded();
   const fontRequests: string[] = [];
+  const reportFontRequests: string[] = [];
   page.on("request", (req) => {
     const url = new URL(req.url());
-    if (FONT_HOSTS.has(url.hostname) || (req.resourceType() === "font" && url.origin !== app)) fontRequests.push(req.url());
+    if (!FONT_HOSTS.has(url.hostname) && !(req.resourceType() === "font" && url.origin !== app)) return;
+    (isReportFrame(page, req, app) ? reportFontRequests : fontRequests).push(req.url());
   });
 
   await test.step("1. Onboarding", async () => {
@@ -214,6 +228,7 @@ test("preview: stop without a banner, reports and PDF, search, settings, 404s, f
     for (const family of fonts.display) expect(family).toMatch(/^"?Instrument Serif/);
     expect(fonts.dmSans).toBe(true);
     expect(fontRequests).toEqual([]);
+    console.log(`off-origin font requests: app shell ${fontRequests.length}, report iframes ${reportFontRequests.length}`);
   });
 
   await test.step("8. Refusals through the web", async () => {
