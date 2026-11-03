@@ -91,3 +91,44 @@ describe("proxy signed-out report frames", () => {
     }
   });
 });
+
+describe("proxy not-found page", () => {
+  const signedIn = (isAdmin: boolean) => {
+    const response = NextResponse.next();
+    response.cookies.set("sb-project-auth-token", "refreshed");
+    response.headers.set("cache-control", "private, no-store");
+    vi.mocked(updateSession).mockResolvedValue({
+      response,
+      session: { user: { id: "u1", email: "a@b.c", name: "", isAdmin }, unavailable: false },
+    });
+  };
+
+  it("answers 404 with the shell's not-found page for a non-admin's /admin and unknown pages", async () => {
+    signedIn(false);
+    for (const path of ["/admin", "/admin/users", "/nope", "/nope/deeper", "/chats/not-a-uuid", "/reports/BAD!"]) {
+      const res = await proxy(new NextRequest(`${APP_ORIGIN}${path}`));
+      expect(res.status, path).toBe(404);
+      expect(new URL(res.headers.get("x-middleware-rewrite") ?? "").pathname, path).toBe("/__not-found");
+      expect(res.headers.get("content-security-policy"), path).toMatch(/script-src 'self' 'nonce-[^']+'/);
+      expect(res.cookies.get("sb-project-auth-token")?.value, path).toBe("refreshed");
+      expect(res.headers.get("cache-control"), path).toBe("private, no-store");
+    }
+  });
+
+  it("forwards the nonce and CSP to the not-found render", async () => {
+    signedIn(false);
+    const res = await proxy(new NextRequest(`${APP_ORIGIN}/nope`));
+    const nonce = /'nonce-([^']+)'/.exec(res.headers.get("content-security-policy") ?? "")?.[1];
+    expect(nonce).toBeTruthy();
+    expect(res.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
+  });
+
+  it("keeps an admin's /admin and every app page a pass", async () => {
+    signedIn(true);
+    for (const path of ["/admin", "/", "/chats", "/reports/AbCdEf_-1234", "/search"]) {
+      const res = await proxy(new NextRequest(`${APP_ORIGIN}${path}`));
+      expect(res.status, path).toBe(200);
+      expect(res.headers.get("x-middleware-rewrite"), path).toBeNull();
+    }
+  });
+});
