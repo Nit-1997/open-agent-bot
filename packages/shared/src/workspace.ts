@@ -52,9 +52,7 @@ export type WorkspaceEdits = PlanEdits & { cart?: CartEdits };
 const EDIT_SECTIONS = { cart: CartEditsSchema, event: EventEditsSchema, trip: TripEditsSchema } as const;
 
 const tooWide = (v: unknown, depth: number): boolean =>
-  !!v &&
-  typeof v === "object" &&
-  (Object.keys(v).length > EDIT_KEYS || (depth > 0 && Object.values(v).some((x) => tooWide(x, depth - 1))));
+  !!v && typeof v === "object" && (Object.keys(v).length > EDIT_KEYS || (depth > 0 && Object.values(v).some((x) => tooWide(x, depth - 1))));
 
 export function parseWorkspaceEdits(v: unknown): WorkspaceEdits | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
@@ -96,12 +94,12 @@ export function validateEntity(kind: EntityKind, value: unknown): { ok: true } |
 
 export type PatchOp = { op: "add" | "replace" | "remove"; path: string; value?: unknown };
 
-const unescape = (s: string) => s.replace(/~1/g, "/").replace(/~0/g, "~");
+const unescapeToken = (s: string) => s.replace(/~1/g, "/").replace(/~0/g, "~");
 const FORBIDDEN = new Set(["__proto__", "constructor", "prototype"]);
 
 function parsePointer(path: string): string[] | null {
   if (path === "") return [];
-  return path.startsWith("/") ? path.slice(1).split("/").map(unescape) : null;
+  return path.startsWith("/") ? path.slice(1).split("/").map(unescapeToken) : null;
 }
 
 type Container = Record<string, unknown> | unknown[];

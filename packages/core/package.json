@@ -1,5 +1,5 @@
 {
-  "name": "agent",
+  "name": "@oab/core",
   "version": "1.0.0",
   "private": true,
   "description": "Open Agent backend: AG-UI server, pi agent sessions, and research tools",

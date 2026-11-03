@@ -85,7 +85,13 @@ export const UiBlockSchemas = {
   list: Type.Object({
     type: Type.Literal("list"),
     items: Type.Array(
-      Type.Object({ title: S(60), subtitle: Type.Optional(S(90)), value: Type.Optional(S(20)), badge: Type.Optional(S(16)), url: Type.Optional(Url) }),
+      Type.Object({
+        title: S(60),
+        subtitle: Type.Optional(S(90)),
+        value: Type.Optional(S(20)),
+        badge: Type.Optional(S(16)),
+        url: Type.Optional(Url),
+      }),
       { minItems: 1, maxItems: 10 },
     ),
   }),
@@ -114,7 +120,10 @@ export const UiBlockSchemas = {
     title: Type.Optional(S(40)),
     items: Type.Array(Type.Object({ text: S(80), note: Type.Optional(S(60)) }), { minItems: 1, maxItems: 12 }),
   }),
-  links: Type.Object({ type: Type.Literal("links"), items: Type.Array(Type.Object({ label: S(30), url: Url }), { minItems: 1, maxItems: 6 }) }),
+  links: Type.Object({
+    type: Type.Literal("links"),
+    items: Type.Array(Type.Object({ label: S(30), url: Url }), { minItems: 1, maxItems: 6 }),
+  }),
   callout: Type.Object({ type: Type.Literal("callout"), tone: Type.Enum(["info", "warning", "success"]), text: S(160) }),
 } as const;
 
@@ -190,7 +199,10 @@ export const CartSchema = Type.Object({
       currency: Type.Optional(Str),
       url: Url,
       missing: Type.Array(Str),
-      items: Type.Array(Type.Object({ query: Str, qty: Type.Number(), picks: Type.Array(CartPickSchema, { maxItems: 3 }) }), { minItems: 1, maxItems: 40 }),
+      items: Type.Array(Type.Object({ query: Str, qty: Type.Number(), picks: Type.Array(CartPickSchema, { maxItems: 3 }) }), {
+        minItems: 1,
+        maxItems: 40,
+      }),
     }),
     { minItems: 1, maxItems: 6 },
   ),
@@ -273,7 +285,13 @@ export const ShortlistEntitySchema = Type.Object({ title: Name, items: Type.Arra
 export const PlanSchema = Type.Union([
   Type.Object({ kind: Type.Literal("plan"), entity: Type.Literal("event"), id: Str, version: Type.Number(), value: EventEntitySchema }),
   Type.Object({ kind: Type.Literal("plan"), entity: Type.Literal("trip"), id: Str, version: Type.Number(), value: TripEntitySchema }),
-  Type.Object({ kind: Type.Literal("plan"), entity: Type.Literal("shortlist"), id: Str, version: Type.Number(), value: ShortlistEntitySchema }),
+  Type.Object({
+    kind: Type.Literal("plan"),
+    entity: Type.Literal("shortlist"),
+    id: Str,
+    version: Type.Number(),
+    value: ShortlistEntitySchema,
+  }),
 ]);
 
 export const FollowupsSchema = Type.Object({
@@ -327,10 +345,12 @@ function fit(schema: TSchema, v: unknown): unknown {
 }
 
 const fitItems = (items: unknown, schemas: Record<string, TSchema>) =>
-  Array.isArray(items) ? items.map((b) => {
-    const type = (b as { type?: unknown } | null)?.type;
-    return typeof type === "string" && type in schemas ? fit(schemas[type], b) : b;
-  }) : items;
+  Array.isArray(items)
+    ? items.map((b) => {
+        const type = (b as { type?: unknown } | null)?.type;
+        return typeof type === "string" && type in schemas ? fit(schemas[type], b) : b;
+      })
+    : items;
 
 export function fitWidget(x: unknown): unknown {
   const kind = (x as { kind?: unknown } | null)?.kind;

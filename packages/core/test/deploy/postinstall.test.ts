@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SCRIPT = join(import.meta.dirname, "../../../scripts/postinstall.mjs");
+const SCRIPT = join(import.meta.dirname, "../../../../scripts/postinstall.mjs");
 
 type Layout = "absent" | "hoisted" | "nested";
 
@@ -12,10 +12,10 @@ async function fakeRoot(layout: Layout) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "postinstall-")));
   await mkdir(join(root, "scripts"));
   await copyFile(SCRIPT, join(root, "scripts/postinstall.mjs"));
-  await mkdir(join(root, "agent"));
-  await writeFile(join(root, "agent/package.json"), '{"name":"agent"}');
+  await mkdir(join(root, "packages/core"), { recursive: true });
+  await writeFile(join(root, "packages/core/package.json"), '{"name":"@oab/core"}');
   if (layout !== "absent") {
-    const base = layout === "hoisted" ? root : join(root, "agent");
+    const base = layout === "hoisted" ? root : join(root, "packages/core");
     const pkg = join(base, "node_modules/@earendil-works/pi-ai");
     await mkdir(pkg, { recursive: true });
     await writeFile(join(pkg, "package.json"), '{"name":"@earendil-works/pi-ai","version":"1.4.0"}');

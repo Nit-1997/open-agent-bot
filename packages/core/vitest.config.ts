@@ -7,7 +7,7 @@ const resolve = createRequire(import.meta.url).resolve;
 export default defineConfig({
   resolve: {
     alias: [
-      { find: /^@oab\/shared\/(.*)$/, replacement: fileURLToPath(new URL("../packages/shared/src/$1.ts", import.meta.url)) },
+      { find: /^@oab\/shared\/(.*)$/, replacement: fileURLToPath(new URL("../shared/src/$1.ts", import.meta.url)) },
       { find: /^typebox\/value$/, replacement: resolve("typebox/value") },
       { find: /^typebox$/, replacement: resolve("typebox") },
     ],

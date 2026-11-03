@@ -1,7 +1,7 @@
 {
-  "$schema": "../node_modules/@biomejs/biome/configuration_schema.json",
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["src/**/*.ts", "!src/db/database.types.ts", "evals/**/*.ts", "test/**/*.ts", "../packages/shared/src/**/*.ts"]
+    "includes": ["src/**/*.ts", "!src/db/database.types.ts", "evals/**/*.ts", "test/**/*.ts"]
   },
   "formatter": {
     "enabled": true,
@@ -17,7 +17,18 @@
     "rules": {
       "preset": "recommended",
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                "message": "Nothing outside cloud/ may import from cloud/."
+              }
+            ]
+          }
+        }
       },
       "suspicious": {
         "noExplicitAny": "off"

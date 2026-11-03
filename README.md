@@ -79,7 +79,7 @@ Agent settings live in `deploy-config/.env-agent` (git-ignored).
 ## Skills, Jev and codemode
 
 - **Follow-ups**: the model ends its answer with `<followups>a | b</followups>`; the agent turns that line into the buttons under the reply.
-- **Skills** live in `agent/skills/<name>/SKILL.md` (frontmatter `name`, `description`, then a playbook). The core prompt lists them and the agent loads one with `load_skill`. A new use case is a new folder; no code change.
+- **Skills** live in `packages/core/skills/<name>/SKILL.md` (frontmatter `name`, `description`, then a playbook). The core prompt lists them and the agent loads one with `load_skill`. A new use case is a new folder; no code change.
 - **Jev** (TypeSafe's calibrated classifier) judges product matches in `shop`, hotel brand/area/vibe wishes in `stays`, music cover art, which search hits to read, and research claims. It uses whichever key you added in the app: TypeSafe first, then OpenRouter (`JEV_MODEL` pins one). If Jev is unreachable, every feature falls back to its non-Jev behavior.
 - **Codemode**: Claude Sonnet models (from any provider), or models tagged `codemode` in `AGENT_MODEL_CAPS`, can write one script that runs many lookups and does the maths in code. A failed script turns codemode off for the rest of that chat.
 - **Workspace and chats**: Chats and their messages are saved in Supabase, and a chat continues after an agent restart. Carts, trips, events and shortlists are working state for the conversation: they live in the agent's session only. Cards from earlier sessions stay in the chat, read-only and dated; ask again for fresh prices. The app shell has a sidebar of chats (Today, This week, Earlier), and its own views for **Reports** (every report, with PDF download) and **Search** (chat titles, message text and report titles). Every view has a URL. A report shows in the chat as a card with a thumbnail and opens in a resizable panel beside the chat (an overlay on tablets, a full-screen viewer on phones), with previous/next, PDF and a new-tab link; the open report is in the URL, and the agent knows which report is open, so "what's the cheapest option in this report?" just works.
@@ -101,14 +101,14 @@ The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fres
 
 ## Evals
 
-- `cd agent && npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5` runs the scenarios in `agent/evals/scenarios/` against the running agent and writes `agent/evals/results/<date>-<label>-<model>/report.md`, diffed against `agent/evals/baseline/<model>.json`. Live runs cost money; `--only a,b` and `--runs N` keep them small. Evals sign in as `EVAL_USER_EMAIL` (default `oab-eval@example.test`, created once with `bootstrap-admin.mjs oab-eval@example.test --user` and given a provider key in the app), reading `deploy-config/.env-agent` and `.env-supabase-admin`.
+- `cd packages/core && npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5` runs the scenarios in `packages/core/evals/scenarios/` against the running agent and writes `packages/core/evals/results/<date>-<label>-<model>/report.md`, diffed against `packages/core/evals/baseline/<model>.json`. Live runs cost money; `--only a,b` and `--runs N` keep them small. Evals sign in as `EVAL_USER_EMAIL` (default `oab-eval@example.test`, created once with `bootstrap-admin.mjs oab-eval@example.test --user` and given a provider key in the app), reading `deploy-config/.env-agent` and `.env-supabase-admin`.
 - `npm run eval:rank` scores shop ranking on the ESCI grocery slice (Exact@1, NDCG@3); add `-- --judge` with an OpenRouter key to score the Jev re-rank.
 - `npx tsx evals/run.ts --rescore <results dir>` re-grades saved runs after assertions change.
 
 ## Develop
 
 - Install once from the repo root with `npm ci` (one workspace, one `package-lock.json`); `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` checks every package.
-- Agent: `npm run lint -w agent && npm run format:check -w agent && npm run typecheck -w agent && npm test -w agent && npm run build -w agent` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test -w agent`; Supabase integration tests against the real project: `npm run test:supabase -w agent`)
+- Agent: `npm run lint -w @oab/core && npm run format:check -w @oab/core && npm run typecheck -w @oab/core && npm test -w @oab/core && npm run build -w @oab/core` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test -w @oab/core`; Supabase integration tests against the real project: `npm run test:supabase -w @oab/core`)
 - Web: `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web`
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, how to add a tool, and conventions. Report security issues as described in [SECURITY.md](SECURITY.md).

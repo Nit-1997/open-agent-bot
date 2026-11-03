@@ -5,7 +5,7 @@ COPY package.json package-lock.json ./
 COPY scripts/postinstall.mjs ./scripts/
 COPY patches ./patches
 COPY packages/shared/package.json packages/shared/
-COPY agent/package.json agent/
+COPY packages/core/package.json packages/core/
 COPY web/package.json web/
 COPY e2e/package.json e2e/
 RUN npm ci -w web --include-workspace-root

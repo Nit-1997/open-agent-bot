@@ -7,7 +7,7 @@ import { deleteAccount } from "../../src/admin/deleteAccount.js";
 import { createAdminRepo } from "../../src/db/admin.js";
 import { createAnonClient, createServiceClient } from "../../src/db/client.js";
 
-const ROOT = resolve(new URL(".", import.meta.url).pathname, "../../..");
+const ROOT = resolve(new URL(".", import.meta.url).pathname, "../../../..");
 
 export const env: Record<string, string> = {
   ...readEnvFile(resolve(ROOT, "deploy-config/.env-agent")),
