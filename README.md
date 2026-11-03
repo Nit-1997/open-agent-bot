@@ -92,12 +92,12 @@ Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`,
 `e2e/` drives the local stack (`docker compose … --profile local up -d --build`, https://app.localhost) with Playwright on desktop, tablet and phone sizes. It creates `oab-e2e+shell@example.test` and `oab-e2e+other@example.test`, seeds chats, reports and saved cards, and removes them afterwards with `supabase/scripts/cleanup-e2e.mjs`. It reads `deploy-config/env-files/.env-supabase-admin` and needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e` (saved through the app's API, never typed or logged; the run uses DeepSeek V4 Flash).
 
 ```bash
-cd e2e && npm ci && npx playwright test --project=desktop --project=tablet --project=phone && node scripts/make-demo.mjs
+npm ci && npm run demo -w e2e
 ```
 
 `make-demo.mjs` needs `ffmpeg` and joins the recordings into `~/Downloads/app-shell-demo.mp4`.
 
-The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fresh preview: `APP_ORIGIN=http://localhost:18300 npx playwright test --project=smoke` signs in, completes onboarding, and checks that a reply streams and that Stop ends a run.
+The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fresh preview: `APP_ORIGIN=http://localhost:18300 npm run smoke -w e2e` signs in, completes onboarding, and checks that a reply streams and that Stop ends a run.
 
 ## Evals
 
@@ -107,8 +107,9 @@ The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fres
 
 ## Develop
 
-- Agent: `cd agent && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test`; Supabase integration tests against the real project: `npm run test:supabase`)
-- Web: `cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`
+- Install once from the repo root with `npm ci` (one workspace, one `package-lock.json`); `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` checks every package.
+- Agent: `npm run lint -w agent && npm run format:check -w agent && npm run typecheck -w agent && npm test -w agent && npm run build -w agent` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test -w agent`; Supabase integration tests against the real project: `npm run test:supabase -w agent`)
+- Web: `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web`
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, how to add a tool, and conventions. Report security issues as described in [SECURITY.md](SECURITY.md).
 

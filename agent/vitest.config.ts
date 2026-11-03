@@ -1,13 +1,13 @@
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { defineConfig } from "vitest/config";
 
-const nm = (p: string) => fileURLToPath(new URL(`./node_modules/${p}`, import.meta.url));
+const resolve = createRequire(import.meta.url).resolve;
 
 export default defineConfig({
   resolve: {
     alias: [
-      { find: /^typebox\/value$/, replacement: nm("typebox/build/value/index.mjs") },
-      { find: /^typebox$/, replacement: nm("typebox/build/index.mjs") },
+      { find: /^typebox\/value$/, replacement: resolve("typebox/value") },
+      { find: /^typebox$/, replacement: resolve("typebox") },
     ],
   },
   test: { include: ["test/**/*.test.ts"], setupFiles: ["test/setup.ts"], testTimeout: 30000, execArgv: ["--disable-warning=ExperimentalWarning"] },

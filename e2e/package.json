@@ -7,9 +7,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "playwright test --project=desktop --project=tablet --project=phone",
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test --project=desktop --project=tablet --project=phone",
     "smoke": "playwright test --project=smoke",
-    "demo": "npm test && node scripts/make-demo.mjs"
+    "demo": "npm run e2e && node scripts/make-demo.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

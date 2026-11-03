@@ -1,16 +1,22 @@
 FROM node:22-slim AS build
-WORKDIR /app/web
-COPY web/package.json web/package-lock.json ./
-RUN npm ci
-COPY shared /app/shared
-COPY web ./
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY scripts/postinstall.mjs ./scripts/
+COPY patches ./patches
+COPY agent/package.json agent/
+COPY web/package.json web/
+COPY e2e/package.json e2e/
+RUN npm ci -w web --include-workspace-root
+COPY shared ./shared
+COPY web ./web
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" && test -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
   || { echo "Build with --env-file deploy-config/.env-nextjs so the NEXT_PUBLIC_SUPABASE_* build args are set" >&2; exit 1; }
-RUN npm run build
+RUN npm run build -w web
 
 FROM node:22-slim
 WORKDIR /app
