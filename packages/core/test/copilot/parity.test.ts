@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { RunAgentInput } from "@ag-ui/core";
 import { serve } from "@hono/node-server";
@@ -62,17 +63,24 @@ const sessionRun: Handle = async function* (input: RunAgentInput, ctx: RunContex
   }
 } as Handle;
 
-type Server = { h: CopilotHarness; url: string; close(): Promise<void> };
+type Server = { h: CopilotHarness; url: string; openRuns(): number; close(): Promise<void> };
 
 async function serverFor(mode: Mode): Promise<Server> {
   let url = "";
+  let openRuns = 0;
   const h = await copilotHarness({ handle: sessionRun, mode, agentUrl: () => url });
   const server = serve({ fetch: h.app.fetch, port: 0, hostname: "127.0.0.1" });
+  server.on("request", (req: IncomingMessage, res: ServerResponse) => {
+    if (req.url !== RUN) return;
+    openRuns++;
+    res.once("close", () => openRuns--);
+  });
   await new Promise<void>((resolve) => server.once("listening", () => resolve()));
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
     h,
     url,
+    openRuns: () => openRuns,
     close: () =>
       new Promise<void>((resolve) => {
         if ("closeAllConnections" in server) server.closeAllConnections();
@@ -184,9 +192,10 @@ const SCENARIOS: Record<string, Scenario> = {
     holds.set(t, new Deferred());
     const client = new AbortController();
     const { reader } = await readUntilText(await send(s, RUN, runBody(t), client.signal), "Hello");
+    expect(s.openRuns()).toBe(1);
     client.abort();
     await reader.cancel().catch(() => {});
-    await new Promise((r) => setTimeout(r, 100));
+    await waitFor(() => s.openRuns() === 0);
     const stillRunning = s.h.gate.active;
     const joined = await send(s, CONNECT, runBody(t));
     const { reader: joinReader, seen } = await readUntilText(joined, "Hello");

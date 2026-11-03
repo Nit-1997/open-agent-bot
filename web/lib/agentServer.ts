@@ -1,13 +1,11 @@
-import { isAllowedOrigin, jsonError } from "@oab/bff";
+import { isAllowedOrigin } from "@oab/bff";
 import { type AgentAuth, AuthUnavailable, SignedOut } from "@/lib/auth";
 import { AUTH_ERROR_COPY } from "@oab/ui/lib/authErrors.ts";
 import { agentBaseUrl, appOrigin, ConfigError, serviceSecret } from "@/lib/env";
 
-export { jsonError };
-
 export type AgentFailure = { status: number; error: string; message: string };
 
-export type AuthFailure = {
+type AuthFailure = {
   status: 401 | 503;
   error: "signed_out" | "auth_unavailable";
   message: string;

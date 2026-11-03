@@ -5,7 +5,7 @@ import { segmentsOf } from "./params.ts";
 import { allowsMethod, matchRoute } from "./routes.ts";
 import type { BffContext, BffDeps, BffHandler } from "./types.ts";
 
-export { ARTIFACT_PASSTHROUGH, artifactErrorPage, type Format, formatOf, isFramedReport } from "./artifacts.ts";
+export { artifactErrorPage, isFramedReport } from "./artifacts.ts";
 export { isAllowedOrigin, jsonError } from "./forward.ts";
 export { segmentsOf } from "./params.ts";
 export type { AuthOutcome, BffDeps, BffHandler } from "./types.ts";
