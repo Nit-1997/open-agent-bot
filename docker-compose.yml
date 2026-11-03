@@ -1,148 +1,87 @@
-services:
-  llm:
-    # LiteLLM 1.106.5, pinned so restarts don't pull a different proxy. Opt in with COMPOSE_PROFILES=litellm
-    image: ghcr.io/berriai/litellm:main-stable@sha256:7d6ae6c8d73d1b6aea4cb75d07c4a8a953f0809b0764522b8eab693734c5e905
-    profiles: ["litellm"]
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
-    env_file:
-      - path: deploy-config/.env-llm
-        required: false
-    volumes:
-      - ./deploy-config/litellm/config.yaml:/app/config.yaml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "127.0.0.1:4000:4000"
-    restart: unless-stopped
+# Open Agent on this computer: `docker compose up -d --build`, then open http://127.0.0.1:3000. The hosted stack is compose.hosted.yml.
+name: open-agent
 
+services:
   search:
-    # pinned so restarts don't pull a different SearXNG
-    image: searxng/searxng:latest@sha256:0f48ffe2152f388f5eaede27f96b610449cebfc890d0ad457304475a54ad7b6e
-    entrypoint: ["/bin/sh", "/opt/open-agent/entrypoint.sh", "/usr/local/searxng/entrypoint.sh"]
-    env_file:
-      - path: deploy-config/.env-search
-        required: false
+    image: ${OPEN_AGENT_SEARCH_IMAGE:-open-agent-search:local}
+    build:
+      context: local/searxng
     volumes:
-      - ./deploy-config/searxng/settings.yml:/etc/searxng/settings.yml:ro
-      - ./deploy-config/searxng/entrypoint.sh:/opt/open-agent/entrypoint.sh:ro
-      - searxng-data:/var/lib/searxng-secret
+      - searxng-secret:/var/lib/searxng-secret
+    tmpfs:
+      - /etc/searxng:size=4m
+      - /var/cache/searxng:size=64m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     restart: unless-stopped
 
   agent:
+    image: ${OPEN_AGENT_IMAGE:-open-agent:local}
     build:
       context: .
       dockerfile: packages/core/Dockerfile
-    env_file:
-      - path: deploy-config/.env-agent
-        required: true
+    command: ["node", "dist/local/main.js"]
     environment:
-      PI_OAUTH_CALLBACK_HOST: 0.0.0.0
+      OPEN_AGENT_PORT: ${OPEN_AGENT_PORT:-3000}
+      OPEN_AGENT_RESET_CREDENTIALS: ${OPEN_AGENT_RESET_CREDENTIALS:-}
+      OPEN_AGENT_LAUNCH_TOKEN: ${OPEN_AGENT_LAUNCH_TOKEN:-}
+      COPILOTKIT_TELEMETRY_DISABLED: "true"
+    ports:
+      - "127.0.0.1:${OPEN_AGENT_PORT:-3000}:3000"
+    volumes:
+      - data:/data
+      - keys:/keys
+      - renderer-key:/run/open-agent/renderer
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     read_only: true
     tmpfs:
       - /tmp:size=512m,mode=1777
       - /home/pwuser:size=128m,uid=1001,gid=1001,mode=0700
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    ports:
-      - "127.0.0.1:8000:8000"
     networks: [default, render]
     depends_on:
-      - search
+      search:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:8000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-      interval: 15s
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
       timeout: 5s
       start_period: 30s
       retries: 3
-    restart: unless-stopped
+    restart: on-failure:3
 
   renderer:
-    # Chromium for report thumbnails and PDFs, apart from the agent: no secrets but RENDERER_SECRET, reachable only from the agent.
-    # Seccomp profile from Playwright v1.64.1 (utils/docker/seccomp_profile.json) so Chromium's sandbox can create its namespaces.
-    build:
-      context: .
-      dockerfile: packages/core/Dockerfile
+    image: ${OPEN_AGENT_IMAGE:-open-agent:local}
+    pull_policy: never
     command: ["node", "dist/renderer/main.js"]
-    env_file:
-      - path: deploy-config/.env-renderer
-        required: true
+    environment:
+      RENDERER_SECRET_FILE: /run/open-agent/renderer/secret
+    volumes:
+      - renderer-key:/run/open-agent/renderer:ro
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777
       - /home/pwuser:size=128m,uid=1001,gid=1001,mode=0700
     cap_drop: [ALL]
     cap_add: [SYS_CHROOT]
-    security_opt: ["no-new-privileges:true", "seccomp=deploy-config/renderer/seccomp.json"]
+    security_opt: ["no-new-privileges:true", "seccomp=local/renderer/seccomp.json"]
     networks: [render, render-egress]
+    depends_on:
+      agent:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8100/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-      interval: 15s
+      interval: 5s
       timeout: 5s
       start_period: 30s
       retries: 3
     restart: unless-stopped
-
-  caddy:
-    # Caddy 2.10, pinned by digest
-    image: caddy:2.10@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
-    env_file:
-      - path: deploy-config/.env-caddy
-        required: false
-    ports:
-      - "${CADDY_BIND:-127.0.0.1}:80:80"
-      - "${CADDY_BIND:-127.0.0.1}:443:443"
-    volumes:
-      - ./deploy-config/caddy/${CADDYFILE:-Caddyfile.local}:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    read_only: true
-    tmpfs:
-      - /tmp:size=16m,mode=1777
-    cap_drop: [ALL]
-    cap_add: [NET_BIND_SERVICE]
-    security_opt: ["no-new-privileges:true"]
-    depends_on:
-      agent:
-        condition: service_healthy
-    restart: unless-stopped
-
-  web:
-    profiles: ["local"]
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-      args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
-    env_file:
-      - path: deploy-config/.env-nextjs
-        required: true
-    environment:
-      AGENT_URL: http://agent:8000
-    read_only: true
-    tmpfs:
-      - /tmp:size=64m,mode=1777
-      - /app/web/.next/cache:size=256m,uid=1000,gid=1000,mode=0700
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    depends_on:
-      agent:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/login').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-      interval: 15s
-      timeout: 5s
-      start_period: 20s
-      retries: 3
-    restart: unless-stopped
-
-  ollama:
-    image: ollama/ollama:0.40.12
-    profiles: ["ollama"]
-    volumes:
-      - ollama-data:/root/.ollama
-    ports:
-      - "127.0.0.1:11434:11434"
 
 networks:
   render:
@@ -150,7 +89,9 @@ networks:
   render-egress: {}
 
 volumes:
-  searxng-data:
-  caddy-data:
-  caddy-config:
-  ollama-data:
+  data:
+    name: ${OPEN_AGENT_DATA_VOLUME:-open-agent-data}
+  keys:
+    name: ${OPEN_AGENT_KEYS_VOLUME:-open-agent-keys}
+  renderer-key: {}
+  searxng-secret: {}

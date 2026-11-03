@@ -12,7 +12,58 @@ web (Next.js + @oab/ui) → @oab/bff (/api) → agent /copilotkit (CopilotKit ru
 - Design: `docs/superpowers/specs/2026-10-27-open-agent-bot-design.md`
 - What we learned about the stack: `docs/findings.md`
 
-## Run
+## Run it on your computer
+
+You need Docker and nothing else: no account, no login and no env files.
+
+```bash
+docker compose up -d --build
+```
+
+Then open http://127.0.0.1:3000 and go through onboarding. The first build takes several minutes. The stack is the project `open-agent`: `agent` (the app on one port: UI, API and chat stream), `search` (SearXNG) and `renderer` (thumbnails and PDFs).
+
+- **Models.** Add a cloud provider key in Models, or use a model server on this computer through `host.docker.internal`: Ollama `http://host.docker.internal:11434/v1`, LM Studio `http://host.docker.internal:1234/v1`, llama.cpp `http://host.docker.internal:8080/v1`.
+- **Port.** `OPEN_AGENT_PORT=3100 docker compose up -d` serves http://127.0.0.1:3100 instead. The port is always bound to 127.0.0.1.
+- **Data.** Chats, reports and settings live in the Docker volume `open-agent-data` (a SQLite file plus a reports folder). The key that encrypts saved model keys lives in a second volume, `open-agent-keys`, mounted only into the agent. `docker compose down` keeps both; `docker compose down -v` deletes both, and with them everything.
+- **Back up the keys volume separately.** A backup of `open-agent-data` alone can't decrypt saved model keys, and a backup of both together holds everything needed to use them.
+- **Prebuilt images.** `OPEN_AGENT_IMAGE` and `OPEN_AGENT_SEARCH_IMAGE` select prebuilt images. Use them only with `docker compose up -d --no-build`: without `--no-build`, compose builds from source and tags the result with that name.
+
+### Security of the local stack
+
+- The port is published on 127.0.0.1 only, so other computers can't reach it.
+- Websites open in your browser can't use it. Every request must name `127.0.0.1:<port>` or `localhost:<port>` as its `Host` (which refuses DNS rebinding), writes must come from that origin, and requests a browser marks as cross-site or same-site are refused. No response carries CORS headers.
+- **Any program, and any other user account, on this computer can use the API** by calling the port directly. They get the same access as you: your chats, your reports, and your saved model keys (used, never shown). This is the same trade-off as other local developer tools. The Mac app adds a launch token that keeps out other user accounts and programs that can't use Docker.
+- With `OPEN_AGENT_LAUNCH_TOKEN` set (the Mac app sets it), every `/api` request needs the matching `oa_launch` cookie. Opening http://127.0.0.1:<port> in a plain browser then still loads the pages, but every API call gets 401 `launch_required`, so the UI there stops working. Unset the variable to use a browser.
+- The `search` and `renderer` containers can reach the agent inside Docker. Both run images this stack pins, and neither runs your or the model's code outside Chromium's sandbox, so they are trusted.
+
+### Reset saved model keys
+
+If the key file in `open-agent-keys` is missing while the database still holds saved model keys, the agent refuses to start with `kek_missing`, because it never creates a new key over keys it can't read. Restore the keys volume, or delete the saved keys and re-enter them in Models:
+
+```bash
+OPEN_AGENT_RESET_CREDENTIALS=1 docker compose up -d
+```
+
+The variable acts only while the key file is missing, so leaving it set does nothing afterwards. A **wrong** keys volume (for example from another install) is present but can't decrypt the saved keys; reset doesn't apply, because the key file isn't missing. Saved keys then fail when used: remove and re-add each one in Models.
+
+### Startup errors
+
+When the agent can't start safely it prints one line, `[startup] refused code=<code> <message>`, and exits with a fixed code. It retries three times and then stays stopped. See it with `docker compose ps -a`, `docker compose logs agent | grep 'startup] refused'` or `docker inspect -f '{{.State.ExitCode}}' open-agent-agent-1`.
+
+| Code | Exit | What to do |
+| --- | --- | --- |
+| `config` | 78 | A setting is invalid, or a hosted setting (`SUPABASE_*`, `AGENT_SERVICE_SECRET`, `CREDENTIAL_KEYS`) is set. Fix or unset the variable the message names |
+| `db_corrupt` | 79 | The database failed its integrity check. Restore `open-agent-data` from a backup |
+| `db_newer` | 80 | A newer Open Agent wrote the database. Run that version or newer |
+| `db_migration` | 81 | An upgrade failed and was rolled back; the message names the backup in `/data/backups`. Report the line as a bug |
+| `kek_missing` | 82 | The key file is missing while saved model keys exist. Restore `open-agent-keys`, or reset as above |
+| `keyfile_invalid` | 83 | A key file is a symlink, not a regular file, readable by others, owned by someone else or malformed. Fix the path the message names (for example `chmod 600`); it is never replaced on its own |
+| `ui_missing` | 84 | The image has no UI build. Rebuild with `docker compose build` |
+| `identity` | 85 | Internal wiring error. Report it as a bug |
+
+## Run the hosted stack
+
+> **Warning.** The root `docker-compose.yml` is the local stack (project `open-agent`). Every hosted command needs `-f compose.hosted.yml`: bare `docker compose ps`, `logs`, `down`, `restart` and `up` target the local project, not the hosted one. `compose.hosted.yml` pins the project name `open-agent-bot`, so the existing containers and volumes are reused.
 
 Open Agent is invite-only. Accounts, sessions and every user's data live in one Supabase project; the agent and the web app keep nothing on disk.
 
@@ -23,13 +74,13 @@ Open Agent is invite-only. Accounts, sessions and every user's data live in one 
    - `deploy-config/.env-nextjs`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, and the same `AGENT_SERVICE_SECRET`.
    - `deploy-config/env-files/.env-supabase-admin` (owner's machine only): the Management API token, the `admin_scripts` secret key, Google OAuth client, Resend key.
 3. Set up Supabase once: apply `supabase/migrations/` in order, then `set -a; . deploy-config/env-files/.env-supabase-admin; set +a; node supabase/scripts/configure-auth.mjs --apply` and `node supabase/scripts/bootstrap-admin.mjs <your email>`.
-4. `docker compose --env-file deploy-config/.env-nextjs --profile local up -d --build` (the env file feeds the web image's `NEXT_PUBLIC_*` build args).
-5. Trust Caddy's local CA once: `docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt && sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt`.
+4. `docker compose -f compose.hosted.yml --env-file deploy-config/.env-nextjs --profile local up -d --build` (the env file feeds the web image's `NEXT_PUBLIC_*` build args).
+5. Trust Caddy's local CA once: `docker compose -f compose.hosted.yml cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt && sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt`.
 6. Open https://app.localhost and sign in with Google using the bootstrapped email. The agent is at https://agent.localhost (it needs the service secret and a user token).
 
 Visitors ask for access at `/request-access`; the admin approves them at `/admin`, which sends the invite email. Users add their own model keys in the app; keys are encrypted by the agent and never sent back to the browser.
 
-To run a preview beside a running stack, work in a second checkout or worktree, never the one that runs the stack. In that checkout, first create a git-ignored root `.env` containing `COMPOSE_PROJECT_NAME=oab-<name>` (`printf 'COMPOSE_PROJECT_NAME=oab-guard\n' > .env`), so unqualified compose commands there never reach the live project; `docker compose config --format json | jq -r .name` must print that name. Then use another project name and the preview override: `. scripts/preview-preflight.sh`, `P="docker compose -p oab-preview --env-file .env --env-file deploy-config/.env-nextjs -f docker-compose.yml -f deploy-config/compose.preview.yml --profile local"`, `preflight $P && $P up -d --build search renderer agent web` (agent on 127.0.0.1:18800, web on http://localhost:18300). `preflight` returns 1 unless the project name starts with `oab-`, every published port is on 127.0.0.1 and at 18000 or above, and any `PREVIEW_AGENT_PORT` / `PREVIEW_WEB_PORT` is in 18000–19999; scripts call it as `preflight … || exit 1`.
+To run a preview beside a running stack, work in a second checkout or worktree, never the one that runs the stack. In that checkout, first create a git-ignored root `.env` containing `COMPOSE_PROJECT_NAME=oab-<name>` (`printf 'COMPOSE_PROJECT_NAME=oab-guard\n' > .env`), so unqualified compose commands there never reach the live project; `docker compose config --format json | jq -r .name` must print that name. Then use another project name and the preview override: `. scripts/preview-preflight.sh`, `P="docker compose -p oab-preview --env-file .env --env-file deploy-config/.env-nextjs -f compose.hosted.yml -f deploy-config/compose.preview.yml --profile local"`, `preflight $P && $P up -d --build search renderer agent web` (agent on 127.0.0.1:18800, web on http://localhost:18300). `preflight` returns 1 unless the project name starts with `oab-`, every published port is on 127.0.0.1 and at 18000 or above, and any `PREVIEW_AGENT_PORT` / `PREVIEW_WEB_PORT` is in 18000–19999; scripts call it as `preflight … || exit 1`. For a second local stack, use `-p oab-<name>` with `OPEN_AGENT_PORT` in 18000–19999 and `OPEN_AGENT_DATA_VOLUME` / `OPEN_AGENT_KEYS_VOLUME` starting with `oab-`; `preflight` refuses any volume name that doesn't start with `oab-`.
 
 Ports bound to 127.0.0.1: Caddy 80/443 and the agent's 8000 for debugging (LiteLLM 4000 and Ollama 11434 when turned on). SearXNG is reachable only from the agent.
 
@@ -37,11 +88,11 @@ The agent refuses to start if a provider key such as `OPENAI_API_KEY` is set in 
 
 ### Deploy
 
-The web app runs on Vercel (Root Directory `web`, "Include files outside the root directory" on, Production env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, `AGENT_URL=https://<AGENT_HOST>`, `AGENT_SERVICE_SECRET`; nothing for Preview). The agent, SearXNG and Caddy run on EC2: create `deploy-config/.env-agent` (same `CREDENTIAL_KEYS` and pepper as local, `APP_ORIGIN=https://<APP_HOST>`, a new `RENDERER_SECRET`), `deploy-config/.env-renderer` (that `RENDERER_SECRET` only) and `deploy-config/.env-caddy` (`AGENT_HOST`, `ACME_EMAIL`), then `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose up -d --build`. Require IMDSv2 with hop limit 1, open 80/443 only, and set `PROD_ORIGIN`/`SITE_URL` in `.env-supabase-admin` before rerunning `configure-auth.mjs --apply`. The renderer runs Chromium with its sandbox, which needs unprivileged user namespaces: Amazon Linux 2023 allows them; on Ubuntu 23.10 or later, check `sysctl kernel.apparmor_restrict_unprivileged_userns` is `0` (or give Docker an AppArmor profile that allows `userns`). If the sandbox can't start, the renderer exits and stays unhealthy, and cards show the plain fallback until it's fixed; the agent keeps working. Runs end at `RUN_TIME_LIMIT_SECONDS` (default 280) to stay inside Vercel's `maxDuration = 300`. The full checklist is in the design spec's "Rollout and deploy".
+The web app runs on Vercel (Root Directory `web`, "Include files outside the root directory" on, Production env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, `AGENT_URL=https://<AGENT_HOST>`, `AGENT_SERVICE_SECRET`; nothing for Preview). The agent, SearXNG and Caddy run on EC2: create `deploy-config/.env-agent` (same `CREDENTIAL_KEYS` and pepper as local, `APP_ORIGIN=https://<APP_HOST>`, a new `RENDERER_SECRET`), `deploy-config/.env-renderer` (that `RENDERER_SECRET` only) and `deploy-config/.env-caddy` (`AGENT_HOST`, `ACME_EMAIL`), then `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose -f compose.hosted.yml up -d --build`. Require IMDSv2 with hop limit 1, open 80/443 only, and set `PROD_ORIGIN`/`SITE_URL` in `.env-supabase-admin` before rerunning `configure-auth.mjs --apply`. The renderer runs Chromium with its sandbox, which needs unprivileged user namespaces: Amazon Linux 2023 allows them; on Ubuntu 23.10 or later, check `sysctl kernel.apparmor_restrict_unprivileged_userns` is `0` (or give Docker an AppArmor profile that allows `userns`). If the sandbox can't start, the renderer exits and stays unhealthy, and cards show the plain fallback until it's fixed; the agent keeps working. Runs end at `RUN_TIME_LIMIT_SECONDS` (default 280) to stay inside Vercel's `maxDuration = 300`. The full checklist is in the design spec's "Rollout and deploy".
 
 ### Optional: Ollama in Docker
 
-`docker compose --profile ollama up -d` runs Ollama on port 11434. As the admin, add it in the app: Models → Ollama → Connect (`http://host.docker.internal:11434/v1`).
+`docker compose -f compose.hosted.yml --profile ollama up -d` runs Ollama on port 11434. As the admin, add it in the app: Models → Ollama → Connect (`http://host.docker.internal:11434/v1`).
 
 ### Optional: LiteLLM gateway
 
@@ -55,7 +106,7 @@ Agent settings live in `deploy-config/.env-agent` (git-ignored).
 | --- | --- | --- |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | required | The Supabase project; the secret key is the agent's own `sb_secret_…` key |
 | `AGENT_SERVICE_SECRET` | required | 64 hex chars shared with the web app |
-| `CREDENTIAL_KEYS` | required | Master keys for stored provider keys, `v2:<base64>,v1:<base64>`, first is current. Rotate with `docker compose exec agent node dist/scripts/rotateCredentials.js` |
+| `CREDENTIAL_KEYS` | required | Master keys for stored provider keys, `v2:<base64>,v1:<base64>`, first is current. Rotate with `docker compose -f compose.hosted.yml exec agent node dist/scripts/rotateCredentials.js` |
 | `ACCESS_REQUEST_PEPPER` | required | Base64 of 32 bytes; hashes visitor IPs |
 | `APP_ORIGIN` | required | The web app's origin, used for email links |
 | `RUN_TIME_LIMIT_SECONDS` | `280` | A run ends cleanly after this long |

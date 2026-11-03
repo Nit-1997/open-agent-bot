@@ -12,6 +12,7 @@ preview_port_ok() {
 preflight() {
   preview_port_ok PREVIEW_AGENT_PORT "${PREVIEW_AGENT_PORT-}" || return 1
   preview_port_ok PREVIEW_WEB_PORT "${PREVIEW_WEB_PORT-}" || return 1
+  preview_port_ok OPEN_AGENT_PORT "${OPEN_AGENT_PORT-}" || return 1
   local cfg n
   cfg="$("$@" config --format json)" || { echo "ABORT: compose config failed" >&2; return 1; }
   n="$(printf '%s' "$cfg" | jq -r .name)"
@@ -23,5 +24,8 @@ preflight() {
     || { echo "ABORT: project '$n' publishes a port outside 127.0.0.1" >&2; return 1; }
   printf '%s' "$cfg" | jq -e '[.services[].ports[]? | .published | tonumber] | all(. >= 18000)' >/dev/null 2>&1 \
     || { echo "ABORT: project '$n' publishes a port below 18000" >&2; return 1; }
+  local v
+  v="$(printf '%s' "$cfg" | jq -r '[.volumes // {} | .[] | .name | select(startswith("oab-") | not)] | first // empty')"
+  [ -z "$v" ] || { echo "ABORT: volume '$v' must start with oab-" >&2; return 1; }
   echo "preflight ok: project '$n'"
 }

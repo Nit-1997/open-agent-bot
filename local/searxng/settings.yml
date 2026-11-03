@@ -1,0 +1,24 @@
+use_default_settings: true
+server:
+  secret_key: "overridden-by-env"
+  limiter: false
+  image_proxy: false
+search:
+  formats:
+    - html
+    - json
+engines:
+  - name: bing
+    disabled: false
+  - name: google
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: startpage
+    disabled: false
+  - name: wikivoyage
+    disabled: false
