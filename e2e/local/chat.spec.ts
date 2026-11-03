@@ -14,6 +14,7 @@ import {
 import { LONG_MARKER, REPORT_MARKER } from "../support/stubModel.ts";
 
 const POLL_MS = 75;
+const CHAT_URL = /\/chats\/[0-9a-f-]{36}(\?.*)?$/;
 
 test("local stack on the stub model: onboarding, streaming, stop, a report with its PDF, and search", async ({ page, baseURL }) => {
   test.setTimeout(300_000);
@@ -31,7 +32,7 @@ test("local stack on the stub model: onboarding, streaming, stop, a report with 
   await test.step("2. A reply streams in growing lengths; Stop shows no error", async () => {
     await page.locator("#sidebar-new-chat").click();
     await send(page, `Tell me about lighthouses ${word} ${LONG_MARKER}`);
-    await expect(page).toHaveURL(/\/chats\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+    await expect(page).toHaveURL(CHAT_URL, { timeout: 60_000 });
     const growth: number[] = [];
     const deadline = Date.now() + 60_000;
     while (growth.length < 3) {
@@ -64,7 +65,7 @@ test("local stack on the stub model: onboarding, streaming, stop, a report with 
   await test.step("4. The stub's scripted tool call creates a report; it opens and its PDF downloads", async () => {
     await page.locator("#sidebar-new-chat").click();
     await send(page, `${reportTitle} ${REPORT_MARKER}`);
-    await expect(page).toHaveURL(/\/chats\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+    await expect(page).toHaveURL(CHAT_URL, { timeout: 60_000 });
     chatId = new URL(page.url()).pathname.split("/").at(-1) as string;
     await waitForReplyDone(page);
     const reports = (await (await page.request.get("/api/reports")).json()) as { items: Array<{ id: string; title: string }> };

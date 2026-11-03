@@ -60,7 +60,7 @@ When the agent can't start safely it prints one line, `[startup] refused code=<c
 | `keyfile_invalid` | 83 | A key file is a symlink, not a regular file, readable by others, owned by someone else or malformed. Fix the path the message names (for example `chmod 600`); it is never replaced on its own |
 | `ui_missing` | 84 | The image has no UI build. Rebuild with `docker compose build` |
 | `identity` | 85 | Internal wiring error. Report it as a bug |
-| `listen` | 86 | The port is in use (or can't be opened). Stop whatever holds it, or pick another with `OPEN_AGENT_PORT` |
+| `listen` | 86 | Only when the entry runs outside compose (`OPEN_AGENT_LISTEN_PORT`, the Mac app): the port is in use or can't be opened. Free it or pick another. Under compose a busy host port fails earlier, when Docker publishes the port (`docker compose up` reports `port is already allocated` or `address already in use`), and the agent never starts; pick another `OPEN_AGENT_PORT` |
 
 ## Run the hosted stack
 

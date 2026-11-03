@@ -7,7 +7,8 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 const BASE = /mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble(@sha256:[0-9a-f]{64})?/g;
 
-const baseImages = () => [...read("packages/core/Dockerfile").matchAll(BASE)].map((m) => ({ version: m[1]!, digest: m[2] }));
+const imagesIn = (path: string) => [...read(path).matchAll(BASE)].map((m) => ({ version: m[1]!, digest: m[2] }));
+const baseImages = () => imagesIn("packages/core/Dockerfile");
 
 function imageVersion(): string {
   const [first] = baseImages();
@@ -28,6 +29,16 @@ describe("Playwright version pin", () => {
     }
     expect(new Set(images.map((i) => i.digest)).size).toBe(1);
   });
+
+  it.each([".github/workflows/ci.yml", "CONTRIBUTING.md"])(
+    "pins the Node 24 test image in %s to the Dockerfile's tag and digest",
+    (path) => {
+      const [base] = baseImages();
+      const images = imagesIn(path);
+      expect(images.length).toBeGreaterThan(0);
+      for (const image of images) expect(image).toEqual(base);
+    },
+  );
 
   it("pins the agent's playwright dependency exactly to the image version", () => {
     const agent = JSON.parse(read("packages/core/package.json")) as { dependencies: Record<string, string> };
