@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import type { RunContext } from "./agui/runHandler.js";
+import type { handleRun, RunContext } from "./agui/runHandler.js";
 import type { ArtifactStore } from "./artifacts/store.js";
 import type { AuthEnv, Guards, Principal, RouteMount } from "./identity/types.js";
 import { USER_PATHS } from "./identity/userPaths.js";
@@ -8,6 +8,7 @@ import type { UserRepos } from "./store/types.js";
 import { aguiRoutes } from "./http/agui.js";
 import { artifactRoutes } from "./http/artifacts.js";
 import { chatRoutes } from "./http/chats.js";
+import { COPILOTKIT_RUN_PATH, type CopilotDeps, copilotkitRoutes } from "./http/copilotkit.js";
 import { reportRoutes } from "./http/reports.js";
 import { searchRoutes } from "./http/search.js";
 import { errorResponse } from "./http/handlers.js";
@@ -35,6 +36,8 @@ export type AppDeps = {
   artifacts: ArtifactStore;
   onboarding: OnboardingDeps;
   mounts: RouteMount[];
+  copilot?: CopilotDeps;
+  handleRun?: typeof handleRun;
 };
 
 export const BODY_LIMIT_BYTES = 1024 * 1024;
@@ -42,6 +45,8 @@ export const RUN_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
 
 const limitBody = (maxSize: number) =>
   bodyLimit({ maxSize, onError: (c) => errorResponse(c, new UserError("That request is too large.", "too_large")) });
+
+const takesRunBody = (method: string, path: string) => path === "/agui" || (method === "POST" && path === COPILOTKIT_RUN_PATH);
 
 export function createApp(deps: AppDeps) {
   const app = new Hono<AuthEnv>();
@@ -52,13 +57,13 @@ export function createApp(deps: AppDeps) {
   app.use("*", guards.requireService);
   const runBody = limitBody(RUN_BODY_LIMIT_BYTES);
   const otherBody = limitBody(BODY_LIMIT_BYTES);
-  app.use("*", (c, next) => (c.req.path === "/agui" ? runBody(c, next) : otherBody(c, next)));
+  app.use("*", (c, next) => (takesRunBody(c.req.method, c.req.path) ? runBody(c, next) : otherBody(c, next)));
 
   for (const mount of deps.mounts) if (mount.stage === "public") app.route("/", mount.routes);
 
   for (const path of USER_PATHS) app.use(path, guards.requireUser);
 
-  app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, policy: deps.runPolicy }));
+  app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, policy: deps.runPolicy, handle: deps.handleRun }));
   app.route("/", chatRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", reportRoutes({ repos: deps.repos, limiter: deps.limiter }));
   app.route("/", searchRoutes({ repos: deps.repos, limiter: deps.limiter }));
@@ -67,6 +72,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", onboardingRoutes({ ...deps.onboarding, limiter: deps.limiter }));
   app.route("/", providerRoutes({ hubs: deps.hubs, logins: deps.logins, profiles: deps.profiles, limiter: deps.limiter }));
   app.route("/", artifactRoutes({ artifacts: deps.artifacts, owner: deps.repos, limiter: deps.limiter }));
+  if (deps.copilot) app.route("/", copilotkitRoutes(deps.copilot));
   for (const mount of deps.mounts) {
     if (mount.stage !== "protected") continue;
     app.use(`${mount.basePath}/*`, guards.requireUser);

@@ -14,6 +14,8 @@ export const USER_PATHS = [
   "/reports",
   "/reports/*",
   "/search",
+  "/copilotkit",
+  "/copilotkit/*",
 ] as const;
 
 const segments = (path: string) => path.split("/").filter(Boolean);

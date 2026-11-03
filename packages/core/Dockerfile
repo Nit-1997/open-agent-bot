@@ -18,6 +18,7 @@ COPY packages/core/skills packages/core/skills
 RUN npm run build -w @oab/core && npm prune --omit=dev -w @oab/core -w @oab/shared --include-workspace-root
 USER pwuser
 ENV NODE_ENV=production
+ENV COPILOTKIT_TELEMETRY_DISABLED=true
 WORKDIR /app/packages/core
 EXPOSE 8000
 CMD ["node", "dist/server.js"]

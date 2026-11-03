@@ -12,6 +12,7 @@ export const TEST_ENV: NodeJS.ProcessEnv = {
   APP_ORIGIN: "https://app.localhost",
   ACCESS_REQUEST_PEPPER: Buffer.alloc(32, 9).toString("base64"),
   RENDERER_SECRET: "b".repeat(64),
+  COPILOTKIT_TELEMETRY_DISABLED: "true",
 };
 
 export const testConfig = (extra: NodeJS.ProcessEnv = {}): HostedConfig => loadHostedConfig({ ...TEST_ENV, ...extra });

@@ -12,6 +12,8 @@ export type CoreConfig = {
   runTimeLimitSeconds: number;
   rendererUrl: string;
   rendererSecret: string;
+  copilotConnectsPerUser: number;
+  copilotConnectMaxMs: number;
 };
 
 type ModelCap = "codemode";
@@ -71,6 +73,11 @@ export function hasCap(cfg: Pick<CoreConfig, "modelCaps">, ref: string | undefin
   return DEFAULT_CAPS.some((d) => d.match.test(ref) && d.caps.includes(cap));
 }
 
+function wholeIn(raw: string | undefined, fallback: number, min: number, max: number): number | undefined {
+  const n = raw?.trim() ? Number(raw.trim()) : fallback;
+  return Number.isInteger(n) && n >= min && n <= max ? n : undefined;
+}
+
 function httpUrl(raw: string): string | undefined {
   try {
     const u = new URL(raw);
@@ -89,6 +96,11 @@ export function coreConfigFrom(env: NodeJS.ProcessEnv, problems: string[]): Core
   const runTimeLimitSeconds = rawLimit ? Number(rawLimit) : 280;
   if (!Number.isInteger(runTimeLimitSeconds) || runTimeLimitSeconds < 30 || runTimeLimitSeconds > 3600)
     problems.push("RUN_TIME_LIMIT_SECONDS must be a whole number from 30 to 3600");
+  need("COPILOTKIT_TELEMETRY_DISABLED", (v) => (v === "true" ? v : undefined), 'must be "true"');
+  const copilotConnectsPerUser = wholeIn(env.COPILOT_CONNECTS_PER_USER, 8, 1, 100);
+  if (copilotConnectsPerUser === undefined) problems.push("COPILOT_CONNECTS_PER_USER must be a whole number from 1 to 100");
+  const copilotConnectMaxMs = wholeIn(env.COPILOT_CONNECT_MAX_MS, 30 * 60 * 1000, 60_000, 24 * 60 * 60 * 1000);
+  if (copilotConnectMaxMs === undefined) problems.push("COPILOT_CONNECT_MAX_MS must be a whole number from 60000 to 86400000");
 
   return {
     port: Number(env.AGENT_PORT ?? 8000),
@@ -100,6 +112,8 @@ export function coreConfigFrom(env: NodeJS.ProcessEnv, problems: string[]): Core
     runTimeLimitSeconds,
     rendererUrl: rendererUrl as string,
     rendererSecret,
+    copilotConnectsPerUser: copilotConnectsPerUser as number,
+    copilotConnectMaxMs: copilotConnectMaxMs as number,
   };
 }
 

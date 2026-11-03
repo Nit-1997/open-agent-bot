@@ -1,14 +1,17 @@
 import type { AddressInfo } from "node:net";
 import { serve } from "@hono/node-server";
 import type { Hono } from "hono";
+import type { RunContext } from "./agui/runHandler.js";
 import { createApp } from "./app.js";
 import { loadOpenReport } from "./artifacts/openReport.js";
 import { remoteRenderer } from "./artifacts/remoteRenderer.js";
 import { ArtifactStore } from "./artifacts/store.js";
 import { BrowserPool } from "./browser/pool.js";
 import type { CoreConfig } from "./config.js";
+import { coreAgentFactory } from "./copilot/coreRunAgent.js";
+import { ConnectSlots, ThreadOwners } from "./copilot/owners.js";
 import { createGuards } from "./identity/guards.js";
-import type { AuthEnv, Identity, RouteMount } from "./identity/types.js";
+import type { AuthEnv, Identity, Principal, RouteMount } from "./identity/types.js";
 import { pathCovered } from "./identity/userPaths.js";
 import { createJudgeFrom, type Judge, judgeResolver } from "./judge/index.js";
 import { createLimiter } from "./lib/concurrency.js";
@@ -108,22 +111,26 @@ export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
   const mounts = deps.routes?.(handles) ?? [];
   checkMounts(mounts);
 
+  const runPolicy = deps.runPolicy?.({ limiter }) ?? new LocalRunPolicy({ limiter, gate: new ConcurrencyGate(RUN_CONCURRENCY) });
+  const runContext = (user: Principal, chatId: string): RunContext => {
+    const r = repos(user.id);
+    return {
+      user,
+      chats: r.chats,
+      messages: r.messages,
+      profiles: profiles(user.id),
+      openReport: (id, cached) => loadOpenReport(artifacts, r, chatId, id, cached),
+      timeLimitMs: cfg.runTimeLimitSeconds * 1000,
+    };
+  };
+  const owners = new ThreadOwners();
+
   const app = createApp({
     guards: createGuards(deps.identity),
     limiter,
-    runPolicy: deps.runPolicy?.({ limiter }) ?? new LocalRunPolicy({ limiter, gate: new ConcurrencyGate(RUN_CONCURRENCY) }),
+    runPolicy,
     store: sessions,
-    runContext: (user, chatId) => {
-      const r = repos(user.id);
-      return {
-        user,
-        chats: r.chats,
-        messages: r.messages,
-        profiles: profiles(user.id),
-        openReport: (id, cached) => loadOpenReport(artifacts, r, chatId, id, cached),
-        timeLimitMs: cfg.runTimeLimitSeconds * 1000,
-      };
-    },
+    runContext,
     repos,
     profiles,
     hubs,
@@ -131,6 +138,13 @@ export async function startAgent(deps: AgentDeps): Promise<RunningAgent> {
     artifacts,
     onboarding: { registry, groceries: (at) => nearbyGroceries(at) },
     mounts,
+    copilot: {
+      agent: coreAgentFactory({ run: { store: sessions, context: runContext, policy: runPolicy }, owners }),
+      owners,
+      chatExists: (userId, threadId) => repos(userId).chats.exists(threadId),
+      slots: new ConnectSlots(cfg.copilotConnectsPerUser),
+      connectMaxMs: cfg.copilotConnectMaxMs,
+    },
   });
 
   const server = await new Promise<ReturnType<typeof serve>>((resolve, reject) => {

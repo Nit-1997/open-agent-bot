@@ -56,6 +56,8 @@ describe("loadHostedConfig", () => {
       runTimeLimitSeconds: 280,
       rendererUrl: "http://renderer:8100",
       rendererSecret: "b".repeat(64),
+      copilotConnectsPerUser: 8,
+      copilotConnectMaxMs: 1_800_000,
     });
   });
 
@@ -72,6 +74,7 @@ describe("loadHostedConfig", () => {
           "APP_ORIGIN must be an https origin with no path or trailing slash",
           "ACCESS_REQUEST_PEPPER is missing",
           "RENDERER_SECRET is missing",
+          "COPILOTKIT_TELEMETRY_DISABLED is missing",
         ],
       ],
       [
@@ -85,6 +88,7 @@ describe("loadHostedConfig", () => {
           "APP_ORIGIN is missing",
           "ACCESS_REQUEST_PEPPER is missing",
           "RENDERER_SECRET is missing",
+          "COPILOTKIT_TELEMETRY_DISABLED is missing",
         ],
       ],
       [{ ...TEST_ENV, SUPABASE_SECRET_KEY: "eyJhbGciOi" }, ["SUPABASE_SECRET_KEY must start with sb_secret_"]],
@@ -130,6 +134,7 @@ describe("loadHostedConfig", () => {
       "APP_ORIGIN",
       "ACCESS_REQUEST_PEPPER",
       "RENDERER_SECRET",
+      "COPILOTKIT_TELEMETRY_DISABLED",
     ])
       expect(message).toContain(name);
     expect(message).not.toContain("short-secret-value");
