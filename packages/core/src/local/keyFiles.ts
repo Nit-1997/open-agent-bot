@@ -181,7 +181,7 @@ export function loadLocalKeys(o: LocalKeysOptions): { kek: CredentialKeys; rende
     if (rows > 0) {
       const deleted = o.resetCredentials();
       log.warn(
-        `[startup] OPEN_AGENT_RESET_CREDENTIALS=1: the credential key was missing, so ${savedKeys(deleted)} were deleted and a new key was created; re-enter them in Models`,
+        `[startup] OPEN_AGENT_RESET_CREDENTIALS=1: the credential key was missing, so ${savedKeys(deleted)} ${deleted === 1 ? "was" : "were"} deleted and a new key was created; re-enter ${deleted === 1 ? "it" : "them"} in Models`,
       );
     }
   }

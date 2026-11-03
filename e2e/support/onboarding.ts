@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-export async function completeOnboardingIfShown(page: Page): Promise<boolean> {
+export async function completeOnboardingIfShown(page: Page, options: { summaryHoldMs?: number } = {}): Promise<boolean> {
   await page.goto("/");
   const step = page.locator("#onboarding-step");
   await expect(step.or(page.locator("#rail"))).toBeVisible();
@@ -19,6 +19,7 @@ export async function completeOnboardingIfShown(page: Page): Promise<boolean> {
       await page.locator("#onboarding-next").click();
     }
     await expect(page.locator("#onboarding-summary")).toContainText("Sage · brief · ember look");
+    if (options.summaryHoldMs) await page.waitForTimeout(options.summaryHoldMs);
     await page.locator("#onboarding-next").click();
   }
   await expect(page.locator("#rail")).toBeVisible();
