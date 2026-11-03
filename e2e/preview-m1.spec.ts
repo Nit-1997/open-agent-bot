@@ -13,6 +13,14 @@ const PRIVATE_URLS: Array<[string, string]> = [
 const composer = (page: Page) => page.locator("main [id$='-composer-input']:visible");
 const status = (page: Page) => page.locator("[id$='-header-status']:visible");
 
+async function openModels(page: Page): Promise<void> {
+  await page.goto("/");
+  await expect(page.locator("#rail")).toBeVisible();
+  await page.locator("#account-menu-button").click();
+  await page.locator("#account-menu-models").click();
+  await expect(page.locator("#models-panel")).toBeVisible();
+}
+
 async function replyLength(page: Page): Promise<number> {
   const article = page.locator("main [id$='-turns'] article:visible").last();
   if ((await article.count()) === 0) return 0;
@@ -39,11 +47,7 @@ test("preview: isolation, provider settings, private URLs refused and admin guar
   });
 
   await test.step("3. Provider settings", async () => {
-    await page.goto("/");
-    await expect(page.locator("#rail")).toBeVisible();
-    await page.locator("#account-menu-button").click();
-    await page.locator("#account-menu-models").click();
-    await expect(page.locator("#models-panel")).toBeVisible();
+    await openModels(page);
     await expect(page.locator("#provider-openrouter-status")).not.toHaveText("Not connected");
     await expect(page.locator("#provider-litellm")).toHaveCount(0);
   });
@@ -51,9 +55,13 @@ test("preview: isolation, provider settings, private URLs refused and admin guar
   await test.step("4. Private URLs refused", async () => {
     for (const [id, url] of PRIVATE_URLS) {
       const row = `#provider-${id}`;
+      await openModels(page);
+      await expect(page.locator(`${row}-error`)).toHaveCount(0);
       if (!(await page.locator(`${row}-url`).isVisible())) await page.locator(`${row}-connect`).click();
       await page.locator(`${row}-url`).fill(url);
+      const refused = page.waitForResponse((res) => res.request().method() === "POST" && new URL(res.url()).pathname === "/api/providers/local");
       await page.locator(`${row}-connect-save`).click();
+      expect((await refused).status(), url).toBe(422);
       await expect(page.locator(`${row}-error`)).toHaveText(PRIVATE_TARGET);
       await expect(page.locator(`${row}-status`)).toHaveText("Not connected");
     }
