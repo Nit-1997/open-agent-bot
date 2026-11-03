@@ -31,6 +31,8 @@ export function shellEnv(o: ShellEnv): Record<string, string> {
     PATH: process.env.PATH ?? "/usr/bin:/bin",
     HOME: process.env.HOME ?? "",
     TMPDIR: process.env.TMPDIR ?? "/tmp",
+    ...(process.env.DISPLAY ? { DISPLAY: process.env.DISPLAY } : {}),
+    ...(process.env.XAUTHORITY ? { XAUTHORITY: process.env.XAUTHORITY } : {}),
     OPEN_AGENT_SHELL_TEST: "1",
     OPEN_AGENT_SHELL_STATE_DIR: o.stateDir,
     OPEN_AGENT_SHELL_PROJECT: o.project,

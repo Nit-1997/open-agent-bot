@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createFakeDocker, type FakeDocker, type FakeScenario, fakeServices, subOf } from "./support/fakeDocker";
@@ -75,7 +75,8 @@ test("Docker not running → the stopped screen continues by itself within 5 s o
   const s = await launch("stopped");
   const page = await s.waitScreen("screen-docker-stopped");
   await expect(page.locator("#screen-docker-stopped-title")).toHaveText("Docker isn't running");
-  await expect(page.locator("#screen-docker-stopped-open-docker-desktop")).toBeVisible();
+  if (existsSync("/Applications/Docker.app")) await expect(page.locator("#screen-docker-stopped-open-docker-desktop")).toBeVisible();
+  else await expect(page.locator("#screen-docker-stopped-open-docker-desktop")).toHaveCount(0);
   await everyElementHasUniqueId(page);
   await page.waitForTimeout(1000);
   fake.daemon("up");
@@ -102,13 +103,24 @@ test("a Docker engine with 2 GiB shows the memory warning on the progress screen
   await expect(page.locator("#screen-progress-docker-detail")).toHaveText("Docker Desktop is running");
 });
 
+const rootSocket = (p: string) => {
+  try {
+    const st = statSync(p);
+    return st.isSocket() && st.uid === 0;
+  } catch {
+    return false;
+  }
+};
+const ROOT_SOCKET = ["/var/run/mDNSResponder", "/var/run/docker.sock", "/run/systemd/journal/socket"].find(rootSocket);
+
 for (const endpoint of ["tcp", "foreignSocket"] as const) {
   test(`endpoint ${endpoint} → screen-docker-remote with zero compose calls`, async () => {
-    await setup({ endpoint });
+    test.skip(endpoint === "foreignSocket" && !ROOT_SOCKET, "no root-owned socket on this host to stand in for another user's engine");
+    await setup(endpoint === "tcp" ? { endpoint } : { endpoint, foreignSocketPath: ROOT_SOCKET });
     const s = await launch(`remote-${endpoint}`);
     const page = await s.waitScreen("screen-docker-remote");
     await expect(page.locator("#screen-docker-remote-endpoint-endpoint-value")).toHaveText(
-      endpoint === "tcp" ? "tcp://192.168.64.2:2376" : "unix:///var/run/mDNSResponder",
+      endpoint === "tcp" ? "tcp://192.168.64.2:2376" : `unix://${ROOT_SOCKET}`,
     );
     await expect(page.locator("#screen-docker-remote-endpoint-reason-value")).toHaveText(endpoint === "tcp" ? "not_unix" : "foreign_owner");
     await everyElementHasUniqueId(page);
