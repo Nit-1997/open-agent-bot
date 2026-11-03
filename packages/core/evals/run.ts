@@ -315,7 +315,7 @@ async function main() {
       .filter(Boolean),
     values.set,
   );
-  const headers = await evalAuth(resolve(evalsDir, "../.."));
+  const headers = await evalAuth(resolve(evalsDir, "../../.."));
   const date = new Date().toISOString().slice(0, 10);
   const outDir = join(evalsDir, "results", `${date}-${label}-${model}`);
   await mkdir(outDir, { recursive: true });

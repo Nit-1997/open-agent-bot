@@ -31,7 +31,7 @@ services:
   agent:
     build:
       context: .
-      dockerfile: agent/Dockerfile
+      dockerfile: packages/core/Dockerfile
     env_file:
       - path: deploy-config/.env-agent
         required: true
@@ -61,7 +61,7 @@ services:
     # Seccomp profile from Playwright v1.64.1 (utils/docker/seccomp_profile.json) so Chromium's sandbox can create its namespaces.
     build:
       context: .
-      dockerfile: agent/Dockerfile
+      dockerfile: packages/core/Dockerfile
     command: ["node", "dist/renderer/main.js"]
     env_file:
       - path: deploy-config/.env-renderer

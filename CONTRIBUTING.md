@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `agent`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -12,7 +12,7 @@ npm ci && npx playwright install chromium
 
 To run the whole stack, follow **Run** in the [README](README.md). To work on one side, run the other in Docker and point at it:
 
-- Agent: `cd agent && npm run build && set -a && . ../deploy-config/.env-agent && set +a && npm start` (`tsc -b` builds `@oab/shared` and then the agent into `agent/dist/`; settings in the README's reference table)
+- Agent: `cd packages/core && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && npm start` (`tsc -b` builds `@oab/shared` and then the agent into `packages/core/dist/`; settings in the README's reference table)
 - Web: `cd web && set -a && . ../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see **Run** in the README). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
@@ -24,7 +24,7 @@ CI runs these on every pull request. Run them from the repo root before you push
 | Package | Commands |
 | --- | --- |
 | `@oab/shared` | `npm run build -w @oab/shared` (also built by the agent's `tsc -b`) |
-| `agent` | `npm run lint -w agent && npm run format:check -w agent && npm run typecheck -w agent && npm test -w agent && npm run build -w agent` |
+| `@oab/core` | `npm run lint -w @oab/core && npm run format:check -w @oab/core && npm run typecheck -w @oab/core && npm test -w @oab/core && npm run build -w @oab/core` |
 | `web` | `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web` |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `test/supabase/` run against the real Supabase project with `npm run test:supabase`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
@@ -32,7 +32,7 @@ Agent tests marked `.int.test.ts` start a real Chromium against local fixture se
 ## Layout
 
 ```
-agent/src/
+packages/core/src/
   server.ts            process wiring: config, Supabase clients, per-user hubs, session store, shutdown
   app.ts               composes the HTTP routes in http/ behind the auth guards
   auth/                service secret, JWT verification (JWKS, ES256), active-user cache, guards,
@@ -102,33 +102,33 @@ e2e/                   Playwright demo against the local stack (see README "End-
 
 ## Adding a tool
 
-1. Add `agent/src/tools/<name>.ts` that exports a factory returning `defineTool({...})`. Take network access (`fetch`) and other services as injectable deps so tests can fake them.
+1. Add `packages/core/src/tools/<name>.ts` that exports a factory returning `defineTool({...})`. Take network access (`fetch`) and other services as injectable deps so tests can fake them.
 2. Validate URLs from the model with `publicHttpUrlError` and fetch them with `fetchPublic` from `lib/net.ts`. Never call `fetch` on a model-supplied URL directly.
 3. Register it in `tools/index.ts`. Wrap it in `withBudget` if it costs a network round trip.
 4. If it returns structured data for a card, add a renderer in `render/registry.ts` and a schema in `packages/shared/src/widgets.ts`.
-5. Add a step label in `web/lib/steps.ts` and tests under `agent/test/tools/`.
+5. Add a step label in `web/lib/steps.ts` and tests under `packages/core/test/tools/`.
 
 ## Adding a source
 
-Every provider (a store, a stay site, a flight search) is a `Source` in `agent/src/sources/`: `{ id, vertical, regions, capabilities, defaultFor?, search(q, ctx) }`. Tools never name providers; they ask the registry (`sources/registry.ts`) with `select({ vertical, region, capability })` or `defaults({ vertical, region, kind })`. `regions` are country codes (`"*"` for anywhere). `defaultFor` lists the region tags (`"IN"`, or `"US:grocery"` with a kind, or `"*"`) where the source is a default. Register it in `sources/index.ts`. A test can register a source on `createRegistry()` instead, as `agent/test/sources/registry.test.ts` does.
+Every provider (a store, a stay site, a flight search) is a `Source` in `packages/core/src/sources/`: `{ id, vertical, regions, capabilities, defaultFor?, search(q, ctx) }`. Tools never name providers; they ask the registry (`sources/registry.ts`) with `select({ vertical, region, capability })` or `defaults({ vertical, region, kind })`. `regions` are country codes (`"*"` for anywhere). `defaultFor` lists the region tags (`"IN"`, or `"US:grocery"` with a kind, or `"*"`) where the source is a default. Register it in `sources/index.ts`. A test can register a source on `createRegistry()` instead, as `packages/core/test/sources/registry.test.ts` does.
 
 ### A store
 
-1. Add a `browserStore({...})` to `agent/src/sources/retail/stores.ts` (or its own file for one that needs special reading, like `shipt.ts`): `id`, `label`, `home`, `searchUrl(q)`, `regions`, and `defaultFor` if it is a regional default. `domains` defaults to `<id>.com`; set it for others (`amazon.in`). `aliases` are extra spoken names.
+1. Add a `browserStore({...})` to `packages/core/src/sources/retail/stores.ts` (or its own file for one that needs special reading, like `shipt.ts`): `id`, `label`, `home`, `searchUrl(q)`, `regions`, and `defaultFor` if it is a regional default. `domains` defaults to `<id>.com`; set it for others (`amazon.in`). `aliases` are extra spoken names.
 2. Add it to `SIMPLE_STORES`.
-3. Add a resolution case to `agent/test/sources/registry.test.ts`.
+3. Add a resolution case to `packages/core/test/sources/registry.test.ts`.
 
 A store with no entry still works: `shop` reads any unknown domain through its schema.org JSON-LD (`sources/jsonld.ts`, `sources/retail/jsonldStore.ts`): it finds product pages with a `site:` search, reads their offers, and reports a block with a link when the site denies access. `fetch_page` appends the same data as `structured:` lines.
 
 ### A stay site
 
-1. Create `agent/src/sources/stays/<site>.ts` that exports `staySource({...})` (see `sources/stays/define.ts` and `stays/types.ts`):
+1. Create `packages/core/src/sources/stays/<site>.ts` that exports `staySource({...})` (see `sources/stays/define.ts` and `stays/types.ts`):
    - `id`, `label`, `site` (domain, used for the favicon), and `lists` (`"hotel"`, `"rental"` or both, also its capabilities)
    - `searchUrl(q)`: the site's search URL for `q.location`, `q.checkin`, `q.checkout`, `q.adults`, `q.rooms` and `q.currency`
    - `read(page, q)` (optional): pulls listings from the loaded results page. Leave it out and the site is offered as a link the user opens, which is the right choice for sites that block automated browsers (see `expedia.ts`).
 2. Split `read` in two, like `booking.ts`: a `collect` function that runs in the page and returns plain objects, and a pure `parse<Site>Card(card, q)` that turns one into a `Stay`. Prefer `data-testid` or ARIA labels over class names, which change often. Use the helpers in `stays/parse.ts` for prices, review counts and cleaning tracking parameters off links.
 3. Add it to `STAY_SOURCES` in `sources/stays/index.ts`.
-4. Add `parse` cases to `agent/test/stays/parse.test.ts` with card text copied from the real site, and a fixture-page case to `sources.int.test.ts`.
+4. Add `parse` cases to `packages/core/test/stays/parse.test.ts` with card text copied from the real site, and a fixture-page case to `sources.int.test.ts`.
 
 Check that the site's search results load for the agent's browser first: run the stack, ask for stays somewhere, and look at the stays card. Sites that blocked the browser or returned nothing readable are listed in its footer as links.
 
@@ -138,7 +138,7 @@ Export a `FlightSource` like `sources/flights/google.ts` and register it. The `f
 
 ## Adding a country to onboarding
 
-Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` entry per country code (airlines, hotel chains, extra booking sites, groceries, other shops, delivery apps), with `"*"` as the fallback. Adding a country is adding an entry. Travel sites read by a source in `agent/src/sources/` are tagged "searched" automatically; the rest are "linked". Nearby grocery stores come from Overpass and fall back to the country's list.
+Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` entry per country code (airlines, hotel chains, extra booking sites, groceries, other shops, delivery apps), with `"*"` as the fallback. Adding a country is adding an entry. Travel sites read by a source in `packages/core/src/sources/` are tagged "searched" automatically; the rest are "linked". Nearby grocery stores come from Overpass and fall back to the country's list.
 
 ## Conventions
 

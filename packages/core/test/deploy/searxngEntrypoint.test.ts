@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SCRIPT = join(import.meta.dirname, "../../../deploy-config/searxng/entrypoint.sh");
+const SCRIPT = join(import.meta.dirname, "../../../../deploy-config/searxng/entrypoint.sh");
 
 const run = (file: string) =>
   execFileSync("sh", [SCRIPT, "sh", "-c", 'printf %s "$SEARXNG_SECRET"'], {

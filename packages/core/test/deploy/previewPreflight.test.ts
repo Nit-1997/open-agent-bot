@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SCRIPT = join(import.meta.dirname, "../../../scripts/preview-preflight.sh");
+const SCRIPT = join(import.meta.dirname, "../../../../scripts/preview-preflight.sh");
 
 async function fakeDocker(projectName: string): Promise<string> {
   const bin = await mkdtemp(join(tmpdir(), "preflight-"));

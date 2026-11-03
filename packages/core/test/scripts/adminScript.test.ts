@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain JS owner script without type declarations
-import { createAdmin } from "../../../supabase/scripts/admin.mjs";
+import { createAdmin } from "../../../../supabase/scripts/admin.mjs";
 import { DELETE_STEPS, type DeleteStep } from "../../src/admin/deleteAccount.js";
 import { BOB } from "../fixtures/users.js";
 

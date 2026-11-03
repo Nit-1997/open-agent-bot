@@ -13,10 +13,10 @@
     "rewriteRelativeImportExtensions": true,
     "paths": {
       "typebox": [
-        "../node_modules/typebox/build/index.d.mts"
+        "../../node_modules/typebox/build/index.d.mts"
       ],
       "typebox/value": [
-        "../node_modules/typebox/build/value/index.d.mts"
+        "../../node_modules/typebox/build/value/index.d.mts"
       ]
     },
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
@@ -26,7 +26,7 @@
   ],
   "references": [
     {
-      "path": "../packages/shared"
+      "path": "../shared"
     }
   ]
 }

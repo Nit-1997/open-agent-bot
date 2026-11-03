@@ -2,12 +2,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const ROOT = join(import.meta.dirname, "../../..");
+const ROOT = join(import.meta.dirname, "../../../..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 function imageVersion(): string {
-  const match = read("agent/Dockerfile").match(/^FROM mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble$/m);
-  if (!match) throw new Error("agent/Dockerfile has no Playwright base image");
+  const match = read("packages/core/Dockerfile").match(/^FROM mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-noble$/m);
+  if (!match) throw new Error("packages/core/Dockerfile has no Playwright base image");
   return match[1];
 }
 
@@ -16,7 +16,7 @@ describe("Playwright version pin", () => {
   const lock = JSON.parse(read("package-lock.json")) as { packages: Record<string, { version?: string }> };
 
   it("pins the agent's playwright dependency exactly to the image version", () => {
-    const agent = JSON.parse(read("agent/package.json")) as { dependencies: Record<string, string> };
+    const agent = JSON.parse(read("packages/core/package.json")) as { dependencies: Record<string, string> };
     expect(agent.dependencies.playwright).toBe(expected);
   });
 

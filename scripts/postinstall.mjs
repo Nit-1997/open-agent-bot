@@ -8,7 +8,7 @@ const PACKAGE = "@earendil-works/pi-ai";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function piAiInstalled() {
-  const lookup = createRequire(join(root, "agent", "package.json")).resolve.paths(PACKAGE) ?? [];
+  const lookup = createRequire(join(root, "packages", "core", "package.json")).resolve.paths(PACKAGE) ?? [];
   return lookup.some((dir) => existsSync(join(dir, PACKAGE, "package.json")));
 }
 

@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  agent:
+  core:
     runs-on: ubuntu-latest
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
@@ -22,11 +22,11 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run lint -w agent
-      - run: npm run format:check -w agent
-      - run: npm run typecheck -w agent
-      - run: npm test -w agent
-      - run: npm run build -w agent
+      - run: npm run lint -w @oab/core
+      - run: npm run format:check -w @oab/core
+      - run: npm run typecheck -w @oab/core
+      - run: npm test -w @oab/core
+      - run: npm run build -w @oab/core
 
   web:
     runs-on: ubuntu-latest

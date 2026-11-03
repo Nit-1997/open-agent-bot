@@ -7,7 +7,6 @@
   },
   "workspaces": [
     "packages/*",
-    "agent",
     "web",
     "e2e"
   ],
