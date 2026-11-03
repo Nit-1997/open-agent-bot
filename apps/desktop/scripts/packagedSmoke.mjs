@@ -19,13 +19,22 @@ import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { assertReleaseLock } from "../../../scripts/release/releaseLib.mjs";
 import {
   checkFuses,
   checkPlist,
   composeStopRecorded,
   composeSubcommands,
+  dmgNameProblems,
   launchTargetProblems,
+  licenseProblems,
+  loggedPullProblems,
+  loggedPulls,
   parseFuses,
+  pullProblems,
+  refVersionsFor,
+  releaseArgProblems,
+  releaseStaticProblems,
   sizeProblems,
   smokeEnv,
   statusProblems,
@@ -45,6 +54,8 @@ const { values } = parseArgs({
     range: { type: "string" },
     moved: { type: "boolean" },
     "local-build": { type: "boolean" },
+    release: { type: "string" },
+    "expect-lock": { type: "string" },
     evidence: { type: "string" },
     timeout: { type: "string" },
   },
@@ -55,8 +66,23 @@ if (apps.length === 0) {
   process.exit(2);
 }
 const realDocker = values.docker;
-if (realDocker && !values.services && !values["local-build"]) {
-  process.stderr.write("packaged smoke: --docker needs --services <dev services file> or --local-build (the bundled kind:local lock)\n");
+const release = values.release;
+for (const p of releaseArgProblems(release)) {
+  process.stderr.write(`packaged smoke: ${p}\n`);
+  process.exit(2);
+}
+if (values["expect-lock"] && !release) {
+  process.stderr.write("packaged smoke: --expect-lock needs --release <version>\n");
+  process.exit(2);
+}
+if (release && (values.services || values["local-build"])) {
+  process.stderr.write("packaged smoke: --release launches with the bundled lock; drop --services and --local-build\n");
+  process.exit(2);
+}
+if (realDocker && !values.services && !values["local-build"] && !release) {
+  process.stderr.write(
+    "packaged smoke: --docker needs --services <dev services file>, --local-build (the bundled kind:local lock) or --release <version> (the bundled release lock)\n",
+  );
   process.exit(2);
 }
 if (values.moved && realDocker) {
@@ -68,7 +94,10 @@ const run = (cmd, args, env) => spawnSync(cmd, args, { encoding: "utf8", maxBuff
 const sha = (p) => createHash("sha256").update(readFileSync(p)).digest("hex");
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
 const du = (p) => walk(p).reduce((n, f) => n + (lstatSync(f).isFile() ? lstatSync(f).size : 0), 0);
-const version = JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")).version;
+const version = release ?? JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")).version;
+const expectLock = values["expect-lock"] ? readFileSync(resolve(values["expect-lock"])) : undefined;
+const repoLicense = readFileSync(join(REPO, "LICENSE"));
+const bundledLocks = new Map();
 const EXPECTED_ARCH = { "mac-arm64": "arm64", mac: "x86_64" };
 const dmgFor = (arch) => (values.dmg ?? []).find((d) => d.endsWith(`-${arch === "x86_64" ? "x64" : arch}.dmg`));
 const say = (m) => process.stdout.write(`${m}\n`);
@@ -81,8 +110,10 @@ const readJson = (p) => {
   }
 };
 const readIf = (p) => (existsSync(p) ? readFileSync(p, "utf8") : "");
+const readIfBuffer = (p) => (existsSync(p) ? readFileSync(p) : undefined);
 
 const problems = [];
+if (release) for (const d of dmgNameProblems(values.dmg ?? [], release)) problems.push(d);
 const archOf = new Map();
 for (const appPath of apps) {
   const name = relative(process.cwd(), appPath);
@@ -123,12 +154,27 @@ for (const appPath of apps) {
     if (composeSha !== sha(join(REPO, "docker-compose.yml"))) p("Resources/stack/docker-compose.yml differs from the repo root");
     if (sha(join(stack, "local/renderer/seccomp.json")) !== sha(join(REPO, "local/renderer/seccomp.json")))
       p("Resources/stack seccomp.json differs from the repo root");
-    const lock = JSON.parse(readFileSync(join(stack, "services.lock.json"), "utf8"));
+    const lockBytes = readFileSync(join(stack, "services.lock.json"));
+    const lock = JSON.parse(lockBytes.toString("utf8"));
+    bundledLocks.set(appPath, lock);
     if (lock.composeSha256 !== composeSha) p("services.lock.json composeSha256 differs from the bundled compose file");
     if (values["local-build"] && lock.kind !== "local") p(`services.lock.json kind is ${lock.kind}, expected local`);
+    if (release)
+      for (const f of releaseStaticProblems({
+        lock,
+        lockBytes,
+        expectBytes: expectLock,
+        version: release,
+        composeSha256: composeSha,
+        license: { app: readIfBuffer(join(appPath, "Contents/Resources/LICENSE")), repo: repoLicense },
+        assertLock: assertReleaseLock,
+      }))
+        p(f);
     say(`${name}: compose sha256 ${composeSha}\n${name}: seccomp sha256 ${sha(join(stack, "local/renderer/seccomp.json"))}`);
     say(`${name}: services.lock.json kind=${lock.kind ?? "dev"} version=${lock.version} images=${JSON.stringify(lock.images)}`);
   }
+  if (!release)
+    for (const f of licenseProblems({ app: readIfBuffer(join(appPath, "Contents/Resources/LICENSE")), repo: repoLicense })) p(f);
   const envFiles = walk(appPath).filter((f) => /(^|\/)\.env/.test(relative(appPath, f)));
   if (envFiles.length) p(`contains env files: ${envFiles.map((f) => relative(appPath, f)).join(", ")}`);
 
@@ -158,7 +204,7 @@ if (evidence) mkdirSync(evidence, { recursive: true });
 const root = mkdtempSync(join(tmpdir(), "oab-smoke-"));
 const timeoutMs = Number(values.timeout ?? (realDocker ? 900 : 60)) * 1000;
 
-async function createFake(home) {
+async function createFake(home, scenario = {}) {
   const bin = join(home, "bin");
   mkdirSync(bin, { recursive: true, mode: 0o755 });
   const docker = join(bin, "docker");
@@ -167,7 +213,7 @@ async function createFake(home) {
     `#!${process.execPath}\nimport(${JSON.stringify(join(FAKE_DIR, "docker.mjs"))}).then((m) => m.main(${JSON.stringify(home)}, process.argv.slice(2)));\n`,
     { mode: 0o755 },
   );
-  writeFileSync(join(home, "scenario.json"), "{}");
+  writeFileSync(join(home, "scenario.json"), JSON.stringify(scenario));
   const sock = createServer();
   await new Promise((res) => sock.listen(join(home, "d.sock"), () => res(undefined)));
   return {
@@ -270,16 +316,23 @@ async function launchOnce(appPath, label, target, fake) {
     await sleep(250);
   }
   say(`${label}: pid ${child.pid}; status.json ${JSON.stringify(status)} after ${Date.now() - started} ms`);
-  for (const f of statusProblems(status, log(), { localBuild: values["local-build"] })) p(f);
+  for (const f of statusProblems(status, log(), { localBuild: values["local-build"], release })) p(f);
   if (!log().includes("[app] app view loaded")) p("shell.log has no '[app] app view loaded' line");
   if (status?.port) {
     const health = run("curl", ["-sS", "--max-time", "5", `http://127.0.0.1:${status.port}/health`]);
     say(`${label}: curl /health → exit ${health.status} ${health.stdout.trim()}`);
     if (health.status !== 0) p(`curl /health exited ${health.status}: ${health.stderr.trim()}`);
+    else if (release) {
+      let got;
+      try {
+        got = JSON.parse(health.stdout).version;
+      } catch {}
+      if (got !== release) p(`/health version is ${got}, expected ${release}`);
+    }
   }
   for (const line of log()
     .split("\n")
-    .filter((l) => /\[app\] (start|title)|\[stack\] (staged|stale|foreign)|\[docker\] ok/.test(l)))
+    .filter((l) => /\[app\] (start|title)|\[stack\] (staged|stale|foreign)|\[docker\] (ok|pull)/.test(l)))
     say(`${label}: ${line}`);
 
   const stopAt = Date.now();
@@ -297,6 +350,7 @@ async function launchOnce(appPath, label, target, fake) {
     const subs = composeSubcommands(calls);
     say(`${label}: compose subcommands ${subs.join(" ")}`);
     if (!composeStopRecorded(calls)) p("the fake docker recorded no finished compose stop");
+    if (release && target.lock) for (const f of pullProblems(calls, target.lock)) p(f);
     return { subs, log: log() };
   }
   const states = realStates(target.project);
@@ -304,6 +358,10 @@ async function launchOnce(appPath, label, target, fake) {
   if (JSON.stringify(states) !== JSON.stringify(["agent=exited", "renderer=exited", "search=exited"]))
     p(`containers after quit: ${states.join(" ")}`);
   if (!/\[docker\] compose .* stop/.test(log())) p("shell.log has no compose stop after SIGTERM");
+  if (release && target.lock) {
+    say(`${label}: pulled ${loggedPulls(log()).join(" ") || "nothing (images already present)"}`);
+    for (const f of loggedPullProblems(log(), target.lock)) p(f);
+  }
   return { subs: [], log: log() };
 }
 
@@ -314,22 +372,26 @@ for (const appPath of apps) {
   const label = `${relative(process.cwd(), appPath)} (${arch}, ${realDocker ? "real docker" : "fake docker"})`;
   const stateDir = mkdtempSync(join(root, `state-${n}-`));
   const fakeHome = realDocker ? undefined : mkdtempSync(join(root, `fake-${n}-`));
-  const fake = fakeHome ? await createFake(fakeHome) : undefined;
+  const lock = bundledLocks.get(appPath);
+  const fake = fakeHome
+    ? await createFake(fakeHome, release && lock?.images ? { refVersions: refVersionsFor(lock, release) } : {})
+    : undefined;
   const target = {
     stateDir,
     project: values.project ?? `oab-smoke-${arch.replace("_", "-")}`,
     range: values.range ?? (realDocker ? "18486-18486" : "18488-18489"),
     docker: realDocker ?? fake.docker,
-    ...(values.services ? { services: resolve(values.services) } : fake ? { services: fakeServicesFile(stateDir) } : {}),
+    ...(values.services ? { services: resolve(values.services) } : fake && !release ? { services: fakeServicesFile(stateDir) } : {}),
   };
   const bad = launchTargetProblems(target, homedir());
+  const smokeTarget = release ? { ...target, lock } : target;
   if (bad.length) {
     for (const b of bad) problems.push(`${label}: ${b}`);
     await fake?.stop();
     continue;
   }
   try {
-    await launchOnce(appPath, label, target, fake);
+    await launchOnce(appPath, label, smokeTarget, fake);
     if (values.moved && fake) {
       const movedDir = mkdtempSync(join(root, "moved-"));
       const moved = join(movedDir, "Open Agent.app");

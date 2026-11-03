@@ -1,0 +1,8 @@
+{
+  "containerimage.descriptor": {
+    "mediaType": "application/vnd.oci.image.index.v1+json",
+    "digest": "sha256:329912742a9b65eeb63f23b143a78aa87ea7cdc3fac0fd78526c6e1b8becd0d0",
+    "size": 647
+  },
+  "image.name": "127.0.0.1:18501/oab-m5-warm-search"
+}

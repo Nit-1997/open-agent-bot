@@ -176,6 +176,56 @@ describe("validatePins (D12, D22)", () => {
   });
 });
 
+describe("test-mode release locks (M5 D7)", () => {
+  const LOCAL_AGENT = `127.0.0.1:18501/oab-m5-open-agent@sha256:${D("a")}`;
+  const LOCAL_SEARCH = `127.0.0.1:18501/oab-m5-open-agent-search@sha256:${D("b")}`;
+  const localRelease = (o: Record<string, unknown> = {}) => release({ images: { agent: LOCAL_AGENT, search: LOCAL_SEARCH }, ...o });
+
+  it("refuses local-registry refs outside test mode", () => {
+    expect(validatePins(localRelease(), prod)).toEqual({ ok: false, reason: "release_refs" });
+  });
+
+  it("accepts local-registry refs in test mode, with pull on", () => {
+    expect(validatePins(localRelease({ pull: true }), test_)).toEqual({
+      ok: true,
+      pins: { kind: "release", version: "1.4.0", composeSha256: SHA, images: { agent: LOCAL_AGENT, search: LOCAL_SEARCH }, pull: true },
+    });
+  });
+
+  it("refuses oab- tag refs for a release lock even in test mode", () => {
+    expect(validatePins(release({ images: { agent: "oab-x:tag", search: "oab-y:tag" } }), test_)).toEqual({
+      ok: false,
+      reason: "release_refs",
+    });
+  });
+
+  it("refuses a production and local mix in either mode", () => {
+    const mixed = release({ images: { agent: `ghcr.io/nit-1997/open-agent@sha256:${D("a")}`, search: LOCAL_SEARCH } });
+    expect(validatePins(mixed, test_)).toEqual({ ok: false, reason: "release_refs" });
+    expect(validatePins(mixed, prod)).toEqual({ ok: false, reason: "release_refs" });
+  });
+
+  it("keeps pull:false refused for a test-mode release lock", () => {
+    expect(validatePins(localRelease({ pull: false }), test_)).toEqual({ ok: false, reason: "release_pull" });
+  });
+
+  it("compares minShellVersion with the shell's release core, so 0.0.0 takes every shell and an rc meets its own version", () => {
+    const m = (min: string) => release({ minShellVersion: min });
+    for (const shellVersion of ["0.0.0-dev", "0.0.0-dryrun.1", "1.0.0-rc.1", "1.4.0"])
+      expect(validatePins(m("0.0.0"), { ...prod, shellVersion }).ok, shellVersion).toBe(true);
+    expect(validatePins(m("1.1.0"), { ...prod, shellVersion: "1.1.0-rc.1" }).ok).toBe(true);
+    expect(validatePins(m("1.1.0"), { ...prod, shellVersion: "1.0.9" })).toEqual({ ok: false, reason: "shell_too_old" });
+    expect(validatePins(m("1.0.0"), { ...prod, shellVersion: "0.0.0-dev" })).toEqual({ ok: false, reason: "shell_too_old" });
+  });
+
+  it("the dry-run lock bytes work only in test mode", () => {
+    const lock = JSON.parse(readFileSync(join(__dirname, "fixtures/dryrun-release-lock.json"), "utf8"));
+    const ctx = { composeSha256: lock.composeSha256, shellVersion: "0.0.0-dryrun.1" };
+    expect(validatePins(lock, { ...ctx, test: false })).toEqual({ ok: false, reason: "release_refs" });
+    expect(validatePins(lock, { ...ctx, test: true }).ok).toBe(true);
+  });
+});
+
 describe("effectivePins", () => {
   const pins = (version: string, kind: ServicePins["kind"] = "release"): ServicePins => ({
     kind,

@@ -116,10 +116,12 @@ export function composeSubcommands(callsJsonl) {
   });
 }
 
-/** @param {{ screen?: string; phase?: string; port?: number; servicesVersion?: string } | undefined} status @param {string} log @param {{ localBuild?: boolean }} o */
+/** @param {{ screen?: string; phase?: string; port?: number; servicesVersion?: string } | undefined} status @param {string} log @param {{ localBuild?: boolean; release?: string }} o */
 export function statusProblems(status, log, o) {
   const out = [];
   if (status?.screen !== "app") out.push(`status.json screen is ${status?.screen}, expected app`);
+  if (o.release !== undefined && status?.servicesVersion !== o.release)
+    out.push(`status.json servicesVersion is ${status?.servicesVersion}, expected ${o.release}`);
   if (o.localBuild) {
     if (!/^local-[0-9a-f]{7,12}(-dirty)?$/.test(status?.servicesVersion ?? ""))
       out.push(`status.json servicesVersion is ${status?.servicesVersion}, expected local-<sha>`);
@@ -127,4 +129,71 @@ export function statusProblems(status, log, o) {
       out.push("shell.log has no '[app] title Open Agent — Local build — test' line");
   }
   return out;
+}
+
+const RELEASE_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+/** @param {string | undefined} v */
+export function releaseArgProblems(v) {
+  if (v === undefined) return [];
+  return RELEASE_VERSION.test(v) ? [] : [`--release must be a version like 1.0.0 or 0.0.0-dryrun.1 (no v), got ${JSON.stringify(v)}`];
+}
+
+/** @param {string[]} dmgs @param {string} version */
+export function dmgNameProblems(dmgs, version) {
+  const want = [`Open-Agent-${version}-arm64.dmg`, `Open-Agent-${version}-x64.dmg`];
+  const names = dmgs.map((d) => d.split("/").pop() ?? "");
+  const out = names.filter((n) => !want.includes(n)).map((n) => `DMG ${n} is not named ${want.join(" or ")}`);
+  if (dmgs.length && out.length === 0) for (const w of want) if (!names.includes(w)) out.push(`no DMG named ${w}`);
+  return out;
+}
+
+/** @param {{ lock: unknown; lockBytes: Buffer; expectBytes?: Buffer; version: string; composeSha256: string; license: { app?: Buffer; repo: Buffer }; assertLock: (lock: unknown, o: object) => string[] }} o */
+export function releaseStaticProblems(o) {
+  const out = [];
+  const images = /** @type {{ images?: { agent?: unknown } }} */ (o.lock)?.images;
+  const dryRun = typeof images?.agent === "string" && images.agent.startsWith("127.0.0.1:");
+  for (const p of o.assertLock(o.lock, { version: o.version, composeSha256: o.composeSha256, dryRun }))
+    out.push(`services.lock.json: ${p}`);
+  if (o.expectBytes && !o.expectBytes.equals(o.lockBytes)) out.push("services.lock.json is not byte-equal to --expect-lock");
+  out.push(...licenseProblems(o.license));
+  return out;
+}
+
+/** @param {{ app?: Buffer; repo: Buffer }} l */
+export function licenseProblems(l) {
+  if (!l.app) return ["Contents/Resources/LICENSE is missing"];
+  return l.app.equals(l.repo) ? [] : ["Contents/Resources/LICENSE differs from the repo LICENSE"];
+}
+
+/** @param {{ images: { agent: string; search: string } }} lock @param {string} version */
+export const refVersionsFor = (lock, version) => ({ [lock.images.agent]: version, [lock.images.search]: version });
+
+/** @param {string} callsJsonl */
+export const pulledRefs = (callsJsonl) => [
+  ...new Set(
+    records(callsJsonl)
+      .filter((r) => r.argv[0] === "pull")
+      .map((r) => r.argv[r.argv.length - 1]),
+  ),
+];
+
+/** @param {string} callsJsonl @param {{ images: { agent: string; search: string } }} lock */
+export function pullProblems(callsJsonl, lock) {
+  const got = pulledRefs(callsJsonl).sort();
+  const want = [lock.images.agent, lock.images.search].sort();
+  return JSON.stringify(got) === JSON.stringify(want)
+    ? []
+    : [`pulled [${got.join(", ")}], expected exactly the bundled [${want.join(", ")}]`];
+}
+
+/** @param {string} log */
+export const loggedPulls = (log) => [...new Set([...log.matchAll(/\[docker\] pull (\S+) /g)].map((m) => m[1]))];
+
+/** @param {string} log @param {{ images: { agent: string; search: string } }} lock */
+export function loggedPullProblems(log, lock) {
+  const allowed = new Set([lock.images.agent, lock.images.search]);
+  return loggedPulls(log)
+    .filter((r) => !allowed.has(r))
+    .map((r) => `shell.log pulled ${r}, which is not a bundled ref`);
 }
