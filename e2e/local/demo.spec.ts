@@ -11,6 +11,7 @@ const POLL_MS = 75;
 const HOLD_MS = 2_000;
 const MARKER = "demo";
 const REPLY_MS = 300_000;
+const CHAT_URL = /\/chats\/[0-9a-f-]{36}(\?.*)?$/;
 const REPORT_SETTLE_MS = 20_000;
 
 type ReportItem = { id: string; title: string };
@@ -142,7 +143,7 @@ test("local demo: no login, onboarding, streaming and stop, a report and its PDF
   await test.step("4. A long reply streams; Stop holds the length with no error; a follow-up completes", async () => {
     await startNewChat(page);
     await send(page, terms.long);
-    await expect(page).toHaveURL(/\/chats\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+    await expect(page).toHaveURL(CHAT_URL, { timeout: 60_000 });
     chatId = new URL(page.url()).pathname.split("/").at(-1) as string;
     console.log(`reply lengths while streaming: ${(await growTwice(page)).join(", ")}`);
     await stopButton(page).click();
@@ -161,7 +162,7 @@ test("local demo: no login, onboarding, streaming and stop, a report and its PDF
     const known = new Set(await reportIds(page));
     await startNewChat(page);
     await send(page, terms.report);
-    await expect(page).toHaveURL(/\/chats\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+    await expect(page).toHaveURL(CHAT_URL, { timeout: 60_000 });
     await expect(status(page)).toBeVisible({ timeout: 30_000 }).catch(() => undefined);
     await waitForReplyDone(page, REPLY_MS);
     reportId = await newReportId(page, known, REPORT_SETTLE_MS);
