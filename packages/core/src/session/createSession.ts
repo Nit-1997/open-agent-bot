@@ -4,7 +4,7 @@ import type { ArtifactStore } from "../artifacts/store.js";
 import { FrameBus } from "../browser/frames.js";
 import type { BrowserPool } from "../browser/pool.js";
 import { type AgentConfig, hasCap } from "../config.js";
-import type { UserRepos } from "../db/types.js";
+import type { UserRepos } from "../store/types.js";
 import { Evidence } from "../grounding/evidence.js";
 import { type Judge, scopeJudge } from "../judge/index.js";
 import { log } from "../lib/log.js";

@@ -1,6 +1,6 @@
+import { body, safe } from "@oab/core/http/handlers.js";
 import { Hono } from "hono";
 import { type AccessService, normalizeEmail, readRequest } from "../access/service.js";
-import { body, safe } from "./handlers.js";
 
 const clientIp = (raw: string | undefined) => (raw ?? "").split(",")[0].trim().slice(0, 64) || "unknown";
 

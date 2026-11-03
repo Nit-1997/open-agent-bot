@@ -4,7 +4,7 @@ import { ArtifactStore } from "../../src/artifacts/store.js";
 import { createVerifier } from "../../src/auth/verify.js";
 import { parseCredentialKeys } from "../../src/config.js";
 import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
-import { forUser } from "../../src/db/users.js";
+import { forUser } from "../../src/hosted/store/users.js";
 import { SupabaseProfileStore } from "../../src/profile/store.js";
 import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
 import {

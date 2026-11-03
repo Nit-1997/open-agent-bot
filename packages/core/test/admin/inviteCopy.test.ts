@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeInviteFailure } from "../../src/admin/inviteCopy.js";
+import { describeInviteFailure } from "../../src/hosted/admin/inviteCopy.js";
 
 describe("describeInviteFailure", () => {
   it.each([

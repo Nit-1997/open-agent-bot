@@ -12,7 +12,7 @@ import {
   searchOffsetOk,
 } from "@oab/shared/lists";
 import type { AuthEnv } from "../auth/middleware.js";
-import type { SearchRow, UserRepos } from "../db/types.js";
+import type { SearchRow, UserRepos } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import { ConcurrencyGate, type RateLimiter, rateLimitError, SEARCH_CONCURRENCY } from "../lib/rateLimit.js";
 import { errorResponse, limitBy, pageParam, safe } from "./handlers.js";

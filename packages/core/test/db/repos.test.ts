@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAdminRepo } from "../../src/db/admin.js";
-import { createServiceClient } from "../../src/db/client.js";
-import { forUser } from "../../src/db/users.js";
+import { createAdminRepo } from "../../src/hosted/store/admin.js";
+import { createServiceClient } from "../../src/hosted/store/client.js";
+import { forUser } from "../../src/hosted/store/users.js";
 import { earlierCards } from "../../src/workspace/earlier.js";
 import { ALICE, CHAT_1 } from "../fixtures/users.js";
 

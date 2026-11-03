@@ -5,6 +5,11 @@
   "description": "Open Agent backend: AG-UI server, pi agent sessions, and research tools",
   "license": "MIT",
   "type": "module",
+  "exports": {
+    "./*": "./dist/*",
+    "./hosted/*": null,
+    "./scripts/*": null
+  },
   "engines": {
     "node": ">=22"
   },

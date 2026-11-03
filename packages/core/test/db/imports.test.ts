@@ -12,19 +12,19 @@ function files(dir: string): string[] {
 }
 
 describe("database access", () => {
-  it("creates Supabase clients only inside src/db and the two entry points", () => {
+  it("creates Supabase clients only inside src/hosted/store and the two entry points", () => {
     const allowed = new Set(["server.ts", "scripts/rotateCredentials.ts"]);
     const offenders = files(SRC)
       .map((f) => relative(SRC, f))
-      .filter((f) => !f.startsWith("db/") && !allowed.has(f))
-      .filter((f) => /^import (?!type )[^;]*db\/client\.js["']/m.test(readFileSync(join(SRC, f), "utf8")));
+      .filter((f) => !f.startsWith("hosted/store/") && !allowed.has(f))
+      .filter((f) => /^import (?!type )[^;]*store\/client\.js["']/m.test(readFileSync(join(SRC, f), "utf8")));
     expect(offenders).toEqual([]);
   });
 
   it("never reaches Supabase tables from outside the repositories", () => {
     const offenders = files(SRC)
       .map((f) => relative(SRC, f))
-      .filter((f) => !f.startsWith("db/") && !f.startsWith("admin/authAdmin"))
+      .filter((f) => !f.startsWith("hosted/store/") && !f.startsWith("hosted/admin/authAdmin"))
       .filter((f) =>
         /\.from\(["'](profiles|chats|chat_messages|artifacts|provider_settings|provider_credentials|access_requests|invited_emails)["']\)/.test(
           readFileSync(join(SRC, f), "utf8"),

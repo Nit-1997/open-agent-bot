@@ -1,5 +1,5 @@
 import { describe, expect } from "vitest";
-import { forUser } from "../../src/db/users.js";
+import { createSupabaseStore } from "../../src/hosted/store/supabaseStore.js";
 import { describeStoreContract } from "../contract/store.js";
 import { authAdmin, createBareUser, deleteCreatedUsers, enabled, remainingRows, service } from "./helpers.js";
 
@@ -8,7 +8,7 @@ describe.skipIf(!enabled)("live Supabase", () => {
     const db = service();
     const users: Array<{ id: string; email: string }> = [];
     return {
-      store: { forUser: (userId) => forUser(db, userId) },
+      store: createSupabaseStore(db),
       async newUser() {
         const user = await createBareUser();
         users.push(user);

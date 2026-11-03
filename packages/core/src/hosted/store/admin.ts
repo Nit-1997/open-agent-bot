@@ -1,12 +1,12 @@
+import { UserError } from "@oab/core/lib/errors.js";
 import type { AccessRequestView, InviteStatus, ProfileView, RequestFilter, RequestStatus, UserStatus } from "@oab/shared/admin";
 import { isUuid } from "@oab/shared/ids";
 import { PAGE_SIZE, type Page } from "@oab/shared/pages";
-import { UserError } from "../lib/errors.js";
 import { fromBytea, toBytea } from "./bytea.js";
 import type { Db } from "./client.js";
 import type { Tables } from "./database.types.js";
 import { must, read } from "./errors.js";
-import { ARTIFACTS_BUCKET } from "./types.js";
+import { ARTIFACTS_BUCKET } from "./paths.js";
 import { likePrefix, oneOf, pageOffset } from "./rows.js";
 
 export type SubmitOutcome = "inserted" | "duplicate" | "already_member" | "rate_limited_ip" | "rate_limited_global";

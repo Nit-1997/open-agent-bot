@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AuthEnv } from "../auth/middleware.js";
 import { normalizeId } from "@oab/shared/ids";
 import { CHATS_PAGE_SIZE } from "@oab/shared/lists";
-import type { UserRepos } from "../db/types.js";
+import type { UserRepos } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import type { RateLimiter } from "../lib/rateLimit.js";
 import { limitBy, pageParam, safe } from "./handlers.js";

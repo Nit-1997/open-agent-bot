@@ -1,8 +1,8 @@
 import { loadConfig } from "../config.js";
-import { rotateStale } from "../crypto/rotate.js";
 import { LocalKeyWrapper } from "../crypto/keyWrapper.js";
-import { createServiceClient } from "../db/client.js";
-import { createRotationRepo } from "../db/rotation.js";
+import { rotateStale } from "../hosted/secrets/rotate.js";
+import { createServiceClient } from "../hosted/store/client.js";
+import { createRotationRepo } from "../hosted/store/rotation.js";
 
 const cfg = loadConfig(process.env);
 const r = await rotateStale(createRotationRepo(createServiceClient(cfg)), new LocalKeyWrapper(cfg.credentialKeys), (line) =>

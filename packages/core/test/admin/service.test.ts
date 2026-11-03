@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthAccount, AuthAdmin } from "../../src/admin/authAdmin.js";
-import { createAuthAdmin } from "../../src/admin/authAdmin.js";
-import { DELETE_STEPS, deleteAccount } from "../../src/admin/deleteAccount.js";
-import { createAdminService, createLiveAdminCheck } from "../../src/admin/service.js";
-import { createAnonClient, createServiceClient } from "../../src/db/client.js";
+import type { AuthAccount, AuthAdmin } from "../../src/hosted/admin/authAdmin.js";
+import { createAuthAdmin } from "../../src/hosted/admin/authAdmin.js";
+import { DELETE_STEPS, deleteAccount } from "../../src/hosted/admin/deleteAccount.js";
+import { createAdminService, createLiveAdminCheck } from "../../src/hosted/admin/service.js";
+import { createAnonClient, createServiceClient } from "../../src/hosted/store/client.js";
 import { FakeAccounts } from "../fixtures/app.js";
 import { ADMIN, ALICE, BOB } from "../fixtures/users.js";
 

@@ -3,7 +3,7 @@ import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag
 import { type OpenReport, openReportNote } from "../artifacts/openReport.js";
 import { Evidence } from "../grounding/evidence.js";
 import type { AuthUser } from "../auth/verify.js";
-import type { ChatRepo, MessageRepo, NewMessage } from "../db/types.js";
+import type { ChatRepo, MessageRepo, NewMessage } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
 import { agentPersona, type Profile } from "@oab/shared/profile";
