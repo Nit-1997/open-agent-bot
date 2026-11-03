@@ -17,7 +17,18 @@
     "rules": {
       "preset": "recommended",
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                "message": "Nothing outside cloud/ may import from cloud/."
+              }
+            ]
+          }
+        }
       },
       "suspicious": {
         "noExplicitAny": "off"
