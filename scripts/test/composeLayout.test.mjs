@@ -128,6 +128,8 @@ describe("local compose (docker-compose.yml)", () => {
   it("names local images by default, builds them from this repo, and lets prebuilt images override them", () => {
     assert.equal(agent.image, "open-agent:local");
     assert.equal(renderer.image, "open-agent:local");
+    assert.equal(renderer.build, undefined);
+    assert.equal(renderer.pull_policy, "never");
     assert.equal(search.image, "open-agent-search:local");
     assert.equal(agent.build.context, ROOT);
     assert.equal(agent.build.dockerfile, "packages/core/Dockerfile");
@@ -158,8 +160,9 @@ describe("local compose (docker-compose.yml)", () => {
     assert.equal(cfg.networks.render.internal, true);
   });
 
-  it("health-checks search on /healthz and makes the agent wait for it", () => {
+  it("health-checks search on /healthz, keeps its image volumes in tmpfs, and makes the agent wait for it", () => {
     assert.match(search.healthcheck.test.join(" "), /http:\/\/127\.0\.0\.1:8080\/healthz/);
+    assert.deepEqual((search.tmpfs ?? []).map((t) => t.split(":")[0]).sort(), ["/etc/searxng", "/var/cache/searxng"]);
     assert.equal(search.restart, "unless-stopped");
     assert.equal(agent.depends_on.search.condition, "service_healthy");
   });
@@ -193,8 +196,10 @@ describe("local SearXNG image (local/searxng/Dockerfile)", () => {
     assert.match(dockerfile, new RegExp(`^FROM ${hosted.image.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
   });
 
-  it("bakes the settings and the secret entrypoint in, with the hosted entrypoint override", () => {
-    assert.match(dockerfile, /^COPY settings\.yml \/etc\/searxng\/settings\.yml$/m);
+  it("bakes the settings outside the image's /etc/searxng volume and the secret entrypoint in, with the hosted entrypoint override", () => {
+    assert.match(dockerfile, /^COPY settings\.yml \/opt\/open-agent\/settings\.yml$/m);
+    assert.match(dockerfile, /^ENV SEARXNG_SETTINGS_PATH=\/opt\/open-agent\/settings\.yml$/m);
+    assert.doesNotMatch(dockerfile, /\/etc\/searxng/);
     assert.match(dockerfile, /^COPY entrypoint\.sh \/opt\/open-agent\/entrypoint\.sh$/m);
     assert.match(dockerfile, new RegExp(`^ENTRYPOINT ${JSON.stringify(hosted.entrypoint).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replaceAll(",", ", ")}$`, "m"));
   });

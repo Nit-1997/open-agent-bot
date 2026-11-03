@@ -8,6 +8,9 @@ services:
       context: local/searxng
     volumes:
       - searxng-secret:/var/lib/searxng-secret
+    tmpfs:
+      - /etc/searxng:size=4m
+      - /var/cache/searxng:size=64m
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 5s
@@ -55,6 +58,7 @@ services:
 
   renderer:
     image: ${OPEN_AGENT_IMAGE:-open-agent:local}
+    pull_policy: never
     command: ["node", "dist/renderer/main.js"]
     environment:
       RENDERER_SECRET_FILE: /run/open-agent/renderer/secret
