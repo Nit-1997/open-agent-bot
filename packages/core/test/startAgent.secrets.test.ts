@@ -29,7 +29,7 @@ describe("startAgent secrets", () => {
     };
     const store = new MemoryDb();
     const agent = await startAgent({
-      config: loadCoreConfig({ RENDERER_SECRET: "b".repeat(64), LOG_LEVEL: "error" }),
+      config: loadCoreConfig({ RENDERER_SECRET: "b".repeat(64), LOG_LEVEL: "error", COPILOTKIT_TELEMETRY_DISABLED: "true" }),
       store,
       identity,
       keyWrapper: spy,

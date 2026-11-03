@@ -1,0 +1,22 @@
+{
+  "version": "1.83.0",
+  "agents": {
+    "openagent": {
+      "name": "openagent",
+      "description": "",
+      "className": "Kt"
+    }
+  },
+  "audioFileTranscriptionEnabled": false,
+  "mode": "sse",
+  "threadEndpoints": {
+    "list": false,
+    "inspect": false,
+    "mutations": false,
+    "realtimeMetadata": false
+  },
+  "suggestions": true,
+  "a2uiEnabled": false,
+  "openGenerativeUIEnabled": false,
+  "telemetryDisabled": true
+}

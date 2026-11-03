@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, loadCoreConfig } from "../src/config.js";
+import { ConfigError, loadCoreConfig as loadCore } from "../src/config.js";
 import { loadHostedConfig } from "../src/hosted/config.js";
+import { TEST_ENV } from "./fixtures/config.js";
 
 const RENDERER_SECRET = "b".repeat(64);
+const TELEMETRY_OFF = { COPILOTKIT_TELEMETRY_DISABLED: "true" };
+const loadCoreConfig = (env: NodeJS.ProcessEnv) => loadCore({ ...TELEMETRY_OFF, ...env });
 
 const problemsOf = (load: () => unknown): string[] => {
   try {
@@ -34,6 +37,9 @@ const ALL_VARS = [
   "LLM_BASE_URL",
   "LLM_API_KEY",
   "AGENT_MODELS",
+  "COPILOTKIT_TELEMETRY_DISABLED",
+  "COPILOT_CONNECTS_PER_USER",
+  "COPILOT_CONNECT_MAX_MS",
 ];
 
 describe("loadCoreConfig", () => {
@@ -49,6 +55,8 @@ describe("loadCoreConfig", () => {
       runTimeLimitSeconds: 280,
       rendererUrl: "http://renderer:8100",
       rendererSecret: RENDERER_SECRET,
+      copilotConnectsPerUser: 8,
+      copilotConnectMaxMs: 1_800_000,
     });
   });
 
@@ -80,5 +88,30 @@ describe("loadCoreConfig", () => {
       for (const name of ALL_VARS) expect(message, `${load.name} ${name}`).not.toContain(`short-secret-value-${name}`);
       expect(message).not.toContain("short-secret-value");
     }
+  });
+});
+
+describe("copilot runtime settings", () => {
+  it("refuses to start unless CopilotKit telemetry is disabled, naming the variable", () => {
+    for (const load of [loadCore, loadHostedConfig]) {
+      const base = load === loadCore ? { RENDERER_SECRET } : TEST_ENV;
+      for (const value of [undefined, "", "false", "1", "TRUE"]) {
+        const env = { ...base, COPILOTKIT_TELEMETRY_DISABLED: value };
+        expect(() => load(env), `${load.name} ${value}`).toThrow(ConfigError);
+        expect(() => load(env)).toThrow(/COPILOTKIT_TELEMETRY_DISABLED/);
+      }
+      expect(() => load({ ...base, COPILOTKIT_TELEMETRY_DISABLED: "true" })).not.toThrow();
+    }
+  });
+
+  it("reads the connect cap and maximum connect duration", () => {
+    const cfg = loadCoreConfig({ RENDERER_SECRET, COPILOT_CONNECTS_PER_USER: "3", COPILOT_CONNECT_MAX_MS: "60000" });
+    expect(cfg).toMatchObject({ copilotConnectsPerUser: 3, copilotConnectMaxMs: 60_000 });
+    expect(problemsOf(() => loadCoreConfig({ RENDERER_SECRET, COPILOT_CONNECTS_PER_USER: "0" }))).toEqual([
+      "COPILOT_CONNECTS_PER_USER must be a whole number from 1 to 100",
+    ]);
+    expect(problemsOf(() => loadCoreConfig({ RENDERER_SECRET, COPILOT_CONNECT_MAX_MS: "1.5" }))).toEqual([
+      "COPILOT_CONNECT_MAX_MS must be a whole number from 60000 to 86400000",
+    ]);
   });
 });
