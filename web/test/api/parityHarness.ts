@@ -72,7 +72,8 @@ export function requestOf(input: ParityInput, env: Env): Request {
 async function bodyText(body: unknown): Promise<string | null> {
   if (body === undefined || body === null) return null;
   if (typeof body === "string") return body;
-  if (body instanceof ReadableStream || body instanceof Uint8Array || body instanceof ArrayBuffer) return new Response(body).text();
+  if (body instanceof ReadableStream || body instanceof Uint8Array || body instanceof ArrayBuffer)
+    return new Response(body as BodyInit).text();
   return String(body);
 }
 

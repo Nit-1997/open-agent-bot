@@ -1,5 +1,1 @@
-import { forwardToAgent } from "@/lib/agentServer";
-
-const forward = (req: Request) => forwardToAgent(req, "/profile");
-
-export { forward as GET, forward as PUT };
+export { bffRoute as GET, bffRoute as PUT } from "@/lib/bff";

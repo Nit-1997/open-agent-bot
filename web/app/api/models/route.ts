@@ -1,5 +1,1 @@
-import { forwardToAgent } from "@/lib/agentServer";
-
-export function GET(req: Request) {
-  return forwardToAgent(req, "/models");
-}
+export { bffRoute as GET } from "@/lib/bff";

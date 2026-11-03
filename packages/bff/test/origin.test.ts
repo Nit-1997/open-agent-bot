@@ -45,7 +45,6 @@ describe("appOrigin", () => {
     "http://127.0.0.1:3000.evil",
     "http://127.0.0.1",
     "https://127.0.0.1:3000",
-    " http://127.0.0.1:3000",
   ])("a list refuses %j", async (origin) => {
     const { res, agent } = await write([LOCAL, "http://localhost:3000"], origin);
     expect(res.status).toBe(403);

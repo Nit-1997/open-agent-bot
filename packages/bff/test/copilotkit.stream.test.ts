@@ -62,7 +62,8 @@ describe("copilot streaming proxy", () => {
     vi.useFakeTimers();
     const agent = fakeAgent(neverAnswers);
     const pending = createBff(deps({ fetch: agent.fetch, timeoutMs: 1000 }))(run());
-    await vi.waitFor(() => expect(agent.seen).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(agent.seen).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(999);
     expect(agent.seen[0].signal?.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1);

@@ -68,7 +68,7 @@ describe("CopilotKit route", () => {
     const res = await POST(runRequest());
     await res.text();
     expect(res.status).toBe(200);
-    const call = agentCalls.find((c) => c.url === `${AGENT_URL}/agui`);
+    const call = agentCalls.find((c) => c.url === `${AGENT_URL}/copilotkit/agent/openagent/run`);
     expect(call).toBeDefined();
     const headers = call?.headers ?? new Headers();
     expect(headers.get("authorization")).toBe(`Bearer ${AUTH.accessToken}`);

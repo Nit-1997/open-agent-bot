@@ -271,7 +271,7 @@ function catchAll(route: "providers/[[...path]]" | "settings/[[...path]]", sub: 
   return {
     route,
     url: `/api/${prefix}${rawSub ? `/${rawSub}` : ""}`,
-    params: sub ? { path: rawSub.split("/").map(decodeURIComponent) } : {},
+    params: (sub ? { path: rawSub.split("/").map(decodeURIComponent) } : {}) as Record<string, string | string[]>,
   };
 }
 
