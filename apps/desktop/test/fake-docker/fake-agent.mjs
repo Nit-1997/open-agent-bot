@@ -65,6 +65,7 @@ const HOME = page(
 <button id="fa-display" type="button">display media</button>
 <button id="fa-notify" type="button">notification</button>
 <button id="fa-geo" type="button">geolocation</button>
+<button id="fa-open-services" type="button">Services &amp; data</button>
 <pre id="fa-out"></pre>`,
   "/fake.js",
 );
@@ -89,6 +90,7 @@ on("fa-usb", () => settle("usb", () => navigator.usb.requestDevice({ filters: []
 on("fa-bluetooth", () => settle("bluetooth", () => navigator.bluetooth.requestDevice({ acceptAllDevices: true })));
 on("fa-display", () => settle("display", () => navigator.mediaDevices.getDisplayMedia({ video: true })));
 on("fa-notify", () => settle("notify", () => Notification.requestPermission()));
+on("fa-open-services", () => window.openAgentDesktop.openServices());
 on("fa-geo", () => settle("geo", () => new Promise((res, rej) => navigator.geolocation.getCurrentPosition(() => res("granted"), (e) => rej(new Error("geo_" + e.code)), { timeout: 5000 }))));
 `;
 

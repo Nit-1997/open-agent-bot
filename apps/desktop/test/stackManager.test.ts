@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -14,6 +14,7 @@ import { DEFAULT_SETTINGS, type Settings, type SettingsStore } from "../src/main
 import { loadShellConfig } from "../src/main/shellConfig.ts";
 import { createStackManager, type ManagerDeps, type StackManager } from "../src/main/stackManager.ts";
 import { resolvePaths, writeStateFile } from "../src/main/statePaths.ts";
+import { buildZip } from "./fake-docker/zip.mjs";
 
 const PROJECT = "oab-unit";
 const PINS: ServicePins = {
@@ -37,6 +38,7 @@ type World = {
   stopFails: boolean;
   volumeRmFails: boolean;
   dockerDown: boolean;
+  exportMode: "ok" | "slow";
 };
 
 let dir: string;
@@ -45,7 +47,17 @@ let managers: StackManager[];
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "oab-mgr-"));
-  world = { containers: [], images: {}, up: "healthy", pull: "ok", calls: [], stopFails: false, volumeRmFails: false, dockerDown: false };
+  world = {
+    containers: [],
+    images: {},
+    up: "healthy",
+    pull: "ok",
+    calls: [],
+    stopFails: false,
+    volumeRmFails: false,
+    dockerDown: false,
+    exportMode: "ok",
+  };
   managers = [];
 });
 afterEach(async () => {
@@ -172,6 +184,20 @@ const cli: DockerCli = {
       world.images[ref] = ref.includes("oab-s") ? ID_S : ID_A;
       return ok();
     }
+    if (a === "run") {
+      world.calls.push({ kind: "run", args: [...args] });
+      const cmd = args[args.indexOf("dist/local/dataTools.js") + 1];
+      if (cmd === "stats") return ok(JSON.stringify({ schema: 1, dbBytes: 2 * 1024 * 1024, reports: 1, chats: 4, reportBytes: 100 }));
+      if (cmd === "check") return ok(JSON.stringify({ credentials: 0, schema: 1 }));
+      if (cmd === "export" && world.exportMode === "slow") return waitAbort(o.signal);
+      o.stdoutTo?.write(
+        buildZip([
+          { name: "export.json", data: Buffer.from("{}") },
+          { name: "open-agent.db", data: Buffer.from("SQLite format 3") },
+        ]),
+      );
+      return ok();
+    }
     if (a === "volume") {
       world.calls.push({ kind: "volumeRm", args: [...args] });
       return world.volumeRmFails ? fail("volume is in use") : ok();
@@ -212,7 +238,15 @@ type Built = {
 };
 
 function build(
-  o: { pins?: ServicePins; settings?: Partial<Settings>; busy?: number[]; probe?: DockerProbe; cfgEnv?: Record<string, string> } = {},
+  o: {
+    pins?: ServicePins;
+    settings?: Partial<Settings>;
+    busy?: number[];
+    probe?: DockerProbe;
+    cfgEnv?: Record<string, string>;
+    savePath?: string;
+    log?: ManagerDeps["log"];
+  } = {},
 ): Built {
   const cfg = loadShellConfig({
     OPEN_AGENT_SHELL_TEST: "1",
@@ -240,7 +274,7 @@ function build(
   const deps: ManagerDeps = {
     cfg,
     paths,
-    log: silentLog,
+    log: o.log ?? silentLog,
     settings,
     tokens,
     stage: () => ({ sha256: "s".repeat(64), restaged: false }),
@@ -268,7 +302,18 @@ function build(
     moveToApplications: () => {},
     openApp: () => {},
     relaunch: () => {},
-    timings: { pollMs: 5, healthTimeoutMs: 400, dockerPollMs: 10, watchdogMs: 60_000, healthGetMs: 50, deleteWaitMs: 500, settleMs: 30 },
+    savePath: async () => o.savePath ?? join(dir, "saved.zip"),
+    freeBytes: () => 50 * 1024 ** 3,
+    timings: {
+      pollMs: 5,
+      healthTimeoutMs: 400,
+      dockerPollMs: 10,
+      watchdogMs: 60_000,
+      healthGetMs: 50,
+      deleteWaitMs: 500,
+      settleMs: 30,
+      servicesPollMs: 20,
+    },
   };
   const m = createStackManager(deps);
   managers.push(m);
@@ -643,5 +688,175 @@ describe("after ready", () => {
     const n = b.states.length;
     b.m.internalError();
     expect(b.states.length).toBe(n);
+  });
+});
+
+describe("Services & data (4.3)", () => {
+  const readyApp = async () => {
+    const b = build();
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("app");
+    return b;
+  };
+
+  it("opens over the app, polls the rows and reads the stats; Close returns to the app without a reload or a mutation", async () => {
+    const b = await readyApp();
+    world.calls = [];
+    const views = b.views.length;
+    b.m.openServices();
+    expect(b.m.state().screen).toBe("screen-services");
+    await until(() => b.m.state().servicesInfo?.data !== undefined);
+    expect(b.m.state().servicesInfo?.rows.map((r) => `${r.service}=${r.state}=${r.version}`)).toEqual([
+      "agent=running · healthy=0.0.0-unit",
+      "search=running · healthy=0.0.0-unit",
+      "renderer=running · healthy=0.0.0-unit",
+    ]);
+    expect(b.m.state().servicesInfo?.data).toEqual({ volume: `${PROJECT}-data`, dbBytes: 2 * 1024 * 1024, reports: 1, chats: 4 });
+    const polls = world.calls.filter((c) => c.kind === "ps").length;
+    await until(() => world.calls.filter((c) => c.kind === "ps").length > polls + 1);
+    expect(await b.m.act({ type: "closeServices" })).toEqual({ ok: true });
+    expect(b.m.state().screen).toBe("app");
+    expect(b.views.length).toBe(views);
+    expect(mutations()).toEqual([]);
+    const stats = world.calls.find((c) => c.kind === "run");
+    expect(stats?.args.slice(0, 5)).toEqual(["run", "--rm", "-i", "--network", "none"]);
+    expect(stats?.args).toContain(`${PROJECT}-data:/data`);
+    expect(stats?.args.join(" ")).not.toContain("/keys");
+    const after = world.calls.filter((c) => c.kind === "ps").length;
+    await new Promise((r) => setTimeout(r, 80));
+    expect(world.calls.filter((c) => c.kind === "ps").length).toBe(after);
+  });
+
+  it("Restart services from Services & data rotates the token and returns to the app", async () => {
+    const b = await readyApp();
+    const first = storedToken();
+    b.m.openServices();
+    await b.m.act({ type: "restartServices" });
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("app");
+    expect(storedToken()).not.toBe(first);
+    expect(world.calls.filter((c) => c.kind === "up").at(-1)).toMatchObject({ force: true, token: storedToken() });
+  });
+
+  it("port change: 1023, 65536 and a busy port are refused; a free port recreates the stack on it", async () => {
+    const b = build({ busy: [18423], cfgEnv: { OPEN_AGENT_SHELL_PORT_RANGE: "18421-18422" } });
+    await b.m.boot();
+    await b.m.idle();
+    b.m.openServices();
+    world.calls = [];
+    for (const port of [1023, 65536, 18423, 17999, 18421]) {
+      expect(await b.m.act({ type: "setPort", port }), String(port)).toEqual({ ok: false, error: "invalid_port" });
+    }
+    expect(mutations()).toEqual([]);
+    expect(await b.m.act({ type: "setPort", port: 18429 })).toEqual({ ok: true });
+    await b.m.idle();
+    expect(b.m.state()).toMatchObject({ screen: "app", port: 18429 });
+    expect(JSON.parse(readFileSync(join(dir, "stack.json"), "utf8")).port).toBe(18429);
+    expect(world.calls.filter((c) => c.kind === "up").at(-1)).toMatchObject({ force: true });
+    expect(b.views.at(-1)).toBe(`open 18429 ${tokenFingerprint(storedToken())}`);
+  });
+
+  it("delete from Services & data: confirm screen → down -v then volume rm with the exact names → a fresh start", async () => {
+    const b = await readyApp();
+    b.m.openServices();
+    expect(await b.m.act({ type: "deleteData", confirm: "delete" })).toEqual({ ok: false, error: "not_confirming" });
+    expect(await b.m.act({ type: "resetCredentials", confirm: "reset" })).toEqual({ ok: false, error: "not_confirming" });
+    await b.m.act({ type: "confirmDelete" });
+    expect(b.m.state().screen).toBe("screen-confirm-delete");
+    expect(await b.m.act({ type: "resetCredentials", confirm: "reset" })).toEqual({ ok: false, error: "not_confirming" });
+    world.calls = [];
+    await b.m.act({ type: "deleteData", confirm: "delete" });
+    await b.m.idle();
+    expect(kinds().slice(0, 2)).toEqual(["down", "volumeRm"]);
+    expect(world.calls.find((c) => c.kind === "volumeRm")?.args).toEqual(["volume", "rm", `${PROJECT}-data`, `${PROJECT}-keys`]);
+    expect(b.m.state().screen).toBe("app");
+  });
+
+  it("confirm delete → Cancel returns to Services & data; Back from it returns to the app", async () => {
+    const b = await readyApp();
+    b.m.openServices();
+    await b.m.act({ type: "confirmDelete" });
+    await b.m.act({ type: "back" });
+    expect(b.m.state().screen).toBe("screen-services");
+    await b.m.act({ type: "showLogs" });
+    expect(b.m.state().screen).toBe("screen-logs");
+    await b.m.act({ type: "back" });
+    expect(b.m.state().screen).toBe("screen-services");
+    await b.m.act({ type: "back" });
+    expect(b.m.state().screen).toBe("app");
+  });
+
+  it("export from Services & data: the zip lands at the save path, the notice has the wording, partials are tracked and cleared", async () => {
+    const b = await readyApp();
+    b.m.openServices();
+    expect(await b.m.act({ type: "exportData" })).toEqual({ ok: true });
+    await b.m.idle();
+    expect(existsSync(join(dir, "saved.zip"))).toBe(true);
+    expect(b.m.state().screen).toBe("screen-services");
+    expect(b.m.state().notice?.text).toContain("Saved model keys are not included. Chats, reports and your profile are.");
+    expect(b.settings.writes.some((w) => w.partials?.includes(join(dir, "saved.zip.partial")))).toBe(true);
+    expect(b.settings.get().partials).toBeUndefined();
+    const exp = world.calls.find((c) => c.kind === "run" && c.args.at(-1) === "export");
+    expect(exp?.args).toContain(`${PROJECT}-data:/data`);
+  });
+
+  it("export is offered from db_newer but not from db_corrupt", async () => {
+    world.up = { refuse: "db_newer", exit: 80 };
+    const b = build();
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("screen-refusal-db_newer");
+    expect(await b.m.act({ type: "exportData" })).toEqual({ ok: true });
+    await b.m.idle();
+    expect(existsSync(join(dir, "saved.zip"))).toBe(true);
+    expect(b.m.state().screen).toBe("screen-refusal-db_newer");
+    rmSync(join(dir, "saved.zip"));
+    world.up = { refuse: "db_corrupt", exit: 79 };
+    await b.m.act({ type: "restartServices" });
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("screen-refusal-db_corrupt");
+    expect(await b.m.act({ type: "exportData" })).toEqual({ ok: false, error: "not_available" });
+    expect(existsSync(join(dir, "saved.zip"))).toBe(false);
+  });
+
+  it("quit during export aborts it and leaves no .partial", async () => {
+    world.exportMode = "slow";
+    const b = await readyApp();
+    b.m.openServices();
+    await b.m.act({ type: "exportData" });
+    await until(() => existsSync(join(dir, "saved.zip.partial")));
+    expect(await b.m.quit()).toEqual({ kind: "done" });
+    expect(readdirSync(dir).filter((f) => f.startsWith("saved.zip"))).toEqual([]);
+  });
+
+  it("Save logs writes the redacted service logs and shell.log in two sections", async () => {
+    mkdirSync(join(dir, "logs"), { recursive: true });
+    const b = await readyApp();
+    const token = storedToken();
+    writeFileSync(join(dir, "logs/shell.log.1"), `old line token=${token}\n`);
+    writeFileSync(join(dir, "logs/shell.log"), "new line\n");
+    await b.m.act({ type: "showLogs" });
+    expect(await b.m.act({ type: "saveLogs" })).toEqual({ ok: true });
+    await b.m.idle();
+    const saved = readFileSync(join(dir, "saved.zip"), "utf8");
+    expect(saved.indexOf("== service logs ==")).toBe(0);
+    expect(saved).toContain("agent-1  | hello");
+    expect(saved.indexOf("== shell.log ==")).toBeGreaterThan(saved.indexOf("agent-1"));
+    expect(saved.indexOf("old line")).toBeLessThan(saved.indexOf("new line"));
+    expect(saved).not.toContain(token);
+    expect(saved).toContain("[token]");
+    expect(b.m.state().notice?.text).toContain(join(dir, "saved.zip"));
+  });
+
+  it("setStopOnQuit persists and the next quit honours it", async () => {
+    const b = await readyApp();
+    b.m.openServices();
+    await b.m.act({ type: "setStopOnQuit", value: false });
+    expect(b.settings.get().stopOnQuit).toBe(false);
+    expect(b.m.state().settings?.stopOnQuit).toBe(false);
+    world.calls = [];
+    await b.m.quit();
+    expect(mutations()).toEqual([]);
   });
 });
