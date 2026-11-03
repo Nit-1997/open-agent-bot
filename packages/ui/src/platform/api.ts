@@ -5,6 +5,7 @@ export type ApiClient = Readonly<{
 
 const DEFAULT_BASE = "/api";
 const DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i;
+const CONTROL = /[\u0000-\u001f\u007f]/;
 
 const hasDotSegment = (path: string) =>
   path
@@ -13,6 +14,7 @@ const hasDotSegment = (path: string) =>
     .some((segment) => DOT_SEGMENT.test(segment));
 
 function guard(path: string): string {
+  if (CONTROL.test(path)) throw new TypeError(`Refusing an API path with a control character: ${JSON.stringify(path)}`);
   if (path.startsWith("//") || path.includes("\\") || hasDotSegment(path))
     throw new TypeError(`Refusing an API path that could leave the origin or the API base: ${path}`);
   return path;

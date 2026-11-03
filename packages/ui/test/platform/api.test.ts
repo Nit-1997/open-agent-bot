@@ -67,6 +67,26 @@ describe("createApiClient", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "/.\t./admin",
+    "/.\n./admin",
+    "/.\r./admin",
+    "/\t/evil.example/x",
+    "/\n/evil.example/x",
+    "/x\u0000",
+    "/x\u001f",
+    "/x\u007f",
+    "/chats?q=a\tb",
+  ])("refuses a path with a control character (%j), even with an empty base", async (path) => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response("ok"));
+    for (const baseUrl of ["", "/api"]) {
+      const client = createApiClient({ baseUrl, fetch });
+      expect(() => client.url(path as `/${string}`)).toThrow(TypeError);
+      await expect(async () => client.fetch(path as `/${string}`)).rejects.toThrow(TypeError);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each(SAFE_DOTS)("allows %s, where the dots are not a whole path segment", (path) => {
     expect(createApiClient({ baseUrl: "/api" }).url(path as `/${string}`)).toBe(`/api${path}`);
   });
