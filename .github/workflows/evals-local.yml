@@ -1,0 +1,87 @@
+name: Evals (local stack)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Model ref, provider/model
+        default: openrouter/deepseek/deepseek-v4-flash
+        type: string
+      only:
+        description: Comma-separated scenario ids (empty runs all)
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evals-local-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evals:
+    runs-on: ubuntu-24.04
+    environment: evals
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      COMPOSE_PROJECT: oab-ci-evals
+      OPEN_AGENT_PORT: "18330"
+      OPEN_AGENT_DATA_VOLUME: oab-ci-evals-data
+      OPEN_AGENT_KEYS_VOLUME: oab-ci-evals-keys
+      EVAL_ORIGIN: http://127.0.0.1:18330
+      EVAL_MODEL: ${{ inputs.model || 'openrouter/deepseek/deepseek-v4-flash' }}
+      EVAL_ONLY: ${{ inputs.only || '' }}
+    steps:
+      - name: Skip with a notice when the evals environment has no OpenRouter key
+        id: key
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "::notice::OPENROUTER_API_KEY is not set in the evals environment; the local evals were skipped, not passed."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: steps.key.outputs.present == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: steps.key.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - if: steps.key.outputs.present == 'true'
+        run: npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
+      - name: Start the local stack
+        if: steps.key.outputs.present == 'true'
+        run: docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null up -d --build --wait --wait-timeout 300
+      - name: Run the evals against the local stack (no Supabase)
+        if: steps.key.outputs.present == 'true'
+        working-directory: packages/core
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -- --target local --origin "$EVAL_ORIGIN" --openrouter-key-env OPENROUTER_API_KEY --model "$EVAL_MODEL" --label ci-local
+          [ -n "$EVAL_ONLY" ] && set -- "$@" --only "$EVAL_ONLY"
+          npx tsx evals/run.ts "$@"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && steps.key.outputs.present == 'true'
+        with:
+          name: evals-local
+          path: packages/core/evals/results
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Tear down the stack and its volumes
+        if: always() && steps.key.outputs.present == 'true'
+        run: |
+          docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null down -v
+          docker volume rm "$OPEN_AGENT_DATA_VOLUME" "$OPEN_AGENT_KEYS_VOLUME" 2>/dev/null || true

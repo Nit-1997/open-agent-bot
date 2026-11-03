@@ -51,3 +51,6 @@ export type RunRecord = {
   failed: AssertionResult[];
   future: AssertionResult[];
 };
+
+export type AuthHeaders = () => Promise<Record<string, string>>;
+export type Transport = { url: string; headers: AuthHeaders };

@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { parse as parseYaml } from "yaml";
 import { evaluateAll } from "./assert.js";
-import { type AuthHeaders, evalAuth } from "./auth.js";
+import { localTransport } from "./auth/local.js";
 import { mergeStats, renderReport, type Summary, summarize } from "./report.js";
 import { type AguiEvent, readEvents } from "./sse.js";
-import type { Assertion, RunRecord, RunStats, Scenario, ToolRecord, TurnRecord, WidgetRecord } from "./types.js";
+import type { Assertion, AuthHeaders, RunRecord, RunStats, Scenario, ToolRecord, TurnRecord, Transport, WidgetRecord } from "./types.js";
 
 const evalsDir = dirname(fileURLToPath(import.meta.url));
 const RESULT_CLIP = 4000;
@@ -278,6 +278,32 @@ export function loadScenarios(dir: string, only?: string[], set?: string): Scena
   return inSet.filter((s) => only.includes(s.id));
 }
 
+export type TransportInput = {
+  target: string;
+  url: string;
+  repoRoot: string;
+  origin?: string;
+  keyEnv?: string;
+  env?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+};
+
+export async function transportFor(input: TransportInput): Promise<Transport> {
+  const env = input.env ?? process.env;
+  if (input.target === "hosted") {
+    const { evalAuth } = await import("./auth/hosted.js");
+    return { url: input.url, headers: await evalAuth(input.repoRoot, env) };
+  }
+  if (input.target !== "local") throw new Error(`--target must be hosted or local; got '${input.target}'`);
+  if (!input.origin) throw new Error("--target local needs --origin, e.g. --origin http://127.0.0.1:18330");
+  let openrouterKey: string | undefined;
+  if (input.keyEnv) {
+    openrouterKey = env[input.keyEnv]?.trim();
+    if (!openrouterKey) throw new Error(`${input.keyEnv} is empty or unset`);
+  }
+  return localTransport({ origin: input.origin, openrouterKey, fetch: input.fetch });
+}
+
 export async function pool<T>(items: T[], concurrency: number, work: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items];
   await Promise.all(
@@ -296,6 +322,9 @@ async function main() {
       runs: { type: "string", default: "1" },
       label: { type: "string", default: "adhoc" },
       url: { type: "string", default: "http://localhost:8000/agui" },
+      target: { type: "string", default: "hosted" },
+      origin: { type: "string" },
+      "openrouter-key-env": { type: "string" },
       concurrency: { type: "string", default: "1" },
       "timeout-s": { type: "string", default: "420" },
       "write-baseline": { type: "boolean", default: false },
@@ -315,14 +344,20 @@ async function main() {
       .filter(Boolean),
     values.set,
   );
-  const headers = await evalAuth(resolve(evalsDir, "../../.."));
+  const transport = await transportFor({
+    target: values.target as string,
+    url: values.url as string,
+    repoRoot: resolve(evalsDir, "../../.."),
+    origin: values.origin,
+    keyEnv: values["openrouter-key-env"],
+  });
   const date = new Date().toISOString().slice(0, 10);
   const outDir = join(evalsDir, "results", `${date}-${label}-${model}`);
   await mkdir(outDir, { recursive: true });
   const jsonl = join(outDir, "runs.jsonl");
   await writeFile(jsonl, "");
 
-  const deps: RunnerDeps = { url: values.url as string, headers, model, timeoutMs: Number(values["timeout-s"]) * 1000 };
+  const deps: RunnerDeps = { url: transport.url, headers: transport.headers, model, timeoutMs: Number(values["timeout-s"]) * 1000 };
   const jobs = scenarios.flatMap((s) => Array.from({ length: runs }, (_, i) => ({ s, i })));
   const records: RunRecord[] = [];
   await pool(jobs, Number(values.concurrency), async ({ s, i }) => {
