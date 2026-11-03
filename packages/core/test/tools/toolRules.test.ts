@@ -10,7 +10,7 @@ function tools(userContext = ctx) {
     cfg: testConfig(),
     artifacts: {} as never,
     pool: {} as never,
-    threadId: "t",
+    sessionKey: "t",
     userContext,
     budget: new TurnBudget(PER_REPLY_LIMITS),
   });

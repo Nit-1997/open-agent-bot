@@ -1,4 +1,4 @@
-import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
+import { type BaseEvent, type CustomEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { readUserContext } from "../../src/agui/input.js";
 import {
@@ -604,8 +604,8 @@ describe("chat ownership and persistence", () => {
     const r = db.forUser(ALICE.id);
     const messages = { ...r.messages, append: async () => Promise.reject(new UserError("down", "unavailable")) };
     const out = await collect(run(input(), store, new AbortController().signal, runCtx({ messages })));
-    const notices = out.filter((e) => e.type === EventType.CUSTOM && (e as { name?: string }).name === NOT_SAVED_EVENT);
-    expect(notices.map((e) => (e as { value: { message: string } }).value.message)).toEqual([PROMPT_NOT_SAVED, REPLY_NOT_SAVED]);
+    const notices = out.filter((e): e is CustomEvent => e.type === EventType.CUSTOM && "name" in e && e.name === NOT_SAVED_EVENT);
+    expect(notices.map((e) => e.value.message)).toEqual([PROMPT_NOT_SAVED, REPLY_NOT_SAVED]);
     expect(out.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED });
   });
 

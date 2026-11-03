@@ -3,6 +3,7 @@ import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
 import { TurnBudget, withBudget } from "../../src/tools/budget.js";
 import { ok } from "../../src/tools/result.js";
+import { textOf } from "../fixtures/toolResult.js";
 
 const echo = (name: string) =>
   defineTool({
@@ -120,10 +121,8 @@ describe("TurnBudget", () => {
 
   it("adds the note as a new text part when the result has no text last", async () => {
     const budget = new TurnBudget({}, { total: 2 });
-    const odd = { ...echo("x"), execute: async () => ({ content: [], details: {} }) } as never;
-    const r = (await withBudget(odd, budget, "g").execute("c", {}, undefined, undefined, {} as never)) as {
-      content: Array<{ text: string }>;
-    };
-    expect(r.content[0].text).toBe("(budget: 1 of 2 calls used)");
+    const odd: ReturnType<typeof echo> = { ...echo("x"), execute: async () => ({ content: [], details: {} }) };
+    const r = await withBudget(odd, budget, "g").execute("c", {}, undefined, undefined, {} as never);
+    expect(textOf(r)).toBe("(budget: 1 of 2 calls used)");
   });
 });

@@ -112,13 +112,13 @@ const stores = (): Record<string, Store> => ({
 const run = (params: object, cart = new ActiveCart(), judge?: Judge) =>
   shopTool({
     pool,
-    threadId: "shop-t",
+    sessionKey: "shop-t",
     userContext: null,
     allowPrivateHosts: true,
     storeFor: (s) => stores()[s.toLowerCase()],
     cart,
     judge,
-  }).execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
+  }).execute("c", params as never, undefined, undefined, {} as never) as Promise<{
     isError?: boolean;
     content: Array<{ text: string }>;
     details: { data?: { summary: Array<{ store: string; found: number; total: number; missing: string[] }> } };

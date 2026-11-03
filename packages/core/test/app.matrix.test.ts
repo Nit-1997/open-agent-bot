@@ -171,7 +171,8 @@ async function cellFor(app: Awaited<ReturnType<typeof makeApp>>["app"], caller: 
     const json = (await res.json()) as { error?: unknown };
     error = typeof json.error === "string" ? json.error : null;
   } else await res.body?.cancel();
-  return Object.assign({ status: res.status, error }, Object.fromEntries(HEADERS.map((h) => [h, res.headers.get(h)]))) as Cell;
+  const headers = Object.fromEntries(HEADERS.map((h) => [h, res.headers.get(h)])) as Record<(typeof HEADERS)[number], string | null>;
+  return { status: res.status, error, ...headers };
 }
 
 async function runMatrix(): Promise<{ matrix: Matrix; routes: string[] }> {

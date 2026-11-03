@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { validateWidget } from "@oab/shared/widgets";
+import { type UiWidget, validateWidget } from "@oab/shared/widgets";
 import { showUiTool } from "../../src/tools/showWidget.js";
 import { validWidgets } from "../fixtures/widgets.js";
 
+const cardItems = (details: Record<string, unknown>, index = 0) => {
+  const block = (details.widget as UiWidget).blocks[index];
+  if (block.type !== "cards") throw new Error(`expected a cards block, got ${block.type}`);
+  return block.items;
+};
+
 const exec = (params: unknown) =>
-  showUiTool().execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
+  showUiTool().execute("c", params as never, undefined, undefined, {} as never) as Promise<{
     isError?: boolean;
     content: Array<{ text: string }>;
     details: { widget?: unknown };
@@ -167,10 +173,7 @@ describe("flight schema", () => {
 
 describe("show_ui image fill", () => {
   const execWith = (findImage: (name: string, source?: string) => Promise<string | undefined>, params: unknown) =>
-    showUiTool({ findImage }).execute(...(["c", params, undefined, undefined, {}] as never[])) as Promise<{
-      content: Array<{ text: string }>;
-      details: { widget: { blocks: Array<{ items: Array<{ title: string; image?: string }> }> }; sourced?: string };
-    }>;
+    showUiTool({ findImage }).execute("c", params as never, undefined, undefined, {} as never);
 
   it("looks up a picture for every card that has none, by name and source", async () => {
     const asked: string[] = [];
@@ -192,7 +195,7 @@ describe("show_ui image fill", () => {
       ],
     });
     expect(asked).toEqual(["Barilla Elbow Macaroni 16 oz Shipt", "First Street Butter"]);
-    const items = res.details.widget.blocks[0].items;
+    const items = cardItems(res.details);
     expect(items.map((i) => i.image)).toEqual(["https://tse1.mm.bing.net/barilla.jpg", "https://target.scene7.com/cheddar.jpg", undefined]);
     expect(res.details.sourced).toContain("https://tse1.mm.bing.net/barilla.jpg");
   });
@@ -204,30 +207,25 @@ describe("show_ui replaces unsourced pictures", () => {
       findImage: async () => "https://tse1.mm.bing.net/real.jpg",
       isSourced: (u) => u.includes("target.scene7.com"),
     });
-    const res = (await tool.execute(
-      ...([
-        "c",
-        {
-          title: "Cart",
-          blocks: [
-            {
-              type: "cards",
-              items: [
-                { title: "Made-up picture", image: "https://cdn.invented.example/x.jpg" },
-                { title: "Sourced picture", image: "https://target.scene7.com/ok.jpg" },
-              ],
-            },
-          ],
-        },
-        undefined,
-        undefined,
-        {},
-      ] as never[]),
-    )) as { details: { widget: { blocks: Array<{ items: Array<{ image?: string }> }> } } };
-    expect(res.details.widget.blocks[0].items.map((i) => i.image)).toEqual([
-      "https://tse1.mm.bing.net/real.jpg",
-      "https://target.scene7.com/ok.jpg",
-    ]);
+    const res = await tool.execute(
+      "c",
+      {
+        title: "Cart",
+        blocks: [
+          {
+            type: "cards",
+            items: [
+              { title: "Made-up picture", image: "https://cdn.invented.example/x.jpg" },
+              { title: "Sourced picture", image: "https://target.scene7.com/ok.jpg" },
+            ],
+          },
+        ],
+      },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    expect(cardItems(res.details).map((i) => i.image)).toEqual(["https://tse1.mm.bing.net/real.jpg", "https://target.scene7.com/ok.jpg"]);
   });
 });
 

@@ -7,11 +7,11 @@ import { REPORT_GUIDE } from "../../src/artifacts/reportKit.js";
 import { corePrompt, buildSystemPrompt, skillIndex } from "../../src/prompt/systemPrompt.js";
 import { loadSkillCatalog, skillsDir } from "../../src/skills/catalog.js";
 import { loadSkillTool } from "../../src/tools/loadSkill.js";
+import { textOf } from "../fixtures/toolResult.js";
 
 const NAMES = ["dining-out", "gift-ideas", "grocery-run", "music", "party-planning", "research", "trip-planning"];
 const run = (skills: ReturnType<typeof loadSkillCatalog>, name: string) =>
   loadSkillTool(() => skills).execute("c", { name }, undefined, undefined, {} as never);
-const text = (r: { content: { text: string }[] }) => r.content[0].text;
 
 function dummy(dir: string, name: string) {
   mkdirSync(join(dir, name), { recursive: true });
@@ -133,7 +133,7 @@ describe("system prompt", () => {
     dummy(dir, "pet-care");
     const found = loadSkillCatalog(skillsDir({ SKILLS_DIR: dir }));
     expect(buildSystemPrompt(null, found)).toContain("- pet-care: Load for pet grooming questions.");
-    expect(text(await run(found, "pet-care"))).toBe("# Grooming\n\nBrush daily.");
+    expect(textOf(await run(found, "pet-care"))).toBe("# Grooming\n\nBrush daily.");
   });
 });
 
@@ -143,14 +143,14 @@ describe("load_skill", () => {
   it("returns the body of a known skill without frontmatter", async () => {
     const r = await run(skills, "research");
     expect(r.isError).toBeUndefined();
-    expect(text(r)).toContain("create_artifact");
-    expect(text(r)).not.toContain("description:");
+    expect(textOf(r)).toContain("create_artifact");
+    expect(textOf(r)).not.toContain("description:");
   });
 
   it("lists the available names for an unknown skill", async () => {
     const r = await run(skills, "nope");
     expect(r.isError).toBe(true);
-    for (const n of NAMES) expect(text(r)).toContain(n);
+    for (const n of NAMES) expect(textOf(r)).toContain(n);
   });
 
   it("rejects path-like names", async () => {
@@ -167,7 +167,7 @@ describe("load_skill", () => {
     ]) {
       const r = await run(skills, n);
       expect(r.isError).toBe(true);
-      expect(text(r)).toContain("Unknown skill");
+      expect(textOf(r)).toContain("Unknown skill");
     }
   });
 });

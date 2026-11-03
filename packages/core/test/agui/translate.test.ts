@@ -1,4 +1,4 @@
-import { EventType } from "@ag-ui/core";
+import { EventType, type TextMessageStartEvent } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { createTranslator, type PiEvent } from "../../src/agui/translate.js";
 import { Evidence } from "../../src/grounding/evidence.js";
@@ -64,7 +64,7 @@ describe("createTranslator", () => {
 
   it("text then tool then text yields two distinct messageIds", () => {
     const out = run([assistantStart, delta("a"), assistantEnd, toolStart, toolEnd, assistantStart, delta("b"), assistantEnd]);
-    const starts = out.filter((e) => e.type === EventType.TEXT_MESSAGE_START) as Array<{ messageId: string }>;
+    const starts = out.filter((e): e is TextMessageStartEvent => e.type === EventType.TEXT_MESSAGE_START);
     expect(starts).toHaveLength(2);
     expect(starts[0].messageId).not.toBe(starts[1].messageId);
   });

@@ -108,7 +108,7 @@ describe("ProviderHub", () => {
   });
 
   it("offers only ChatGPT-plan models after a ChatGPT sign-in and drops ones the plan rejects", async () => {
-    const plan = new Set(Object.values(OPENAI_CODEX_MODELS).map((m) => m.id));
+    const plan = new Set<string>(Object.values(OPENAI_CODEX_MODELS).map((m) => m.id));
     const db = new MemoryDb();
     const { hub: keyed } = await make(db);
     await keyed.setKey("openai", "sk-x");
