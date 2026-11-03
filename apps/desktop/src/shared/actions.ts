@@ -32,18 +32,76 @@ export type ShellAction =
   | { type: "saveLogs" }
   | { type: "exportData" }
   | { type: "deleteData"; confirm: "delete" }
-  | { type: "closeServices" };
+  | { type: "closeServices" }
+  | { type: "confirmReset" }
+  | { type: "confirmDelete" }
+  | { type: "back" }
+  | { type: "discardPendingDelete" }
+  | { type: "relaunch" };
 
-export type ActError = "invalid_action" | "not_confirming" | "not_available" | "forbidden";
+export type ActError = "invalid_action" | "not_confirming" | "not_available" | "forbidden" | "busy" | "invalid_port";
 export type ActResult = { ok: true } | { ok: false; error: ActError };
 
 export type ScreenId = "app" | "screen-progress" | "screen-confirm-delete" | "screen-confirm-reset" | (string & {});
+
+export type PullRow = Readonly<{
+  name: string;
+  ref: string;
+  layersDone: number;
+  layersTotal: number;
+  bytesDone?: number;
+  bytesTotal?: number;
+  done: boolean;
+}>;
+export type ServiceRow = Readonly<{ service: string; state: string; health: string }>;
+export type EngineInfo = Readonly<{
+  cli: string;
+  context: string;
+  engine: string;
+  engineName: string;
+  compose: string;
+  server: string;
+  socket?: string;
+  memBytes?: number;
+  memWarning: boolean;
+}>;
 
 export type ShellState = Readonly<{
   phase: string;
   screen: ScreenId;
   test: boolean;
   port?: number;
+  localBuild?: string;
+  servicesVersion?: string;
+  engine?: EngineInfo;
+  apps?: Readonly<{ dockerDesktop: boolean; orbstack: boolean; colima: boolean }>;
+  docker?: Readonly<{ searched: readonly string[]; rejected: readonly Readonly<{ path: string; reason: string }>[] }>;
+  remote?: Readonly<{ endpoint: string; reason: string; owner?: number }>;
+  compose?: Readonly<{ version?: string }>;
+  pull?: readonly PullRow[];
+  services?: readonly ServiceRow[];
+  refusal?: Readonly<{ code: string; line: string; exitCode: number; count?: number }>;
+  failure?: Readonly<{ reason: string; step?: string; exitCode?: number; detail?: string; tail?: string }>;
+  foreign?: Readonly<{
+    workingDir: string;
+    version?: string;
+    port?: number;
+    dataVolume?: string;
+    keysVolume?: string;
+    ourDataVolume: string;
+    ourKeysVolume: string;
+  }>;
+  conflict?: Readonly<{ port: number }>;
+  disk?: Readonly<{ where: "docker" | "mac"; engine: string; line: string; detail?: string }>;
+  stopping?: Readonly<{ what: string }>;
+  stopped?: Readonly<{ reason: string; exitCode?: number; tail?: string }>;
+  logs?: Readonly<{ text: string }>;
+  confirm?: Readonly<{ count?: number; dataVolume: string; keysVolume: string }>;
+  pendingDelete?: Readonly<{
+    stored: Readonly<{ project: string; dataVolume: string; keysVolume: string }>;
+    current: Readonly<{ project: string; dataVolume: string; keysVolume: string }>;
+  }>;
+  settings?: Readonly<{ stopOnQuit: boolean; checkForUpdates: boolean }>;
 }>;
 
 export type ShellBridge = Readonly<{
@@ -80,6 +138,11 @@ const SHAPES: Readonly<Record<ShellAction["type"], Readonly<Record<string, Field
   exportData: {},
   deleteData: { confirm: ["delete"] },
   closeServices: {},
+  confirmReset: {},
+  confirmDelete: {},
+  back: {},
+  discardPendingDelete: {},
+  relaunch: {},
 };
 
 const fieldOk = (field: Field, v: unknown): boolean => {

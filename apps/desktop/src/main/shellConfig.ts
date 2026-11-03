@@ -14,7 +14,7 @@ export const OVERRIDE_VARS = [
   "OPEN_AGENT_SHELL_SAVE_PATH",
   "OPEN_AGENT_SHELL_SINGLE_INSTANCE_ID",
   "OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET",
-  "OPEN_AGENT_SHELL_ATTACH_PORT",
+  "OPEN_AGENT_SHELL_FAKE_LOCATION",
 ] as const;
 
 export const PRODUCTION = Object.freeze({
@@ -39,7 +39,7 @@ export type ShellConfig = Readonly<{
   stateDir?: string;
   singleInstanceId?: string;
   allowSystemSocket: boolean;
-  attachPort?: number;
+  fakeOutside: boolean;
   ignored: readonly string[];
 }>;
 
@@ -75,6 +75,7 @@ export function loadShellConfig(env: NodeJS.ProcessEnv, real: { realUserData: st
       test: false,
       ...PRODUCTION,
       allowSystemSocket: false,
+      fakeOutside: false,
       ignored: OVERRIDE_VARS.filter((name) => env[name] !== undefined),
     };
   }
@@ -141,7 +142,9 @@ export function loadShellConfig(env: NodeJS.ProcessEnv, real: { realUserData: st
   const socket = get("OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET");
   if (socket !== undefined && socket !== "1") throw new ShellConfigError("OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET", "must be 1 or unset");
 
-  const attach = get("OPEN_AGENT_SHELL_ATTACH_PORT");
+  const location = get("OPEN_AGENT_SHELL_FAKE_LOCATION");
+  if (location !== undefined && location !== "outside")
+    throw new ShellConfigError("OPEN_AGENT_SHELL_FAKE_LOCATION", "must be outside or unset");
 
   return {
     test: true,
@@ -157,9 +160,10 @@ export function loadShellConfig(env: NodeJS.ProcessEnv, real: { realUserData: st
     savePath: absolute("OPEN_AGENT_SHELL_SAVE_PATH"),
     singleInstanceId,
     allowSystemSocket: socket === "1",
-    attachPort: attach === undefined ? undefined : testPort("OPEN_AGENT_SHELL_ATTACH_PORT", attach),
+    fakeOutside: location === "outside",
     ignored: [],
   };
 }
 
-export const windowTitle = (cfg: ShellConfig) => (cfg.test ? "Open Agent — test" : "Open Agent");
+export const windowTitle = (cfg: Pick<ShellConfig, "test">, localBuild?: string) =>
+  `Open Agent${localBuild ? " — Local build" : ""}${cfg.test ? " — test" : ""}`;
