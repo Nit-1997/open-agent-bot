@@ -22,14 +22,7 @@ import {
   tsvRow,
   versionProblems,
 } from "../docs/doc-commands.mjs";
-import {
-  createRunner,
-  parseRunnerArgs,
-  preflight,
-  SCRATCH,
-  scratchEnv,
-  writeDockerConfig,
-} from "../docs/run-doc-commands.mjs";
+import { createRunner, parseRunnerArgs, preflight, SCRATCH, scratchEnv, writeDockerConfig } from "../docs/run-doc-commands.mjs";
 import { notes } from "../release/releaseLib.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -161,7 +154,7 @@ describe("tokenize", () => {
     );
   });
   it("flags command substitution, parameters and a leading tilde", () => {
-    const t = tokenize('echo $(id) `id` "$HOME/x" ~/y \'$HOME\'');
+    const t = tokenize("echo $(id) `id` \"$HOME/x\" ~/y '$HOME'");
     const w = t.commands[0].words;
     assert.ok(w[1].cmdsub && w[2].cmdsub);
     assert.deepEqual(w[3].params, ["HOME"]);
@@ -202,10 +195,7 @@ describe("substitutions", () => {
   });
   it("rewrites the §9 printf line's two refs and nothing else", () => {
     const s = substitute(PRINTF, ["agent-ref", "search-ref"], RULES);
-    assert.equal(
-      s.text,
-      `printf 'OPEN_AGENT_IMAGE=${CTX.refs.agent}\\nOPEN_AGENT_SEARCH_IMAGE=${CTX.refs.search}\\n' > .env`,
-    );
+    assert.equal(s.text, `printf 'OPEN_AGENT_IMAGE=${CTX.refs.agent}\\nOPEN_AGENT_SEARCH_IMAGE=${CTX.refs.search}\\n' > .env`);
     const real = PRINTF.replace("<agent-digest>", D("a")).replace("<search-digest>", D("b"));
     assert.equal(substitute(real, ["agent-ref", "search-ref"], RULES).text, s.text);
   });
@@ -215,14 +205,8 @@ describe("substitutions", () => {
       substitute("curl -fsS http://127.0.0.1:3000/health", ["local-url"], RULES).text,
       "curl -fsS http://127.0.0.1:18520/health",
     );
-    assert.equal(
-      substitute('xattr -l "/Applications/Open Agent.app"', ["install-path"], RULES).text,
-      `xattr -l "${CTX.installApp}"`,
-    );
-    assert.equal(
-      substitute("ls Open-Agent-1.0.0-arm64.dmg", ["dmg"], RULES).text,
-      "ls Open-Agent-0.0.0-dryrun.1-arm64.dmg",
-    );
+    assert.equal(substitute('xattr -l "/Applications/Open Agent.app"', ["install-path"], RULES).text, `xattr -l "${CTX.installApp}"`);
+    assert.equal(substitute("ls Open-Agent-1.0.0-arm64.dmg", ["dmg"], RULES).text, "ls Open-Agent-0.0.0-dryrun.1-arm64.dmg");
   });
   it("applies only the listed substitutions", () => {
     const s = substitute("open http://127.0.0.1:3000", [], RULES);
@@ -408,7 +392,7 @@ describe("scratch environment", () => {
 });
 
 describe("preflight", () => {
-  const exec = (name) => (cmd, args, o) => {
+  const exec = (name) => (cmd, _args, o) => {
     if (cmd === "docker") return { status: 0, stdout: JSON.stringify({ name, services: {}, volumes: {} }), stderr: "" };
     if (cmd === "jq") return { status: 0, stdout: `${JSON.parse(o.input).name}\n`, stderr: "" };
     return { status: 127, stdout: "", stderr: "unexpected" };
@@ -424,7 +408,13 @@ describe("preflight", () => {
   it("refuses a published port other than the scratch port and a volume without oab-", () => {
     const cfg = (o) => (cmd, args, x) =>
       cmd === "docker" ? { status: 0, stdout: JSON.stringify({ name: CTX.project, ...o }), stderr: "" } : exec(CTX.project)(cmd, args, x);
-    const port = preflight(CTX.clone, {}, cfg({ services: { agent: { ports: [{ host_ip: "127.0.0.1", published: "3000" }] } } }), CTX.project, 18520);
+    const port = preflight(
+      CTX.clone,
+      {},
+      cfg({ services: { agent: { ports: [{ host_ip: "127.0.0.1", published: "3000" }] } } }),
+      CTX.project,
+      18520,
+    );
     assert.match(port.reason, /port 3000/);
     const vol = preflight(CTX.clone, {}, cfg({ volumes: { data: { name: "open-agent-data" } } }), CTX.project, 18520);
     assert.match(vol.reason, /open-agent-data/);
@@ -506,11 +496,14 @@ describe("runner", () => {
     assert.equal(calls.length, 0);
   });
   it("tracks cwd after a successful cd and fails on an unexpected exit", () => {
-    const { runner } = harness([
-      { command: "cd open-agent-bot", mode: "run" },
-      { command: "docker compose ps", mode: "env", expectExit: 0 },
-      { command: "docker compose logs agent", mode: "env", expectExit: 1, reason: "no containers" },
-    ], { exits: { "docker compose ps": 3, "docker compose logs agent": 1 } });
+    const { runner } = harness(
+      [
+        { command: "cd open-agent-bot", mode: "run" },
+        { command: "docker compose ps", mode: "env", expectExit: 0 },
+        { command: "docker compose logs agent", mode: "env", expectExit: 1, reason: "no containers" },
+      ],
+      { exits: { "docker compose ps": 3, "docker compose logs agent": 1 } },
+    );
     runner.run(occ("cd open-agent-bot"));
     assert.equal(runner.cwd, CTX.clone);
     const ps = runner.run(occ("docker compose ps"));
@@ -535,12 +528,18 @@ describe("runner", () => {
 describe("runner arguments", () => {
   const tmp = realpathSync(tmpdir());
   it("refuses a scratch dir outside the temp dir and .factory", () => {
-    assert.throws(() => parseRunnerArgs(["--scratch", "/Users/me/x", "--release-dir", "r", "--log", "l", "--tsv", "t"], { tmp, repo: ROOT }), /--scratch must be under/);
+    assert.throws(
+      () => parseRunnerArgs(["--scratch", "/Users/me/x", "--release-dir", "r", "--log", "l", "--tsv", "t"], { tmp, repo: ROOT }),
+      /--scratch must be under/,
+    );
   });
   it("refuses a non-empty scratch dir", () => {
     const d = mkdtempSync(join(tmp, "oab-m5-docs-"));
     writeFileSync(join(d, "x"), "");
-    assert.throws(() => parseRunnerArgs(["--scratch", d, "--release-dir", d, "--log", "l", "--tsv", "t"], { tmp, repo: ROOT }), /is not empty/);
+    assert.throws(
+      () => parseRunnerArgs(["--scratch", d, "--release-dir", d, "--log", "l", "--tsv", "t"], { tmp, repo: ROOT }),
+      /is not empty/,
+    );
   });
   it("requires every option and a release dir with a lock and SHA256SUMS", () => {
     const d = mkdtempSync(join(tmp, "oab-m5-docs-"));
@@ -570,7 +569,10 @@ describe("guide checks", () => {
   });
   it("pins every gh attestation verify", () => {
     assert.deepEqual(attestationProblems(INSTALL, "1.0.0"), []);
-    assert.match(attestationProblems(fixture("bare-attest.md"), "1.0.0").join("\n"), /--signer-workflow.*--source-ref.*--deny-self-hosted-runners/s);
+    assert.match(
+      attestationProblems(fixture("bare-attest.md"), "1.0.0").join("\n"),
+      /--signer-workflow.*--source-ref.*--deny-self-hosted-runners/s,
+    );
     const generated = notes({
       version: "1.0.0",
       prerelease: false,
@@ -605,8 +607,14 @@ describe("INSTALL content", () => {
       "## 11. Troubleshooting",
     ];
     const at = want.map((h) => INSTALL.indexOf(h));
-    assert.ok(at.every((i) => i >= 0), `missing ${want.filter((_, i) => at[i] < 0)}`);
-    assert.deepEqual([...at].sort((a, b) => a - b), at);
+    assert.ok(
+      at.every((i) => i >= 0),
+      `missing ${want.filter((_, i) => at[i] < 0)}`,
+    );
+    assert.deepEqual(
+      [...at].sort((a, b) => a - b),
+      at,
+    );
   });
   it("covers the Docker engines with their first-run steps", () => {
     for (const s of [

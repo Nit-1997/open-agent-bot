@@ -1,0 +1,171 @@
+{
+  "commands": [
+    {
+      "file": "docs/INSTALL.md",
+      "command": "brew install colima docker docker-compose",
+      "mode": "owner",
+      "reason": "Homebrew changes the real Mac, and Colima isn't installed on the factory Mac"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "colima start",
+      "mode": "owner",
+      "reason": "Colima isn't installed on the factory Mac"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "cd ~/Downloads",
+      "mode": "owner",
+      "reason": "the real Downloads folder; the runner checks the dry-run files in <scratch>/downloads instead (next line)"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "shasum -a 256 -c SHA256SUMS --ignore-missing",
+      "mode": "run",
+      "cwd": "downloads"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "brew install gh",
+      "mode": "owner",
+      "reason": "Homebrew changes the real Mac"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "brew upgrade gh",
+      "mode": "owner",
+      "reason": "Homebrew changes the real Mac"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "gh auth login",
+      "mode": "owner",
+      "reason": "interactive GitHub sign-in"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "gh auth status",
+      "mode": "owner",
+      "reason": "needs a signed-in GitHub account"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "gh attestation verify Open-Agent-1.0.0-arm64.dmg --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref refs/tags/v1.0.0 --deny-self-hosted-runners",
+      "mode": "owner",
+      "reason": "needs the published release and its GitHub attestation; dry-run files have none, so docs/RELEASING.md Gate 5 runs it on the real files"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "xattr -dr com.apple.quarantine \"/Applications/Open Agent.app\"",
+      "mode": "subst",
+      "subst": [
+        "install-path"
+      ]
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "xattr -l \"/Applications/Open Agent.app\"",
+      "mode": "subst",
+      "subst": [
+        "install-path"
+      ]
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "rm -rf ~/Library/Application\\ Support/Open\\ Agent ~/Library/Logs/Open\\ Agent",
+      "mode": "owner",
+      "reason": "deletes the real app state in ~/Library, which the factory never touches"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "docker image ls -a --digests 'ghcr.io/nit-1997/*'",
+      "mode": "run"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "git clone --branch v1.0.0 --depth 1 https://github.com/Nit-1997/open-agent-bot",
+      "mode": "subst",
+      "subst": [
+        "clone-url",
+        "clone-branch"
+      ]
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "cd open-agent-bot",
+      "mode": "run"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "docker compose up -d --build",
+      "mode": "env"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "open http://127.0.0.1:3000",
+      "mode": "subst",
+      "subst": [
+        "local-url"
+      ]
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "curl -fsS http://127.0.0.1:3000/health",
+      "mode": "subst",
+      "subst": [
+        "local-url"
+      ]
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "docker compose ps",
+      "mode": "env"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "printf 'OPEN_AGENT_IMAGE=ghcr.io/nit-1997/open-agent@sha256:<agent-digest>\\nOPEN_AGENT_SEARCH_IMAGE=ghcr.io/nit-1997/open-agent-search@sha256:<search-digest>\\n' > .env",
+      "mode": "subst",
+      "subst": [
+        "agent-ref",
+        "search-ref"
+      ]
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "docker compose pull agent search",
+      "mode": "env"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "docker compose up -d --no-build",
+      "mode": "env"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "gh attestation verify oci://ghcr.io/nit-1997/open-agent@sha256:<agent-digest> --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref refs/tags/v1.0.0 --deny-self-hosted-runners",
+      "mode": "owner",
+      "reason": "needs the published release and its GitHub attestation; dry-run files have none, so docs/RELEASING.md Gate 5 runs it on the real files"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "git fetch --tags",
+      "mode": "run"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "git checkout v1.0.1",
+      "mode": "owner",
+      "reason": "needs a newer release tag; no later version exists yet"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "docker compose down",
+      "mode": "env"
+    },
+    {
+      "file": "docs/INSTALL.md",
+      "command": "docker compose down -v",
+      "mode": "env"
+    }
+  ]
+}
