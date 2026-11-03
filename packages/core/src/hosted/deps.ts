@@ -1,4 +1,3 @@
-import type { AgentConfig } from "@oab/core/config.js";
 import { LocalKeyWrapper } from "@oab/core/secrets/keyWrapper.js";
 import type { Identity } from "@oab/core/identity/types.js";
 import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
@@ -6,6 +5,7 @@ import type { AgentDeps, CoreHandles } from "@oab/core/startAgent.js";
 import { createAccessService } from "./access/service.js";
 import { createAuthAdmin } from "./admin/authAdmin.js";
 import { type AccountHooks, createAdminService, createLiveAdminCheck } from "./admin/service.js";
+import type { HostedConfig } from "./config.js";
 import { hostedGateway } from "./gateway.js";
 import { createAdminGuard } from "./identity/adminGuard.js";
 import { UserStatusCache } from "./identity/status.js";
@@ -29,7 +29,7 @@ export const adminHooks = (status: Pick<UserStatusCache, "invalidate">, core: Pi
 });
 
 export function hostedAgentDeps(
-  cfg: AgentConfig,
+  cfg: HostedConfig,
   clients: HostedClients = { db: createServiceClient(cfg), anon: createAnonClient(cfg) },
   seams: { identity?: Identity } = {},
 ): { deps: AgentDeps; status: UserStatusCache } {

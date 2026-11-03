@@ -8,10 +8,11 @@ import { type AppDeps, createApp } from "../../src/app.js";
 import { ArtifactStore, type Renderer } from "../../src/artifacts/store.js";
 import { UserStatusCache } from "../../src/hosted/identity/status.js";
 import { AuthError, type Verifier } from "../../src/hosted/identity/verify.js";
-import { parseCredentialKeys } from "../../src/config.js";
+import { parseCredentialKeys } from "../../src/hosted/config.js";
 import { createGuards } from "../../src/identity/guards.js";
 import type { Principal } from "../../src/identity/types.js";
 import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
+import { secretsFor } from "../../src/secrets/secretsFor.js";
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
 import { PAGE_SIZE } from "@oab/shared/pages";
 import type { AdminRepo } from "../../src/hosted/store/admin.js";
@@ -215,7 +216,7 @@ export async function makeApp(
   const hubs = new UserHubs(
     hubFactory({
       repos,
-      keyWrapper: wrapper,
+      credentials: secretsFor(db, wrapper),
       gateway: over.gateway,
       network: {
         fetch: over.fetch ?? fakeFetch([]),

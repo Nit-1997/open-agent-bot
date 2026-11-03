@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCredentialKeys } from "../../src/config.js";
+import { parseCredentialKeys } from "../../src/hosted/config.js";
 import { type CredentialContext, CredentialIntegrityError, open, rewrap, type Sealed, seal } from "../../src/secrets/envelope.js";
 import { keyHint, oauthHint } from "../../src/secrets/hint.js";
 import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";

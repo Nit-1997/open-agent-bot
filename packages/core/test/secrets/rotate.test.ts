@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { parseCredentialKeys } from "../../src/config.js";
+import { parseCredentialKeys } from "../../src/hosted/config.js";
 import { open, type Sealed, seal } from "../../src/secrets/envelope.js";
 import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
 import { type RotationRepo, rotateStale } from "../../src/hosted/secrets/rotate.js";

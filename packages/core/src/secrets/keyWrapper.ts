@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import type { CredentialKeys } from "../config.js";
+
+export type CredentialKeys = { current: number; keys: ReadonlyMap<number, Buffer> };
 
 export type Wrapped = { wrapped: Buffer; nonce: Buffer; version: number };
 

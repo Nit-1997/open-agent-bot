@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_CAPABILITIES, type Principal } from "../../src/identity/types.js";
 import { ProviderHub } from "../../src/providers/hub.js";
 import { hubFactory } from "../../src/providers/hubFactory.js";
+import { secretsFor } from "../../src/secrets/secretsFor.js";
 import { wrapper } from "../fixtures/app.js";
 import { fakeFetch } from "../fixtures/fakeFetch.js";
 import { MemoryDb } from "../fixtures/memoryRepos.js";
@@ -14,7 +15,12 @@ function build(user: Principal) {
   const create = vi.spyOn(ProviderHub, "create");
   const db = new MemoryDb();
   const f = fakeFetch([]);
-  const factory = hubFactory({ repos: (id) => db.forUser(id), keyWrapper: wrapper, gateway: GATEWAY, network: { fetch: f, userFetch: f } });
+  const factory = hubFactory({
+    repos: (id) => db.forUser(id),
+    credentials: secretsFor(db, wrapper),
+    gateway: GATEWAY,
+    network: { fetch: f, userFetch: f },
+  });
   return factory(user).then((hub) => ({ hub, options: create.mock.calls[0][0] }));
 }
 

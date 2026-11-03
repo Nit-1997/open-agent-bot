@@ -1,14 +1,12 @@
-import type { KeyWrapper } from "../secrets/keyWrapper.js";
 import type { Principal } from "../identity/types.js";
 import type { UserRepos } from "../store/types.js";
-import { EnvelopeCredentialStore } from "../secrets/credentialStore.js";
-import { type HubOptions, ProviderHub } from "./hub.js";
+import { type HubCredentials, type HubOptions, ProviderHub } from "./hub.js";
 
 export type GatewayLike = Readonly<{ baseUrl: string; apiKey: string; models: Array<{ id: string; label: string; note?: string }> }>;
 
 export type HubFactoryDeps = Readonly<{
-  repos: (userId: string) => Pick<UserRepos, "providerSettings" | "credentials">;
-  keyWrapper: KeyWrapper;
+  repos: (userId: string) => Pick<UserRepos, "providerSettings">;
+  credentials: (userId: string) => HubCredentials;
   gateway?: GatewayLike;
   network?: Pick<HubOptions, "fetch" | "userFetch" | "lookup">;
 }>;
@@ -21,7 +19,7 @@ export function hubFactory(deps: HubFactoryDeps): (user: Principal) => Promise<P
       userId: user.id,
       capabilities: user.capabilities,
       settings: r.providerSettings,
-      credentials: new EnvelopeCredentialStore(user.id, r.credentials, deps.keyWrapper),
+      credentials: deps.credentials(user.id),
       ...(gateway && { litellm: { baseUrl: gateway.baseUrl, apiKey: gateway.apiKey, models: gateway.models } }),
       ...deps.network,
     });

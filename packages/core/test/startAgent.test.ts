@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BrowserPool } from "../src/browser/pool.js";
-import { parseCredentialKeys } from "../src/config.js";
+import { parseCredentialKeys } from "../src/hosted/config.js";
 import { LocalKeyWrapper } from "../src/secrets/keyWrapper.js";
 import { createAdminGuard } from "../src/hosted/identity/adminGuard.js";
 import { hostedRoutes } from "../src/hosted/routes.js";
