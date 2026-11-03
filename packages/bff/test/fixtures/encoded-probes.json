@@ -1,0 +1,281 @@
+{
+  "note": "Baseline 8 (M2): raw GETs against real Next on the base preview. <chat> d78e1a64-ea58-4699-bc7f-9e0afae086d7, <CHAT> its uppercase, <report> e2eReport001. status/error are what Next answered; upstream is the request line the agent saw.",
+  "rows": [
+    {
+      "name": "chats:uppercase",
+      "path": "/api/chats/<CHAT>",
+      "status": 200,
+      "error": null,
+      "upstream": [
+        "GET /chats/<chat>"
+      ]
+    },
+    {
+      "name": "chats:pct41",
+      "path": "/api/chats/%4178e1a64-ea58-4699-bc7f-9e0afae086d7",
+      "status": 404,
+      "error": "not_found",
+      "upstream": [
+        "GET /chats/a78e1a64-ea58-4699-bc7f-9e0afae086d7"
+      ]
+    },
+    {
+      "name": "chats:pct2F",
+      "path": "/api/chats/d78e1a64%2Fea58-4699-bc7f-9e0afae086d7",
+      "status": 404,
+      "error": "not_found",
+      "upstream": []
+    },
+    {
+      "name": "chats:pct252F",
+      "path": "/api/chats/d78e1a64%252Fea58-4699-bc7f-9e0afae086d7",
+      "status": 404,
+      "error": "not_found",
+      "upstream": []
+    },
+    {
+      "name": "chats:malformed",
+      "path": "/api/chats/<chat>%E0%A4%A",
+      "status": 500,
+      "error": "Internal Server Error",
+      "upstream": []
+    },
+    {
+      "name": "chats:dotdot",
+      "path": "/api/chats/%2e%2e",
+      "status": 308,
+      "error": "/api",
+      "upstream": []
+    },
+    {
+      "name": "chats:dotdot-id",
+      "path": "/api/chats/%2e%2e/<chat>",
+      "status": 200,
+      "error": "<!DOCTYPE html><html id=\"root-html\" lang",
+      "upstream": []
+    },
+    {
+      "name": "chats:trailing-slash",
+      "path": "/api/chats/<chat>/",
+      "status": 308,
+      "error": "/api/chats/d78e1a64-ea58-4699-bc7f-9e0af",
+      "upstream": []
+    },
+    {
+      "name": "chats:double-slash",
+      "path": "/api/chats//<chat>",
+      "status": 308,
+      "error": "/api/chats/d78e1a64-ea58-4699-bc7f-9e0af",
+      "upstream": []
+    },
+    {
+      "name": "reports:uppercase",
+      "path": "/api/reports/E2EREPORT001",
+      "status": 404,
+      "error": "not_found",
+      "upstream": [
+        "GET /reports/E2EREPORT001"
+      ]
+    },
+    {
+      "name": "reports:pct41",
+      "path": "/api/reports/%412eReport001",
+      "status": 404,
+      "error": "not_found",
+      "upstream": [
+        "GET /reports/A2eReport001"
+      ]
+    },
+    {
+      "name": "reports:pct2F",
+      "path": "/api/reports/e2eRepor%2F001",
+      "status": 404,
+      "error": "not_found",
+      "upstream": []
+    },
+    {
+      "name": "reports:pct252F",
+      "path": "/api/reports/e2eRepor%252F001",
+      "status": 404,
+      "error": "not_found",
+      "upstream": []
+    },
+    {
+      "name": "reports:malformed",
+      "path": "/api/reports/<report>%E0%A4%A",
+      "status": 500,
+      "error": "Internal Server Error",
+      "upstream": []
+    },
+    {
+      "name": "reports:dotdot",
+      "path": "/api/reports/%2e%2e",
+      "status": 308,
+      "error": "/api",
+      "upstream": []
+    },
+    {
+      "name": "reports:dotdot-id",
+      "path": "/api/reports/%2e%2e/<report>",
+      "status": 200,
+      "error": "<!DOCTYPE html><html id=\"root-html\" lang",
+      "upstream": []
+    },
+    {
+      "name": "reports:trailing-slash",
+      "path": "/api/reports/<report>/",
+      "status": 308,
+      "error": "/api/reports/e2eReport001",
+      "upstream": []
+    },
+    {
+      "name": "reports:double-slash",
+      "path": "/api/reports//<report>",
+      "status": 308,
+      "error": "/api/reports/e2eReport001",
+      "upstream": []
+    },
+    {
+      "name": "providers:uppercase",
+      "path": "/api/providers/OPENAI",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "providers:pct41",
+      "path": "/api/providers/%41penai",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "providers:pct2F",
+      "path": "/api/providers/openai%2F",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "providers:pct252F",
+      "path": "/api/providers/openai%252F",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "providers:malformed",
+      "path": "/api/providers/openai%E0%A4%A",
+      "status": 500,
+      "error": "Internal Server Error",
+      "upstream": []
+    },
+    {
+      "name": "providers:dotdot",
+      "path": "/api/providers/%2e%2e",
+      "status": 308,
+      "error": "/api",
+      "upstream": []
+    },
+    {
+      "name": "providers:dotdot-id",
+      "path": "/api/providers/%2e%2e/openai",
+      "status": 200,
+      "error": "<!DOCTYPE html><html id=\"root-html\" lang",
+      "upstream": []
+    },
+    {
+      "name": "providers:trailing-slash",
+      "path": "/api/providers/openai/",
+      "status": 308,
+      "error": "/api/providers/openai",
+      "upstream": []
+    },
+    {
+      "name": "providers:double-slash",
+      "path": "/api/providers//openai",
+      "status": 308,
+      "error": "/api/providers/openai",
+      "upstream": []
+    },
+    {
+      "name": "providers:openai%2Fkey",
+      "path": "/api/providers/openai%2Fkey",
+      "status": 404,
+      "error": "not_found",
+      "upstream": [
+        "GET /providers/openai/key"
+      ]
+    },
+    {
+      "name": "settings:uppercase",
+      "path": "/api/settings/BRAVE-SEARCH",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "settings:pct41",
+      "path": "/api/settings/%41rave-search",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "settings:pct2F",
+      "path": "/api/settings/brave-se%2Frch",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "settings:pct252F",
+      "path": "/api/settings/brave-se%252Frch",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    },
+    {
+      "name": "settings:malformed",
+      "path": "/api/settings/brave-search%E0%A4%A",
+      "status": 500,
+      "error": "Internal Server Error",
+      "upstream": []
+    },
+    {
+      "name": "settings:dotdot",
+      "path": "/api/settings/%2e%2e",
+      "status": 308,
+      "error": "/api",
+      "upstream": []
+    },
+    {
+      "name": "settings:dotdot-id",
+      "path": "/api/settings/%2e%2e/brave-search",
+      "status": 200,
+      "error": "<!DOCTYPE html><html id=\"root-html\" lang",
+      "upstream": []
+    },
+    {
+      "name": "settings:trailing-slash",
+      "path": "/api/settings/brave-search/",
+      "status": 308,
+      "error": "/api/settings/brave-search",
+      "upstream": []
+    },
+    {
+      "name": "settings:double-slash",
+      "path": "/api/settings//brave-search",
+      "status": 308,
+      "error": "/api/settings/brave-search",
+      "upstream": []
+    },
+    {
+      "name": "settings:openai%2Fkey",
+      "path": "/api/settings/openai%2Fkey",
+      "status": 404,
+      "error": "not found",
+      "upstream": []
+    }
+  ]
+}

@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY scripts/postinstall.mjs ./scripts/
 COPY patches ./patches
 COPY packages/shared/package.json packages/shared/
+COPY packages/bff/package.json packages/bff/
 COPY packages/core/package.json packages/core/
 COPY packages/ui/package.json packages/ui/
 COPY web/package.json web/
