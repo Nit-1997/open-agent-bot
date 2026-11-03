@@ -18,16 +18,18 @@ const STATUS: Record<UserErrorKind, ContentfulStatusCode> = {
   internal: 500,
 };
 
-export function errorResponse(c: Context, err: UserError): Response {
+export const errorStatus = (err: UserError): ContentfulStatusCode => STATUS[err.kind];
+
+export function errorBody(err: UserError): Record<string, unknown> {
   const { retryAfter, details } = err.opts;
+  return { error: err.code, message: err.message, ...(retryAfter !== undefined && { retryAfter }), ...details };
+}
+
+export function errorResponse(c: Context, err: UserError): Response {
   const headers: Record<string, string> = {};
-  if (retryAfter !== undefined) headers["retry-after"] = String(retryAfter);
+  if (err.opts.retryAfter !== undefined) headers["retry-after"] = String(err.opts.retryAfter);
   if (err.kind === "unauthorized") headers["www-authenticate"] = 'Bearer error="invalid_token"';
-  return c.json(
-    { error: err.code, message: err.message, ...(retryAfter !== undefined && { retryAfter }), ...details },
-    STATUS[err.kind],
-    headers,
-  );
+  return c.json(errorBody(err), errorStatus(err), headers);
 }
 
 export function limitBy<E extends { Variables: { user: { id: string } } }>(
