@@ -82,7 +82,7 @@ test("the account menu item opens Services & data: status, versions from labels,
   await everyElementHasUniqueId(page);
   const stats = fake.calls().find((c) => c.argv[0] === "run");
   expect(stats?.argv.join(" ")).toMatch(
-    /^run --rm -i --network none --read-only .* -v oab-e2e-desktop-services-data:\/data --entrypoint node .* stats$/,
+    /^run --rm -i --init --name oab-e2e-desktop-services-export-[0-9a-f]{12} --network none --read-only .* -v oab-e2e-desktop-services-data:\/data --entrypoint node .* stats$/,
   );
   await page.locator("#screen-services-close").click();
   await expect.poll(() => s.status()?.screen).toBe("app");
@@ -95,6 +95,9 @@ test("Restart services (confirmed) → a new tokenFp, the app reloads and /api/w
   const s = await setup({}, "restart");
   const page = await openServices(s);
   const before = s.stack()?.launchToken ?? "";
+  await (await s.appPage()).evaluate(() => {
+    (window as unknown as { staleMarker: number }).staleMarker = 1;
+  });
   await page.locator("#screen-services-restart").click();
   await expect(page.locator("#screen-services-restart-confirm-text")).toHaveText("Chats in progress will stop.");
   await everyElementHasUniqueId(page);
@@ -107,6 +110,10 @@ test("Restart services (confirmed) → a new tokenFp, the app reloads and /api/w
   expect(ups.at(-1)?.argv).toContain("--force-recreate");
   const app = await s.appPage();
   await expect.poll(() => app.evaluate(() => fetch("/api/whoami").then((r) => r.status))).toBe(200);
+  expect(await app.evaluate(() => (window as unknown as { staleMarker?: number }).staleMarker)).toBeUndefined();
+  const restartLog = s.log().slice(s.log().lastIndexOf("[action] restartServices"));
+  expect(restartLog.indexOf("[app] app view unloaded")).toBeGreaterThan(0);
+  expect(restartLog.indexOf("[app] app view unloaded")).toBeLessThan(restartLog.indexOf("[stack] ready"));
 });
 
 test("View logs: the Requests only filter and the service selector; Save logs has both sections and no token", async () => {
@@ -154,7 +161,9 @@ test("Export → the zip at the save path with the D15 entries only, and the mes
   expect(exp?.argv.join(" ")).toContain("--network none");
   expect(exp?.argv.join(" ")).not.toMatch(/\/keys|renderer/);
   expect(runs.some((c) => c.argv.includes("check"))).toBe(true);
-  expect(s.log()).toMatch(/\[docker\] run --rm -i --network none .* -v oab-e2e-desktop-services-data:\/data .* export/);
+  expect(s.log()).toMatch(
+    /\[docker\] run --rm -i --init --name [a-z0-9-]+-export-[0-9a-f]{12} --network none .* -v oab-e2e-desktop-services-data:\/data .* export/,
+  );
   expect(settings().partials).toBeUndefined();
   await everyElementHasUniqueId(page);
 });
@@ -179,6 +188,19 @@ test("noSpace export → screen-disk-full (docker) with the Docker Desktop line"
   await s.waitScreen("screen-disk-full");
   await expect(page.locator("#screen-disk-full-line")).toContainText("Disk usage limit");
   expect(existsSync(env.savePath)).toBe(false);
+});
+
+test("an export bigger than the free space on this Mac → screen-disk-full (mac) before the export runs", async () => {
+  const s = await setup({ stats: { schema: 1, dbBytes: 2 ** 53 - 1, reports: 1, chats: 1, reportBytes: 0 } }, "export-nospace-mac");
+  const page = await openServices(s);
+  await page.locator("#screen-services-export").click();
+  await s.waitScreen("screen-disk-full");
+  await expect(page.locator("#screen-disk-full-title")).toHaveText("Not enough free space on this Mac");
+  await expect(page.locator("#screen-disk-full-mac")).toContainText("free; the export needs about");
+  await everyElementHasUniqueId(page);
+  expect(fake.calls().some((c) => c.argv[0] === "run" && c.argv.includes("export"))).toBe(false);
+  expect(existsSync(env.savePath)).toBe(false);
+  expect(existsSync(`${env.savePath}.partial`)).toBe(false);
 });
 
 test("db_corrupt has no Export and shows the deferral text; db_newer exports a snapshot", async () => {

@@ -12,7 +12,7 @@ import { type ActResult, type ShellAction, type ShellState, validateAction } fro
 import type { ExternalOpener } from "./externalLinks.ts";
 import { describeUrl } from "./firewall.ts";
 import type { Log } from "./logger.ts";
-import { type NavContext, navigationDecision, SHELL_URL } from "./navigation.ts";
+import { createOpenBudget, type NavContext, navigationDecision, REPORT_OPEN_BUDGET, SHELL_URL } from "./navigation.ts";
 import { APP_PARTITION, nameView } from "./permissions.ts";
 
 export const SHELL_PARTITION = "shell";
@@ -35,7 +35,7 @@ export type MainWindow = Readonly<{
   appView: WebContentsView;
   showShell(): void;
   showApp(port: number): Promise<void>;
-  hideApp(): void;
+  hideApp(): Promise<void>;
   revealApp(): void;
   reloadApp(): void;
   setTitle(title: string): void;
@@ -104,10 +104,13 @@ export function createMainWindow(d: WindowDeps): MainWindow {
     };
     contents.on("will-navigate", onNav("navigate"));
     contents.on("will-redirect", onNav("redirect"));
+    const budget = view === "report" ? createOpenBudget() : undefined;
     contents.setWindowOpenHandler(({ url }) => {
       const r = decide(url, true, "open");
-      if (r.action === "external") d.openExternal(r.url);
-      else if (r.action === "report") openReport(r.url);
+      if (r.action === "external") {
+        if (budget?.spent()) d.log.warn(`[nav] deny report open ${describeUrl(url)} (budget of ${REPORT_OPEN_BUDGET} spent)`);
+        else if (d.openExternal(r.url) === "opened") budget?.take();
+      } else if (r.action === "report") openReport(r.url);
       else d.log.warn(`[nav] deny ${view} open ${describeUrl(url)}`);
       return { action: "deny" };
     });
@@ -230,16 +233,15 @@ export function createMainWindow(d: WindowDeps): MainWindow {
       shellView.webContents.focus();
     },
     showApp: async (port) => {
-      const url = `http://127.0.0.1:${port}/`;
-      if (originOf(appView.webContents.getURL()) === originOf(url) && !appView.webContents.isCrashed()) appView.webContents.reload();
-      else await appView.webContents.loadURL(url);
+      await appView.webContents.loadURL(`http://127.0.0.1:${port}/`);
       appView.setVisible(true);
       shellView.setVisible(false);
       appView.webContents.focus();
     },
-    hideApp: () => {
+    hideApp: async () => {
       appView.setVisible(false);
       shellView.setVisible(true);
+      if (appView.webContents.getURL() !== "about:blank") await appView.webContents.loadURL("about:blank").catch(() => {});
     },
     revealApp: () => {
       const origin = d.appOrigin();

@@ -1,6 +1,7 @@
 import { compareSemver, type ServicePins, validatePins } from "./services.ts";
 import type { Settings } from "./settings.ts";
 import { PRODUCTION } from "./shellConfig.ts";
+import { obj } from "../shared/util.ts";
 
 export { incompatibleText } from "../shared/updateText.ts";
 export { compareSemver };
@@ -51,9 +52,6 @@ const originPolicy =
   (origin: string): Policy =>
   (u) =>
     u.origin === origin && noUser(u);
-
-const obj = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
 
 const parseUrl = (raw: string, base?: string): URL | undefined => {
   try {

@@ -281,7 +281,9 @@ async function composeCmd(home, sc, state, c, env, rec) {
           service: svc,
           project,
           image: imageFor(svc),
-          imageId: state.images[imageFor(svc)] ?? `sha256:${hex(imageFor(svc))}`,
+          imageId: /^sha256:[0-9a-f]{64}$/.test(imageFor(svc))
+            ? imageFor(svc)
+            : (state.images[imageFor(svc)] ?? `sha256:${hex(imageFor(svc))}`),
           configFiles: c.file,
           workingDir: c.dir,
           version: versionFor(svc),
@@ -523,13 +525,13 @@ export async function main(home, argv) {
     ...(env.OPEN_AGENT_LAUNCH_TOKEN ? { tokenFp: fp(env.OPEN_AGENT_LAUNCH_TOKEN) } : {}),
     ...(env.OPEN_AGENT_IMAGE ? { images: { agent: env.OPEN_AGENT_IMAGE, search: env.OPEN_AGENT_SEARCH_IMAGE } } : {}),
   };
-  appendFileSync(paths(home).calls, `${JSON.stringify({ ...rec, phase: "start" })}\n`);
   process.on("SIGTERM", () => {
     rec.exitCode = 143;
     rec.signal = "SIGTERM";
     finish(home, rec);
     process.exit(143);
   });
+  appendFileSync(paths(home).calls, `${JSON.stringify({ ...rec, phase: "start" })}\n`);
   let code;
   try {
     code = await dispatch(home, sc, state, argv, env, rec);
@@ -560,6 +562,20 @@ async function dispatch(home, sc, state, argv, env, rec) {
       return 0;
     }
     case "info":
+      if (argv.includes("{{json .ClientInfo.Plugins}}")) {
+        out(
+          JSON.stringify(
+            (sc.plugins ?? []).map((path) => ({
+              Name: path
+                .split("/")
+                .pop()
+                ?.replace(/^docker-/, ""),
+              Path: path,
+            })),
+          ),
+        );
+        return up ? 0 : 1;
+      }
       if (!up) return down();
       out(JSON.stringify({ ...sc.engine, MemTotal: sc.memTotal, OSType: "linux", Architecture: "aarch64" }));
       return 0;
@@ -672,6 +688,9 @@ async function dispatch(home, sc, state, argv, env, rec) {
     case "run":
       if (!up) return down();
       return runCmd(home, sc, argv, rec);
+    case "rm":
+      if (!up) return down();
+      return argv[1] === "-f" && /^oab-[a-z0-9-]+-export-[0-9a-f]{12}$/.test(argv[2] ?? "") ? 0 : 64;
     case "volume": {
       if (!up) return down();
       if (argv[1] !== "rm") return 64;

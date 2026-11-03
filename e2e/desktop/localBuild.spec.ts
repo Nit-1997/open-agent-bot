@@ -95,6 +95,15 @@ test("dist:local: a kind:local lock from the script → the Local build badge an
   say(`healthy; /health.version ${health.version}`);
   expect(health.version).toBe(lock.version);
   expect(s1.log()).not.toMatch(/\[docker\] pull /);
+  const ids = docker(["ps", "-aq", "--filter", `label=com.docker.compose.project=${PROJECT}`])
+    .trim()
+    .split("\n");
+  const runBy = docker(["inspect", "-f", "{{.Config.Image}}", ...ids])
+    .trim()
+    .split("\n")
+    .sort();
+  say(`containers run by image Id: ${runBy.map((i) => i.slice(0, 19)).join(", ")}`);
+  expect(runBy).toEqual([lock.imageIds.agent, lock.imageIds.agent, lock.imageIds.search].sort());
 
   await s1.app.evaluate(({ Menu, BaseWindow }) => {
     const item = Menu.getApplicationMenu()?.getMenuItemById("menu-services");

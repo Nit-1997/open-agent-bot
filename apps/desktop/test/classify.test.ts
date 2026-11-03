@@ -102,3 +102,30 @@ describe("classify (D10)", () => {
     );
   });
 });
+
+describe("local pins run by image Id (S4)", () => {
+  const local: ServicePins = {
+    kind: "local",
+    version: "local-abc",
+    composeSha256: "x",
+    images: { agent: "open-agent:local", search: "open-agent-search:local" },
+    imageIds: IDS,
+    pull: false,
+  };
+  const byId = (s: string) => (s === "search" ? IDS.search : IDS.agent);
+  it("containers created from the pinned Ids are ours and running", () => {
+    const containers = all({ agent: { image: byId("agent") }, search: { image: byId("search") }, renderer: { image: byId("renderer") } });
+    expect(run(containers, { pins: local, health: { ok: true, app: "open-agent", version: "local-abc" } }).kind).toBe("oursRunning");
+  });
+  it("containers created from the tags are stale", () => {
+    const containers = all({
+      agent: { image: "open-agent:local" },
+      search: { image: "open-agent-search:local" },
+      renderer: { image: "open-agent:local" },
+    });
+    expect(run(containers, { pins: local, health: { ok: true, app: "open-agent", version: "local-abc" } })).toMatchObject({
+      kind: "oursStale",
+      reasons: expect.arrayContaining(["image_mismatch(agent)"]),
+    });
+  });
+});

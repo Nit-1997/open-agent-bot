@@ -1,3 +1,5 @@
+import { obj } from "../shared/util.ts";
+
 export type PullProgress = Readonly<{
   ref: string;
   layersDone: number;
@@ -50,9 +52,6 @@ export function createPullParser(
     },
   };
 }
-
-const obj = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
 
 export function layerSizesFromManifest(stdout: string, arch: string): Map<string, number> | undefined {
   let parsed: unknown;

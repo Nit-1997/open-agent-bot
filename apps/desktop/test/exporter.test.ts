@@ -45,6 +45,7 @@ const cli: DockerCli = {
       o.stdoutTo?.write(zip);
       return result(0);
     }
+    if (args[0] === "rm") return result(0);
     return result(64, "", "unexpected");
   },
 };
@@ -66,17 +67,21 @@ const run = (o: { free?: number; signal?: AbortSignal } = {}) =>
     workDir: join(dir, "work"),
     signal: o.signal ?? new AbortController().signal,
     freeBytes: () => o.free ?? 10 * 1024 ** 3,
+    namePrefix: "oab-unit-export",
   });
 
 const files = () => readdirSync(dir).filter((f) => f !== "work");
 
 describe("dataToolsArgs", () => {
   it("is the exact no-network, read-only, data-volume-only docker run argv (no /keys, no renderer mount)", () => {
-    const args = dataToolsArgs({ agentRef: REF, mount: "oab-unit-data:/data", cmd: ["export"] });
+    const args = dataToolsArgs({ agentRef: REF, mount: "oab-unit-data:/data", cmd: ["export"], name: "oab-unit-export-0a1b2c3d" });
     expect(args).toEqual([
       "run",
       "--rm",
       "-i",
+      "--init",
+      "--name",
+      "oab-unit-export-0a1b2c3d",
       "--network",
       "none",
       "--read-only",
@@ -102,9 +107,9 @@ describe("dataToolsArgs", () => {
 
 describe("readStats", () => {
   it("parses the stats line; a failure → undefined", async () => {
-    expect(await readStats({ cli, env: {}, dataVolume: "oab-unit-data", agentRef: REF })).toEqual(STATS);
+    expect(await readStats({ cli, env: {}, dataVolume: "oab-unit-data", agentRef: REF, namePrefix: "oab-unit-export" })).toEqual(STATS);
     mode = "badStats";
-    expect(await readStats({ cli, env: {}, dataVolume: "oab-unit-data", agentRef: REF })).toBeUndefined();
+    expect(await readStats({ cli, env: {}, dataVolume: "oab-unit-data", agentRef: REF, namePrefix: "oab-unit-export" })).toBeUndefined();
   });
 });
 
@@ -115,7 +120,12 @@ describe("exportData", () => {
     expect(files()).toEqual(["export.zip"]);
     expect(statSync(join(dir, "export.zip")).mode & 0o777).toBe(0o600);
     const exp = calls.find((c) => c.at(-1) === "export");
-    expect(exp).toEqual(dataToolsArgs({ agentRef: REF, mount: "oab-unit-data:/data", cmd: ["export"] }));
+    const name = exp?.[exp.indexOf("--name") + 1] ?? "";
+    expect(name).toMatch(/^oab-unit-export-[0-9a-f]{12}$/);
+    expect(exp).toEqual(dataToolsArgs({ agentRef: REF, mount: "oab-unit-data:/data", cmd: ["export"], name }));
+    const names = calls.filter((c) => c[0] === "run").map((c) => c[c.indexOf("--name") + 1]);
+    expect(new Set(names).size).toBe(names.length);
+    expect(calls.some((c) => c[0] === "rm")).toBe(false);
     const check = calls.find((c) => c.includes("check"));
     expect(check?.join(" ")).toMatch(/--network none/);
     expect(check?.some((a) => /:\/check\/open-agent\.db:ro$/.test(a))).toBe(true);
@@ -165,6 +175,8 @@ describe("exportData", () => {
     ac.abort();
     expect(await p).toEqual({ ok: false, reason: "cancelled" });
     expect(files()).toEqual([]);
+    const exp = calls.find((c) => c.at(-1) === "export") ?? [];
+    expect(calls.at(-1)).toEqual(["rm", "-f", exp[exp.indexOf("--name") + 1]]);
   });
 
   it("a second export to the same target replaces it (the save dialog confirmed the overwrite)", async () => {
@@ -182,7 +194,8 @@ describe("exportData", () => {
 describe("verifyExportEntries", () => {
   it.each([
     [["export.json", "open-agent.db", "reports/u/AbCdEfGhIjKl.html"], true],
-    [["export.json", "open-agent.db", "open-agent.db-wal", "open-agent.db-shm"], true],
+    [["export.json", "open-agent.db", "open-agent.db-wal"], false],
+    [["export.json", "open-agent.db", "open-agent.db-shm"], false],
     [["export.json", "keys/kek"], false],
     [["export.json", "kek"], false],
     [["reports/../keys/kek"], false],

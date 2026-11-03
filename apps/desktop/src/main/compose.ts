@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { DockerCli, RunResult } from "./dockerCli.ts";
+import { obj } from "../shared/util.ts";
 
 export type ComposeVars = Readonly<{
   port: number;
@@ -88,8 +89,6 @@ export const UP_ARGS = (forceRecreate: boolean) => [
   "--remove-orphans",
 ];
 
-const obj = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 

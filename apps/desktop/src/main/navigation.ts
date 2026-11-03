@@ -40,8 +40,22 @@ export function navigationDecision(url: string, ctx: NavContext): NavDecision {
       : DENY;
   }
   if (isLoopbackHost(u.hostname)) return DENY;
-  if (ctx.kind === "open" || (ctx.kind === "navigate" && ctx.mainFrame)) return { action: "external", url: u.href };
+  if (ctx.kind === "open" || (ctx.view === "app" && ctx.kind === "navigate" && ctx.mainFrame)) return { action: "external", url: u.href };
   return DENY;
+}
+
+export const REPORT_OPEN_BUDGET = 3;
+
+export function createOpenBudget(limit = REPORT_OPEN_BUDGET): Readonly<{ take(): boolean; spent(): boolean }> {
+  let used = 0;
+  return {
+    take: () => {
+      if (used >= limit) return false;
+      used += 1;
+      return true;
+    },
+    spent: () => used >= limit,
+  };
 }
 
 export function subframeDecision(url: string, parentOrigin: string | undefined): "allow" | "cancel" {

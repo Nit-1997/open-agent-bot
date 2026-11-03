@@ -3,8 +3,9 @@ import { join } from "node:path";
 import type { Log } from "./logger.ts";
 import { effectivePins, type ServicePins, validatePins } from "./services.ts";
 import { bundledComposeSha } from "./stackFiles.ts";
-import type { PinsLoad } from "./stackManager.ts";
+import type { PinsLoad } from "./stackRuntime.ts";
 import { readStateFile, writeStateFile } from "./statePaths.ts";
+import { obj } from "../shared/util.ts";
 
 export type PinsSource = Readonly<{
   bundledDir: string;
@@ -14,9 +15,6 @@ export type PinsSource = Readonly<{
   shellVersion: string;
   log: Log;
 }>;
-
-const obj = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
 
 const manifestOf = (p: ServicePins) => ({
   schema: 1,

@@ -1,3 +1,5 @@
+import { obj } from "../shared/util.ts";
+
 export type PinsKind = "release" | "local" | "dev";
 export type ServicePins = Readonly<{
   kind: PinsKind;
@@ -37,17 +39,32 @@ export function compareSemver(a: string, b: string): -1 | 0 | 1 {
   if (x.pre === y.pre) return 0;
   if (x.pre === undefined) return 1;
   if (y.pre === undefined) return -1;
-  return x.pre < y.pre ? -1 : 1;
+  return comparePre(x.pre.split("."), y.pre.split("."));
 }
 
-const obj = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
+const NUMERIC = /^\d+$/;
+
+function comparePre(a: readonly string[], b: readonly string[]): -1 | 0 | 1 {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const p = a[i];
+    const q = b[i];
+    if (p === undefined) return -1;
+    if (q === undefined) return 1;
+    if (p === q) continue;
+    const pn = NUMERIC.test(p);
+    const qn = NUMERIC.test(q);
+    if (pn && qn) return BigInt(p) < BigInt(q) ? -1 : 1;
+    if (pn !== qn) return pn ? -1 : 1;
+    return p < q ? -1 : 1;
+  }
+  return 0;
+}
 
 export function validatePins(v: unknown, ctx: { test: boolean; composeSha256: string; shellVersion: string }): PinsResult {
   const r = obj(v);
   if (!r) return { ok: false, reason: "not_an_object" };
   if (r.schema !== 1) return { ok: false, reason: "schema" };
-  const kind = r.kind === undefined ? "dev" : r.kind;
+  const kind = r.kind;
   if (kind !== "release" && kind !== "local" && kind !== "dev") return { ok: false, reason: "kind" };
   if (typeof r.version !== "string" || !VERSION.test(r.version)) return { ok: false, reason: "version" };
   if (typeof r.composeSha256 !== "string" || !SHA.test(r.composeSha256)) return { ok: false, reason: "compose_sha256" };
@@ -105,3 +122,6 @@ export function effectivePins(bundled: ServicePins | undefined, accepted: Servic
 }
 
 export const isLocalBuild = (p: ServicePins | undefined) => p?.kind === "local";
+
+export const stackRefs = (p: ServicePins): Readonly<{ agent: string; search: string }> =>
+  p.kind === "local" && p.imageIds ? p.imageIds : p.images;

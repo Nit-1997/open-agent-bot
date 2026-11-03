@@ -34,11 +34,15 @@ export function createUpdates(d: UpdatesDeps): Updates {
   let error: string | undefined;
   let checked = false;
   let running: Promise<void> | undefined;
+  let manualJoined = false;
 
   const dismissed = () => shell !== undefined && d.settings.get().dismissedVersion === shell.version;
 
   const run = (manual: boolean): Promise<void> => {
-    if (running) return running;
+    if (running) {
+      if (manual) manualJoined = true;
+      return running;
+    }
     const check = d.check;
     if (!check) {
       if (manual) {
@@ -51,6 +55,7 @@ export function createUpdates(d: UpdatesDeps): Updates {
     d.settings.update({ lastUpdateCheck: new Date(d.now()).toISOString() });
     const how = manual ? "manual" : "automatic";
     d.log.info(`[update] ${how} check`);
+    manualJoined = manual;
     running = (async () => {
       d.onChange();
       let r: UpdateResult;
@@ -70,9 +75,9 @@ export function createUpdates(d: UpdatesDeps): Updates {
         if (!shell && !services && !incompatible) d.log.info("[update] up to date");
       } else {
         d.log.warn(`[update] check failed reason=${r.reason} (${how})${r.detail ? ` ${r.detail}` : ""}`);
-        if (manual) error = r.reason;
+        if (manualJoined) error = r.reason;
       }
-      if (manual) checked = true;
+      if (manualJoined) checked = true;
     })().finally(() => {
       running = undefined;
       d.onChange();

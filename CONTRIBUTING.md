@@ -58,7 +58,7 @@ npm run lint -w @oab/desktop && npm run format:check -w @oab/desktop && npm run 
 npm run dist -w @oab/desktop -- --arm64 --x64   # macOS only: both DMGs in apps/desktop/release/, ad-hoc signed, fuses flipped
 ```
 
-**Test mode.** Every test runs the app with `OPEN_AGENT_SHELL_TEST=1` and a separate state dir (`OPEN_AGENT_SHELL_STATE_DIR`), an `oab-…` project and volumes, and a port range inside 18000–19999. Test mode never touches `~/Library/Application Support/Open Agent` or the real `open-agent` project. The window title ends in " — test" and the window shows "TEST MODE".
+**Test mode.** Every test runs the app with `OPEN_AGENT_SHELL_TEST=1` and a separate state dir (`OPEN_AGENT_SHELL_STATE_DIR`), an `oab-…` project and volumes, and a port range inside 18000–19999. Test mode never touches `~/Library/Application Support/Open Agent` or the real `open-agent` project. The window title ends in " — test" and the window shows "TEST MODE". Two test-only knobs keep tests from sleeping or depending on this Mac: `OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS` (the external-link rate and de-duplication window) and `OPEN_AGENT_SHELL_FAKE_APPS` (`docker-desktop`, `orbstack`; which Docker apps the screens offer to open).
 
 **Tests with the fake docker CLI** (no Docker needed; `apps/desktop/test/fake-docker/` emulates the CLI and the agent). On Linux run it under `xvfb-run -a`:
 

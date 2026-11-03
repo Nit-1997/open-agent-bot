@@ -136,6 +136,22 @@ describe("dataTools export (D15)", () => {
     expect(leftovers()).toEqual([]);
   });
 
+  it("sweeps snapshots a killed export left in backups/ before it starts, and keeps other backups", async () => {
+    seed();
+    const backups = join(dataDir, "backups");
+    for (const f of [".export-0011223344556677.db", ".export-0011223344556677.db-wal", ".export-8899aabbccddeeff.db-journal"])
+      writeFileSync(join(backups, f), "stale");
+    writeFileSync(join(backups, "open-agent-v1-20261103.db"), "kept");
+    const seen: string[] = [];
+    const { out } = sink();
+    await writeExport({ dataDir, out, version: "1.4.0", now: NOW, hooks: { afterSnapshot: () => seen.push(...leftovers()) } });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatch(/^\.export-[0-9a-f]{16}\.db$/);
+    expect(seen[0]).not.toBe(".export-0011223344556677.db");
+    expect(leftovers()).toEqual([]);
+    expect(readdirSync(backups)).toContain("open-agent-v1-20261103.db");
+  });
+
   it("the snapshot opens with node:sqlite, keeps the schema version and the chats", async () => {
     seed();
     const { out, bytes } = sink();

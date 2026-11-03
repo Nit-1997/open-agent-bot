@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { createFakeDocker, type FakeDocker, type FakeScenario, fakeServices, subOf } from "./support/fakeDocker";
@@ -47,7 +47,7 @@ test("no Docker CLI → the missing screen lists what was searched and the three
   mkdirSync(planted);
   chmodSync(planted, 0o775);
   writeFileSync(join(planted, "docker"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
-  await setup({}, { docker: join(planted, "docker") });
+  await setup({}, { docker: join(planted, "docker"), extra: { OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS: "0" } });
   const s = await launch("missing");
   const page = await s.waitScreen("screen-docker-missing");
   await expect(page.locator("#screen-docker-missing-searched-0")).toHaveText(`Searched ${join(planted, "docker")}`);
@@ -56,9 +56,9 @@ test("no Docker CLI → the missing screen lists what was searched and the three
   );
   await expect(page.locator("#screen-docker-missing-note")).toContainText("OrbStack and Colima are alternatives");
   await everyElementHasUniqueId(page);
-  for (const id of ["get-docker-desktop", "get-orbstack", "get-colima"]) {
+  for (const [i, id] of ["get-docker-desktop", "get-orbstack", "get-colima"].entries()) {
     await page.click(`#screen-docker-missing-${id}`);
-    await page.waitForTimeout(1100);
+    await expect.poll(() => s.externalLog().length).toBe(i + 1);
   }
   expect(s.externalLog()).toEqual([
     "https://www.docker.com/products/docker-desktop/",
@@ -69,21 +69,51 @@ test("no Docker CLI → the missing screen lists what was searched and the three
   rmSync(join(planted, ".."), { recursive: true, force: true });
 });
 
-test("Docker not running → the stopped screen continues by itself within 5 s of the daemon coming up", async () => {
-  await setup({});
+test("Docker not running → the stopped screen continues by itself at the next poll after the daemon comes up", async () => {
+  await setup({}, { extra: { OPEN_AGENT_SHELL_FAKE_APPS: "docker-desktop" } });
   fake.daemon("down");
   const s = await launch("stopped");
   const page = await s.waitScreen("screen-docker-stopped");
   await expect(page.locator("#screen-docker-stopped-title")).toHaveText("Docker isn't running");
-  if (existsSync("/Applications/Docker.app")) await expect(page.locator("#screen-docker-stopped-open-docker-desktop")).toBeVisible();
-  else await expect(page.locator("#screen-docker-stopped-open-docker-desktop")).toHaveCount(0);
+  await expect(page.locator("#screen-docker-stopped-open-docker-desktop")).toBeVisible();
   await everyElementHasUniqueId(page);
-  await page.waitForTimeout(1000);
+  const versionCalls = () => fake.calls().filter((c) => c.argv[0] === "version");
+  const versions = () => versionCalls().length;
+  const first = versions();
+  await expect.poll(versions, { timeout: 20_000 }).toBeGreaterThan(first);
   fake.daemon("up");
-  const at = Date.now();
+  const atUp = versions();
   await expect.poll(() => s.status()?.screen, { timeout: 20_000 }).not.toBe("screen-docker-stopped");
-  expect(Date.now() - at).toBeLessThan(5_000);
   await expect.poll(() => s.status()?.screen, { timeout: 30_000 }).toBe("app");
+  const pollsUntilBack = versionCalls()
+    .slice(atUp)
+    .findIndex((c) => c.exitCode === 0);
+  expect(pollsUntilBack).toBeGreaterThanOrEqual(0);
+  expect(pollsUntilBack).toBeLessThanOrEqual(1);
+});
+
+test("no Docker Desktop or OrbStack installed (stubbed) → the stopped screen offers no open buttons", async () => {
+  await setup({});
+  fake.daemon("down");
+  const s = await launch("stopped-no-apps");
+  const page = await s.waitScreen("screen-docker-stopped");
+  await expect(page.locator("#screen-docker-stopped-open-docker-desktop")).toHaveCount(0);
+  await expect(page.locator("#screen-docker-stopped-open-orbstack")).toHaveCount(0);
+});
+
+test("a CLI plugin in a world-writable folder → the missing screen names it and nothing runs compose", async () => {
+  const planted = newStateDir("plugin");
+  chmodSync(planted, 0o777);
+  writeFileSync(join(planted, "docker-compose"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  await setup({ plugins: [join(planted, "docker-compose")] });
+  const s = await launch("plugin");
+  const page = await s.waitScreen("screen-docker-missing");
+  await expect(page.locator("#screen-docker-missing-rejected-0")).toContainText(
+    `${join(planted, "docker-compose")}: parent ${planted} is other-writable`,
+  );
+  await everyElementHasUniqueId(page);
+  expect(composeCalls()).toEqual([]);
+  rmSync(planted, { recursive: true, force: true });
 });
 
 test("Compose 2.23.0 → screen-compose-old", async () => {
@@ -129,6 +159,18 @@ for (const endpoint of ["tcp", "foreignSocket"] as const) {
     expect(fake.calls().map((c) => c.argv.slice(0, 2).join(" "))).toEqual(["context inspect"]);
   });
 }
+
+test("no space left during up → screen-disk-full (docker) with the prune hint", async () => {
+  await setup({ noSpace: "up" });
+  const s = await launch("disk-full-up");
+  const page = await s.waitScreen("screen-disk-full");
+  await expect(page.locator("#screen-disk-full-title")).toHaveText("Docker's disk is full");
+  await expect(page.locator("#screen-disk-full-line")).toContainText("Disk usage limit");
+  await expect(page.locator("#screen-disk-full-prune")).toContainText("docker image prune");
+  await everyElementHasUniqueId(page);
+  expect(fake.calls().filter((c) => subOf(c) === "up")).toHaveLength(1);
+  expect(s.log()).toContain("[stack] disk full where=docker");
+});
 
 test("no space left during pull → screen-disk-full with the Docker Desktop line", async () => {
   await setup({ noSpace: "pull" });

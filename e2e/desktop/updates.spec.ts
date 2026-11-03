@@ -146,9 +146,9 @@ test("v99.0.0 → the menu item and update-row; Download logs the release URL; L
   const hits = latestHits();
   shell = await launchShell(env, test.info(), { video: "throttled" });
   await readyApp(shell);
-  await shell.app.evaluate(() => new Promise((r) => setTimeout(r, 1500)));
+  const throttled = shell;
+  await expect.poll(() => throttled.log()).toContain("[update] automatic check skipped (checked within 24 h)");
   expect(latestHits()).toBe(hits);
-  expect(shell.log()).toContain("[update] automatic check skipped (checked within 24 h)");
   expect((await appMenu(shell.app)).some((i) => i.id === "menu-update")).toBe(false);
   await shell.app.close();
   shell = undefined;
@@ -279,9 +279,9 @@ test("check turned off → zero requests; a manual check redirected to another o
   mock.redirect(LATEST_PATH, `http://127.0.0.1:${OTHER_PORT}/latest`);
   shell = await launchShell(env, test.info(), { video: "disabled" });
   await readyApp(shell);
-  await shell.app.evaluate(() => new Promise((r) => setTimeout(r, 2000)));
+  const off = shell;
+  await expect.poll(() => off.log()).toContain("[update] automatic check skipped (turned off)");
   expect(mock.requests()).toEqual([]);
-  expect(shell.log()).toContain("[update] automatic check skipped (turned off)");
   expect(settings().lastUpdateCheck).toBeUndefined();
 
   const page = await openServices(shell);

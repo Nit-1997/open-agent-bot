@@ -2,11 +2,7 @@ import { aboutBlocks } from "./aboutModel.ts";
 import type { ShellState } from "./actions.ts";
 import type { Block, Button, ScreenModel } from "./screenModel.ts";
 import { EXPORT_WORDING, PORT_WARNING, RESTART_WARNING } from "./wording.ts";
-
-const MB = 1024 ** 2;
-const GB = 1024 ** 3;
-const bytes = (n: number) =>
-  n >= GB ? `${(n / GB).toFixed(1)} GB` : n >= MB ? `${Math.round(n / MB)} MB` : `${Math.max(1, Math.ceil(n / 1024))} KB`;
+import { formatBytes } from "./util.ts";
 
 export function updateButton(s: ShellState): Button {
   const action = { type: "updateServices" } as const;
@@ -24,7 +20,7 @@ function dataBlock(s: ShellState): Block {
       key: "data",
       rows: [
         { key: "volume", label: "Data volume", value: info.data.volume },
-        { key: "size", label: "Database", value: bytes(info.data.dbBytes) },
+        { key: "size", label: "Database", value: formatBytes(info.data.dbBytes) },
         { key: "reports", label: "Reports", value: String(info.data.reports) },
         { key: "chats", label: "Chats", value: String(info.data.chats) },
       ],

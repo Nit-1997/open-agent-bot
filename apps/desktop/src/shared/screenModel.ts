@@ -1,6 +1,7 @@
 import type { PullRow, ShellAction, ShellState } from "./actions.ts";
 import { servicesModel } from "./servicesModel.ts";
 import { EXPORT_WORDING } from "./wording.ts";
+import { formatBytes } from "./util.ts";
 
 export type StepState = "pending" | "active" | "done" | "failed";
 export type Step = Readonly<{
@@ -45,20 +46,17 @@ export type ScreenModel = Readonly<{
   focus?: string;
 }>;
 
-const GB = 1024 ** 3;
-const MB = 1024 ** 2;
-const size = (n: number) => (n >= GB ? `${(n / GB).toFixed(1)} GB` : `${Math.max(0, Math.round(n / MB))} MB`);
-
 export function pullDetail(rows: readonly PullRow[]): { detail: string; value: number; max: number } {
   const names = rows.map((r) => r.name).join(", ");
   const started = rows.filter((r) => r.layersTotal > 0 || r.bytesTotal !== undefined);
   const layersDone = rows.reduce((a, r) => a + r.layersDone, 0);
   const layersTotal = rows.reduce((a, r) => a + r.layersTotal, 0);
+  if (layersTotal === 0) return { detail: `${names} · preparing…`, value: 0, max: 1 };
   const layers = `layer ${layersDone} of ${layersTotal}`;
   if (started.length > 0 && started.every((r) => r.bytesTotal !== undefined)) {
     const done = started.reduce((a, r) => a + (r.bytesDone ?? 0), 0);
     const total = started.reduce((a, r) => a + (r.bytesTotal ?? 0), 0);
-    return { detail: `${names} · ${size(done)} of ${size(total)} · ${layers}`, value: done, max: Math.max(total, 1) };
+    return { detail: `${names} · ${formatBytes(done)} of ${formatBytes(total)} · ${layers}`, value: done, max: Math.max(total, 1) };
   }
   return { detail: `${names} · ${layers}`, value: layersDone, max: Math.max(layersTotal, 1) };
 }
@@ -112,13 +110,22 @@ function progressModel(s: ShellState): ScreenModel {
       state: state(2),
     },
   ];
-  const blocks: Block[] = [{ kind: "steps", key: "steps", steps }];
+  const blocks: Block[] = [
+    { kind: "steps", key: "steps", steps },
+    {
+      kind: "p",
+      key: "about",
+      tone: "muted",
+      text: "Everything runs on this Mac in Docker. The first start downloads about 2 GB; after that it starts in seconds.",
+    },
+    { kind: "p", key: "privacy", tone: "muted", text: "No account. No telemetry. Only your Mac can reach these services." },
+  ];
   if (e?.memWarning)
     blocks.push({
       kind: "p",
       key: "memory",
       tone: "warn",
-      text: `Docker has ${size(e.memBytes ?? 0)} of memory; Open Agent works best with 4 GB or more.`,
+      text: `Docker has ${formatBytes(e.memBytes ?? 0)} of memory; Open Agent works best with 4 GB or more.`,
     });
   return {
     id: "screen-progress",

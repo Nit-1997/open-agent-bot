@@ -15,6 +15,8 @@ export const OVERRIDE_VARS = [
   "OPEN_AGENT_SHELL_SINGLE_INSTANCE_ID",
   "OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET",
   "OPEN_AGENT_SHELL_FAKE_LOCATION",
+  "OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS",
+  "OPEN_AGENT_SHELL_FAKE_APPS",
 ] as const;
 
 export const PRODUCTION = Object.freeze({
@@ -40,6 +42,8 @@ export type ShellConfig = Readonly<{
   singleInstanceId?: string;
   allowSystemSocket: boolean;
   fakeOutside: boolean;
+  externalWindowMs?: number;
+  fakeApps?: Readonly<{ dockerDesktop: boolean; orbstack: boolean }>;
   ignored: readonly string[];
 }>;
 
@@ -146,6 +150,14 @@ export function loadShellConfig(env: NodeJS.ProcessEnv, real: { realUserData: st
   if (location !== undefined && location !== "outside")
     throw new ShellConfigError("OPEN_AGENT_SHELL_FAKE_LOCATION", "must be outside or unset");
 
+  const externalWindow = get("OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS");
+  if (externalWindow !== undefined && (!/^\d{1,5}$/.test(externalWindow) || Number(externalWindow) > 60_000))
+    throw new ShellConfigError("OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS", "must be a whole number of ms in 0-60000");
+
+  const apps = (get("OPEN_AGENT_SHELL_FAKE_APPS") ?? "").split(",").filter(Boolean);
+  if (apps.some((a) => a !== "docker-desktop" && a !== "orbstack"))
+    throw new ShellConfigError("OPEN_AGENT_SHELL_FAKE_APPS", "must list docker-desktop and/or orbstack");
+
   return {
     test: true,
     stateDir,
@@ -161,6 +173,8 @@ export function loadShellConfig(env: NodeJS.ProcessEnv, real: { realUserData: st
     singleInstanceId,
     allowSystemSocket: socket === "1",
     fakeOutside: location === "outside",
+    ...(externalWindow !== undefined ? { externalWindowMs: Number(externalWindow) } : {}),
+    fakeApps: { dockerDesktop: apps.includes("docker-desktop"), orbstack: apps.includes("orbstack") },
     ignored: [],
   };
 }
