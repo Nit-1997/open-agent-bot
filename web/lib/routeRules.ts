@@ -1,3 +1,4 @@
+import { parseRoute } from "@oab/shared/routes";
 import type { SessionState } from "@/lib/supabase/proxy";
 
 export type RouteDecision =
@@ -23,6 +24,7 @@ export function decideRoute(pathname: string, session: SessionState): RouteDecis
     }
     return api ? { kind: "json", status: 401, error: "signed_out" } : { kind: "login" };
   }
+  if (api) return { kind: "pass" };
   if (!session.user.isAdmin && isAdminPage(pathname)) return { kind: "not_found_page" };
-  return { kind: "pass" };
+  return parseRoute(pathname) ? { kind: "pass" } : { kind: "not_found_page" };
 }

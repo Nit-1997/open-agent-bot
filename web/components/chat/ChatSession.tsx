@@ -8,7 +8,7 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { errorCodeIn, noteRunFailure } from "@/lib/authState";
 import type { HistoryMessage } from "@/lib/chats";
-import { classifyRunError, NOT_SAVED_EVENT, notSavedMessage, type RunErrorKind } from "@/lib/errors";
+import { classifyRunError, isUserStop, NOT_SAVED_EVENT, notSavedMessage, type RunErrorKind } from "@/lib/errors";
 import type { WorkflowStepEvent } from "@/lib/steps";
 import { parseArtifactId, REPORT_TOOLS, type ReportRef, reportsIn, reportTitleIn } from "@/lib/reportRefs";
 import { buildTurns, type ChatMessage, withWorkflow } from "@/lib/turns";
@@ -63,6 +63,7 @@ export function ChatSession(props: ChatSessionProps) {
   const [now, setNow] = useState(() => Date.now());
   const scroller = useRef<HTMLDivElement>(null);
   const reveal = useRef<string | null>(null);
+  const stopRequested = useRef(false);
   const [below, setBelow] = useState(false);
 
   const [workflow, setWorkflow] = useState<Record<string, WorkflowStepEvent[]>>({});
@@ -150,6 +151,7 @@ export function ChatSession(props: ChatSessionProps) {
         onReportReady?.({ reportId, toolCallId: event.toolCallId, title, tool: call.name });
       },
       onRunErrorEvent: ({ event }) => {
+        if (isUserStop(stopRequested.current, event)) return;
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
         noteRunFailure(event.code);
         setError({ kind: classifyRunError({ error: new Error(message) }), message: event.message });
@@ -186,6 +188,7 @@ export function ChatSession(props: ChatSessionProps) {
       setEdits({});
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
+      if (isUserStop(stopRequested.current, e)) return;
       noteRunFailure(errorCodeIn(e.message));
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
     } finally {
@@ -198,6 +201,7 @@ export function ChatSession(props: ChatSessionProps) {
 
   const send = useCallback(
     (text: string, quiet = false) => {
+      stopRequested.current = false;
       setError(null);
       setUnsaved(null);
       const id = `${quiet ? QUIET_ANSWER : ""}${crypto.randomUUID()}`;
@@ -211,6 +215,7 @@ export function ChatSession(props: ChatSessionProps) {
   );
 
   const stop = useCallback(() => {
+    stopRequested.current = true;
     void copilotkit.stopAgent({ agent });
   }, [agent, copilotkit]);
 
@@ -291,6 +296,7 @@ export function ChatSession(props: ChatSessionProps) {
             kind={error.kind}
             message={error.message}
             onRetry={() => {
+              stopRequested.current = false;
               setError(null);
               void run();
             }}
