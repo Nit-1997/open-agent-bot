@@ -4,6 +4,7 @@ import { BIG_SUR } from "./support/seed";
 import { seeded } from "./support/state";
 
 const PRIVATE_TARGET = "That address isn't reachable from the server.";
+const REFUSAL_HOLD_MS = 1500;
 const PRIVATE_URLS: Array<[string, string]> = [
   ["ollama", "http://host.docker.internal:11434/v1"],
   ["custom", "http://127.0.0.1:8000/v1"],
@@ -29,7 +30,7 @@ async function replyLength(page: Page): Promise<number> {
   return (await reply.innerText()).trim().length;
 }
 
-test("preview: isolation, provider settings, private URLs refused and admin guarded @m1", async ({ page }) => {
+test("preview: isolation, provider settings, private URLs refused and admin guarded @m1", async ({ page }, testInfo) => {
   const { otherChat } = seeded();
 
   await test.step("1. Onboarding", async () => {
@@ -64,6 +65,11 @@ test("preview: isolation, provider settings, private URLs refused and admin guar
       expect((await refused).status(), url).toBe(422);
       await expect(page.locator(`${row}-error`)).toHaveText(PRIVATE_TARGET);
       await expect(page.locator(`${row}-status`)).toHaveText("Not connected");
+      await page.locator(`${row}-error`).scrollIntoViewIfNeeded();
+      await page.waitForTimeout(REFUSAL_HOLD_MS);
+      await expect(page.locator(`${row}-error`)).toHaveText(PRIVATE_TARGET);
+      await expect(page.locator(`${row}-status`)).toHaveText("Not connected");
+      await testInfo.attach(`refused ${url}`, { body: await page.locator(row).screenshot(), contentType: "image/png" });
     }
   });
 
