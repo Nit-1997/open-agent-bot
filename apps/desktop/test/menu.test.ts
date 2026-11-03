@@ -5,10 +5,12 @@ import { buildMenuTemplate } from "../src/main/menu.ts";
 const flat = (items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] =>
   items.flatMap((i) => [i, ...(Array.isArray(i.submenu) ? flat(i.submenu as MenuItemConstructorOptions[]) : [])]);
 
-const build = (packaged: boolean, calls: string[] = []) =>
+const build = (packaged: boolean, calls: string[] = [], update?: string) =>
   buildMenuTemplate({
     packaged,
     appName: "Open Agent",
+    ...(update ? { update } : {}),
+    onUpdate: () => calls.push("update"),
     onServices: () => calls.push("services"),
     onCheckUpdates: () => calls.push("updates"),
     onReloadApp: () => calls.push("reload"),
@@ -55,5 +57,22 @@ describe("buildMenuTemplate", () => {
 
   it("gives every custom item an id", () => {
     for (const i of flat(build(false))) if (!i.role && i.type !== "separator") expect(i.id, i.label).toMatch(/^menu-[a-z-]+$/);
+  });
+
+  it("has no update item without a new version", () => {
+    expect(flat(build(true)).some((i) => i.id === "menu-update")).toBe(false);
+  });
+
+  it("shows the new version above Services & data, and its click opens the update row", () => {
+    const calls: string[] = [];
+    const app = build(true, calls, "99.0.0")[0]?.submenu as MenuItemConstructorOptions[];
+    const ids = app.map((i) => i.id ?? i.role ?? i.type);
+    expect(ids.indexOf("menu-update")).toBeGreaterThan(-1);
+    expect(ids.indexOf("menu-update")).toBe(ids.indexOf("menu-services") - 1);
+    const item = app.find((i) => i.id === "menu-update");
+    expect(item?.label).toBe("Open Agent 99.0.0 is available…");
+    if (!item?.click) throw new Error("no menu-update click");
+    (item.click as () => void)();
+    expect(calls).toEqual(["update"]);
   });
 });

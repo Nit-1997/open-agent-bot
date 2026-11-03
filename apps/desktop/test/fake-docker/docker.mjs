@@ -234,7 +234,7 @@ async function composeCmd(home, sc, state, c, env, rec) {
   const sub = c.sub[0];
   const save = () => writeJson(paths(home).state, state);
   const imageFor = (svc) => (svc === "search" ? env.OPEN_AGENT_SEARCH_IMAGE : env.OPEN_AGENT_IMAGE);
-  const versionFor = (svc) => (svc === "search" ? sc.versions.search : sc.versions.agent);
+  const versionFor = (svc) => sc.refVersions?.[imageFor(svc)] ?? (svc === "search" ? sc.versions.search : sc.versions.agent);
 
   if (sub === "version") {
     out(c.sub.includes("--short") ? sc.composeVersion : `Docker Compose version v${sc.composeVersion}`);
@@ -593,7 +593,8 @@ async function dispatch(home, sc, state, argv, env, rec) {
         return 1;
       }
       const format = argv[argv.indexOf("-f") + 1] ?? "";
-      out(format.includes("image.version") ? (ref.includes("search") ? sc.versions.search : sc.versions.agent) : id);
+      const label = sc.refVersions?.[ref] ?? (ref.includes("search") ? sc.versions.search : sc.versions.agent);
+      out(format.includes("image.version") ? label : id);
       return 0;
     }
     case "manifest": {
