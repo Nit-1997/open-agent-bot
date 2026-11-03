@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import type { Browser } from "@playwright/test";
+import { isTestEmail } from "../../supabase/scripts/test-users.mjs";
 import { admin } from "./admin";
 import { AUTH_DIR, env, ROOT, scriptEnv } from "./env";
 
@@ -26,7 +27,7 @@ export async function assertNotAdmin(email: string): Promise<void> {
 }
 
 export async function createUser(email: string): Promise<void> {
-  if (!/^oab-e2e\+[a-z0-9-]+@example\.test$/.test(email)) throw new Error(`refusing to create non-test user ${email}`);
+  if (!isTestEmail(email)) throw new Error(`refusing to create non-test user ${email}`);
   script("bootstrap-admin.mjs", ["--user", email]);
   await assertNotAdmin(email);
 }
