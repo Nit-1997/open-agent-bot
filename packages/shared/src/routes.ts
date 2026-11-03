@@ -41,7 +41,12 @@ export function parseRoute(pathname: string, params: Params = new URLSearchParam
     case "search": {
       if (a !== undefined) return null;
       const scope = params.get("scope");
-      return { section: "search", q: normalizeQuery(params.get("q") ?? ""), scope: isSearchScope(scope) ? scope : "all", page: pageOf(params) };
+      return {
+        section: "search",
+        q: normalizeQuery(params.get("q") ?? ""),
+        scope: isSearchScope(scope) ? scope : "all",
+        page: pageOf(params),
+      };
     }
     default:
       return null;

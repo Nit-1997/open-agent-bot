@@ -59,9 +59,19 @@ export function matchesPrefs(f: FlightLike, prefs: FlightPrefs): boolean {
 }
 
 type AirportLike = { code: string; status: "ok" | "failed"; rideOneWay?: number; driveMinutes?: number };
-export type RankedAirport<A extends AirportLike> = A & { bestFare?: number; total?: number; bestValue?: boolean; closest?: boolean; noMatch?: boolean };
+export type RankedAirport<A extends AirportLike> = A & {
+  bestFare?: number;
+  total?: number;
+  bestValue?: boolean;
+  closest?: boolean;
+  noMatch?: boolean;
+};
 
-export function rankAirports<A extends AirportLike>(airports: A[], flights: Array<FlightLike & { origin?: string; price?: number }>, prefs: FlightPrefs): RankedAirport<A>[] {
+export function rankAirports<A extends AirportLike>(
+  airports: A[],
+  flights: Array<FlightLike & { origin?: string; price?: number }>,
+  prefs: FlightPrefs,
+): RankedAirport<A>[] {
   const ranked = airports.map((a): RankedAirport<A> => {
     const { bestFare: _b, total: _t, bestValue: _v, closest: _c, noMatch: _n, ...base } = a as RankedAirport<A>;
     if (a.status !== "ok") return base as RankedAirport<A>;
