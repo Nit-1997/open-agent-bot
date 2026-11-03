@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -44,6 +44,58 @@ docker run --rm --user pwuser -v "$PWD":/src:ro -e ELECTRON_SKIP_BINARY_DOWNLOAD
 ```
 
 It copies the source without `node_modules` and runs `npm ci` inside the container, because the host's macOS `node_modules` don't run on Linux. It runs as `pwuser`, not root, because root can read the mode-0000 key files the tests expect to be refused.
+
+## Mac app
+
+`apps/desktop` (`@oab/desktop`) is a thin Electron shell: it starts the local Docker stack (agent, search, renderer) from the bundled `docker-compose.yml` and shows the UI from `127.0.0.1`. The agent never runs inside Electron. Spec: `docs/superpowers/specs/2026-11-03-m4-mac-shell-design.md`.
+
+**Build.** Electron's binary is not downloaded by `npm ci`; fetch it once, then build and stage the stack files:
+
+```bash
+npm run electron:install -w @oab/desktop
+npm run build -w @oab/desktop && npm run stage -w @oab/desktop
+npm run lint -w @oab/desktop && npm run format:check -w @oab/desktop && npm run typecheck -w @oab/desktop && npm test -w @oab/desktop
+npm run dist -w @oab/desktop -- --arm64 --x64   # macOS only: both DMGs in apps/desktop/release/, ad-hoc signed, fuses flipped
+```
+
+**Test mode.** Every test runs the app with `OPEN_AGENT_SHELL_TEST=1` and a separate state dir (`OPEN_AGENT_SHELL_STATE_DIR`), an `oab-…` project and volumes, and a port range inside 18000–19999. Test mode never touches `~/Library/Application Support/Open Agent` or the real `open-agent` project. The window title ends in " — test" and the window shows "TEST MODE".
+
+**Tests with the fake docker CLI** (no Docker needed; `apps/desktop/test/fake-docker/` emulates the CLI and the agent). On Linux run it under `xvfb-run -a`:
+
+```bash
+(cd e2e && npx playwright test -c playwright.desktop.config.ts --project desktop-fake)
+```
+
+**Packaged smoke** (macOS, after `npm run dist`): fuses, `Info.plist`, `lipo -archs`, `codesign --verify --deep --strict`, the bundled stack hashes and the size budget, then a test-mode launch of each `.app` with the fake CLI (polls `status.json` for `app`, `curl`s `/health`, sends SIGTERM and checks the recorded `compose … stop`). No debugger is attached, so it works with the fuses on. The x64 app runs under Rosetta. `--moved` also copies each app to a second folder and checks the stack stays ours; `--static` skips the launches.
+
+```bash
+node apps/desktop/scripts/packagedSmoke.mjs --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" \
+  --dmg apps/desktop/release/Open-Agent-0.0.0-dev-arm64.dmg --dmg apps/desktop/release/Open-Agent-0.0.0-dev-x64.dmg --moved
+```
+
+**Real Docker smoke** (your own engine; `oab-` names and 184xx ports only). Build two dev images, describe them in a dev services file, then run the `desktop-real` project. It covers the lifecycle (stop on quit, token reuse, `kek_missing` reset, watchdog), a smoke with onboarding on the stub model and a streamed reply, Services & data, and the local build. Each spec removes its project and volumes when it ends.
+
+```bash
+docker build -f packages/core/Dockerfile --build-arg OPEN_AGENT_VERSION=0.0.0-dev -t oab-dev-agent:dev .
+docker build --build-arg OPEN_AGENT_VERSION=0.0.0-dev -t oab-dev-search:dev local/searxng
+node -e 'const c=require("node:crypto").createHash("sha256").update(require("node:fs").readFileSync("docker-compose.yml")).digest("hex");require("node:fs").writeFileSync("/tmp/oab-dev-services.json",JSON.stringify({schema:1,kind:"dev",version:"0.0.0-dev",composeSha256:c,images:{agent:"oab-dev-agent:dev",search:"oab-dev-search:dev"},pull:false}))'
+cd e2e && DESKTOP_REAL_DOCKER=1 DESKTOP_REAL_SERVICES=/tmp/oab-dev-services.json DESKTOP_REAL_PROJECT=oab-dev-desktop \
+  DESKTOP_REAL_RANGE=18480-18482 DESKTOP_LOCAL_RANGE=18484-18485 STUB_PORT=18483 DESKTOP_REAL_AGENT_IMAGE=oab-dev-agent:dev \
+  npx playwright test -c playwright.desktop.config.ts --project desktop-real
+```
+
+The same packaged smoke runs against real Docker with `--docker /usr/local/bin/docker --services /tmp/oab-dev-services.json` (project `oab-smoke-<arch>`, port 18486). Afterwards remove the dev images with `docker image rm oab-dev-agent:dev oab-dev-search:dev`. On Linux CI the engine socket belongs to root, so the `desktop-real` job also sets `OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET=1`, `DESKTOP_REAL_DOCKER_CLI=/usr/bin/docker`, `DESKTOP_REAL_ENGINE=Docker` and `STUB_BIND=0.0.0.0` (the agent container reaches the stub through `host.docker.internal`).
+
+**Local build (Gate 4: dogfood the DMG before any GHCR publish).** `npm run dist:local -w @oab/desktop` builds `open-agent:local` and `open-agent-search:local` from your checkout with plain `docker build` (no compose project is created), writes a `kind:"local"` lock with their image Ids, and packages a DMG for your Mac's arch. The app shows "Local build (local-<sha>)" and "Open Agent — Local build" in its title, and refuses to start (`local_images_changed`) if either image is later rebuilt or removed; run `dist:local` again then. "Update services" is not available for local builds.
+
+1. `git clone https://github.com/Nit-1997/open-agent-bot && cd open-agent-bot && git checkout <merged M4 commit>`
+2. `npm ci`
+3. `npm run dist:local -w @oab/desktop` (Docker running; about 10 minutes the first time)
+4. Open `apps/desktop/release/Open-Agent-0.0.0-dev-<arch>.dmg` and drag the app to Applications. A locally built file isn't quarantined, so there is no "Open Anyway".
+5. Launch: the title shows "Local build"; onboarding; chat.
+6. This uses the real project `open-agent` and the real volumes `open-agent-data`/`open-agent-keys`. Use Delete all data to start over, or `docker compose -p open-agent down -v` from the clone.
+
+Tests never write `open-agent:local`: with `OPEN_AGENT_SHELL_TEST=1` the script refuses to run without `--tag-prefix oab-…` (for example `--tag-prefix oab-dev- --lock-out /tmp/oab-local.lock.json --no-dist`, which `e2e/desktop/localBuild.spec.ts` uses), and such a lock is only accepted in test mode.
 
 ## Layout
 

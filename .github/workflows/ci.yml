@@ -171,3 +171,189 @@ jobs:
               cd /tmp/repo && node --version && case "$(node -p process.versions.node)" in 24.*) ;; *) echo "Node 24 required, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
               npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
               cd packages/core && npx vitest run test/local test/store'
+
+  desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    env:
+      TMPDIR: /home/runner/oab-tmp
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: A private temp dir (the shell refuses a docker CLI under a world-writable parent such as /tmp)
+        run: mkdir -m 700 "$TMPDIR"
+      - run: npm ci
+      - name: Electron's system libraries, xvfb, and unprivileged user namespaces for Chromium's sandbox
+        run: |
+          npx playwright install-deps chromium
+          sudo apt-get install -y --no-install-recommends xvfb
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run electron:install -w @oab/desktop
+      - run: npm run lint -w @oab/desktop
+      - run: npm run format:check -w @oab/desktop
+      - run: npm run typecheck -w @oab/desktop
+      - run: npm test -w @oab/desktop
+      - run: npm run build -w @oab/desktop && npm run stage -w @oab/desktop
+      - name: Electron e2e with the fake docker CLI (no Docker)
+        working-directory: e2e
+        run: xvfb-run -a npx playwright test -c playwright.desktop.config.ts --project desktop-fake
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: desktop-fake-e2e
+          path: e2e/test-results/desktop
+          retention-days: 7
+
+  desktop-real:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      TMPDIR: /home/runner/oab-tmp
+      DESKTOP_REAL_DOCKER: "1"
+      DESKTOP_REAL_DOCKER_CLI: /usr/bin/docker
+      DESKTOP_REAL_ENGINE: Docker
+      DESKTOP_REAL_PROJECT: oab-ci-desktop
+      DESKTOP_REAL_RANGE: 18350-18359
+      DESKTOP_REAL_AGENT_IMAGE: oab-ci-agent:dev
+      DESKTOP_LOCAL_PREFIX: oab-ci-
+      OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET: "1"
+      STUB_HOST: host.docker.internal
+      STUB_PORT: "18341"
+      STUB_BIND: 0.0.0.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: A private temp dir (the shell refuses a docker CLI under a world-writable parent such as /tmp)
+        run: mkdir -m 700 "$TMPDIR"
+      - run: npm ci
+      - name: Electron's system libraries, xvfb, and unprivileged user namespaces for Chromium's sandbox
+        run: |
+          npx playwright install-deps chromium
+          sudo apt-get install -y --no-install-recommends xvfb
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: npm run electron:install -w @oab/desktop
+      - run: npm run build -w @oab/desktop && npm run stage -w @oab/desktop
+      - name: Build the two local images (plain docker build; no compose project is created)
+        run: |
+          docker build -f packages/core/Dockerfile --build-arg OPEN_AGENT_VERSION=0.0.0-ci -t oab-ci-agent:dev .
+          docker build --build-arg OPEN_AGENT_VERSION=0.0.0-ci -t oab-ci-search:dev local/searxng
+      - name: Write the dev services file (local tags, no pull)
+        run: |
+          file="$RUNNER_TEMP/dev-services.json"
+          node -e '
+            const { createHash } = require("node:crypto");
+            const sha = createHash("sha256").update(require("node:fs").readFileSync("docker-compose.yml")).digest("hex");
+            const lock = { schema: 1, kind: "dev", version: "0.0.0-ci", composeSha256: sha, images: { agent: "oab-ci-agent:dev", search: "oab-ci-search:dev" }, pull: false };
+            require("node:fs").writeFileSync(process.argv[1], JSON.stringify(lock, null, 2));
+          ' "$file"
+          cat "$file"
+          echo "DESKTOP_REAL_SERVICES=$file" >> "$GITHUB_ENV"
+      - name: The stub model is reachable from a container through host.docker.internal (the specs start their own on the same port)
+        run: |
+          setsid nohup npx tsx e2e/support/stubModel.ts > "$RUNNER_TEMP/stub.log" 2>&1 &
+          pid=$!
+          for _ in $(seq 1 30); do grep -q "listening" "$RUNNER_TEMP/stub.log" && break; sleep 1; done
+          cat "$RUNNER_TEMP/stub.log"
+          rc=0
+          docker run --rm --add-host host.docker.internal:host-gateway --entrypoint node oab-ci-agent:dev -e "fetch('http://$STUB_HOST:$STUB_PORT/v1/models').then(r=>{console.log('stub via host-gateway:',r.status);process.exit(r.ok?0:1)},e=>{console.log('stub unreachable:',e.cause?.code??e.message);process.exit(1)})" || rc=$?
+          kill -- -"$pid"
+          for _ in $(seq 1 10); do (exec 3<>"/dev/tcp/127.0.0.1/$STUB_PORT") 2>/dev/null || break; sleep 1; done
+          exit "$rc"
+      - name: Electron e2e against real Docker (lifecycle, smoke with the stub, Services & data, local build)
+        working-directory: e2e
+        run: xvfb-run -a npx playwright test -c playwright.desktop.config.ts --project desktop-real
+        env:
+          DESKTOP_REAL_EVIDENCE: ${{ github.workspace }}/e2e/test-results/desktop/evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: desktop-real-e2e
+          path: e2e/test-results/desktop
+          retention-days: 7
+      - name: Tear down every oab-ci-desktop project and its volumes
+        if: always()
+        run: |
+          for p in oab-ci-desktop oab-ci-desktop-lb; do
+            OPEN_AGENT_DATA_VOLUME=$p-data OPEN_AGENT_KEYS_VOLUME=$p-keys OPEN_AGENT_PORT=18350 \
+              docker compose -p "$p" -f docker-compose.yml --env-file /dev/null down -v --remove-orphans
+            docker volume rm "$p-data" "$p-keys" 2>/dev/null || true
+          done
+
+  desktop-changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      desktop: ${{ steps.filter.outputs.desktop }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: filter
+        name: Package the Mac app only on main, or when the shell, the bundled stack files or this workflow change
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then echo "desktop=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(apps/desktop/|docker-compose\.yml$|local/renderer/seccomp\.json$|\.github/workflows/ci\.yml$)'; then
+            echo "desktop=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "desktop=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  desktop-package:
+    needs: desktop-changes
+    if: needs.desktop-changes.outputs.desktop == 'true'
+    runs-on: macos-15
+    timeout-minutes: 50
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run electron:install -w @oab/desktop
+      - name: Rosetta for the x64 smoke
+        run: /usr/bin/pgrep -q oahd || sudo softwareupdate --install-rosetta --agree-to-license
+      - name: Both DMGs, ad-hoc signed, fuses flipped
+        run: npm run dist -w @oab/desktop -- --arm64 --x64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Packaged smoke on both apps (fuses, plist, lipo, codesign, stack hashes, sizes, then a test-mode launch with the fake docker CLI)
+        run: |
+          v=$(node -p 'require("./apps/desktop/package.json").version')
+          node apps/desktop/scripts/packagedSmoke.mjs --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" \
+            --dmg "apps/desktop/release/Open-Agent-$v-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$v-x64.dmg"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: open-agent-dmgs
+          path: apps/desktop/release/*.dmg
+          retention-days: 7
