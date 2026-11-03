@@ -1,4 +1,4 @@
-import type { AuthUser } from "@oab/core/auth/verify.js";
+import type { Principal } from "@oab/core/identity/types.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import { log } from "@oab/core/lib/log.js";
 import type { AccessRequestView, AdminUser, ProfileView, RequestFilter } from "@oab/shared/admin";
@@ -22,7 +22,7 @@ const inviteOutcome = (result: EmailResult) =>
 
 export function createLiveAdminCheck(auth: Pick<AuthAdmin, "getUser">, now: () => number = Date.now) {
   const cache = new Map<string, { ok: boolean; at: number }>();
-  return async (user: AuthUser): Promise<boolean> => {
+  return async (user: Principal): Promise<boolean> => {
     const hit = cache.get(user.id);
     if (hit && now() - hit.at < ADMIN_TTL_MS) return hit.ok;
     const account = await auth.getUser(user.id);
@@ -48,7 +48,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
     isAdmin: a?.isAdmin ?? false,
   });
 
-  const target = async (admin: AuthUser, id: string): Promise<ProfileView> => {
+  const target = async (admin: Principal, id: string): Promise<ProfileView> => {
     if (id === admin.id) throw selfAction();
     const profile = await repo.users.get(id);
     if (!profile) throw missingUser();
@@ -72,7 +72,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
   return {
     listRequests: (filter: RequestFilter, page: number) => repo.accessRequests.page(filter, page),
 
-    async approve(admin: AuthUser, id: string): Promise<AccessRequestView> {
+    async approve(admin: Principal, id: string): Promise<AccessRequestView> {
       const r = await request(id);
       if (r.status !== "pending") throw new UserError("This request was already decided.", "conflict", { code: "already_decided" });
       const member = await repo.users.findByEmail(r.email);
@@ -89,13 +89,13 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
       return updated;
     },
 
-    async reject(admin: AuthUser, id: string): Promise<AccessRequestView> {
+    async reject(admin: Principal, id: string): Promise<AccessRequestView> {
       const r = await request(id);
       if (r.status !== "pending") throw new UserError("This request was already decided.", "conflict", { code: "already_decided" });
       return repo.accessRequests.decide(id, { status: "rejected", decidedBy: admin.id });
     },
 
-    async resend(_admin: AuthUser, id: string): Promise<AccessRequestView> {
+    async resend(_admin: Principal, id: string): Promise<AccessRequestView> {
       const r = await request(id);
       if (r.status !== "approved")
         throw new UserError("Only approved requests can get a new invite.", "conflict", { code: "not_approved" });
@@ -112,13 +112,13 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
       return { items: profiles.items.map((p, i) => userView(p, accounts[i])), total: profiles.total };
     },
 
-    async deactivate(admin: AuthUser, id: string): Promise<AdminUser> {
+    async deactivate(admin: Principal, id: string): Promise<AdminUser> {
       await target(admin, id);
       await disable(id);
       return userView((await repo.users.get(id))!, await auth.getUser(id));
     },
 
-    async reactivate(admin: AuthUser, id: string): Promise<AdminUser> {
+    async reactivate(admin: Principal, id: string): Promise<AdminUser> {
       await target(admin, id);
       await auth.setBanned(id, false);
       await repo.users.setStatus(id, "active");
@@ -126,7 +126,7 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
       return userView((await repo.users.get(id))!, await auth.getUser(id));
     },
 
-    async remove(admin: AuthUser, id: string, confirmEmail: unknown): Promise<void> {
+    async remove(admin: Principal, id: string, confirmEmail: unknown): Promise<void> {
       const profile = await target(admin, id);
       if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== profile.email)
         throw new UserError("Type the user's email to confirm.", "unprocessable");

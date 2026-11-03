@@ -1,16 +1,17 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
 
-export type Rule = "B1" | "B2" | "B3" | "B4";
+export type Rule = "B1" | "B2" | "B3" | "B4" | "B6";
 export type Violation = { rule: Rule; file: string; specifier: string };
 export type SourceTree = Record<string, string>;
 
 export const ENTRIES = ["server.ts", "scripts/rotateCredentials.ts"];
 export const B1_EXCEPTIONS = [...ENTRIES, "app.ts"];
-export const B3_EXCEPTIONS = ["auth/verify.ts"];
+export const B3_EXCEPTIONS: string[] = [];
 
 const SELF = "@oab/core";
 const HOSTED = "hosted/";
+const LOCAL_IDENTITY = "identity/local";
 const REGEX_AFTER = new Set(["return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void", "throw", "yield", "await"]);
 
 type Token = { kind: "word" | "string" | "punct"; value: string };
@@ -128,6 +129,7 @@ export function boundaryViolations(tree: SourceTree, exceptions: Exceptions = { 
       if (isHosted(file) && specifier.startsWith(".") && !isHosted(to!)) add("B2");
       if (!isHosted(file) && isVendor(specifier) && !exceptions.b3.includes(file)) add("B3");
       if (self && (isHosted(`${to}/`) || !isHosted(file))) add("B4");
+      if (isHosted(file) && to?.startsWith(LOCAL_IDENTITY)) add("B6");
     }
   }
   return out;

@@ -1,11 +1,10 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { AccessService } from "./hosted/access/service.js";
 import type { AdminService } from "./hosted/admin/service.js";
 import type { RunContext } from "./agui/runHandler.js";
 import type { ArtifactStore } from "./artifacts/store.js";
-import type { AuthEnv, Guards } from "./auth/middleware.js";
-import type { AuthUser } from "./auth/verify.js";
+import type { AuthEnv, Guards, Principal } from "./identity/types.js";
 import type { UserRepos } from "./store/types.js";
 import { accessRoutes } from "./hosted/http/access.js";
 import { adminRoutes } from "./hosted/http/admin.js";
@@ -26,11 +25,11 @@ import type { LoginFlows } from "./providers/logins.js";
 import type { SessionStore } from "./session/sessionStore.js";
 
 export type AppDeps = {
-  guards: Guards;
+  guards: Guards & { requireAdmin: MiddlewareHandler<AuthEnv> };
   limiter: RateLimiter;
   gate: ConcurrencyGate;
   store: SessionStore;
-  runContext: (user: AuthUser, chatId: string) => RunContext;
+  runContext: (user: Principal, chatId: string) => RunContext;
   repos: (userId: string) => UserRepos;
   profiles: ProfilesFor;
   hubs: UserHubs;

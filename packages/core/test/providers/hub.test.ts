@@ -2,7 +2,7 @@ import { BlockedAddressError } from "../../src/lib/net.js";
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { OPENAI_CODEX_MODELS } from "@earendil-works/pi-ai/providers/openai-codex.models";
 import { describe, expect, it } from "vitest";
-import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
+import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
 import { wrapper } from "../fixtures/app.js";
 import type { ProviderHub } from "../../src/providers/hub.js";
 import { fakeFetch, json } from "../fixtures/fakeFetch.js";
@@ -114,7 +114,7 @@ describe("ProviderHub", () => {
     expect(keyed.models("openai").some((m) => m.id === "gpt-5.5")).toBe(true);
     await keyed.setEnabled("openai", ["gpt-5.5"]);
 
-    const creds = new SupabaseCredentialStore(ADMIN.id, db.forUser(ADMIN.id).credentials, wrapper);
+    const creds = new EnvelopeCredentialStore(ADMIN.id, db.forUser(ADMIN.id).credentials, wrapper);
     await creds.modify("openai", async () => ({ type: "oauth", refresh: "r", access: "a", expires: Date.now() + 3_600_000 }));
     const { hub } = await make(db);
 

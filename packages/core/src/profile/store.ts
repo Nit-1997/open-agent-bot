@@ -16,7 +16,7 @@ export function readStoredProfile(raw: unknown): Profile {
   return parseProfile(value) ?? emptyProfile();
 }
 
-export class SupabaseProfileStore implements ProfileStore {
+export class RepoProfileStore implements ProfileStore {
   constructor(private readonly repo: ProfileRepo) {}
 
   async get(): Promise<Profile> {

@@ -1,12 +1,15 @@
 import { createAccessService } from "../../src/hosted/access/service.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/hosted/admin/authAdmin.js";
 import { createAdminService } from "../../src/hosted/admin/service.js";
+import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
+import { createSupabaseIdentity } from "../../src/hosted/identity/supabaseIdentity.js";
 import { type AppDeps, createApp } from "../../src/app.js";
 import { ArtifactStore, type Renderer } from "../../src/artifacts/store.js";
-import { createGuards } from "../../src/auth/middleware.js";
-import { UserStatusCache } from "../../src/auth/status.js";
-import { AuthError, type AuthUser } from "../../src/auth/verify.js";
+import { UserStatusCache } from "../../src/hosted/identity/status.js";
+import { AuthError } from "../../src/hosted/identity/verify.js";
 import { parseCredentialKeys } from "../../src/config.js";
+import { createGuards } from "../../src/identity/guards.js";
+import type { Principal } from "../../src/identity/types.js";
 import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
 import { PAGE_SIZE } from "@oab/shared/pages";
@@ -15,8 +18,8 @@ import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
 import { UserError } from "../../src/lib/errors.js";
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "../../src/lib/rateLimit.js";
-import { SupabaseProfileStore } from "../../src/profile/store.js";
-import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
+import { RepoProfileStore } from "../../src/profile/store.js";
+import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
 import { ProviderHub } from "../../src/providers/hub.js";
 import { UserHubs } from "../../src/providers/hubs.js";
 import { LoginFlows } from "../../src/providers/logins.js";
@@ -24,11 +27,11 @@ import { SessionStore } from "../../src/session/sessionStore.js";
 import { TEST_KEY_B64, TEST_SECRET } from "./config.js";
 import { fakeFetch } from "./fakeFetch.js";
 import { MemoryDb } from "./memoryRepos.js";
-import { ADMIN, ALICE, BOB } from "./users.js";
+import { ADMIN, ALICE, BOB, verified } from "./users.js";
 
 export const wrapper = new LocalKeyWrapper(parseCredentialKeys(`v1:${TEST_KEY_B64}`));
 
-export const tokenFor = (u: AuthUser) => `t.${u.id}`;
+export const tokenFor = (u: Principal) => `t.${u.id}`;
 
 export class FakeAccounts {
   users = new Map<string, { email: string; status: UserStatus; createdAt: string; account: AuthAccount }>();
@@ -38,7 +41,7 @@ export class FakeAccounts {
   failNext?: string;
   removedArtifacts: string[] = [];
 
-  add(u: AuthUser, status: UserStatus = "active") {
+  add(u: Principal, status: UserStatus = "active") {
     this.users.set(u.id, {
       email: u.email,
       status,
@@ -185,9 +188,10 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
   const verify = async (token: string) => {
     const u = users.get(token);
     if (!u) throw new AuthError("invalid_token");
-    return u;
+    return verified(u);
   };
   const status = new UserStatusCache((id) => accounts.repo().users.status(id));
+  const identity = createSupabaseIdentity({ serviceSecret: TEST_SECRET, verify, status });
   const limiter = new RateLimiter();
   const repos = (id: string) => db.forUser(id);
   const hubs = new UserHubs((user) => {
@@ -196,7 +200,7 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
       userId: user.id,
       isAdmin: user.isAdmin,
       settings: r.providerSettings,
-      credentials: new SupabaseCredentialStore(user.id, r.credentials, wrapper),
+      credentials: new EnvelopeCredentialStore(user.id, r.credentials, wrapper),
       fetch: over.fetch ?? fakeFetch([]),
       userFetch: createSafeFetch(over.fetch ?? fakeFetch([])),
       lookup: async () => ["93.184.216.34"],
@@ -211,7 +215,7 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
   const logins = new LoginFlows(async (user, providerId, ui) => {
     await (await hubs.get(user)).login(providerId, ui);
   });
-  const profiles = (id: string) => new SupabaseProfileStore(repos(id).profiles);
+  const profiles = (id: string) => new RepoProfileStore(repos(id).profiles);
   const artifacts = new ArtifactStore(
     over.render ?? (async (html) => Buffer.from(`%PDF ${html.length}`)),
     over.renderThumb ?? (async (html) => Buffer.from(`JPG ${html.length}`)),
@@ -233,12 +237,10 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
     },
   });
   const deps: AppDeps = {
-    guards: createGuards({
-      serviceSecret: TEST_SECRET,
-      verify,
-      status,
-      isLiveAdmin: async (u) => !!accounts.users.get(u.id)?.account.isAdmin,
-    }),
+    guards: {
+      ...createGuards(identity),
+      requireAdmin: createAdminGuard({ identity, isLiveAdmin: async (u) => !!accounts.users.get(u.id)?.account.isAdmin }),
+    },
     limiter,
     gate: new ConcurrencyGate(RUN_CONCURRENCY),
     store,
@@ -263,7 +265,7 @@ export async function makeApp(over: Partial<AppDeps> & { fetch?: typeof fetch; r
     ...over,
   };
   const app = createApp(deps);
-  const call = (user: AuthUser | null, path: string, init: RequestInit & { secret?: string | null } = {}) => {
+  const call = (user: Principal | null, path: string, init: RequestInit & { secret?: string | null } = {}) => {
     const { secret = TEST_SECRET, ...rest } = init;
     return app.request(path, {
       ...rest,

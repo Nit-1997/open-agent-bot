@@ -14,7 +14,7 @@ function hintFor(c: Credential): string {
   return c.key ? keyHint(c.key) : "Key saved";
 }
 
-export class SupabaseCredentialStore implements CredentialStore {
+export class EnvelopeCredentialStore implements CredentialStore {
   private readonly mutex = new KeyedMutex();
 
   constructor(

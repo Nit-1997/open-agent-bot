@@ -3,27 +3,29 @@ import { createApp } from "./app.js";
 import { loadOpenReport } from "./artifacts/openReport.js";
 import { remoteRenderer } from "./artifacts/remoteRenderer.js";
 import { ArtifactStore } from "./artifacts/store.js";
-import { ambientProviderEnv } from "./auth/ambientEnv.js";
-import { createGuards } from "./auth/middleware.js";
-import { UserStatusCache } from "./auth/status.js";
-import { createVerifier } from "./auth/verify.js";
+import { ambientProviderEnv } from "./hosted/ambientEnv.js";
+import { UserStatusCache } from "./hosted/identity/status.js";
+import { createVerifier } from "./hosted/identity/verify.js";
 import { BrowserPool } from "./browser/pool.js";
 import { ConfigError, loadConfig } from "./config.js";
 import { LocalKeyWrapper } from "./crypto/keyWrapper.js";
 import { createAccessService } from "./hosted/access/service.js";
 import { createAuthAdmin } from "./hosted/admin/authAdmin.js";
 import { createAdminService, createLiveAdminCheck } from "./hosted/admin/service.js";
+import { createAdminGuard } from "./hosted/identity/adminGuard.js";
+import { createSupabaseIdentity } from "./hosted/identity/supabaseIdentity.js";
 import { createAdminRepo } from "./hosted/store/admin.js";
 import { createAnonClient, createServiceClient } from "./hosted/store/client.js";
 import { createSupabaseStore } from "./hosted/store/supabaseStore.js";
+import { createGuards } from "./identity/guards.js";
 import { createJudgeFrom, type Judge, judgeResolver } from "./judge/index.js";
 import { BackgroundQueue } from "./lib/backgroundQueue.js";
 import { createLimiter } from "./lib/concurrency.js";
 import { log, setLogLevel } from "./lib/log.js";
 import { ConcurrencyGate, RateLimiter, RUN_CONCURRENCY } from "./lib/rateLimit.js";
 import { nearbyGroceries } from "./onboarding/groceries.js";
-import { SupabaseProfileStore } from "./profile/store.js";
-import { SupabaseCredentialStore } from "./providers/credentialStore.js";
+import { RepoProfileStore } from "./profile/store.js";
+import { EnvelopeCredentialStore } from "./providers/credentialStore.js";
 import { ProviderHub } from "./providers/hub.js";
 import { UserHubs } from "./providers/hubs.js";
 import { LoginFlows } from "./providers/logins.js";
@@ -58,7 +60,7 @@ const adminRepo = createAdminRepo(db);
 const wrapper = new LocalKeyWrapper(cfg.credentialKeys);
 const dataStore = createSupabaseStore(db);
 const repos = (userId: string) => dataStore.forUser(userId);
-const profiles = (userId: string) => new SupabaseProfileStore(repos(userId).profiles);
+const profiles = (userId: string) => new RepoProfileStore(repos(userId).profiles);
 const renderer = remoteRenderer({ url: cfg.rendererUrl, secret: cfg.rendererSecret });
 const artifacts = new ArtifactStore(renderer.pdf, renderer.thumb);
 const pool = new BrowserPool();
@@ -71,7 +73,7 @@ const hubs = new UserHubs((user) => {
     userId: user.id,
     isAdmin: user.isAdmin,
     settings: r.providerSettings,
-    credentials: new SupabaseCredentialStore(user.id, r.credentials, wrapper),
+    credentials: new EnvelopeCredentialStore(user.id, r.credentials, wrapper),
     ...(cfg.llmApiKey && { litellm: { baseUrl: cfg.llmBaseUrl, apiKey: cfg.llmApiKey, models: cfg.models } }),
   });
 });
@@ -122,13 +124,10 @@ const access = createAccessService({
   },
 });
 
+const identity = createSupabaseIdentity({ serviceSecret: cfg.serviceSecret, verify: createVerifier(cfg), status });
+
 const app = createApp({
-  guards: createGuards({
-    serviceSecret: cfg.serviceSecret,
-    verify: createVerifier(cfg),
-    status,
-    isLiveAdmin: createLiveAdminCheck(authAdmin),
-  }),
+  guards: { ...createGuards(identity), requireAdmin: createAdminGuard({ identity, isLiveAdmin: createLiveAdminCheck(authAdmin) }) },
   limiter,
   gate: new ConcurrencyGate(RUN_CONCURRENCY),
   store,

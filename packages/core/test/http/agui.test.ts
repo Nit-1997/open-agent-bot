@@ -1,7 +1,7 @@
 import { type BaseEvent, EventType } from "@ag-ui/core";
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
-import type { AuthEnv } from "../../src/auth/middleware.js";
+import type { AuthEnv } from "../../src/identity/types.js";
 import { aguiRoutes } from "../../src/http/agui.js";
 import { ConcurrencyGate, RateLimiter } from "../../src/lib/rateLimit.js";
 import { SessionStore } from "../../src/session/sessionStore.js";

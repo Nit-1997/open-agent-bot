@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { ARTIFACT_CSP } from "@oab/shared/artifacts";
 import { type ArtifactOwner, type ArtifactStore, slugify } from "../artifacts/store.js";
-import type { AuthEnv } from "../auth/middleware.js";
+import type { AuthEnv } from "../identity/types.js";
 import { LIMITS, type RateLimiter, rateLimitError } from "../lib/rateLimit.js";
 import { limitBy, safe } from "./handlers.js";
 

@@ -56,6 +56,14 @@ const blocked: Array<[string, SourceTree, string]> = [
   ["B4", { "hosted/x.ts": 'import "@oab/core/hosted/store/client.js";\n' }, "@oab/core/hosted/store/client.js"],
   ["B4", { "lib/x.ts": 'import { UserError } from "@oab/core/lib/errors.js";\n' }, "@oab/core/lib/errors.js"],
   ["B4", { "server.ts": 'import "@oab/core/hosted/main.js";\n' }, "@oab/core/hosted/main.js"],
+  ["B6", { "hosted/deps.ts": 'import "@oab/core/identity/localIdentity.js";\n' }, "@oab/core/identity/localIdentity.js"],
+  [
+    "B6",
+    { "hosted/x.ts": 'import type { LocalIdentity } from "@oab/core/identity/local/identity.js";\n' },
+    "@oab/core/identity/local/identity.js",
+  ],
+  ["B6", { "hosted/x.ts": 'export const f = () => import("@oab/core/identity/localLaunch.js");\n' }, "@oab/core/identity/localLaunch.js"],
+  ["B6", { "hosted/identity/x.ts": 'import "../../identity/localIdentity.js";\n' }, "../../identity/localIdentity.js"],
 ];
 
 const allowed: Array<[string, SourceTree]> = [
@@ -69,6 +77,8 @@ const allowed: Array<[string, SourceTree]> = [
   ["the rotation entry", { "scripts/rotateCredentials.ts": 'import { rotateStale } from "../hosted/secrets/rotate.js";\n' }],
   ["names that only contain hosted", { "lib/x.ts": 'import "./hostedLimits.js";\nimport "../unhosted/x.js";\n' }],
   ["core importing core", { "http/chats.ts": 'import type { UserRepos } from "../store/types.js";\n' }],
+  ["hosted reaching the identity port", { "hosted/identity/x.ts": 'import type { Identity } from "@oab/core/identity/types.js";\n' }],
+  ["core reaching a local identity", { "app.ts": 'import "./identity/localIdentity.js";\n' }],
 ];
 
 describe("hosted boundary rules on fixture trees", () => {
@@ -81,10 +91,10 @@ describe("hosted boundary rules on fixture trees", () => {
     expect(boundaryViolations(tree)).toEqual([]);
   });
 
-  it("keeps B1 and B3 exceptions narrow", () => {
+  it("keeps B1 exceptions narrow and has no B3 exceptions", () => {
     expect(ENTRIES).toEqual(["server.ts", "scripts/rotateCredentials.ts"]);
     expect(B1_EXCEPTIONS).toEqual([...ENTRIES, "app.ts"]);
-    expect(B3_EXCEPTIONS).toEqual(["auth/verify.ts"]);
+    expect(B3_EXCEPTIONS).toEqual([]);
     expect(boundaryViolations({ "app.ts": 'import { adminRoutes } from "./hosted/http/admin.js";\nimport "jose";\n' })).toEqual([
       { rule: "B3", file: "app.ts", specifier: "jose" },
     ]);
@@ -98,17 +108,17 @@ describe("hosted boundary on src/", () => {
     expect(Object.keys(tree).filter((f) => f.startsWith("hosted/")).length).toBeGreaterThan(10);
   });
 
-  it("has no B1–B4 violations", () => {
+  it("has no B1–B6 violations", () => {
     expect(boundaryViolations(tree)).toEqual([]);
   });
 
   it("still needs every temporary exception", () => {
     const strict = boundaryViolations(tree, { b1: ENTRIES, b3: [] });
-    expect(new Set(strict.map((v) => `${v.rule} ${v.file}`))).toEqual(new Set(["B1 app.ts", "B3 auth/verify.ts"]));
+    expect(new Set(strict.map((v) => `${v.rule} ${v.file}`))).toEqual(new Set(["B1 app.ts"]));
   });
 });
 
-describe("Biome enforces B1, B3 and B4", () => {
+describe("Biome enforces B1, B3, B4 and B6", () => {
   const { lint, dispose } = biomeFixtures("hosted-boundary-");
   afterAll(dispose);
 
@@ -119,6 +129,7 @@ describe("Biome enforces B1, B3 and B4", () => {
     ["src/lib/x.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
     ["src/lib/x.ts", 'import { UserError } from "@oab/core/lib/errors.js";\nexport default UserError;\n'],
     ["src/lib/x.ts", 'import x from "@oab/core";\nexport default x;\n'],
+    ["src/auth/verify.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
   ];
 
   const lintAllowed: Array<[string, string]> = [
@@ -127,7 +138,7 @@ describe("Biome enforces B1, B3 and B4", () => {
     ["src/server.ts", 'import "./hosted/main.js";\n'],
     ["src/scripts/rotateCredentials.ts", 'import { rotateStale } from "../hosted/secrets/rotate.js";\nexport default rotateStale;\n'],
     ["src/app.ts", 'import { adminRoutes } from "./hosted/http/admin.js";\nexport default adminRoutes;\n'],
-    ["src/auth/verify.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
+    ["src/hosted/identity/verify.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
     ["src/http/chats.ts", 'import type { UserRepos } from "../store/types.js";\nexport type R = UserRepos;\n'],
   ];
 
@@ -147,6 +158,14 @@ describe("Biome enforces B1, B3 and B4", () => {
     const r = lint("core", "src/hosted/x.ts", 'import x from "@oab/core/hosted/store/client.js";\nexport default x;\n');
     expect(r.out).toContain("lint/style/noRestrictedImports");
     expect(r.status).not.toBe(0);
+  });
+
+  it("blocks local identity modules inside hosted files", () => {
+    for (const spec of ["@oab/core/identity/localIdentity.js", "@oab/core/identity/local/identity.js"]) {
+      const r = lint("core", "src/hosted/deps.ts", `import x from "${spec}";\nexport default x;\n`);
+      expect(r.out).toContain("Hosted code must not use a local identity.");
+      expect(r.status).not.toBe(0);
+    }
   });
 
   it("still blocks cloud imports where the override applies", () => {

@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { AuthUser } from "../auth/verify.js";
+import type { Principal } from "../identity/types.js";
 import type { AuthEvent, AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
 import { log } from "../lib/log.js";
 import { UserError } from "../lib/errors.js";
 
 type Interaction = AuthInteraction & { signal: AbortSignal };
-type Login = (user: AuthUser, providerId: string, interaction: Interaction) => Promise<void>;
+type Login = (user: Principal, providerId: string, interaction: Interaction) => Promise<void>;
 
 const EXPIRED = "This sign-in expired. Start it again.";
 
@@ -41,7 +41,7 @@ export class LoginFlows {
     this.now = opts.now ?? Date.now;
   }
 
-  start(user: AuthUser, providerId: string): string {
+  start(user: Principal, providerId: string): string {
     const userId = user.id;
     for (const id of [...this.flows.keys()]) this.live(id);
     for (const [id, f] of this.flows) {

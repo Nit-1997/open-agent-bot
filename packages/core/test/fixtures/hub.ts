@@ -1,6 +1,6 @@
 import { createSafeFetch } from "../../src/lib/safeFetch.js";
 import { ProviderHub } from "../../src/providers/hub.js";
-import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
+import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
 import { wrapper } from "./app.js";
 import { fakeFetch } from "./fakeFetch.js";
 import { MemoryDb } from "./memoryRepos.js";
@@ -15,7 +15,7 @@ export async function testHub(extra: Extra = {}, db = new MemoryDb()) {
     userId,
     isAdmin: true,
     settings: repos.providerSettings,
-    credentials: new SupabaseCredentialStore(userId, repos.credentials, wrapper),
+    credentials: new EnvelopeCredentialStore(userId, repos.credentials, wrapper),
     fetch: fakeFetch([]),
     lookup: async () => ["93.184.216.34"],
     userFetch: createSafeFetch(extra.fetch ?? fakeFetch([])),

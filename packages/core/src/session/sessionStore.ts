@@ -1,5 +1,5 @@
 import type { OpenReport } from "../artifacts/openReport.js";
-import type { AuthUser } from "../auth/verify.js";
+import type { Principal } from "../identity/types.js";
 import type { FrameBus } from "../browser/frames.js";
 import type { Evidence } from "../grounding/evidence.js";
 import { log } from "../lib/log.js";
@@ -14,7 +14,7 @@ export type HistoryMessage = { role: "user" | "assistant"; text: string };
 
 export type SessionSeed = { history?: HistoryMessage[]; earlier?: EarlierCards };
 
-export type SessionOwner = { user: AuthUser; chatId: string };
+export type SessionOwner = { user: Principal; chatId: string };
 
 export type SessionEntry = {
   session: PiSession;

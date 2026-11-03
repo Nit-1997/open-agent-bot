@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { UserStatusCache } from "../../src/auth/status.js";
+import { UserStatusCache } from "../../src/hosted/identity/status.js";
 
 describe("UserStatusCache", () => {
   it("caches both answers for 30 s and refreshes after an invalidate", async () => {
