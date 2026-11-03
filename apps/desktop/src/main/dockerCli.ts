@@ -1,11 +1,12 @@
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import type { ComposeVars } from "./compose.ts";
 import { currentUid, type FsProbe, type FsStat, realFs } from "./fsProbe.ts";
 import type { Log } from "./logger.ts";
 import { redact } from "./redact.ts";
 import type { ShellConfig } from "./shellConfig.ts";
+import { obj } from "../shared/util.ts";
 
 export type DockerLocation =
   | { kind: "found"; path: string; searched: string[]; rejected: Rejected[] }
@@ -120,12 +121,64 @@ export function locateDocker(
   return { kind: "missing", searched, rejected };
 }
 
+export const SYSTEM_PLUGIN_DIRS = [
+  "/usr/local/lib/docker/cli-plugins",
+  "/usr/local/libexec/docker/cli-plugins",
+  "/usr/lib/docker/cli-plugins",
+  "/usr/libexec/docker/cli-plugins",
+] as const;
+
+export function cliPluginDirs(o: { fs?: FsProbe; home?: string } = {}): string[] {
+  const fs = o.fs ?? realFs;
+  const docker = join(o.home ?? homedir(), ".docker");
+  let extra: string[] = [];
+  const text = fs.readText?.(join(docker, "config.json"));
+  if (text !== undefined) {
+    try {
+      const dirs = obj(JSON.parse(text))?.cliPluginsExtraDirs;
+      if (Array.isArray(dirs)) extra = dirs.filter((d): d is string => typeof d === "string" && isAbsolute(d));
+    } catch {
+      extra = [];
+    }
+  }
+  return [...new Set([join(docker, "cli-plugins"), ...extra, ...SYSTEM_PLUGIN_DIRS])];
+}
+
 export function cliPluginsProblem(o: { fs?: FsProbe; uid?: number; home?: string } = {}): Rejected | undefined {
   const fs = o.fs ?? realFs;
-  const dir = join(o.home ?? homedir(), ".docker/cli-plugins");
-  if (!fs.lstat(dir)) return undefined;
-  const t = trustedDir(dir, o.uid ?? currentUid(), fs);
-  return t.ok ? undefined : { path: dir, reason: t.reason };
+  const uid = o.uid ?? currentUid();
+  for (const dir of cliPluginDirs(o)) {
+    if (!fs.lstat(dir)) continue;
+    const t = trustedDir(dir, uid, fs);
+    if (!t.ok) return { path: dir, reason: t.reason };
+    for (const name of (fs.list?.(dir) ?? []).sort()) {
+      if (!name.startsWith("docker-")) continue;
+      const path = join(dir, name);
+      if (!fs.realpath(path)) continue;
+      const p = trustedPath(path, uid, fs);
+      if (!p.ok) return { path, reason: p.reason };
+    }
+  }
+  return undefined;
+}
+
+export async function pluginPathsProblem(
+  cli: DockerCli,
+  env: Record<string, string>,
+  o: { fs?: FsProbe; uid?: number } = {},
+): Promise<{ checked: number; problem?: Rejected }> {
+  const fs = o.fs ?? realFs;
+  const uid = o.uid ?? currentUid();
+  const r = await cli.run(["info", "--format", "{{json .ClientInfo.Plugins}}"], { env, timeoutMs: 15_000, quiet: true });
+  const list = parseJson(r.stdout);
+  if (list === null) return { checked: 0 };
+  if (!Array.isArray(list)) return { checked: 0, problem: { path: "docker info", reason: "the CLI plugin list couldn't be read" } };
+  const paths = list.map((p) => str(obj(p)?.Path)).filter((p): p is string => p !== undefined);
+  for (const path of paths) {
+    const t = trustedPath(path, uid, fs);
+    if (!t.ok) return { checked: paths.length, problem: { path, reason: t.reason } };
+  }
+  return { checked: paths.length };
 }
 
 export function dockerPath(
@@ -161,7 +214,7 @@ export function dockerPath(
 }
 
 const PASS_ALWAYS = ["HOME", "USER", "LOGNAME", "TMPDIR", "LANG"] as const;
-const PASS_DOCKER = ["DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG", "DOCKER_CERT_PATH", "DOCKER_TLS_VERIFY"] as const;
+const PASS_DOCKER = ["DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CERT_PATH", "DOCKER_TLS_VERIFY"] as const;
 export const COMPOSE_VAR_NAMES = [
   "OPEN_AGENT_PORT",
   "OPEN_AGENT_LAUNCH_TOKEN",
@@ -299,8 +352,6 @@ const parseJson = (s: string): unknown => {
     return undefined;
   }
 };
-const obj = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
 const str = (v: unknown) => (typeof v === "string" ? v : undefined);
 
 export function engineOf(info: Record<string, unknown> | undefined, context: string): Engine {

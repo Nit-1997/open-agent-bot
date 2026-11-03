@@ -1,4 +1,4 @@
-import { constants, accessSync, lstatSync, realpathSync, statSync, type Stats } from "node:fs";
+import { constants, accessSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync, type Stats } from "node:fs";
 
 export type FsStat = Readonly<{ uid: number; gid: number; mode: number; kind: "file" | "dir" | "socket" | "symlink" | "other" }>;
 
@@ -7,6 +7,8 @@ export interface FsProbe {
   stat(path: string): FsStat | undefined;
   realpath(path: string): string | undefined;
   executable(path: string): boolean;
+  list?(path: string): string[] | undefined;
+  readText?(path: string): string | undefined;
 }
 
 const kindOf = (s: Stats): FsStat["kind"] => {
@@ -36,6 +38,8 @@ export const realFs: FsProbe = {
       accessSync(p, constants.X_OK);
       return true;
     }) ?? false,
+  list: (p) => attempt(() => readdirSync(p)),
+  readText: (p) => attempt(() => readFileSync(p, "utf8")),
 };
 
 export const currentUid = () => (typeof process.getuid === "function" ? process.getuid() : -1);

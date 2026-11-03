@@ -10,6 +10,7 @@ import type { Log } from "./logger.ts";
 import { serviceInfoRows } from "./servicesScreen.ts";
 import type { SettingsStore } from "./settings.ts";
 import type { ShellPaths } from "./statePaths.ts";
+import { formatBytes } from "../shared/util.ts";
 
 export type SavePath = (o: { defaultName: string; message: string }) => Promise<string | undefined>;
 
@@ -22,6 +23,7 @@ export type DataOutcome =
 export type DataDeps = Readonly<{
   paths: ShellPaths;
   dataVolume: string;
+  project: string;
   log: Log;
   settings: SettingsStore;
   savePath: SavePath;
@@ -31,9 +33,6 @@ export type DataDeps = Readonly<{
   redact: (text: string) => string;
 }>;
 
-const MB = 1024 ** 2;
-const size = (n: number) =>
-  n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1)} GB` : n >= MB ? `${Math.round(n / MB)} MB` : `${Math.max(1, Math.ceil(n / 1024))} KB`;
 const pad = (n: number) => String(n).padStart(2, "0");
 export const stamp = (d = new Date()) =>
   `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
@@ -67,7 +66,13 @@ export function createServicesData(d: DataDeps) {
     async stats(): Promise<Pick<ServicesInfo, "data" | "dataProblem">> {
       const docker = d.docker();
       if (!docker) return { dataProblem: "Docker isn't ready" };
-      const st = await readStats({ cli: docker.cli, env: docker.env, dataVolume: d.dataVolume, agentRef: docker.agentRef });
+      const st = await readStats({
+        cli: docker.cli,
+        env: docker.env,
+        dataVolume: d.dataVolume,
+        agentRef: docker.agentRef,
+        namePrefix: `${d.project}-export`,
+      });
       if (!st) return { dataProblem: "the data stats couldn't be read (see View logs)" };
       return { data: { volume: d.dataVolume, dbBytes: st.dbBytes, reports: st.reports, chats: st.chats } };
     },
@@ -83,6 +88,7 @@ export function createServicesData(d: DataDeps) {
         env: docker.env,
         dataVolume: d.dataVolume,
         agentRef: docker.agentRef,
+        namePrefix: `${d.project}-export`,
         target,
         workDir: join(d.paths.stateDir, "tmp"),
         signal,
@@ -96,7 +102,7 @@ export function createServicesData(d: DataDeps) {
       });
       if (r.ok) {
         d.log.info(`[export] done entries=${r.entries} bytes=${r.bytes}`);
-        return { kind: "notice", notice: { tone: "info", text: `Exported to ${target} (${size(r.bytes)}). ${EXPORT_WORDING}` } };
+        return { kind: "notice", notice: { tone: "info", text: `Exported to ${target} (${formatBytes(r.bytes)}). ${EXPORT_WORDING}` } };
       }
       d.log.warn(`[export] ${r.reason}${r.detail ? ` ${d.redact(r.detail)}` : ""}`);
       if (r.reason === "cancelled") return { kind: "cancelled" };

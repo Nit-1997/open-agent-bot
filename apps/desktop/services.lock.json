@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "kind": "release",
   "version": "dev",
   "composeSha256": "31e14d00d66d7bb6b8a2f41b64bb8230c631f6f9f637c7eaa938d080bf50a67d",
   "images": null

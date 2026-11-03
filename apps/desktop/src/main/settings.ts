@@ -1,5 +1,6 @@
 import type { Log } from "./logger.ts";
 import { readStateFile, writeStateFile } from "./statePaths.ts";
+import { obj } from "../shared/util.ts";
 
 export type PendingDelete = Readonly<{ project: string; dataVolume: string; keysVolume: string; at: string }>;
 
@@ -16,8 +17,6 @@ export type Settings = Readonly<{
 
 export const DEFAULT_SETTINGS: Settings = { schema: 1, stopOnQuit: true, checkForUpdates: true };
 
-const obj = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
 const NAME = /^[a-z0-9][a-z0-9_.-]{0,62}$/;
 
 function parsePending(v: unknown): PendingDelete | undefined {
@@ -63,11 +62,7 @@ export function createSettingsStore(file: string, log: Log): SettingsStore {
     writeStateFile(file, current);
   }
   return {
-    get: () => {
-      const again = readStateFile(file, parseSettings);
-      if (again.value) current = again.value;
-      return current;
-    },
+    get: () => current,
     update: (patch, drop = []) => {
       const next: Record<string, unknown> = { ...current, ...patch, schema: 1 };
       for (const k of drop) delete next[k];

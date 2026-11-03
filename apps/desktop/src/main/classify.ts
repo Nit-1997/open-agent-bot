@@ -2,7 +2,7 @@ import { type ContainerInspect, SERVICES, type ServiceName } from "./compose.ts"
 import type { Health } from "./health.ts";
 import { type StackFile, tokensEqual } from "./launchToken.ts";
 import { isRefusalExit } from "./refusals.ts";
-import type { ServicePins } from "./services.ts";
+import { type ServicePins, stackRefs } from "./services.ts";
 
 export type Existing = "none" | "oursRunning" | "oursStopped" | "oursStale" | "foreign";
 
@@ -18,7 +18,7 @@ export type ClassifyInput = Readonly<{
 const CLEAN_EXIT = new Set([0, 137, 143]);
 const STOPPED = new Set(["exited", "created"]);
 
-const imageFor = (pins: ServicePins, s: ServiceName) => (s === "search" ? pins.images.search : pins.images.agent);
+const imageFor = (pins: ServicePins, s: ServiceName) => (s === "search" ? stackRefs(pins).search : stackRefs(pins).agent);
 const idFor = (ids: ClassifyInput["expectedImageIds"], s: ServiceName) => (s === "search" ? ids.search : ids.agent);
 
 export function versionMatches(pins: ServicePins, version: string | undefined): boolean {

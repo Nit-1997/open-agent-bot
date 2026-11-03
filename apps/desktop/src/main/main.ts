@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, statfsSync } from "node:fs";
 import { join } from "node:path";
 import { app, dialog, Menu, protocol, session, shell } from "electron";
 import { createCompose } from "./compose.ts";
-import { cliPluginsProblem, createDockerCli, dockerEnv, dockerPath, locateDocker, probeDocker } from "./dockerCli.ts";
+import { cliPluginsProblem, createDockerCli, dockerEnv, dockerPath, locateDocker, pluginPathsProblem, probeDocker } from "./dockerCli.ts";
 import { resolveEndpoint } from "./endpoint.ts";
 import { createExternalOpener, LINKS } from "./externalLinks.ts";
 import { installFirewall } from "./firewall.ts";
@@ -90,6 +90,7 @@ function start(cfg: ShellConfig): void {
   const openExternal = createExternalOpener({
     now: Date.now,
     log,
+    ...(cfg.externalWindowMs !== undefined ? { dedupeMs: cfg.externalWindowMs, minIntervalMs: cfg.externalWindowMs } : {}),
     open: (url) => (cfg.test && cfg.externalLog ? appendFileSync(cfg.externalLog, `${url}\n`, { mode: 0o600 }) : shell.openExternal(url)),
   });
 
@@ -202,6 +203,11 @@ function start(cfg: ShellConfig): void {
     pins: loadPins,
     locate: () => locateDocker(cfg),
     pluginsProblem: () => cliPluginsProblem(),
+    pluginPaths: async (cli, env) => {
+      const r = await pluginPathsProblem(cli, env);
+      if (!r.problem) log.info(`[docker] plugins checked ${r.checked}`);
+      return r.problem;
+    },
     makeCli: (path) => createDockerCli(path, { log, tokens: () => [tokens.current, tokens.previous] }),
     envFor,
     endpoint: (cli, env) => resolveEndpoint(cli, env, uid, { allowSystemSocket: cfg.test && cfg.allowSystemSocket }),
@@ -220,12 +226,14 @@ function start(cfg: ShellConfig): void {
       close: async () => {
         const port = appPort;
         appPort = undefined;
-        main?.hideApp();
+        await main?.hideApp();
+        log.info("[app] app view unloaded");
         if (port !== undefined) await removeLaunchCookie(appSessionRef(), port).catch(() => {});
       },
       reload: () => main?.reloadApp(),
     },
-    apps: () => ({ dockerDesktop: existsSync("/Applications/Docker.app"), orbstack: existsSync("/Applications/OrbStack.app") }),
+    apps: () =>
+      cfg.fakeApps ?? { dockerDesktop: existsSync("/Applications/Docker.app"), orbstack: existsSync("/Applications/OrbStack.app") },
     needsMove: () =>
       needsMovePrompt({
         packaged: app.isPackaged,

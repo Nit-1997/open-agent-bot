@@ -81,6 +81,13 @@ export function stats(dataDir: string): DataStats {
 
 export type ExportHooks = Readonly<{ afterSnapshot?: (path: string) => void }>;
 
+const LEFTOVER = /^\.export-[0-9a-f]{16}\.db(-journal|-wal|-shm)?$/;
+
+const sweepLeftovers = (backups: string) => {
+  if (!existsSync(backups)) return;
+  for (const name of readdirSync(backups)) if (LEFTOVER.test(name)) rmSync(join(backups, name), { force: true });
+};
+
 const removeSnapshot = (path: string | undefined) => {
   if (!path) return;
   for (const p of [path, `${path}-journal`, `${path}-wal`, `${path}-shm`]) rmSync(p, { force: true });
@@ -98,6 +105,7 @@ export async function writeExport(o: {
   let snap: string | undefined;
   try {
     const reports = reportFiles(o.dataDir);
+    sweepLeftovers(join(o.dataDir, "backups"));
     snap = join(o.dataDir, "backups", `.export-${randomBytes(8).toString("hex")}.db`);
     const taken = takeSnapshot(join(o.dataDir, DB_FILE), snap, o.hooks?.afterSnapshot);
     const zip = createZipWriter(o.out, { now, ...(o.limits ? { limits: o.limits } : {}) });
