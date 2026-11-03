@@ -1,0 +1,16 @@
+# Second copy beside the live stack: run with -p oab-<name> and name the services on `up` (search renderer agent web).
+name: oab-preview
+
+services:
+  agent:
+    ports: !override
+      - "127.0.0.1:${PREVIEW_AGENT_PORT:-18800}:8000"
+
+  web:
+    ports:
+      - "127.0.0.1:${PREVIEW_WEB_PORT:-18300}:3000"
+    environment:
+      APP_ORIGIN: http://localhost:${PREVIEW_WEB_PORT:-18300}
+
+  caddy:
+    ports: !reset []

@@ -16,15 +16,24 @@ async function saveModelKey(storageState: string, origin: string): Promise<void>
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   mkdirSync(AUTH_DIR, { recursive: true });
   cleanupE2e();
-  createUser(DEMO_USER);
-  createUser(OTHER_USER);
-  saveSeeded(await seed(DEMO_USER, OTHER_USER));
-  const browser = await chromium.launch();
   try {
-    const demo = await signIn(browser, DEMO_USER);
-    await signIn(browser, OTHER_USER);
-    await saveModelKey(demo, env("APP_ORIGIN"));
-  } finally {
-    await browser.close();
+    await createUser(DEMO_USER);
+    await createUser(OTHER_USER);
+    saveSeeded(await seed(DEMO_USER, OTHER_USER));
+    const browser = await chromium.launch();
+    try {
+      const demo = await signIn(browser, DEMO_USER);
+      await signIn(browser, OTHER_USER);
+      await saveModelKey(demo, env("APP_ORIGIN"));
+    } finally {
+      await browser.close();
+    }
+  } catch (err) {
+    try {
+      cleanupE2e();
+    } catch (cleanupErr) {
+      throw new AggregateError([err, cleanupErr], "e2e setup failed and so did the cleanup of its users");
+    }
+    throw err;
   }
 }

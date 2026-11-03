@@ -7,8 +7,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "playwright test",
-    "demo": "playwright test && node scripts/make-demo.mjs"
+    "test": "playwright test --project=desktop --project=tablet --project=phone",
+    "smoke": "playwright test --project=smoke",
+    "demo": "npm test && node scripts/make-demo.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

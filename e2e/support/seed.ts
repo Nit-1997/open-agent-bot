@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { env } from "./env";
+import { admin } from "./admin";
 
 export const BIG_SUR = "Weekend in Big Sur for two";
 export const SEED = { chats: 24, reports: 13 } as const;
@@ -38,11 +37,6 @@ const TITLES = [
   "Ski trip to Tahoe",
   "Picnic for six",
 ];
-
-const admin = (): SupabaseClient =>
-  createClient(env("SUPABASE_URL"), env("SUPABASE_ADMIN_SECRET_KEY"), {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
 
 async function must<T>(label: string, p: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<T> {
   const { data, error } = await p;

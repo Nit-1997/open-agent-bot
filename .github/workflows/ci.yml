@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   agent:
     runs-on: ubuntu-latest
@@ -60,3 +63,10 @@ jobs:
           sh deploy-config/searxng/entrypoint.sh true
         env:
           SEARXNG_SECRET_FILE: /tmp/searxng-secret/secret
+      - name: Root compose has no project name; preview override is named and bound to 127.0.0.1
+        run: |
+          if grep -qE '^name:' docker-compose.yml; then echo "docker-compose.yml must not set a project name"; exit 1; fi
+          preview="docker compose --env-file /dev/null --profile local -f docker-compose.yml -f deploy-config/compose.preview.yml config --format json"
+          test "$($preview | jq -r .name)" = oab-preview
+          test "$($preview | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
+          test "$($preview | jq -c '[.services[].ports[]? | .published] | sort')" = '["18300","18800"]'

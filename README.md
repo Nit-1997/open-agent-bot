@@ -29,6 +29,8 @@ Open Agent is invite-only. Accounts, sessions and every user's data live in one 
 
 Visitors ask for access at `/request-access`; the admin approves them at `/admin`, which sends the invite email. Users add their own model keys in the app; keys are encrypted by the agent and never sent back to the browser.
 
+To run a preview beside a running stack, use another project name and the preview override, for example `docker compose -p oab-preview --env-file .env --env-file deploy-config/.env-nextjs -f docker-compose.yml -f deploy-config/compose.preview.yml --profile local up -d --build search renderer agent web` (agent on 127.0.0.1:18800, web on http://localhost:18300; source `scripts/preview-preflight.sh` and run `preflight <same command>` first), and keep a git-ignored root `.env` with `COMPOSE_PROJECT_NAME=<other name>` in any second checkout so unqualified compose commands there never reach the live project.
+
 Ports bound to 127.0.0.1: Caddy 80/443 and the agent's 8000 for debugging (LiteLLM 4000 and Ollama 11434 when turned on). SearXNG is reachable only from the agent.
 
 The agent refuses to start if a provider key such as `OPENAI_API_KEY` is set in its environment, because it would serve every user. The operator LiteLLM gateway (`LLM_API_KEY`) and private-network model servers are available to the admin only.
@@ -90,10 +92,12 @@ Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`,
 `e2e/` drives the local stack (`docker compose … --profile local up -d --build`, https://app.localhost) with Playwright on desktop, tablet and phone sizes. It creates `oab-e2e+shell@example.test` and `oab-e2e+other@example.test`, seeds chats, reports and saved cards, and removes them afterwards with `supabase/scripts/cleanup-e2e.mjs`. It reads `deploy-config/env-files/.env-supabase-admin` and needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e` (saved through the app's API, never typed or logged; the run uses DeepSeek V4 Flash).
 
 ```bash
-cd e2e && npm ci && npx playwright test && node scripts/make-demo.mjs
+cd e2e && npm ci && npx playwright test --project=desktop --project=tablet --project=phone && node scripts/make-demo.mjs
 ```
 
 `make-demo.mjs` needs `ffmpeg` and joins the recordings into `~/Downloads/app-shell-demo.mp4`.
+
+The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fresh preview: `APP_ORIGIN=http://localhost:18300 npx playwright test --project=smoke` signs in, completes onboarding, and checks that a reply streams and that Stop ends a run.
 
 ## Evals
 
