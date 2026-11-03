@@ -35,6 +35,16 @@ describe("css-selectors", () => {
     assert.deepEqual(splitSelectors(':where(.a,.b) > .c, [data-x="1,2"]'), [":where(.a,.b) > .c", '[data-x="1,2"]']);
   });
 
+  it("treats a backslash-escaped quote in a selector as part of the selector, not a string", () => {
+    const css = `.content-\\"x\\"{color:red}.a\\'b{x:y}@font-face{font-family:'DM Mono';font-style:normal;font-weight:400;font-display:swap}`;
+    assert.deepEqual([...selectorsOf(css)].sort(), [
+      '.a\\\'b',
+      '.content-\\"x\\"',
+      "@font-face font-family:'DM Mono'; font-style:normal; font-weight:400; font-display:swap",
+    ]);
+    assert.deepEqual(splitSelectors('.a\\",.b'), ['.a\\"', ".b"]);
+  });
+
   it("reads static/**.css under a Next build dir, sorted and de-duplicated", () => {
     const dir = mkdtempSync(join(tmpdir(), "css-sel-"));
     try {
