@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { ArtifactSink } from "../artifacts/store.js";
-import type { AgentConfig } from "../config.js";
+import type { CoreConfig } from "../config.js";
 import { regionFor } from "../prompt/region.js";
 import type { UserContext } from "../prompt/userContext.js";
 import { browseTool, runBrowse } from "./browse.js";
@@ -35,7 +35,7 @@ import { defaultStoresFor } from "../shop/stores.js";
 import { registry as sourceRegistry } from "../sources/index.js";
 
 type ToolDeps = {
-  cfg: AgentConfig;
+  cfg: CoreConfig;
   artifacts: ArtifactSink;
   pool: BrowserPool;
   sessionKey: string;

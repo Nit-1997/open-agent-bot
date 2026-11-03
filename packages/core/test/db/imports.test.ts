@@ -12,8 +12,8 @@ function files(dir: string): string[] {
 }
 
 describe("database access", () => {
-  it("creates Supabase clients only inside src/hosted/store and the two entry points", () => {
-    const allowed = new Set(["server.ts", "scripts/rotateCredentials.ts"]);
+  it("creates Supabase clients only inside src/hosted/store, the hosted wiring and the rotation entry", () => {
+    const allowed = new Set(["hosted/deps.ts", "scripts/rotateCredentials.ts"]);
     const offenders = files(SRC)
       .map((f) => relative(SRC, f))
       .filter((f) => !f.startsWith("hosted/store/") && !allowed.has(f))

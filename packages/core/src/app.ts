@@ -1,13 +1,10 @@
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import type { AccessService } from "./hosted/access/service.js";
-import type { AdminService } from "./hosted/admin/service.js";
 import type { RunContext } from "./agui/runHandler.js";
 import type { ArtifactStore } from "./artifacts/store.js";
-import type { AuthEnv, Guards, Principal } from "./identity/types.js";
+import type { AuthEnv, Guards, Principal, RouteMount } from "./identity/types.js";
+import { USER_PATHS } from "./identity/userPaths.js";
 import type { UserRepos } from "./store/types.js";
-import { accessRoutes } from "./hosted/http/access.js";
-import { adminRoutes } from "./hosted/http/admin.js";
 import { aguiRoutes } from "./http/agui.js";
 import { artifactRoutes } from "./http/artifacts.js";
 import { chatRoutes } from "./http/chats.js";
@@ -25,7 +22,7 @@ import type { LoginFlows } from "./providers/logins.js";
 import type { SessionStore } from "./session/sessionStore.js";
 
 export type AppDeps = {
-  guards: Guards & { requireAdmin: MiddlewareHandler<AuthEnv> };
+  guards: Guards;
   limiter: RateLimiter;
   gate: ConcurrencyGate;
   store: SessionStore;
@@ -36,8 +33,7 @@ export type AppDeps = {
   logins: LoginFlows;
   artifacts: ArtifactStore;
   onboarding: OnboardingDeps;
-  access: AccessService;
-  admin: AdminService;
+  mounts: RouteMount[];
 };
 
 export const BODY_LIMIT_BYTES = 1024 * 1024;
@@ -45,24 +41,6 @@ export const RUN_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
 
 const limitBody = (maxSize: number) =>
   bodyLimit({ maxSize, onError: (c) => errorResponse(c, new UserError("That request is too large.", "too_large")) });
-
-const USER_PATHS = [
-  "/agui",
-  "/chats",
-  "/chats/*",
-  "/profile",
-  "/settings",
-  "/settings/*",
-  "/places",
-  "/onboarding/*",
-  "/models",
-  "/providers",
-  "/providers/*",
-  "/artifacts/*",
-  "/reports",
-  "/reports/*",
-  "/search",
-];
 
 export function createApp(deps: AppDeps) {
   const app = new Hono<AuthEnv>();
@@ -75,10 +53,9 @@ export function createApp(deps: AppDeps) {
   const otherBody = limitBody(BODY_LIMIT_BYTES);
   app.use("*", (c, next) => (c.req.path === "/agui" ? runBody(c, next) : otherBody(c, next)));
 
-  app.route("/", accessRoutes({ access: deps.access }));
+  for (const mount of deps.mounts) if (mount.stage === "public") app.route("/", mount.routes);
 
   for (const path of USER_PATHS) app.use(path, guards.requireUser);
-  app.use("/admin/*", guards.requireAdmin);
 
   app.route("/", aguiRoutes({ store: deps.store, context: deps.runContext, limiter: deps.limiter, gate: deps.gate }));
   app.route("/", chatRoutes({ repos: deps.repos, limiter: deps.limiter }));
@@ -89,7 +66,12 @@ export function createApp(deps: AppDeps) {
   app.route("/", onboardingRoutes({ ...deps.onboarding, limiter: deps.limiter }));
   app.route("/", providerRoutes({ hubs: deps.hubs, logins: deps.logins, profiles: deps.profiles, limiter: deps.limiter }));
   app.route("/", artifactRoutes({ artifacts: deps.artifacts, owner: deps.repos, limiter: deps.limiter }));
-  app.route("/", adminRoutes({ admin: deps.admin, limiter: deps.limiter }));
+  for (const mount of deps.mounts) {
+    if (mount.stage !== "protected") continue;
+    app.use(`${mount.basePath}/*`, guards.requireUser);
+    app.use(mount.basePath, guards.requireUser);
+    app.route("/", mount.routes);
+  }
   app.notFound((c) => c.json({ error: "not_found", message: "Not found." }, 404));
 
   return app;

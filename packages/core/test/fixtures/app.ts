@@ -1,8 +1,9 @@
-import { createAccessService } from "../../src/hosted/access/service.js";
+import { type AccessService, createAccessService } from "../../src/hosted/access/service.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/hosted/admin/authAdmin.js";
 import { createAdminService } from "../../src/hosted/admin/service.js";
 import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
 import { createSupabaseIdentity } from "../../src/hosted/identity/supabaseIdentity.js";
+import { hostedRoutes } from "../../src/hosted/routes.js";
 import { type AppDeps, createApp } from "../../src/app.js";
 import { ArtifactStore, type Renderer } from "../../src/artifacts/store.js";
 import { UserStatusCache } from "../../src/hosted/identity/status.js";
@@ -187,7 +188,13 @@ export type IdentitySeams = {
 };
 
 export async function makeApp(
-  over: Partial<AppDeps> & { fetch?: typeof fetch; render?: Renderer; renderThumb?: Renderer; seams?: IdentitySeams } = {},
+  over: Partial<AppDeps> & {
+    fetch?: typeof fetch;
+    render?: Renderer;
+    renderThumb?: Renderer;
+    seams?: IdentitySeams;
+    access?: AccessService;
+  } = {},
 ) {
   const db = new MemoryDb();
   const accounts = new FakeAccounts();
@@ -246,11 +253,9 @@ export async function makeApp(
       return {};
     },
   });
+  const { access: accessOver, fetch: _fetch, render: _render, renderThumb: _thumb, seams: _seams, ...appOver } = over;
   const deps: AppDeps = {
-    guards: {
-      ...createGuards(identity),
-      requireAdmin: createAdminGuard({ identity, isLiveAdmin }),
-    },
+    guards: createGuards(identity),
     limiter,
     gate: new ConcurrencyGate(RUN_CONCURRENCY),
     store,
@@ -270,9 +275,13 @@ export async function makeApp(
     logins,
     artifacts,
     onboarding: {},
-    access,
-    admin,
-    ...over,
+    mounts: hostedRoutes({
+      access: accessOver ?? access,
+      admin,
+      adminGuard: createAdminGuard({ isLiveAdmin }),
+      limiter: appOver.limiter ?? limiter,
+    }),
+    ...appOver,
   };
   const app = createApp(deps);
   const call = (user: Principal | null, path: string, init: RequestInit & { secret?: string | null } = {}) => {

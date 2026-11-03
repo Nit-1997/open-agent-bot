@@ -6,7 +6,7 @@ export type Violation = { rule: Rule; file: string; specifier: string };
 export type SourceTree = Record<string, string>;
 
 export const ENTRIES = ["server.ts", "scripts/rotateCredentials.ts"];
-export const B1_EXCEPTIONS = [...ENTRIES, "app.ts"];
+export const B1_EXCEPTIONS = [...ENTRIES];
 export const B3_EXCEPTIONS: string[] = [];
 
 const SELF = "@oab/core";
