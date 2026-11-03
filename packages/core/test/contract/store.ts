@@ -165,6 +165,18 @@ export function describeStoreContract(name: string, setup: () => Promise<Contrac
         expect(await r.chats.get("not-a-uuid")).toBeUndefined();
         expect(await r.chats.get(randomUUID())).toBeUndefined();
       });
+
+      it("C8: exists, touch, history and append with a non-UUID chat id are invalid", async () => {
+        const r = await repos();
+        await newChat(r, "Real");
+        for (const bad of ["not-a-uuid", "", "../x"]) {
+          await expectUserError(r.chats.exists(bad), "invalid");
+          await expectUserError(r.chats.touch(bad, { titleIfEmpty: "Nope" }), "invalid");
+          await expectUserError(r.messages.history(bad), "invalid");
+          await expectUserError(r.messages.append(bad, "run-1", [message("lost")]), "invalid");
+        }
+        expect((await r.chats.page(1)).items.map((c) => c.title)).toEqual(["Real"]);
+      });
     });
 
     describe("messages", () => {
@@ -251,6 +263,35 @@ export function describeStoreContract(name: string, setup: () => Promise<Contrac
         expect((await r.artifacts.get(id))?.thumbReady).toBe(true);
         expect(await r.artifacts.setThumb(artifactId())).toBe(false);
       });
+
+      it("A4: insert with an existing id is a conflict for the same user and for another user", async () => {
+        const r = await repos();
+        const other = await repos();
+        const id = await newArtifact(r, "Original");
+        await expectUserError(r.artifacts.insert({ id, chatId: null, title: "Again", sizeBytes: 200 }), "conflict");
+        await expectUserError(other.artifacts.insert({ id, chatId: null, title: "Stolen", sizeBytes: 300 }), "conflict");
+        expect(await r.artifacts.summary(id)).toEqual({
+          id,
+          chatId: null,
+          title: "Original",
+          pdfReady: false,
+          sizeBytes: 100,
+          createdAt: expect.any(String),
+        });
+        expect((await r.artifacts.page(1)).total).toBe(1);
+        expect(await other.artifacts.get(id)).toBeUndefined();
+        expect((await other.artifacts.page(1)).total).toBe(0);
+      });
+
+      it("A5: setPdf and setThumb with an invalid id are not_found", async () => {
+        const r = await repos();
+        const id = await newArtifact(r, "Untouched");
+        for (const bad of ["BAD!", "../x", id.slice(0, 11), `${id}x`]) {
+          await expectUserError(r.artifacts.setPdf(bad), "not_found");
+          await expectUserError(r.artifacts.setThumb(bad), "not_found");
+        }
+        expect(await r.artifacts.get(id)).toMatchObject({ pdfReady: false, thumbReady: false });
+      });
     });
 
     describe("search", () => {
@@ -326,6 +367,23 @@ export function describeStoreContract(name: string, setup: () => Promise<Contrac
         expect((await r.search.search("50%", "all", 1)).items.map((i) => i.refId)).toEqual([percent]);
         expect((await r.search.search("e_c", "all", 1)).items.map((i) => i.refId)).toEqual([underscore]);
       });
+
+      it("S7: the store accepts a 2-character query and rejects a 1-character one", async () => {
+        const r = await repos();
+        const chat = await newChat(r, "Qx marks the spot");
+        await newChat(r, "Nothing here");
+        expect((await r.search.search("qX", "all", 1)).items.map((i) => i.refId)).toEqual([chat]);
+        await expectUserError(r.search.search("q", "all", 1), "invalid");
+      });
+
+      it("S8: matching is case-insensitive beyond ASCII", async () => {
+        const r = await repos();
+        const chat = await newChat(r, "Café ÜBER Straße");
+        await newChat(r, "Plain uber ride");
+        const hits = (await r.search.search("über", "all", 1)).items;
+        expect(hits.map((i) => i.refId)).toEqual([chat]);
+        expect(hits[0]).toMatchObject({ kind: "chat", match: "title", title: "Café ÜBER Straße" });
+      });
     });
 
     describe("storage", () => {
@@ -369,6 +427,25 @@ export function describeStoreContract(name: string, setup: () => Promise<Contrac
           await r.storage.upload(id, file, next);
           expect((await r.storage.download(id, file))?.equals(next)).toBe(true);
         }
+      });
+
+      it("ST5: upload, download and remove with an invalid id are not_found and write nothing", async () => {
+        const r = await repos();
+        const other = await repos();
+        const id = artifactId();
+        await other.storage.upload(id, "html", FILES.html);
+        const escapes = [`../${other.userId}/${id}`, `../../${other.userId}/${id}`];
+        for (const bad of ["../../etc", "a/b", "", ...escapes]) {
+          for (const file of ["html", "pdf", "jpg"] as const) {
+            await expectUserError(r.storage.upload(bad, file, FILES[file]), "not_found");
+            await expectUserError(r.storage.download(bad, file), "not_found");
+            await expectUserError(r.storage.remove(bad, file), "not_found");
+          }
+        }
+        expect((await other.storage.download(id, "html"))?.equals(FILES.html)).toBe(true);
+        expect(await other.storage.download(id, "pdf")).toBeUndefined();
+        expect(await other.storage.download(id, "jpg")).toBeUndefined();
+        expect(await r.storage.download(id, "html")).toBeUndefined();
       });
     });
 
@@ -437,6 +514,14 @@ export function describeStoreContract(name: string, setup: () => Promise<Contrac
         await r.credentials.delete("openai");
         expect(await r.credentials.read("openai")).toBeUndefined();
         expect(await r.credentials.list()).toEqual([]);
+      });
+
+      it("CR5: a provider name outside the allowed pattern is invalid", async () => {
+        const r = await repos();
+        for (const bad of ["Bad Name", "a".repeat(65), "-lead", "UPPER", ""])
+          await expectUserError(r.credentials.insert(credential(bad)), "invalid");
+        await r.credentials.insert(credential(`a${"b".repeat(63)}`));
+        expect((await r.credentials.list()).map((c) => c.provider)).toEqual([`a${"b".repeat(63)}`]);
       });
     });
 

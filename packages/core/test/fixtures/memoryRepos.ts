@@ -17,6 +17,20 @@ import { UserError } from "../../src/lib/errors.js";
 const TITLE_MAX = 200;
 const SEARCH_DB_MIN = 2;
 const SEARCH_DB_MAX = 100;
+const PROVIDER_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/;
+
+const invalid = () => new UserError("That value isn't valid.", "invalid");
+const missingReport = () => new UserError("That report doesn't exist.", "not_found");
+
+const uuidColumn = (chatId: string) => {
+  if (!isUuid(chatId)) throw invalid();
+  return chatId;
+};
+
+const validArtifactId = (id: string) => {
+  if (!ARTIFACT_ID_RE.test(id)) throw missingReport();
+  return id;
+};
 
 const copyCredential = <T extends Omit<CredentialRow, "version">>(row: T): T => ({
   ...row,
@@ -51,7 +65,7 @@ export class MemoryDb {
     if (!isUuid(userId) || userId !== userId.toLowerCase()) throw new Error("forUser needs a verified user id");
     if (!db.profiles.has(userId)) db.profiles.set(userId, emptyProfile());
     const owned = (chatId: string) => db.chats.get(chatId)?.userId === userId;
-    const okey = (id: string, file: ArtifactFile) => `${userId}/${id}.${file}`;
+    const okey = (id: string, file: ArtifactFile) => `${userId}/${validArtifactId(id)}.${file}`;
     const summary = (c: Chat): ChatSummary => ({ id: c.id, title: c.title, lastMessageAt: c.lastMessageAt });
     const myChats = () =>
       [...db.chats.values()]
@@ -83,10 +97,10 @@ export class MemoryDb {
           if (!c) db.chats.set(chatId, { id: chatId, userId, title: "", lastMessageAt: db.at(), seq: db.tick() });
         },
         async exists(chatId: string) {
-          return owned(chatId);
+          return owned(uuidColumn(chatId));
         },
         async touch(chatId: string, opts: { titleIfEmpty?: string }) {
-          const c = db.chats.get(chatId);
+          const c = db.chats.get(uuidColumn(chatId));
           if (!c || c.userId !== userId) return;
           c.lastMessageAt = db.at();
           if (opts.titleIfEmpty && !c.title) c.title = opts.titleIfEmpty.slice(0, TITLE_MAX);
@@ -107,10 +121,11 @@ export class MemoryDb {
       messages: {
         async append(chatId: string, runId: string, rows: NewMessage[]) {
           if (!rows.length) return;
-          if (!owned(chatId)) throw new UserError("That doesn't exist.", "not_found");
+          if (!owned(uuidColumn(chatId))) throw new UserError("That doesn't exist.", "not_found");
           for (const r of rows) db.messages.push({ ...r, chatId, userId, runId, createdAt: db.at() });
         },
         async history(chatId: string, limit = 200) {
+          uuidColumn(chatId);
           const mine = db.messages.filter((m) => m.chatId === chatId && m.userId === userId);
           return {
             items: mine.slice(-limit).map(({ role, content, status, createdAt, parts }) => ({
@@ -126,7 +141,8 @@ export class MemoryDb {
       },
       artifacts: {
         async insert(row: { id: string; chatId: string | null; title: string; sizeBytes: number }) {
-          if (!ARTIFACT_ID_RE.test(row.id)) throw new UserError("That report doesn't exist.", "not_found");
+          validArtifactId(row.id);
+          if (db.artifacts.has(row.id)) throw new UserError("That already exists.", "conflict");
           if (row.chatId !== null && !owned(row.chatId)) throw new UserError("That doesn't exist.", "not_found");
           db.artifacts.set(row.id, {
             ...row,
@@ -154,11 +170,11 @@ export class MemoryDb {
             : undefined;
         },
         async setPdf(id: string) {
-          const a = db.artifacts.get(id);
+          const a = db.artifacts.get(validArtifactId(id));
           if (a && a.userId === userId) a.pdfReady = true;
         },
         async setThumb(id: string) {
-          const a = db.artifacts.get(id);
+          const a = db.artifacts.get(validArtifactId(id));
           if (!a || a.userId !== userId) return false;
           a.thumbReady = true;
           return true;
@@ -256,6 +272,7 @@ export class MemoryDb {
             .map((r) => ({ provider: r.provider, kind: r.kind, hint: r.hint }));
         },
         async insert(row: Omit<CredentialRow, "version">) {
+          if (!PROVIDER_RE.test(row.provider)) throw invalid();
           const key = `${userId}\0${row.provider}`;
           if (db.credentials.has(key)) throw new UserError("That already exists.", "conflict");
           db.credentials.set(key, { ...copyCredential(row), version: 1, userId });
