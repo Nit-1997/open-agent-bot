@@ -1,9 +1,62 @@
-import { describe, it } from "vitest";
+import { Hono } from "hono";
+import { describe, expect, it, vi } from "vitest";
+import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
+import type { AuthEnv, AuthOutcome, Identity, Principal } from "../../src/identity/types.js";
+import { UserError } from "../../src/lib/errors.js";
+
+const ADMIN: Principal = { id: "33333333-3333-4333-8333-333333333333", email: "admin@example.test", isAdmin: true };
+const USER: Principal = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test", isAdmin: false };
+
+function harness(outcome: AuthOutcome, isLiveAdmin: (p: Principal) => Promise<boolean> = async () => true) {
+  const identity: Identity = { kind: "hosted", admitCaller: () => undefined, authenticate: vi.fn(async () => outcome) };
+  const live = vi.fn(isLiveAdmin);
+  const handler = vi.fn();
+  const app = new Hono<AuthEnv>();
+  app.use("/admin/*", createAdminGuard({ identity, isLiveAdmin: live }));
+  app.get("/admin/users", (c) => {
+    handler(c.get("user"));
+    return c.json({ ok: true });
+  });
+  return { call: () => app.request("/admin/users"), live, handler };
+}
 
 describe("createAdminGuard", () => {
-  it.todo("lets a live admin through with the principal on the context");
-  it.todo("answers 404 without a live check when the token doesn't claim admin");
-  it.todo("answers 404 when the live check says no");
-  it.todo("answers 503 auth_unavailable when the live check throws");
-  it.todo("renders the authentication error verbatim");
+  it("lets a live admin through with the principal on the context", async () => {
+    const { call, live, handler } = harness({ ok: true, principal: ADMIN });
+    expect((await call()).status).toBe(200);
+    expect(live).toHaveBeenCalledWith(ADMIN);
+    expect(handler).toHaveBeenCalledWith(ADMIN);
+  });
+
+  it("answers 404 without a live check when the token doesn't claim admin", async () => {
+    const { call, live, handler } = harness({ ok: true, principal: USER });
+    const res = await call();
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found", message: "Not found." });
+    expect(live).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 when the live check says no", async () => {
+    const { call, handler } = harness({ ok: true, principal: ADMIN }, async () => false);
+    expect((await call()).status).toBe(404);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("answers 503 auth_unavailable when the live check throws", async () => {
+    const { call, handler } = harness({ ok: true, principal: ADMIN }, async () => Promise.reject(new Error("auth down")));
+    const res = await call();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: "auth_unavailable" });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("renders the authentication error verbatim", async () => {
+    const error = new UserError("You were signed out. Sign in again.", "unauthorized", { code: "signed_out" });
+    const { call, live } = harness({ ok: false, error });
+    const res = await call();
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "signed_out", message: "You were signed out. Sign in again." });
+    expect(live).not.toHaveBeenCalled();
+  });
 });

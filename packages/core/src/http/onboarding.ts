@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Place } from "@oab/shared/onboarding";
-import type { AuthEnv } from "../auth/middleware.js";
+import type { AuthEnv } from "../identity/types.js";
 import type { RateLimiter } from "../lib/rateLimit.js";
 import { type OptionsDeps, onboardingOptions } from "../onboarding/options.js";
 import { searchPlaces } from "../onboarding/places.js";

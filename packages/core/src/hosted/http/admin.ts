@@ -1,4 +1,4 @@
-import type { AuthEnv } from "@oab/core/auth/middleware.js";
+import type { AuthEnv } from "@oab/core/identity/types.js";
 import { body, limitBy, pageParam, safe } from "@oab/core/http/handlers.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import type { RateLimiter } from "@oab/core/lib/rateLimit.js";

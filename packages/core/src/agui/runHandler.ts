@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { type BaseEvent, EventType, type Message, type RunAgentInput } from "@ag-ui/core";
 import { type OpenReport, openReportNote } from "../artifacts/openReport.js";
 import { Evidence } from "../grounding/evidence.js";
-import type { AuthUser } from "../auth/verify.js";
+import type { Principal } from "../identity/types.js";
 import type { ChatRepo, MessageRepo, NewMessage } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
@@ -33,7 +33,7 @@ export const EMPTY_REPLY_NUDGE =
 export const TIME_LIMIT_MESSAGE = "This run hit the time limit. Ask me to continue.";
 
 export type RunContext = {
-  user: AuthUser;
+  user: Principal;
   chats: Pick<ChatRepo, "claim" | "touch">;
   messages: MessageRepo;
   profiles?: ProfileStore;

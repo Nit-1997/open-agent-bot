@@ -1,5 +1,5 @@
 import { type Context, Hono } from "hono";
-import type { AuthEnv } from "../auth/middleware.js";
+import type { AuthEnv } from "../identity/types.js";
 import { UserError } from "../lib/errors.js";
 import type { RateLimiter } from "../lib/rateLimit.js";
 import type { UserHubs } from "../providers/hubs.js";

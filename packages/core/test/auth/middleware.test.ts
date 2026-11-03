@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { type AuthEnv, createGuards, serviceSecretMatches } from "../../src/auth/middleware.js";
 import { UserStatusCache } from "../../src/auth/status.js";
 import { AuthError } from "../../src/auth/verify.js";
+import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
+import { createSupabaseIdentity, serviceSecretMatches } from "../../src/hosted/identity/supabaseIdentity.js";
+import { createGuards } from "../../src/identity/guards.js";
+import type { AuthEnv } from "../../src/identity/types.js";
 import { TEST_SECRET } from "../fixtures/config.js";
-import { ADMIN, ALICE } from "../fixtures/users.js";
+import { ADMIN, ALICE, verified } from "../fixtures/users.js";
 
 function app(
   opts: {
@@ -13,13 +16,16 @@ function app(
     liveAdmin?: boolean;
   } = {},
 ) {
-  const verify = vi.fn(opts.verify ?? (async () => ALICE));
-  const guards = createGuards({
+  const verify = vi.fn(async (t: string) => verified(await (opts.verify ?? (async () => ALICE))(t)));
+  const identity = createSupabaseIdentity({
     serviceSecret: TEST_SECRET,
     verify,
     status: new UserStatusCache(opts.status ?? (async () => "active")),
-    isLiveAdmin: async () => opts.liveAdmin ?? true,
   });
+  const guards = {
+    ...createGuards(identity),
+    requireAdmin: createAdminGuard({ identity, isLiveAdmin: async () => opts.liveAdmin ?? true }),
+  };
   const a = new Hono<AuthEnv>();
   a.use("*", guards.requireService);
   a.get("/user", guards.requireUser, (c) => c.json({ id: c.get("user").id }));

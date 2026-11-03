@@ -5,8 +5,8 @@ import { createVerifier } from "../../src/auth/verify.js";
 import { parseCredentialKeys } from "../../src/config.js";
 import { LocalKeyWrapper } from "../../src/crypto/keyWrapper.js";
 import { forUser } from "../../src/hosted/store/users.js";
-import { SupabaseProfileStore } from "../../src/profile/store.js";
-import { SupabaseCredentialStore } from "../../src/providers/credentialStore.js";
+import { RepoProfileStore } from "../../src/profile/store.js";
+import { EnvelopeCredentialStore } from "../../src/providers/credentialStore.js";
 import {
   adminRepo,
   cleanedEmails,
@@ -41,7 +41,7 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
   });
 
   it("creates a profile row on sign-up and round-trips the profile", async () => {
-    const store = new SupabaseProfileStore(forUser(service(), a.id).profiles);
+    const store = new RepoProfileStore(forUser(service(), a.id).profiles);
     expect((await store.get()).name).toBeUndefined();
     await store.put({ name: "Integration", food: ["Vegan"] });
     expect(await store.get()).toMatchObject({ name: "Integration", food: ["Vegan"] });
@@ -50,7 +50,7 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
   });
 
   it("stores credentials as real bytea and serializes concurrent modifies", async () => {
-    const store = new SupabaseCredentialStore(a.id, forUser(service(), a.id).credentials, wrapper);
+    const store = new EnvelopeCredentialStore(a.id, forUser(service(), a.id).credentials, wrapper);
     await store.modify("openrouter", async () => ({ type: "api_key", key: "sk-or-v1-integration0123456789" }));
     expect(await store.read("openrouter")).toEqual({ type: "api_key", key: "sk-or-v1-integration0123456789" });
     const { data } = await service().from("provider_credentials").select("hint, key_version, ciphertext").eq("user_id", a.id).single();
@@ -66,7 +66,7 @@ describe.skipIf(!enabled)("Supabase repositories (live project)", () => {
       ),
     );
     expect(seen[1]).toBe("sk-or-v1-one-0123456789abcdef");
-    expect(await new SupabaseCredentialStore(b.id, forUser(service(), b.id).credentials, wrapper).read("openrouter")).toBeUndefined();
+    expect(await new EnvelopeCredentialStore(b.id, forUser(service(), b.id).credentials, wrapper).read("openrouter")).toBeUndefined();
     await store.delete("openrouter");
     expect(await store.read("openrouter")).toBeUndefined();
   });

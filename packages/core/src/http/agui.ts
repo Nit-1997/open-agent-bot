@@ -3,8 +3,7 @@ import { EventEncoder } from "@ag-ui/encoder";
 import { Hono } from "hono";
 import { isUuid } from "@oab/shared/ids";
 import { handleRun, type RunContext } from "../agui/runHandler.js";
-import type { AuthEnv } from "../auth/middleware.js";
-import type { AuthUser } from "../auth/verify.js";
+import type { AuthEnv, Principal } from "../identity/types.js";
 import { type ConcurrencyGate, LIMITS, type RateLimiter, rateLimitError } from "../lib/rateLimit.js";
 import { UserError } from "../lib/errors.js";
 import { errorResponse } from "./handlers.js";
@@ -22,7 +21,7 @@ const HEARTBEAT = new TextEncoder().encode(": ping\n\n");
 
 export function aguiRoutes(deps: {
   store: SessionStore;
-  context: (user: AuthUser, chatId: string) => RunContext;
+  context: (user: Principal, chatId: string) => RunContext;
   limiter: RateLimiter;
   gate: ConcurrencyGate;
   heartbeatMs?: number;

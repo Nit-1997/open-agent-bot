@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { AuthEnv } from "../auth/middleware.js";
+import type { AuthEnv } from "../identity/types.js";
 import { normalizeId } from "@oab/shared/ids";
 import { CHATS_PAGE_SIZE } from "@oab/shared/lists";
 import type { UserRepos } from "../store/types.js";

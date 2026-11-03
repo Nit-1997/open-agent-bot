@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { REPORTS_PAGE_SIZE, type ReportSummary } from "@oab/shared/lists";
-import type { AuthEnv } from "../auth/middleware.js";
+import type { AuthEnv } from "../identity/types.js";
 import type { ArtifactListRow, UserRepos } from "../store/types.js";
 import { UserError } from "../lib/errors.js";
 import type { RateLimiter } from "../lib/rateLimit.js";

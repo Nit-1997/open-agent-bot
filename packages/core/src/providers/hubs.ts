@@ -1,4 +1,4 @@
-import type { AuthUser } from "../auth/verify.js";
+import type { Principal } from "../identity/types.js";
 import type { ProviderHub } from "./hub.js";
 
 type Entry = { hub: Promise<ProviderHub>; usedAt: number };
@@ -10,7 +10,7 @@ export class UserHubs {
   private readonly now: () => number;
 
   constructor(
-    private readonly build: (user: AuthUser) => Promise<ProviderHub>,
+    private readonly build: (user: Principal) => Promise<ProviderHub>,
     opts: { max?: number; idleMs?: number; now?: () => number } = {},
   ) {
     this.max = opts.max ?? 200;
@@ -18,7 +18,7 @@ export class UserHubs {
     this.now = opts.now ?? Date.now;
   }
 
-  get(user: AuthUser): Promise<ProviderHub> {
+  get(user: Principal): Promise<ProviderHub> {
     const key = `${user.id}:${user.isAdmin ? "admin" : "user"}`;
     const hit = this.entries.get(key);
     if (hit && this.now() - hit.usedAt < this.idleMs) {

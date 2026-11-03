@@ -3,9 +3,9 @@ import { normalizeId } from "@oab/shared/ids";
 import type { AgentConfig } from "../config.js";
 import { log } from "../lib/log.js";
 
-export type AuthUser = { id: string; email: string; sessionId: string; isAdmin: boolean };
+export type VerifiedUser = { id: string; email: string; sessionId: string; isAdmin: boolean };
 
-export type Verifier = (token: string) => Promise<AuthUser>;
+export type Verifier = (token: string) => Promise<VerifiedUser>;
 
 export type AuthErrorCode = "invalid_token" | "expired_token" | "auth_unavailable";
 

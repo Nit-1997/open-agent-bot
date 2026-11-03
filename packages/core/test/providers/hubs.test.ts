@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthUser } from "../../src/auth/verify.js";
+import type { Principal } from "../../src/identity/types.js";
 import type { ProviderHub } from "../../src/providers/hub.js";
 import { UserHubs } from "../../src/providers/hubs.js";
 import { ADMIN, ALICE, BOB } from "../fixtures/users.js";
 
-const hubFor = (user: AuthUser) => ({ user }) as unknown as ProviderHub;
+const hubFor = (user: Principal) => ({ user }) as unknown as ProviderHub;
 
 function setup(opts: { max?: number; idleMs?: number } = {}) {
   let now = 0;
-  const build = vi.fn(async (user: AuthUser) => hubFor(user));
+  const build = vi.fn(async (user: Principal) => hubFor(user));
   const hubs = new UserHubs(build, { ...opts, now: () => now });
   return { hubs, build, tick: (ms: number) => (now += ms) };
 }
@@ -53,7 +53,7 @@ describe("UserHubs", () => {
 
   it("forgets a failed build so the next call rebuilds", async () => {
     const build = vi
-      .fn<(u: AuthUser) => Promise<ProviderHub>>()
+      .fn<(u: Principal) => Promise<ProviderHub>>()
       .mockRejectedValueOnce(new Error("db down"))
       .mockImplementation(async (u) => hubFor(u));
     const hubs = new UserHubs(build);
