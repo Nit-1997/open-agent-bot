@@ -335,7 +335,15 @@ function start(cfg: ShellConfig): void {
       e.preventDefault();
       app.quit();
     });
-    mgr.on((s) => main?.setTitle(windowTitle(cfg, s.localBuild)));
+    let shownTitle = "";
+    const showTitle = (title: string) => {
+      if (title === shownTitle) return;
+      shownTitle = title;
+      main?.setTitle(title);
+      log.info(`[app] title ${title}`);
+    };
+    showTitle(windowTitle(cfg, mgr.state().localBuild));
+    mgr.on((s) => showTitle(windowTitle(cfg, s.localBuild)));
     log.info("[app] ready");
     void mgr.boot();
     void updates.auto();

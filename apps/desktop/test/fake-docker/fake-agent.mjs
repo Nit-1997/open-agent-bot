@@ -1,7 +1,17 @@
 #!/usr/bin/env node
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { closeSync, readdirSync, readFileSync, readlinkSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createServer } from "node:http";
+
+if (process.platform === "linux") {
+  for (const name of readdirSync("/proc/self/fd")) {
+    const fd = Number(name);
+    if (fd <= 2) continue;
+    try {
+      if (readlinkSync(`/proc/self/fd/${name}`).startsWith("socket:")) closeSync(fd);
+    } catch {}
+  }
+}
 
 const port = Number(process.env.OPEN_AGENT_PORT);
 const version = process.env.FAKE_AGENT_VERSION ?? "0.0.0-fake";

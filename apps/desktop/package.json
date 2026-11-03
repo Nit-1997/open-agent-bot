@@ -13,6 +13,7 @@
     "build": "node scripts/build.mjs",
     "stage": "node scripts/stage-stack.mjs",
     "dist": "node scripts/stage-stack.mjs && node scripts/build.mjs && electron-builder --mac --publish never",
+    "dist:local": "node scripts/local-build.mjs",
     "electron:install": "install-electron",
     "lint": "biome lint",
     "format": "biome format --write",

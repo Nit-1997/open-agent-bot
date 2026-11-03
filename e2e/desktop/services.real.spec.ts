@@ -2,17 +2,18 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { connectStub, lastReplyLength, send, status } from "../support/localStack";
-import { REPORT_MARKER, STUB_MODEL, type StubModel, startStubModel } from "../support/stubModel";
+import { lastReplyLength, send, status } from "../support/localStack";
+import { REPORT_MARKER, type StubModel, startStubModel } from "../support/stubModel";
 import { everyElementHasUniqueId } from "./support/ids";
 import { launchShell, newStateDir, type Shell, type ShellEnv } from "./support/launch";
+import { onboardWithStub } from "./support/onboard";
+import { DOCKER, dockerEnv, ENGINE, shellExtra } from "./support/real";
 
 const PROJECT = process.env.DESKTOP_REAL_PROJECT ?? "oab-factory-m4-3-real";
 const SERVICES = process.env.DESKTOP_REAL_SERVICES ?? "";
 const RANGE = process.env.DESKTOP_REAL_RANGE ?? "18460-18462";
 const STUB_PORT = Number(process.env.STUB_PORT ?? 18463);
 const AGENT_IMAGE = process.env.DESKTOP_REAL_AGENT_IMAGE ?? "oab-m4-3-agent:dev";
-const DOCKER = "/usr/local/bin/docker";
 const DATA = `${PROJECT}-data`;
 const KEYS = `${PROJECT}-keys`;
 const WORDING = "Saved model keys are not included. Chats, reports and your profile are.";
@@ -20,7 +21,6 @@ const WORDING = "Saved model keys are not included. Chats, reports and your prof
 test.skip(process.env.DESKTOP_REAL_DOCKER !== "1", "real Docker only with DESKTOP_REAL_DOCKER=1");
 test.skip(!/^oab-[a-z0-9-]+$/.test(PROJECT), "the real project must be oab-*");
 
-const dockerEnv = { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: process.env.HOME ?? "" };
 const docker = (args: string[]) => execFileSync(DOCKER, args, { encoding: "utf8", env: dockerEnv });
 const volumes = () =>
   docker(["volume", "ls", "--format", "{{.Name}}"])
@@ -66,8 +66,9 @@ test.beforeAll(async () => {
     services: SERVICES,
     externalLog: join(stateDir, "external.log"),
     savePath: join(stateDir, "saved.out"),
+    extra: shellExtra(),
   };
-  stub = await startStubModel({ port: STUB_PORT });
+  stub = await startStubModel({ port: STUB_PORT, ...(process.env.STUB_BIND ? { bind: process.env.STUB_BIND } : {}) });
 });
 
 test.afterAll(async () => {
@@ -96,7 +97,10 @@ test.afterAll(async () => {
       "-v",
       "--remove-orphans",
     ],
-    { env: { ...dockerEnv, OPEN_AGENT_DATA_VOLUME: DATA, OPEN_AGENT_KEYS_VOLUME: KEYS, OPEN_AGENT_PORT: "18460" }, stdio: "ignore" },
+    {
+      env: { ...dockerEnv, OPEN_AGENT_DATA_VOLUME: DATA, OPEN_AGENT_KEYS_VOLUME: KEYS, OPEN_AGENT_PORT: RANGE.split("-")[0] ?? "" },
+      stdio: "ignore",
+    },
   );
   spawnSync(DOCKER, ["volume", "rm", DATA, KEYS], { env: dockerEnv, stdio: "ignore" });
   rmSync(env.stateDir, { recursive: true, force: true });
@@ -106,27 +110,6 @@ const ready = async (s: Shell, timeout = 300_000): Promise<Page> => {
   await expect.poll(() => s.status()?.screen, { timeout, intervals: [500] }).toBe("app");
   return s.appPage();
 };
-
-async function onboard(page: Page, baseUrl: string): Promise<void> {
-  const step = page.locator("#onboarding-step");
-  await expect(step).toBeVisible({ timeout: 60_000 });
-  for (let i = 0; i < 10; i++) {
-    if (await page.locator("#onboarding-model-providers").isVisible()) {
-      await connectStub(page, baseUrl);
-      await expect(page.locator("#onboarding-model-list")).toBeVisible();
-    }
-    if (await page.locator("#onboarding-model-list").isVisible()) await page.getByRole("radio", { name: new RegExp(STUB_MODEL) }).click();
-    if (await page.locator("#agent-section-onboarding-name-input").isVisible()) {
-      await page.locator("#agent-section-onboarding-name-input").fill("Sage");
-      await page.locator("#agent-section-onboarding-look-ember").click();
-      await page.locator("#agent-section-onboarding-tone-brief").click();
-    }
-    if (await page.locator("#onboarding-summary").isVisible()) break;
-    await page.locator("#onboarding-next").click();
-  }
-  await page.locator("#onboarding-next").click();
-  await expect(page.locator("#rail")).toBeVisible();
-}
 
 const api = <T>(page: Page, path: string) => page.evaluate((p) => fetch(p).then((r) => r.json()), path) as Promise<T>;
 
@@ -139,7 +122,7 @@ test("real Docker: a chat and a report, Services & data from the account menu, l
   const s = shell;
   let page = await ready(s);
   say(`app on ${page.url()}`);
-  await onboard(page, `http://host.docker.internal:${STUB_PORT}/v1`);
+  await onboardWithStub(page, `http://${process.env.STUB_HOST ?? "host.docker.internal"}:${STUB_PORT}/v1`);
 
   await send(page, `Tell me about lighthouses ${word}`);
   await expect(status(page)).toBeHidden({ timeout: 120_000 });
@@ -163,7 +146,7 @@ test("real Docker: a chat and a report, Services & data from the account menu, l
   await expect(sp.locator("#screen-services-services-agent-state")).toHaveText("running · healthy", { timeout: 30_000 });
   await expect(sp.locator("#screen-services-services-agent-version")).toHaveText(health.version);
   await expect(sp.locator("#screen-services-services-renderer-version")).toHaveText(health.version);
-  await expect(sp.locator("#screen-services-engine-engine-value")).toHaveText("Docker Desktop");
+  await expect(sp.locator("#screen-services-engine-engine-value")).toHaveText(ENGINE);
   await expect(sp.locator("#screen-services-engine-cli-value")).toHaveText(DOCKER);
   await expect(sp.locator("#screen-services-data-volume-value")).toHaveText(DATA, { timeout: 60_000 });
   await expect(sp.locator("#screen-services-data-reports-value")).toHaveText("1");
