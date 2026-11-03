@@ -1,3 +1,4 @@
+import { aboutBlocks } from "./aboutModel.ts";
 import type { ShellState } from "./actions.ts";
 import type { Block, Button, ScreenModel } from "./screenModel.ts";
 import { EXPORT_WORDING, PORT_WARNING, RESTART_WARNING } from "./wording.ts";
@@ -7,9 +8,12 @@ const GB = 1024 ** 3;
 const bytes = (n: number) =>
   n >= GB ? `${(n / GB).toFixed(1)} GB` : n >= MB ? `${Math.round(n / MB)} MB` : `${Math.max(1, Math.ceil(n / 1024))} KB`;
 
-function updateButton(s: ShellState): Button {
-  const label = s.localBuild ? "Not available for local builds" : `Up to date (${s.servicesVersion ?? "unknown"})`;
-  return { key: "update", label, action: { type: "updateServices" }, disabled: true };
+export function updateButton(s: ShellState): Button {
+  const action = { type: "updateServices" } as const;
+  if (s.localBuild) return { key: "update", label: "Not available for local builds", action, disabled: true };
+  const next = s.update?.services;
+  if (next) return { key: "update", label: `Update services (${next} available)`, action, tone: "primary" };
+  return { key: "update", label: `Up to date (${s.servicesVersion ?? "unknown"})`, action, disabled: true };
 }
 
 function dataBlock(s: ShellState): Block {
@@ -60,10 +64,18 @@ export function servicesModel(s: ShellState): ScreenModel {
       checked: s.settings?.stopOnQuit ?? true,
       setting: "stopOnQuit",
     },
+    {
+      kind: "toggle",
+      key: "check-for-updates",
+      label: "Check for new versions",
+      checked: s.settings?.checkForUpdates ?? true,
+      setting: "checkForUpdates",
+    },
     { kind: "port", key: "port", label: "Port", ...(s.port !== undefined ? { value: s.port } : {}), warning: PORT_WARNING },
     dataBlock(s),
     { kind: "p", key: "telemetry", tone: "muted", text: "Telemetry: none" },
     { kind: "p", key: "export-note", tone: "muted", text: `Export chats & reports (.zip). ${EXPORT_WORDING}` },
+    ...aboutBlocks(s),
   ];
   const buttons: Button[] = [
     { key: "restart", label: "Restart services", action: { type: "restartServices" }, tone: "primary", confirm: RESTART_WARNING },
@@ -73,5 +85,12 @@ export function servicesModel(s: ShellState): ScreenModel {
     { key: "delete", label: "Delete all data…", action: { type: "confirmDelete" }, tone: "danger" },
     { key: "close", label: "Close", action: { type: "closeServices" } },
   ];
-  return { id: "screen-services", title: "Services & data", ...(s.localBuild ? { badge: s.localBuild } : {}), blocks, buttons };
+  return {
+    id: "screen-services",
+    title: "Services & data",
+    ...(s.localBuild ? { badge: s.localBuild } : {}),
+    blocks,
+    buttons,
+    ...(s.focus ? { focus: s.focus } : {}),
+  };
 }

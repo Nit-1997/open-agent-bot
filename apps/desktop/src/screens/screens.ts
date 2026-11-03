@@ -62,7 +62,11 @@ function toggle(id: string, b: Extract<Block, { kind: "toggle" }>): HTMLElement 
   label.htmlFor = input.id;
   input.addEventListener("change", () => {
     input.disabled = true;
-    void act({ type: "setStopOnQuit", value: input.checked }).finally(() => {
+    const action =
+      b.setting === "checkForUpdates"
+        ? ({ type: "setCheckForUpdates", value: input.checked } as const)
+        : ({ type: "setStopOnQuit", value: input.checked } as const);
+    void act(action).finally(() => {
       input.disabled = false;
     });
   });
@@ -195,6 +199,13 @@ function block(prefix: string, b: Block): HTMLElement {
       return portField(id, b);
     case "logs":
       return logsView(id, b);
+    case "row": {
+      const rowId = b.id ?? id;
+      const row = el("div", rowId, { cls: "row-block" });
+      row.append(el("p", `${rowId}-text`, { cls: "text", text: b.text }));
+      for (const x of b.buttons) row.append(button(rowId, x));
+      return row;
+    }
     case "steps": {
       const ol = el("ol", `${prefix}-steps`, { cls: "steps" });
       for (const s of b.steps) {
@@ -279,6 +290,7 @@ function build(m: ScreenModel): HTMLElement {
 
 let last = "";
 let lastId = "";
+let lastFocus = "";
 function render(s: ShellState): void {
   lastState = s;
   const label = byId("test-mode-label");
@@ -297,6 +309,9 @@ function render(s: ShellState): void {
   main.replaceChildren(build(m));
   document.body.dataset.screen = m.id;
   document.body.dataset.phase = s.phase;
+  const focus = m.focus ? `${m.id}#${m.focus}` : "";
+  if (focus && focus !== lastFocus) byId(m.focus ?? "")?.scrollIntoView({ block: "center" });
+  lastFocus = focus;
 }
 
 document.addEventListener("DOMContentLoaded", () => {

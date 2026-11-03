@@ -23,9 +23,10 @@ export type Block =
       columns: readonly Readonly<{ key: string; label: string }>[];
       rows: readonly Readonly<{ key: string; cells: Readonly<Record<string, string>> }>[];
     }>
-  | Readonly<{ kind: "toggle"; key: string; label: string; checked: boolean; setting: "stopOnQuit" }>
+  | Readonly<{ kind: "toggle"; key: string; label: string; checked: boolean; setting: "stopOnQuit" | "checkForUpdates" }>
   | Readonly<{ kind: "port"; key: string; label: string; value?: number; warning: string }>
-  | Readonly<{ kind: "logs"; key: string; text: string }>;
+  | Readonly<{ kind: "logs"; key: string; text: string }>
+  | Readonly<{ kind: "row"; key: string; id?: string; text: string; buttons: readonly Button[] }>;
 export type Button = Readonly<{
   key: string;
   label: string;
@@ -35,7 +36,14 @@ export type Button = Readonly<{
   disabled?: boolean;
   confirm?: string;
 }>;
-export type ScreenModel = Readonly<{ id: string; title: string; badge?: string; blocks: readonly Block[]; buttons: readonly Button[] }>;
+export type ScreenModel = Readonly<{
+  id: string;
+  title: string;
+  badge?: string;
+  blocks: readonly Block[];
+  buttons: readonly Button[];
+  focus?: string;
+}>;
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;

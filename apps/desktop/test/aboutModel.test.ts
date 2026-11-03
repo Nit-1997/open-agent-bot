@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ShellState } from "../src/shared/actions.ts";
 import { aboutBlocks } from "../src/shared/aboutModel.ts";
 import { type Block, screenModel } from "../src/shared/screenModel.ts";
+import { updateButton } from "../src/shared/servicesModel.ts";
 
 const base: ShellState = {
   phase: "ready",
@@ -47,26 +48,32 @@ describe("About section (D13, D14)", () => {
     expect(dismissed && dismissed.kind === "row" ? dismissed.buttons.map((b) => b.key) : []).toEqual(["download"]);
   });
 
-  it("service update states", () => {
-    const svc = (s: Partial<ShellState>) => find(aboutBlocks({ ...base, ...s }), "services-update");
-    expect(svc({})).toEqual({ kind: "p", key: "services-update", tone: "muted", text: "Up to date (0.0.0-a)" });
-    expect(svc({ update: { appVersion: "0.0.0-dev", services: "0.0.0-b" } })).toEqual({
-      kind: "row",
-      key: "services-update",
-      text: "Services 0.0.0-b are available",
-      buttons: [{ key: "update", label: "Update services (0.0.0-b available)", action: { type: "updateServices" }, tone: "primary" }],
+  it("service update states: the Update services button and the incompatible line", () => {
+    const btnOf = (x: Partial<ShellState>) => updateButton({ ...base, ...x });
+    const note = (x: Partial<ShellState>) => find(aboutBlocks({ ...base, ...x }), "services-update");
+    expect(btnOf({})).toEqual({ key: "update", label: "Up to date (0.0.0-a)", action: { type: "updateServices" }, disabled: true });
+    expect(note({})).toBeUndefined();
+    expect(btnOf({ update: { appVersion: "0.0.0-dev", services: "0.0.0-b" } })).toEqual({
+      key: "update",
+      label: "Update services (0.0.0-b available)",
+      action: { type: "updateServices" },
+      tone: "primary",
     });
-    expect(svc({ update: { appVersion: "0.0.0-dev", incompatible: "compose_mismatch" } })).toEqual({
+    expect(btnOf({ update: { appVersion: "0.0.0-dev", incompatible: "compose_mismatch" } })).toMatchObject({
+      disabled: true,
+      label: "Up to date (0.0.0-a)",
+    });
+    expect(note({ update: { appVersion: "0.0.0-dev", incompatible: "compose_mismatch" } })).toEqual({
       kind: "p",
       key: "services-update",
       tone: "warn",
       text: "Service update not compatible: it needs a different compose file; update Open Agent first (compose_mismatch)",
     });
-    expect(svc({ localBuild: "Local build (local-abc1234)", update: { appVersion: "0.0.0-dev", services: "9.0.0" } })).toEqual({
-      kind: "p",
-      key: "services-update",
-      tone: "muted",
-      text: "Not available for local builds",
+    expect(btnOf({ localBuild: "Local build (local-abc1234)", update: { appVersion: "0.0.0-dev", services: "9.0.0" } })).toEqual({
+      key: "update",
+      label: "Not available for local builds",
+      action: { type: "updateServices" },
+      disabled: true,
     });
   });
 
@@ -85,12 +92,25 @@ describe("About section (D13, D14)", () => {
 });
 
 describe("screen-services", () => {
-  it("holds the About section, Back, and the focus target", () => {
-    const m = screenModel({ ...base, focus: "update-row", update: { appVersion: "0.0.0-dev", shell: "99.0.0" } });
+  it("holds the About section, the Check for new versions toggle, Close, and the focus target", () => {
+    const m = screenModel({
+      ...base,
+      focus: "update-row",
+      settings: { stopOnQuit: true, checkForUpdates: false },
+      update: { appVersion: "0.0.0-dev", shell: "99.0.0" },
+    });
     expect(m.id).toBe("screen-services");
     expect(m.title).toBe("Services & data");
     expect(m.focus).toBe("update-row");
     expect(m.blocks.some((b) => b.key === "update-row")).toBe(true);
-    expect(m.buttons.map((b) => b.action)).toEqual([{ type: "closeServices" }]);
+    expect(m.blocks.some((b) => b.key === "about")).toBe(true);
+    expect(find(m.blocks, "check-for-updates")).toEqual({
+      kind: "toggle",
+      key: "check-for-updates",
+      label: "Check for new versions",
+      checked: false,
+      setting: "checkForUpdates",
+    });
+    expect(m.buttons.find((b) => b.key === "close")?.action).toEqual({ type: "closeServices" });
   });
 });

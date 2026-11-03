@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import type { ActResult, PullRow, ServiceRow, ShellAction, ShellState } from "../shared/actions.ts";
+import type { ActResult, PullRow, ServiceRow, ShellAction, ShellState, UpdateView } from "../shared/actions.ts";
 import { classify, versionMatches } from "./classify.ts";
 import { type Compose, type ComposeVars, type ContainerInspect, composeFile, type ProjectSpec, SERVICES } from "./compose.ts";
 import { diskHint, isDiskFull } from "./diskFull.ts";
@@ -53,6 +53,7 @@ export type ManagerDeps = Readonly<{
   tokens: { current?: string; previous?: string };
   savePath: SavePath;
   freeBytes: (dir: string) => number;
+  updates?: Readonly<{ view(): UpdateView; pending(): ServicePins | undefined; accepted(pins: ServicePins): void }>;
   timings?: Partial<Timings>;
 }>;
 
@@ -85,12 +86,13 @@ export interface StackManager {
   on(cb: (s: ShellState) => void): () => void;
   boot(): Promise<void>;
   act(a: ShellAction): Promise<ActResult>;
-  openServices(): void;
   quit(): Promise<QuitOutcome>;
   launchMismatch(): void;
   uiCrashed(): void;
   internalError(): void;
   idle(): Promise<void>;
+  openServices(focus?: string): void;
+  refresh(): void;
 }
 
 type Phase = string;
@@ -141,7 +143,8 @@ export function createStackManager(d: ManagerDeps): StackManager {
   const t: Timings = { ...DEFAULT_TIMINGS, ...d.timings };
   const { cfg, log } = d;
   const listeners = new Set<(s: ShellState) => void>();
-  let s: ShellState = { phase: "checkingDocker", screen: "screen-progress", test: cfg.test, settings: settingsView() };
+  const updateView = () => (d.updates ? { update: d.updates.view() } : {});
+  let s: ShellState = { phase: "checkingDocker", screen: "screen-progress", test: cfg.test, settings: settingsView(), ...updateView() };
   let backStack: ShellState[] = [];
   let servicesPoll: AbortController | undefined;
   let ctx: Ctx | undefined;
@@ -177,9 +180,10 @@ export function createStackManager(d: ManagerDeps): StackManager {
       ...(s.apps ? { apps: s.apps } : {}),
       ...(port !== undefined ? { port } : {}),
       settings: settingsView(),
+      ...updateView(),
     };
     if (!OVERLAYS.has(patch.screen)) backStack = [];
-    s = keep ? { ...s, ...patch, settings: settingsView() } : { ...base, ...patch };
+    s = keep ? { ...s, ...patch, settings: settingsView(), ...updateView() } : { ...base, ...patch };
     emit();
   };
   const enter = (patch: Partial<ShellState> & { screen: string }) => {
@@ -450,7 +454,7 @@ export function createStackManager(d: ManagerDeps): StackManager {
     return true;
   };
 
-  function openServices(): void {
+  function openServices(focus?: string): void {
     if (!ctx) {
       log.info("[services] not available before Docker is ready");
       return;
@@ -459,9 +463,12 @@ export function createStackManager(d: ManagerDeps): StackManager {
       log.info(`[services] not opened while ${op.name} runs`);
       return;
     }
-    if (onServices()) return;
+    if (onServices()) {
+      set({ phase: s.phase, screen: s.screen, focus }, true);
+      return;
+    }
     log.info("[services] open");
-    enter({ screen: "screen-services", servicesInfo: { rows: [] } });
+    enter({ screen: "screen-services", servicesInfo: { rows: [] }, ...(focus ? { focus } : {}) });
     pollServices();
   }
 
@@ -1008,14 +1015,26 @@ export function createStackManager(d: ManagerDeps): StackManager {
       case "restartServices":
         void boot({ forceUp: true });
         return { ok: true };
-      case "updateServices":
-        if (!ctx) return { ok: false, error: "not_available" };
+      case "updateServices": {
+        const c = ctx;
+        if (!c || c.pins.kind === "local") return { ok: false, error: "not_available" };
+        const next = d.updates?.pending();
         void runOp("updating", async (signal) => {
           watchdog.stop();
           await d.view.close();
-          await start(signal, { forceRecreate: true, forcePull: true });
+          appShown = false;
+          if (next) {
+            log.info(`[update] applying services ${next.version}`);
+            c.pins = next;
+          }
+          await start(signal, { forceRecreate: true, forcePull: true, ownPort: port });
+          if (!next || s.phase !== "ready") return;
+          d.updates?.accepted(next);
+          s = { ...s, servicesVersion: next.version };
+          set({ phase: s.phase, screen: s.screen }, true);
         });
         return { ok: true };
+      }
       case "cancelPull":
         if (!pullAc) return { ok: false, error: "not_available" };
         pullAc.abort();
@@ -1216,5 +1235,6 @@ export function createStackManager(d: ManagerDeps): StackManager {
     idle: async () => {
       while (op) await op.done.catch(() => {});
     },
+    refresh: () => set({ phase: s.phase, screen: s.screen }, true),
   };
 }

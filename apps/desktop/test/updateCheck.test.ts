@@ -152,7 +152,7 @@ describe("checkForUpdates: the release", () => {
   });
 
   it("maps a network failure to offline and bad JSON to bad_json", async () => {
-    expect((await run({})).result).toEqual({ ok: false, reason: "offline" });
+    expect((await run({})).result).toEqual({ ok: false, reason: "offline", detail: "TypeError: fetch failed" });
     expect((await run({ [RELEASE_API_URL]: ok("{not json") })).result).toEqual({ ok: false, reason: "bad_json" });
     expect((await run({ [RELEASE_API_URL]: ok([1, 2]) })).result).toEqual({ ok: false, reason: "bad_json" });
   });
@@ -192,7 +192,7 @@ describe("checkForUpdates: the release", () => {
       test: false,
       timeoutMs: 150,
     });
-    expect(result).toEqual({ ok: false, reason: "timeout" });
+    expect(result).toEqual({ ok: false, reason: "timeout", detail: expect.stringMatching(/^TimeoutError/) });
     expect(Date.now() - t0).toBeLessThan(2000);
     expect(signal?.aborted).toBe(true);
   });
@@ -255,9 +255,8 @@ describe("checkForUpdates: redirects are manual", () => {
   });
 
   it("treats a browser-style opaque redirect as refused", async () => {
-    const opaque = () => Object.assign(new Response(null, { status: 200 }), { type: "opaqueredirect" }) as Response;
     const fetch: FetchLike = async () => {
-      const r = opaque();
+      const r = new Response(null, { status: 200 });
       Object.defineProperty(r, "type", { value: "opaqueredirect" });
       Object.defineProperty(r, "status", { value: 0 });
       return r;
@@ -512,6 +511,6 @@ describe("test-mode URL rules", () => {
     const url = mock.latestUrl;
     await mock.stop();
     mock = undefined;
-    expect(await check(url)).toEqual({ ok: false, reason: "offline" });
+    expect(await check(url)).toEqual({ ok: false, reason: "offline", detail: "TypeError: fetch failed" });
   });
 });

@@ -138,7 +138,7 @@ test("v99.0.0 → the menu item and update-row; Download logs the release URL; L
   await expect(page.locator("#update-row-download")).toBeVisible();
   await expect.poll(async () => (await appMenu(app)).some((i) => i.id === "menu-update")).toBe(false);
   await everyElementHasUniqueId(page);
-  await page.click("#screen-services-back");
+  await page.click("#screen-services-close");
   await expect.poll(() => shell?.status()?.screen).toBe("app");
 
   await shell.app.close();
@@ -177,10 +177,11 @@ test("a services manifest with a new dev digest → Update services (0.0.0-b ava
 
   const page = await openServices(shell);
   await expect(page.locator("#screen-services-about-services-value")).toHaveText("0.0.0-a");
-  await expect(page.locator("#screen-services-services-update-update")).toHaveText("Update services (0.0.0-b available)");
+  await expect(page.locator("#screen-services-services-agent-version")).toHaveText("0.0.0-a");
+  await expect(page.locator("#screen-services-update")).toHaveText("Update services (0.0.0-b available)");
   await everyElementHasUniqueId(page);
   const before = fake.calls().length;
-  await page.click("#screen-services-services-update-update");
+  await page.click("#screen-services-update");
 
   const seen = new Set<string>();
   const deadline = Date.now() + 30_000;
@@ -211,7 +212,9 @@ test("a services manifest with a new dev digest → Update services (0.0.0-b ava
 
   const again = await openServices(shell);
   await expect(again.locator("#screen-services-about-services-value")).toHaveText("0.0.0-b");
-  await expect(again.locator("#screen-services-services-update")).toHaveText("Up to date (0.0.0-b)");
+  await expect(again.locator("#screen-services-services-agent-version")).toHaveText("0.0.0-b");
+  await expect(again.locator("#screen-services-services-search-version")).toHaveText("0.0.0-b");
+  await expect(again.locator("#screen-services-update")).toHaveText("Up to date (0.0.0-b)");
   await everyElementHasUniqueId(again);
 
   await shell.app.close();
@@ -227,6 +230,8 @@ test("a services manifest with a new dev digest → Update services (0.0.0-b ava
 
 test("an incompatible manifest (another composeSha256) shows its reason and is never applied", async () => {
   if (!mock) throw new Error("no mock");
+  fake.scenario({ versions: { agent: "0.0.0-a", search: "0.0.0-a" } });
+  env = { ...env, services: fakeServices(env.stateDir, { version: "0.0.0-a" }) };
   const asset = mock.asset("open-agent-services.json", manifest({ composeSha256: "0".repeat(64) }));
   mock.release(release("v0.0.0-b", [{ name: "open-agent-services.json", browser_download_url: asset }]));
   shell = await launchShell(env, test.info(), { video: "incompatible" });
@@ -238,7 +243,7 @@ test("an incompatible manifest (another composeSha256) shows its reason and is n
   await expect(page.locator("#screen-services-services-update")).toHaveText(
     "Service update not compatible: it needs a different compose file; update Open Agent first (compose_mismatch)",
   );
-  await expect(page.locator("#screen-services-services-update-update")).toHaveCount(0);
+  await expect(page.locator("#screen-services-update")).toBeDisabled();
   await everyElementHasUniqueId(page);
   await page.waitForTimeout(1000);
   const refs = fake.calls().flatMap((c) => [...c.argv, c.images?.agent ?? "", c.images?.search ?? ""]);
@@ -285,6 +290,9 @@ test("check turned off → zero requests; a manual check redirected to another o
   expect(mock.requests().map((r) => r.path)).toEqual([LATEST_PATH]);
   expect(recorder.hits()).toBe(0);
   await everyElementHasUniqueId(page);
+
+  await page.click("#screen-services-check-for-updates-input");
+  await expect.poll(() => settings().checkForUpdates).toBe(true);
 
   await clickMenu(shell.app, "menu-check-updates");
   await expect.poll(() => mock?.requests().length).toBe(2);

@@ -1,8 +1,7 @@
 import { appendFileSync, readdirSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join } from "node:path";
 
 export const LATEST_PATH = "/repos/Nit-1997/open-agent-bot/releases/latest";
 
@@ -35,12 +34,12 @@ export async function startMockReleases(o: { port: number; log?: string }): Prom
     if (o.log) appendFileSync(o.log, `${JSON.stringify({ method: entry.method, path })}\n`);
     const r = routes.get(path);
     if (!r) {
-      res.writeHead(404, { "content-type": "application/json" });
+      res.writeHead(404, { "content-type": "application/json", connection: "close" });
       res.end('{"message":"Not Found"}');
       return;
     }
     if (r.hang) return;
-    res.writeHead(r.status, { "content-type": "application/json", ...r.headers });
+    res.writeHead(r.status, { "content-type": "application/json", connection: "close", ...r.headers });
     res.end(r.body ?? "");
   };
   const server: Server = createServer(handle);
@@ -84,25 +83,3 @@ export function serveTree(m: MockReleases, dir: string): void {
   } catch {}
   for (const name of names) m.asset(name, sub(readFileSync(join(dir, "assets", name), "utf8")));
 }
-
-async function cli(argv: readonly string[]): Promise<void> {
-  const arg = (name: string) => {
-    const i = argv.indexOf(name);
-    return i >= 0 ? argv[i + 1] : undefined;
-  };
-  const port = Number(arg("--port"));
-  const dir = arg("--dir");
-  if (!Number.isInteger(port) || port < 18000 || port > 19999 || !dir) {
-    process.stderr.write("usage: mockReleases.ts --port <18000-19999> --dir <tree> [--log <file>]\n");
-    process.exit(64);
-  }
-  const log = arg("--log");
-  const m = await startMockReleases({ port, ...(log ? { log: resolve(log) } : {}) });
-  serveTree(m, resolve(dir));
-  process.stdout.write(`[mock-releases] listening ${m.latestUrl}\n`);
-  const stop = () => void m.stop().then(() => process.exit(0));
-  process.on("SIGTERM", stop);
-  process.on("SIGINT", stop);
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) void cli(process.argv.slice(2));
