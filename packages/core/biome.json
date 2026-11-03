@@ -48,7 +48,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts"],
+      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts", "!src/local/store/**"],
       "linter": {
         "rules": {
           "style": {
@@ -63,6 +63,58 @@
                   {
                     "group": ["**/hosted/**", "@supabase/*", "jose", "@oab/core", "@oab/core/**"],
                     "message": "Core must not import hosted implementations."
+                  },
+                  {
+                    "group": ["node:sqlite"],
+                    "message": "node:sqlite is used only inside src/local/store."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/local/store/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "message": "Nothing outside cloud/ may import from cloud/."
+                  },
+                  {
+                    "group": ["**/hosted/**", "@supabase/*", "jose", "@oab/core", "@oab/core/**"],
+                    "message": "Core must not import hosted implementations."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/server.ts", "src/scripts/rotateCredentials.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "message": "Nothing outside cloud/ may import from cloud/."
+                  },
+                  {
+                    "group": ["node:sqlite"],
+                    "message": "node:sqlite is used only inside src/local/store."
                   }
                 ]
               }
@@ -95,6 +147,10 @@
                   {
                     "group": ["@oab/core/identity/local*", "@oab/core/identity/local*/**"],
                     "message": "Hosted code must not use a local identity."
+                  },
+                  {
+                    "group": ["@oab/core/local", "@oab/core/local/**", "node:sqlite"],
+                    "message": "Hosted code must not use the local store."
                   }
                 ]
               }
