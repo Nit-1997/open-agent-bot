@@ -36,9 +36,9 @@ Agent tests marked `.int.test.ts` start a real Chromium against local fixture se
 The local stack's store uses `node:sqlite`. The host and CI run Node 22, but the agent image runs Node 24, so CI's `sqlite-node24` job also runs the SQLite store and local entry tests in the agent's base image (Node 24). Run the same check from the repo root before you change `src/local/`:
 
 ```bash
-docker run --rm --user pwuser -v "$PWD":/src:ro -e ELECTRON_SKIP_BINARY_DOWNLOAD=1 -e COPILOTKIT_TELEMETRY_DISABLED=true mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f sh -ec '
+docker run --rm --user pwuser -v "$PWD":/src:ro -e ELECTRON_SKIP_BINARY_DOWNLOAD=1 -e COPILOTKIT_TELEMETRY_DISABLED=true mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea sh -ec '
   mkdir -p /tmp/repo && cd /src && tar --exclude=./node_modules --exclude="./*/node_modules" --exclude="./*/*/node_modules" --exclude=./.git --exclude=./.factory -cf - . | tar -C /tmp/repo -xf -
-  cd /tmp/repo && node --version
+  cd /tmp/repo && node --version && case "$(node -p process.versions.node)" in 24.*) ;; *) echo "Node 24 required, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
   npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
   cd packages/core && npx vitest run test/local test/store'
 ```

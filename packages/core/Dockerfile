@@ -1,4 +1,5 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f AS ui
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea AS ui
+RUN case "$(node -p process.versions.node)" in 24.*) ;; *) echo "the base image must ship Node 24, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -17,7 +18,8 @@ COPY packages/ui/src packages/ui/src
 COPY packages/local-web packages/local-web
 RUN npm run build -w @oab/local-web && test -f packages/local-web/dist/index.html
 
-FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+RUN case "$(node -p process.versions.node)" in 24.*) ;; *) echo "the base image must ship Node 24, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 WORKDIR /app
 COPY package.json package-lock.json ./

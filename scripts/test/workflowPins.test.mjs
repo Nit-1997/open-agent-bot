@@ -90,6 +90,7 @@ describe("ci.yml local-stack job", () => {
     assert.match(stepsText(node24), /--user pwuser/);
     assert.match(stepsText(node24), /mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-noble@sha256:[0-9a-f]{64} /);
     assert.doesNotMatch(stepsText(node24), /playwright:v[\d.]+-noble(?!@sha256:)/);
+    assert.match(node24.steps.map((s) => s.run ?? "").join("\n"), /case "\$\(node -p process\.versions\.node\)" in 24\.\*\) ;; \*\) echo "[^"]*" >&2; exit 1 ;; esac/);
   });
 });
 
