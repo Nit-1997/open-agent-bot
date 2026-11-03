@@ -1,14 +1,15 @@
+import { api } from "@oab/ui/platform/api";
 import type { ReportSummary } from "@oab/shared/lists";
 import type { PageResponse } from "@oab/shared/pages";
 import { readApi } from "@/lib/api";
 
 export const reportsApi = {
   page: async (page: number, signal?: AbortSignal) =>
-    readApi<PageResponse<ReportSummary>>(await fetch(`/api/reports?page=${page}`, { cache: "no-store", signal })),
+    readApi<PageResponse<ReportSummary>>(await api().fetch(`/reports?page=${page}`, { cache: "no-store", signal })),
   get: async (id: string, signal?: AbortSignal) =>
-    readApi<{ report: ReportSummary }>(await fetch(`/api/reports/${encodeURIComponent(id)}`, { cache: "no-store", signal })),
+    readApi<{ report: ReportSummary }>(await api().fetch(`/reports/${encodeURIComponent(id)}`, { cache: "no-store", signal })),
 };
 
-export const reportPdfHref = (id: string) => `/api/artifacts/${id}?format=pdf`;
-export const reportHtmlHref = (id: string) => `/api/artifacts/${id}`;
-export const reportThumbHref = (id: string) => `/api/artifacts/${id}?format=thumb`;
+export const reportPdfHref = (id: string) => api().url(`/artifacts/${id}?format=pdf`);
+export const reportHtmlHref = (id: string) => api().url(`/artifacts/${id}`);
+export const reportThumbHref = (id: string) => api().url(`/artifacts/${id}?format=thumb`);

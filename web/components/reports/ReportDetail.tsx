@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { ReportViewer } from "./ReportViewer";
 
 export function BackLink(props: { id: string; href: string; label: string }) {

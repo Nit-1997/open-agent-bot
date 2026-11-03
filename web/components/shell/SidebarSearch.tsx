@@ -1,13 +1,13 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useNavigate, usePathname, useSearchParams } from "@oab/ui/platform";
 import { useEffect, useRef, useState } from "react";
 import { isSearchScope, SEARCH_MAX } from "@oab/shared/lists";
 import { SEARCH_DEBOUNCE_MS, searchHref } from "@/lib/shell/searchNav";
 
 export function useSearchField() {
-  const router = useRouter();
+  const router = useNavigate();
   const pathname = usePathname();
   const params = useSearchParams();
   const urlQ = pathname === "/search" ? (params.get("q") ?? "") : "";

@@ -1,0 +1,16 @@
+<main class="flex h-dvh w-full flex-col items-center justify-center gap-4 px-4 text-center" id="session-disabled">
+  <span aria-hidden="true" class="orb h-10 w-10" id="session-disabled-orb">
+  </span>
+  <h1 class="font-display text-[28px] leading-tight text-text-primary" id="session-disabled-title" role="alert">
+    #text "Your access has been turned off."
+  </h1>
+  <p class="max-w-sm text-sm text-text-muted" id="session-disabled-text">
+    #text "Ask the person who invited you if you think this is a mistake."
+  </p>
+  <form action="/auth/signout" id="session-disabled-signout-form" method="post">
+    <input id="session-disabled-signout-scope" name="scope" type="hidden" value="local">
+    <button class="rounded-full border border-border px-4 py-1.5 text-sm text-text-secondary transition hover:border-border-strong" id="session-disabled-signout" type="submit">
+      #text "Sign out"
+    </button>
+  </form>
+</main>

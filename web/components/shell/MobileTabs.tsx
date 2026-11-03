@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText, MessageSquare, Search } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import type { LucideIcon } from "lucide-react";
 import { initials } from "@/lib/profile";
 import { navSectionOf, useRoute } from "@/lib/shell/useRoute";

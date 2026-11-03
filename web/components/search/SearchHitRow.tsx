@@ -1,6 +1,6 @@
 import type { SearchHit } from "@oab/shared/lists";
 import { FileText, MessageSquare } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { UNTITLED } from "@/components/chat/ChatHeader";
 import { fromChat } from "@/components/reports/ReportRow";
 import { shortDate } from "@/lib/dates";

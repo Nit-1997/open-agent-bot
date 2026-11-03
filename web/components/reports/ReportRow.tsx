@@ -1,6 +1,6 @@
 import type { ReportSummary } from "@oab/shared/lists";
 import { Download, FileText } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { UNTITLED } from "@/components/chat/ChatHeader";
 import { shortDate } from "@/lib/dates";
 import { reportPdfHref } from "@/lib/reports";

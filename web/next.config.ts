@@ -18,6 +18,7 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  transpilePackages: ["@oab/ui"],
   outputFileTracingRoot: path.join(__dirname, ".."),
   async headers() {
     return [

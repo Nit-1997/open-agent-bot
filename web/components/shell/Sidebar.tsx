@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { ChatList } from "@/components/chat/ChatList";
 import { useChatIndex } from "@/lib/chatIndex";
 import { AgentCard } from "./AgentCard";

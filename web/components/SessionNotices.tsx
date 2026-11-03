@@ -1,5 +1,5 @@
 import { SignOutForm } from "@/components/auth/SignOutForm";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { AUTH_ERROR_COPY } from "@/lib/authErrors";
 
 export function SignedOutBanner() {

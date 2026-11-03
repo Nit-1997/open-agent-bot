@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@oab/ui/platform/api";
 import { useCallback, useEffect, useState } from "react";
 import { readApi } from "@/lib/api";
 
@@ -16,7 +17,8 @@ export function useModels(): { list: ModelList | null; reload: () => void } {
   const [version, setVersion] = useState(0);
   useEffect(() => {
     let alive = true;
-    fetch("/api/models", { cache: "no-store" })
+    api()
+      .fetch("/models", { cache: "no-store" })
       .then((r) => readApi<ModelList>(r))
       .then((v) => {
         if (alive && v && Array.isArray(v.models)) setList(v);

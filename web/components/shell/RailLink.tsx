@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import type { MouseEventHandler, ReactNode } from "react";
 
 export const RAIL_ITEM =

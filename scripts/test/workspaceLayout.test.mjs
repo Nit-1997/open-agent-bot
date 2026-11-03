@@ -1,0 +1,79 @@
+import assert from "node:assert/strict";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const json = (path) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
+const DOCKERFILES = ["web/Dockerfile", "packages/core/Dockerfile"];
+const CHECKED_PACKAGES = ["packages/ui", "packages/bff"];
+
+function workspaces() {
+  return json("package.json").workspaces.flatMap((pattern) => {
+    if (!pattern.endsWith("/*")) return [pattern];
+    const base = pattern.slice(0, -2);
+    return readdirSync(join(ROOT, base), { withFileTypes: true })
+      .filter((e) => e.isDirectory() && existsSync(join(ROOT, base, e.name, "package.json")))
+      .map((e) => `${base}/${e.name}`);
+  });
+}
+
+function installStage(dockerfile) {
+  const text = readFileSync(join(ROOT, dockerfile), "utf8");
+  const end = text.search(/^RUN npm ci\b/m);
+  assert.ok(end > 0, `${dockerfile} has no RUN npm ci`);
+  return text.slice(0, end);
+}
+
+function sources(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const path = join(dir, e.name);
+    if (e.isDirectory()) return sources(path);
+    return /\.(ts|tsx|mts|js|mjs)$/.test(e.name) ? [path] : [];
+  });
+}
+
+const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'`]([^"'`]+)["'`]/g;
+const packageName = (spec) => (spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0]);
+
+function bareImports(dir) {
+  return new Set(
+    sources(dir).flatMap((file) =>
+      [...readFileSync(file, "utf8").matchAll(SPECIFIER)]
+        .map(([, spec]) => spec)
+        .filter((spec) => !spec.startsWith(".") && !spec.startsWith("node:"))
+        .map(packageName),
+    ),
+  );
+}
+
+describe("workspace layout", () => {
+  const all = workspaces();
+
+  it("finds the workspaces", () => {
+    assert.ok(all.includes("packages/ui"), "packages/ui is a workspace");
+    assert.ok(all.includes("web"));
+  });
+
+  for (const dockerfile of DOCKERFILES) {
+    it(`${dockerfile} copies every workspace package.json before npm ci`, () => {
+      const stage = installStage(dockerfile);
+      for (const ws of all) assert.ok(stage.includes(`COPY ${ws}/package.json ${ws}/`), `${dockerfile} misses COPY ${ws}/package.json`);
+    });
+  }
+
+  for (const ws of CHECKED_PACKAGES.filter((p) => existsSync(join(ROOT, p, "package.json")))) {
+    it(`${ws} declares every bare import of its src`, () => {
+      const pkg = json(`${ws}/package.json`);
+      const declared = new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {})]);
+      const missing = [...bareImports(join(ROOT, ws, "src"))].filter((name) => !declared.has(name));
+      assert.deepEqual(missing, []);
+    });
+  }
+
+  it("the lockfile has an entry for every workspace", () => {
+    const lock = json("package-lock.json").packages;
+    for (const ws of all) assert.ok(lock[ws], `package-lock.json has no "${ws}" entry`);
+  });
+});

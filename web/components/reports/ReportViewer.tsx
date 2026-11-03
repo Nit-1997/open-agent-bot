@@ -3,7 +3,7 @@
 import type { ReportSummary } from "@oab/shared/lists";
 import { hrefFor } from "@oab/shared/routes";
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, X } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@oab/ui/platform";
 import { type ReactNode, type Ref, useEffect, useState } from "react";
 import { ArtifactFrame } from "@/components/artifacts/ArtifactFrame";
 import { ListState } from "@/components/ui/ListState";
