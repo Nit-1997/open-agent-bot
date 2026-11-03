@@ -6,6 +6,7 @@ import { Onboarding } from "@/components/profile/onboarding/Onboarding";
 import { ProfileDrawer } from "@/components/profile/ProfileDrawer";
 import type { ModelList } from "@/lib/models";
 import type { ProviderView } from "@/lib/providers";
+import { renderWithPlatform } from "../support/platform";
 
 const models: ModelList = {
   default: null,
@@ -323,7 +324,9 @@ describe("ProfileDrawer", () => {
 
   it("edits the same data as the slides and saves it", async () => {
     const onSave = vi.fn(async () => {});
-    render(<ProfileDrawer profile={profile} models={models} onSave={onSave} onClose={() => {}} onRestart={() => {}} onClear={() => {}} />);
+    renderWithPlatform(
+      <ProfileDrawer profile={profile} models={models} onSave={onSave} onClose={() => {}} onRestart={() => {}} onClear={() => {}} />,
+    );
     fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Nitin B" } });
     chip("Vegetarian");
     fireEvent.click(await screen.findByRole("button", { name: "Southwest" }));
@@ -342,7 +345,7 @@ describe("ProfileDrawer", () => {
 
   it("edits the agent in the drawer, focuses its name when asked, and blocks Save on a bad name", async () => {
     const onSave = vi.fn(async () => {});
-    render(
+    renderWithPlatform(
       <ProfileDrawer
         profile={profile}
         models={models}
@@ -367,14 +370,16 @@ describe("ProfileDrawer", () => {
     const onSave = vi.fn(async () => {
       throw new Error("that profile isn't valid");
     });
-    render(<ProfileDrawer profile={profile} models={models} onSave={onSave} onClose={() => {}} onRestart={() => {}} onClear={() => {}} />);
+    renderWithPlatform(
+      <ProfileDrawer profile={profile} models={models} onSave={onSave} onClose={() => {}} onRestart={() => {}} onClear={() => {}} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent("that profile isn't valid");
   });
 
   it("asks before clearing the profile", () => {
     const onClear = vi.fn();
-    render(
+    renderWithPlatform(
       <ProfileDrawer profile={profile} models={models} onSave={async () => {}} onClose={() => {}} onRestart={() => {}} onClear={onClear} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /clear profile/i }));
@@ -384,7 +389,7 @@ describe("ProfileDrawer", () => {
   });
 
   it("shows the agent group and a sign-out-on-all-devices form, with unique ids, and no recent chats", () => {
-    const { container } = render(
+    const { container } = renderWithPlatform(
       <ProfileDrawer
         profile={profile}
         models={models}
@@ -409,7 +414,7 @@ describe("ProfileDrawer", () => {
 
   it("closes on Escape", () => {
     const onClose = vi.fn();
-    render(
+    renderWithPlatform(
       <ProfileDrawer profile={profile} models={models} onSave={async () => {}} onClose={onClose} onRestart={() => {}} onClear={() => {}} />,
     );
     fireEvent.keyDown(document, { key: "Escape" });

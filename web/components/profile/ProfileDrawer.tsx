@@ -1,7 +1,7 @@
 "use client";
 
-import { SignOutForm } from "@/components/auth/SignOutForm";
 import type { Profile } from "@oab/shared/profile";
+import { usePlatform } from "@oab/ui/platform";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { AgentSection } from "@/components/agent/AgentSection";
@@ -42,6 +42,7 @@ export function ProfileDrawer(props: {
   const [error, setError] = useState<string | null>(null);
   const [agentValid, setAgentValid] = useState(true);
   const options = useOnboardingOptions(draft.home);
+  const SignOutEverywhere = usePlatform().slots.signOutEverywhere;
   const { onClose, focus } = props;
 
   useEffect(() => {
@@ -162,18 +163,7 @@ export function ProfileDrawer(props: {
           >
             Run setup again
           </button>
-          <div id="profile-signout-all-row">
-            <SignOutForm
-              id="profile-signout-all"
-              scope="global"
-              className="block text-sm text-text-secondary underline-offset-4 hover:underline"
-            >
-              Sign out on all devices
-            </SignOutForm>
-            <p id="profile-signout-all-hint" className="text-xs text-text-muted">
-              Ends your sessions on every phone and computer, not just this one.
-            </p>
-          </div>
+          {SignOutEverywhere && <SignOutEverywhere id="profile-signout-all" />}
           {confirming ? (
             <div id="profile-clear-confirm" className="flex items-center gap-2 text-sm">
               <span id="profile-clear-question" className="text-text-secondary">

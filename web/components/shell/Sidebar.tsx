@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "@oab/ui/platform";
+import { Link, usePlatform } from "@oab/ui/platform";
 import { ChatList } from "@/components/chat/ChatList";
 import { useChatIndex } from "@/lib/chatIndex";
 import { AgentCard } from "./AgentCard";
@@ -9,6 +9,7 @@ import { SidebarSearch } from "./SidebarSearch";
 
 export function SidebarContent(props: { onNavigate?: () => void }) {
   const index = useChatIndex();
+  const UsageMeter = usePlatform().slots.usageMeter;
   return (
     <>
       <div id="sidebar-top" className="flex items-center gap-2">
@@ -28,6 +29,11 @@ export function SidebarContent(props: { onNavigate?: () => void }) {
           {`All chats · ${index.total}`}
         </Link>
       </div>
+      {UsageMeter && (
+        <div id="sidebar-usage">
+          <UsageMeter id="sidebar-usage-meter" variant="sidebar" />
+        </div>
+      )}
       <AgentCard id="agent-card" />
     </>
   );

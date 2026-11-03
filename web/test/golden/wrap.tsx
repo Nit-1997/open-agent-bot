@@ -1,4 +1,4 @@
 import type { ReactNode } from "react";
-import { withPlatform } from "../support/platform";
+import { hostedTestPlatform, withPlatform } from "../support/platform";
 
-export const wrapGolden = (ui: ReactNode) => withPlatform(ui);
+export const wrapGolden = (ui: ReactNode, opts: { isAdmin?: boolean } = {}) => withPlatform(ui, hostedTestPlatform(opts));

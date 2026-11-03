@@ -111,9 +111,9 @@ html.dark {
   --color-danger-bg: var(--status-danger-bg);
   --color-danger-fg: var(--status-danger-fg);
 
-  --font-display: var(--font-instrument-serif), Georgia, serif;
-  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
-  --font-mono: var(--font-dm-mono), Menlo, monospace;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-sans: "DM Sans Variable", system-ui, sans-serif;
+  --font-mono: "DM Mono", Menlo, monospace;
 
   --radius-card: 16px;
   --shadow-float: 0 2px 12px rgba(0, 0, 0, 0.06);

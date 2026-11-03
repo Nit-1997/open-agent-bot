@@ -6,9 +6,9 @@ import { Providers } from "../providers";
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   return (
-    <HostedPlatform user={{ email: user.email, name: user.name }}>
+    <HostedPlatform user={{ email: user.email, name: user.name, isAdmin: user.isAdmin }}>
       <Providers>
-        <AppShell user={{ email: user.email, name: user.name, isAdmin: user.isAdmin }}>{children}</AppShell>
+        <AppShell>{children}</AppShell>
       </Providers>
     </HostedPlatform>
   );

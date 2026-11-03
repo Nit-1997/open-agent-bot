@@ -30,7 +30,7 @@ function sources(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const path = join(dir, e.name);
     if (e.isDirectory()) return sources(path);
-    return /\.(ts|tsx|mts|js|mjs)$/.test(e.name) ? [path] : [];
+    return /\.(ts|tsx|mts|js|mjs|css)$/.test(e.name) ? [path] : [];
   });
 }
 
