@@ -8,6 +8,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/bff/package.json packages/bff/
 COPY packages/core/package.json packages/core/
 COPY packages/ui/package.json packages/ui/
+COPY packages/local-web/package.json packages/local-web/
 COPY web/package.json web/
 COPY e2e/package.json e2e/
 RUN npm ci -w web --include-workspace-root

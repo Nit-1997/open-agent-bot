@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-export const ID_ROOTS = ["packages/ui/src", "web/app", "web/components"];
+export const ID_ROOTS = ["packages/ui/src", "packages/local-web/src", "web/app", "web/components"];
 export const BASE_COUNT = 1005;
 export const ALLOWLIST = JSON.parse(readFileSync(join(REPO, "scripts/id-spread-allowlist.json"), "utf8"));
 

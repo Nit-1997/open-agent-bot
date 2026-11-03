@@ -1,0 +1,42 @@
+{
+  "name": "@oab/local-web",
+  "version": "1.0.0",
+  "description": "The Open Agent UI for the local stack: a Vite build of @oab/ui served by the local agent",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint",
+    "format": "biome format --write",
+    "format:check": "biome format",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@oab/shared": "1.0.0",
+    "@oab/ui": "1.0.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@tailwindcss/vite": "4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "6.1.2",
+    "eslint": "^9",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "^5",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

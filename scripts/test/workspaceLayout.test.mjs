@@ -8,6 +8,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const json = (path) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
 const DOCKERFILES = ["web/Dockerfile", "packages/core/Dockerfile"];
 const CHECKED_PACKAGES = ["packages/ui", "packages/bff"];
+const BUNDLED_APPS = ["packages/local-web"];
 
 function workspaces() {
   return json("package.json").workspaces.flatMap((pattern) => {
@@ -73,6 +74,23 @@ describe("workspace layout", () => {
     it(`${ws} declares every bare import of its src`, () => {
       const pkg = json(`${ws}/package.json`);
       const declared = new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {})]);
+      const missing = [...bareImports(join(ROOT, ws, "src"))].filter((name) => !declared.has(name));
+      assert.deepEqual(missing, []);
+    });
+  }
+
+  it("finds the local-web workspace", () => {
+    assert.ok(all.includes("packages/local-web"));
+  });
+
+  for (const ws of BUNDLED_APPS) {
+    it(`${ws} declares every bare import of its src, build-time packages included`, () => {
+      const pkg = json(`${ws}/package.json`);
+      const declared = new Set([
+        ...Object.keys(pkg.dependencies ?? {}),
+        ...Object.keys(pkg.peerDependencies ?? {}),
+        ...Object.keys(pkg.devDependencies ?? {}),
+      ]);
       const missing = [...bareImports(join(ROOT, ws, "src"))].filter((name) => !declared.has(name));
       assert.deepEqual(missing, []);
     });

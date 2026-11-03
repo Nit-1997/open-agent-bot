@@ -33,9 +33,11 @@ export function AccountMenuItems(props: { id: string; variant: "menu" | "sheet";
             {name}
           </p>
         )}
-        <p id={`${id}-email`} className="truncate text-xs text-text-muted" title={user.email}>
-          {user.email}
-        </p>
+        {user.email && (
+          <p id={`${id}-email`} className="truncate text-xs text-text-muted" title={user.email}>
+            {user.email}
+          </p>
+        )}
       </div>
       <div id={`${id}-items`} className="py-1">
         <button id={`${id}-profile`} type="button" role={role} onClick={() => go("profile")} className={cls}>

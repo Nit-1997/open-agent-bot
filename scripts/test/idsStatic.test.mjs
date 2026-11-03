@@ -31,6 +31,10 @@ describe("static ids", () => {
     assert.ok(elements.length >= BASE_COUNT, `${elements.length} elements, expected at least ${BASE_COUNT}`);
   });
 
+  it("scans the ui, web and local-web sources", () => {
+    for (const root of ["packages/ui/src", "packages/local-web/src", "web/app", "web/components"]) assert.ok(ID_ROOTS.includes(root), root);
+  });
+
   it("keeps the spread allowlist short, justified and in use", () => {
     assert.ok(ALLOWLIST.length <= 10);
     for (const entry of ALLOWLIST) assert.ok(entry.reason.trim().length > 10, entry.file);
