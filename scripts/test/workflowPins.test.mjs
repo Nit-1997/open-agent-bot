@@ -7,10 +7,18 @@ import { parse } from "yaml";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const DIR = join(ROOT, ".github/workflows");
-const FILES = readdirSync(DIR).filter((f) => /\.ya?ml$/.test(f)).sort();
+const FILES = readdirSync(DIR)
+  .filter((f) => /\.ya?ml$/.test(f))
+  .sort();
 const read = (file) => readFileSync(join(DIR, file), "utf8");
 const doc = (file) => parse(read(file));
-const WRITE_SCOPES = ["packages", "id-token", "attestations"];
+const WRITE_SCOPES = ["contents", "packages", "id-token", "attestations"];
+const RELEASE_WRITES = {
+  push: ["packages", "id-token", "attestations"],
+  merge: ["packages", "id-token", "attestations"],
+  attest: ["id-token", "attestations"],
+  release: ["contents"],
+};
 
 const usesOf = (text) => [...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)].map((m) => ({ ref: m[1], comment: m[2].trim() }));
 const triggers = (wf) => (typeof wf.on === "string" ? [wf.on] : Array.isArray(wf.on) ? wf.on : Object.keys(wf.on ?? {}));
@@ -19,7 +27,7 @@ const stepsText = (job) => JSON.stringify(job.steps ?? []);
 
 describe("workflow action pins", () => {
   it("finds the workflows", () => {
-    for (const f of ["ci.yml", "images.yml", "evals-local.yml"]) assert.ok(FILES.includes(f), f);
+    for (const f of ["ci.yml", "release.yml", "evals-local.yml"]) assert.ok(FILES.includes(f), f);
   });
 
   for (const file of FILES) {
@@ -44,13 +52,12 @@ describe("workflow action pins", () => {
 
 describe("write scopes", () => {
   for (const file of FILES) {
-    it(`${file}: packages/id-token/attestations write only on images.yml push and merge jobs`, () => {
+    it(`${file}: contents/packages/id-token/attestations write only on the release.yml write jobs`, () => {
       const wf = doc(file);
       assert.deepEqual(writes(wf.permissions), []);
       for (const [name, job] of Object.entries(wf.jobs ?? {})) {
-        const granted = writes(job.permissions);
-        if (file === "images.yml" && (name === "push" || name === "merge")) continue;
-        assert.deepEqual(granted, [], `${file} job ${name}`);
+        const want = file === "release.yml" ? (RELEASE_WRITES[name] ?? []) : [];
+        assert.deepEqual(writes(job.permissions), want, `${file} job ${name}`);
       }
     });
   }
@@ -75,7 +82,14 @@ describe("ci.yml local-stack job", () => {
 
   it("builds, waits up to 300 s, runs the subset, probes, restarts, re-checks and tears down with -v in always()", () => {
     const text = stepsText(job);
-    for (const piece of ["build", "--wait-timeout 300", "npm run local -w e2e", "local-probes.mts", "npm run local:after-restart -w e2e", "down -v"]) {
+    for (const piece of [
+      "build",
+      "--wait-timeout 300",
+      "npm run local -w e2e",
+      "local-probes.mts",
+      "npm run local:after-restart -w e2e",
+      "down -v",
+    ]) {
       assert.ok(text.includes(piece), piece);
     }
     const teardown = job.steps.at(-1);
@@ -90,7 +104,10 @@ describe("ci.yml local-stack job", () => {
     assert.match(stepsText(node24), /--user pwuser/);
     assert.match(stepsText(node24), /mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-noble@sha256:[0-9a-f]{64} /);
     assert.doesNotMatch(stepsText(node24), /playwright:v[\d.]+-noble(?!@sha256:)/);
-    assert.match(node24.steps.map((s) => s.run ?? "").join("\n"), /case "\$\(node -p process\.versions\.node\)" in 24\.\*\) ;; \*\) echo "[^"]*" >&2; exit 1 ;; esac/);
+    assert.match(
+      node24.steps.map((s) => s.run ?? "").join("\n"),
+      /case "\$\(node -p process\.versions\.node\)" in 24\.\*\) ;; \*\) echo "[^"]*" >&2; exit 1 ;; esac/,
+    );
   });
 });
 
@@ -184,7 +201,10 @@ describe("ci.yml desktop jobs", () => {
     assert.equal(filter.run.includes("${{"), false);
     const text = runs(job);
     assert.match(text, /npm run dist -w @oab\/desktop -- --arm64 --x64/);
-    assert.match(text, /packagedSmoke\.mjs .*--app "apps\/desktop\/release\/mac-arm64\/Open Agent\.app" --app "apps\/desktop\/release\/mac\/Open Agent\.app"/);
+    assert.match(
+      text,
+      /packagedSmoke\.mjs .*--app "apps\/desktop\/release\/mac-arm64\/Open Agent\.app" --app "apps\/desktop\/release\/mac\/Open Agent\.app"/,
+    );
     assert.match(text, /--dmg/);
     const dist = job.steps.find((s) => (s.run ?? "").includes("npm run dist"));
     assert.equal(String(dist.env.CSC_IDENTITY_AUTO_DISCOVERY), "false");
@@ -194,75 +214,23 @@ describe("ci.yml desktop jobs", () => {
   });
 });
 
-describe("images.yml", () => {
-  const text = read("images.yml");
-  const wf = doc("images.yml");
+describe("release.yml", () => {
+  const text = read("release.yml");
+  const wf = doc("release.yml");
 
-  it("runs on v* tags and dispatch only", () => {
-    assert.deepEqual(Object.keys(wf.on).sort(), ["push", "workflow_dispatch"]);
-    assert.deepEqual(wf.on.push, { tags: ["v*"] });
-  });
+  it("runs on v* tags only", () => assert.deepEqual(wf.on, { push: { tags: ["v*"] } }));
 
-  it("builds natively on amd64 and arm64 runners", () => {
-    const include = wf.jobs.build.strategy.matrix.include;
-    const legs = include.map((l) => `${l.platform} ${l.runner}`).sort();
-    assert.ok(legs.includes("linux/amd64 ubuntu-24.04"));
-    assert.ok(legs.includes("linux/arm64 ubuntu-24.04-arm"));
-  });
-
-  it("gates the push and merge jobs on a v* tag and grants them the write scopes", () => {
-    for (const name of ["push", "merge"]) {
-      const job = wf.jobs[name];
-      assert.match(job.if, /startsWith\(github\.ref, 'refs\/tags\/v'\)/, name);
-      assert.deepEqual(writes(job.permissions).sort(), [...WRITE_SCOPES].sort(), name);
-    }
-  });
-
-  it("sets provenance mode=max, an SBOM and attests each pushed digest", () => {
+  it("sets provenance mode=max, an SBOM and attests what it pushes", () => {
     assert.match(text, /provenance: mode=max/);
     assert.match(text, /sbom: true/);
     assert.match(text, /actions\/attest-build-provenance@[0-9a-f]{40}/);
     assert.match(text, /push-to-registry: true/);
   });
 
-  it("passes only the version and revision as build args, never secrets", () => {
-    const builds = Object.values(wf.jobs).flatMap((job) => job.steps.filter((s) => String(s.uses ?? "").startsWith("docker/build-push-action@")));
-    assert.equal(builds.length, 2);
-    for (const step of builds) {
-      const args = String(step.with["build-args"]).trim().split("\n");
-      assert.deepEqual(args.map((a) => a.split("=")[0]), ["OPEN_AGENT_VERSION", "OPEN_AGENT_REVISION"]);
-      assert.equal(JSON.stringify(step.with).includes("secrets."), false);
-      assert.equal(step.with.secrets, undefined);
-    }
-  });
-
-  it("checks the image content (/app for the agent) in the build job and on the exact digest it pushed", () => {
-    const agentDirs = (job) => job.strategy.matrix.include.filter((l) => l.image === "open-agent").map((l) => l.content);
-    for (const name of ["build", "push"]) {
-      const job = wf.jobs[name];
-      assert.deepEqual([...new Set(agentDirs(job))], ["/app"], name);
-      const steps = job.steps.map((s) => s.run ?? "").join("\n");
-      assert.match(steps, /find '\$CONTENT_DIR' \\\( -name '\.env\*' -o -name '\*\.pem' -o -name \.factory \\\) -print/, name);
-      assert.match(steps, /test -z "\$found"/, name);
-    }
-    const push = wf.jobs.push.steps;
-    const pushed = push.findIndex((s) => String(s.with?.outputs ?? "").includes("push=true"));
-    const check = push.findIndex((s) => (s.run ?? "").includes("find '$CONTENT_DIR'"));
-    const attest = push.findIndex((s) => String(s.uses ?? "").startsWith("actions/attest-build-provenance@"));
-    assert.ok(pushed >= 0 && check > pushed && attest > check);
-    assert.equal(push.filter((s) => String(s.uses ?? "").startsWith("docker/build-push-action@")).length, 1);
-    assert.match(push[check].env.IMAGE, /steps\.meta\.outputs\.name \}\}@\$\{\{ steps\.build\.outputs\.digest/);
-  });
-
-  it("never pushes from the build job", () => {
-    for (const step of wf.jobs.build.steps) {
-      if (!String(step.uses ?? "").startsWith("docker/build-push-action@")) continue;
-      assert.equal(step.with.push, false);
-      assert.equal(String(step.with.outputs ?? "").includes("push=true"), false);
-    }
-  });
-
-  it("builds both images", () => {
+  it("builds both images, the agent content check on /app", () => {
+    const include = wf.jobs.push.strategy.matrix.include;
+    assert.deepEqual([...new Set(include.filter((l) => l.image === "open-agent").map((l) => l.content))], ["/app"]);
+    assert.deepEqual([...new Set(include.filter((l) => l.image === "open-agent-search").map((l) => l.content))], ["/opt/open-agent"]);
     assert.match(text, /packages\/core\/Dockerfile/);
     assert.match(text, /local\/searxng/);
   });

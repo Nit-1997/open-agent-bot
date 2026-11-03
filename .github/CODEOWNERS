@@ -1,0 +1,4 @@
+/.github/CODEOWNERS @Nit-1997
+/.github/workflows/ @Nit-1997
+/scripts/release/ @Nit-1997
+/apps/desktop/release-policy.json @Nit-1997

@@ -86,6 +86,8 @@ jobs:
           test "$($local | jq '[.services[].volumes[]? | select(.type == "bind")] | length')" = 0
       - name: Compose layout, hosted config equivalence with 6986a4c, and preflight
         run: node --test scripts/test/composeLayout.test.mjs scripts/test/preflight.test.mjs
+      - name: actionlint on every workflow (pinned image)
+        run: npm run lint:workflows
 
   local-stack:
     if: github.event_name == 'pull_request'

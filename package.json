@@ -18,7 +18,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && node --test scripts/test/*.test.mjs",
     "build": "npm run build --workspaces --if-present",
-    "release:dry-run": "node scripts/release/dry-run.mjs"
+    "release:dry-run": "node scripts/release/dry-run.mjs",
+    "lint:workflows": "docker run --rm -v \"$PWD:/repo:ro\" -w /repo rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color"
   },
   "devDependencies": {
     "patch-package": "8.0.1",

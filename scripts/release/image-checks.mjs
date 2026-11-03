@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { isMain, main, spawnRunner, writeOutputs } from "./cli.mjs";
 
@@ -84,7 +85,9 @@ export function imageChecks(argv, docker = spawnRunner("docker")) {
       platform: { type: "string" },
       pull: { type: "boolean" },
       metadata: { type: "string" },
+      inspect: { type: "string" },
       name: { type: "string" },
+      out: { type: "string" },
     },
   });
   const need = (...ks) => {
@@ -103,10 +106,16 @@ export function imageChecks(argv, docker = spawnRunner("docker")) {
     return report(nodeCheck({ docker, image: values.image, platform: values.platform }));
   }
   if (sub === "merge-digest") {
+    if (values.out && !values.name) throw new Error("merge-digest --out needs --name");
     const digest = values.metadata
       ? mergeDigest({ metadata: readFileSync(values.metadata, "utf8") })
-      : mergeDigest({ inspectJson: readFileSync(0, "utf8") });
+      : mergeDigest({ inspectJson: readFileSync(values.inspect ?? 0, "utf8") });
     process.stdout.write(`merge-digest: ${values.name ? `${values.name}@` : ""}${digest}\n`);
+    if (values.out) {
+      const out = resolve(values.out);
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, `${JSON.stringify({ name: values.name, digest })}\n`, { mode: 0o644 });
+    }
     writeOutputs({ ...(values.name ? { name: values.name } : {}), digest });
     return 0;
   }
