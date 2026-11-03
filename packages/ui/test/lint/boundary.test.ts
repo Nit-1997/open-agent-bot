@@ -45,14 +45,16 @@ async function restricted(code: string) {
   return result.messages.filter((m) => m.ruleId !== null && RULES.has(m.ruleId));
 }
 
+const importing = (names: string, spec: string) => `import ${names} from "${spec}";\nexport default ${names.replace(/[{}\s]/g, "")};\n`;
+
 const INJECTED = [
-  'import Link from "next/link";\nexport default Link;\n',
-  'import { useRouter } from "next/navigation";\nexport default useRouter;\n',
+  importing("Link", "next/link"),
+  importing("{ useRouter }", "next/navigation"),
   'import "@supabase/ssr";\n',
-  'import { createBff } from "@oab/bff/index.js";\nexport default createBff;\n',
-  'import { requireUser } from "../../../web/lib/auth";\nexport default requireUser;\n',
-  'import x from "@/lib/x";\nexport default x;\n',
-  'import { readFileSync } from "node:fs";\nexport default readFileSync;\n',
+  importing("{ createBff }", "@oab/bff/index.js"),
+  importing("{ requireUser }", "../../../web/lib/auth"),
+  importing("x", "@/lib/x"),
+  importing("{ readFileSync }", "node:fs"),
 ];
 
 const ALLOWED = [
