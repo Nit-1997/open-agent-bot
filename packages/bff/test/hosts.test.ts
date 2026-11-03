@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { type AuthOutcome, createBff } from "../src/index.ts";
 import { deps, fakeAgent, localAuth, signedIn } from "./support.ts";
 
+const SECRET = "0123456789abcdef".repeat(4);
+
 const ORIGIN = "http://127.0.0.1:3000";
 const LOCAL = { appOrigin: [ORIGIN, "http://localhost:3000"], allowedHosts: ["127.0.0.1:3000", "localhost:3000"] };
 
@@ -51,23 +53,24 @@ describe("allowedHosts (local-style config)", () => {
   });
 });
 
-describe("sample localAuth (the shape M3 uses)", () => {
+describe("localAuth", () => {
   const bff = (auth: (r: Request) => Promise<AuthOutcome>) => createBff(deps({ ...LOCAL, auth, fetch: fakeAgent().fetch }));
 
   it("refuses an unsafe method with Sec-Fetch-Site: cross-site", async () => {
-    const res = await bff(localAuth("secret"))(
+    const res = await bff(localAuth({ secret: SECRET }))(
       new Request(`${ORIGIN}/api/profile`, {
         method: "PUT",
         body: "{}",
         headers: { host: "127.0.0.1:3000", origin: ORIGIN, "sec-fetch-site": "cross-site" },
       }),
     );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: "bad_origin" });
   });
 
   it("accepts same-origin writes and sends only the per-install secret", async () => {
     const agent = fakeAgent();
-    const handler = createBff(deps({ ...LOCAL, auth: localAuth("secret"), fetch: agent.fetch }));
+    const handler = createBff(deps({ ...LOCAL, auth: localAuth({ secret: SECRET }), fetch: agent.fetch }));
     const res = await handler(
       new Request(`${ORIGIN}/api/profile`, {
         method: "PUT",

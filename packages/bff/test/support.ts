@@ -1,5 +1,7 @@
 import type { AuthOutcome, BffDeps } from "../src/index.ts";
 
+export { localAuth } from "../src/index.ts";
+
 export const AGENT = "http://agent.test:8000";
 export const APP = "https://app.test";
 export const SECRET = "s".repeat(64);
@@ -48,13 +50,3 @@ export function request(path: string, init: RequestInit & { origin?: string | nu
   if (host) headers.set("host", host);
   return new Request(`${APP}${path}`, { ...rest, headers });
 }
-
-export const localAuth =
-  (secret: string) =>
-  async (req: Request): Promise<AuthOutcome> => {
-    const site = req.headers.get("sec-fetch-site");
-    const unsafe = !["GET", "HEAD"].includes(req.method);
-    if (unsafe && site !== null && site !== "same-origin")
-      return { ok: false, status: 401, error: "signed_out", message: "Cross-site requests are not allowed." };
-    return { ok: true, headers: { "x-agent-secret": secret } };
-  };
