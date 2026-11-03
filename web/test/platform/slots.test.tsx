@@ -84,16 +84,16 @@ describe("platform slots in the shell", () => {
     expect(document.getElementById("profile-restart")).not.toBeNull();
     expect(document.getElementById("profile-signout-all-row")).toBeNull();
     expect(document.querySelector("[id$='-signout']")).toBeNull();
-    expectUniqueIds(document.body);
+    expectUniqueIds(container);
   });
 
   it("renders no sign-out or usage in the phone account sheet without slots", async () => {
-    await renderShell(bare(), 390);
+    const { container } = await renderShell(bare(), 390);
     await click("mobile-tabs-you");
     await waitFor(() => expect(document.getElementById("account-sheet-profile")).not.toBeNull());
     expect(document.querySelector("[id$='-signout']")).toBeNull();
     expect(document.getElementById("account-sheet-usage")).toBeNull();
-    expectUniqueIds(document.body);
+    expectUniqueIds(container);
   });
 
   it("shows the neutral session-ended notice on 401 when no signed-out slot is given", async () => {
@@ -127,7 +127,7 @@ describe("platform slots in the shell", () => {
     expectUniqueIds(first.container);
     first.unmount();
 
-    await renderShell(bare({ usageMeter: UsageStub }), 390);
+    const second = await renderShell(bare({ usageMeter: UsageStub }), 390);
     await click("mobile-tabs-you");
     const sheet = await waitFor(() => {
       const el = document.getElementById("account-sheet-usage");
@@ -135,6 +135,7 @@ describe("platform slots in the shell", () => {
       return el!;
     });
     expect(sheet.querySelector("#account-sheet-usage-meter")).toHaveAttribute("data-variant", "sheet");
-    expectUniqueIds(document.body);
+    expect(sheet.parentElement?.id).toBe("account-sheet-body");
+    expectUniqueIds(second.container);
   });
 });

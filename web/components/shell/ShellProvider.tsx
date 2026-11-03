@@ -3,7 +3,7 @@
 import type { AgentPersona, Profile } from "@oab/shared/profile";
 import { agentPersona } from "@oab/shared/profile";
 import { hrefFor, parseRoute } from "@oab/shared/routes";
-import { useNavigate, usePathname, usePlatformHistory } from "@oab/ui/platform";
+import { type PlatformUser, useNavigate, usePathname, usePlatform, usePlatformHistory } from "@oab/ui/platform";
 import {
   createContext,
   type ReactNode,
@@ -32,13 +32,12 @@ import { readSidebarOpen, writeSidebarOpen } from "@/lib/shell/sidebarPref";
 
 export type Overlay = "none" | "sidebar" | "drawer" | "account" | "profile" | "models";
 export type FocusTarget = "search" | "composer";
-export type ShellUser = { email: string; name: string; isAdmin: boolean };
 
 const FOCUS_PATH: Record<FocusTarget, string> = { search: "/search", composer: "/" };
 const BREAKPOINT_OVERLAYS: ReadonlySet<Overlay> = new Set(["sidebar", "drawer"]);
 
 export type ShellApi = {
-  user: ShellUser;
+  user: PlatformUser;
   persona: AgentPersona;
   profile: Profile;
   saveProfile(p: Profile): Promise<void>;
@@ -78,7 +77,6 @@ export function useShell(): ShellApi {
 }
 
 export function ShellProvider(props: {
-  user: ShellUser;
   profile: Profile;
   saveProfile: (p: Profile) => Promise<void>;
   models: ModelList | null;
@@ -86,6 +84,7 @@ export function ShellProvider(props: {
   starter?: string;
   children: ReactNode;
 }) {
+  const { user } = usePlatform();
   const router = useNavigate();
   const history = usePlatformHistory();
   const pathname = usePathname();
@@ -220,7 +219,7 @@ export function ShellProvider(props: {
 
   const running = useMemo(() => new Set(chats.running), [chats.running]);
   const persona = useMemo(() => agentPersona(props.profile), [props.profile]);
-  const { user, profile, saveProfile, models, reloadModels } = props;
+  const { profile, saveProfile, models, reloadModels } = props;
 
   const api = useMemo<ShellApi>(
     () => ({

@@ -1,16 +1,17 @@
 "use client";
 
+import { AccessEnded, SessionEnded } from "@oab/ui/components/shell/SessionFallbacks.tsx";
+import { usePlatform } from "@oab/ui/platform";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
 import { Onboarding } from "@/components/profile/onboarding/Onboarding";
-import { AccessDisabled, SignedOutBanner } from "@/components/session/SignedOutBanner";
 import { useAuthState } from "@/lib/authState";
 import { useModels } from "@/lib/models";
 import { type Profile, saveProfile, useProfile } from "@/lib/profile";
 import { ShellFrame } from "./ShellFrame";
 import { ShellOverlays } from "./ShellOverlays";
-import { ShellProvider, type ShellUser } from "./ShellProvider";
+import { ShellProvider } from "./ShellProvider";
 
 function ProfileLoading({ error, onRetry }: { error?: string; onRetry: () => void }) {
   return (
@@ -39,7 +40,10 @@ function ProfileLoading({ error, onRetry }: { error?: string; onRetry: () => voi
   );
 }
 
-export function AppShell({ user, children }: { user: ShellUser; children: ReactNode }) {
+export function AppShell({ children }: { children: ReactNode }) {
+  const { user, slots } = usePlatform();
+  const SignedOutNotice = slots.signedOutNotice ?? SessionEnded;
+  const AccessDisabledNotice = slots.accessDisabledNotice ?? AccessEnded;
   const authState = useAuthState();
   const { profile: stored, error, reload } = useProfile();
   const profile = useMemo(
@@ -57,8 +61,8 @@ export function AppShell({ user, children }: { user: ShellUser; children: ReactN
     [reloadModels],
   );
 
-  if (authState === "account_disabled") return <AccessDisabled />;
-  const signedOut = authState === "signed_out" && <SignedOutBanner />;
+  if (authState === "account_disabled") return <AccessDisabledNotice />;
+  const signedOut = authState === "signed_out" && <SignedOutNotice />;
   if (!profile) {
     return (
       <>
@@ -84,7 +88,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: ReactN
     );
   }
   return (
-    <ShellProvider user={user} profile={profile} saveProfile={save} models={models} reloadModels={reloadModels} starter={starter}>
+    <ShellProvider profile={profile} saveProfile={save} models={models} reloadModels={reloadModels} starter={starter}>
       {signedOut}
       <ShellFrame>{children}</ShellFrame>
       <ShellOverlays />

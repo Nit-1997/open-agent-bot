@@ -1,10 +1,9 @@
 "use client";
 
-import { Check, LogOut, Moon, Shield, SlidersHorizontal, UserRound } from "lucide-react";
-import { Link } from "@oab/ui/platform";
+import { Check, LogOut, Moon, SlidersHorizontal, UserRound } from "lucide-react";
+import { usePlatform } from "@oab/ui/platform";
 import { useState } from "react";
 import { AgentOrb } from "@/components/agent/AgentOrb";
-import { SignOutForm } from "@/components/auth/SignOutForm";
 import { useShell } from "@/components/shell/ShellProvider";
 import { isDark, setTheme } from "@/lib/theme";
 
@@ -15,6 +14,7 @@ const SHEET_ITEM = `${ITEM} min-h-11 text-[15px]`;
 export function AccountMenuItems(props: { id: string; variant: "menu" | "sheet"; onDone: () => void }) {
   const { id, variant, onDone } = props;
   const { user, profile, persona, open, close } = useShell();
+  const { signOut: SignOut, accountMenuExtra: Extra } = usePlatform().slots;
   const [dark, setDark] = useState(isDark);
   const menu = variant === "menu";
   const role = menu ? "menuitem" : undefined;
@@ -69,27 +69,25 @@ export function AccountMenuItems(props: { id: string; variant: "menu" | "sheet";
           </span>
           {dark && <Check id={`${id}-theme-check`} aria-hidden="true" size={15} />}
         </button>
-        {user.isAdmin && (
-          <Link
-            id={`${id}-admin`}
-            href="/admin"
+        {Extra && (
+          <Extra
+            id={id}
             role={role}
-            onClick={() => {
+            className={cls}
+            onSelect={() => {
               onDone();
               close();
             }}
-            className={cls}
-          >
-            <Shield id={`${id}-admin-icon`} aria-hidden="true" size={15} />
-            Admin
-          </Link>
+          />
         )}
       </div>
       <div id={`${id}-footer`} className="border-t border-border pt-1">
-        <SignOutForm id={`${id}-signout`} scope="local" role={role} className={cls}>
-          <LogOut id={`${id}-signout-icon`} aria-hidden="true" size={15} />
-          Sign out
-        </SignOutForm>
+        {SignOut && (
+          <SignOut id={`${id}-signout`} role={role} className={cls} onSelect={onDone}>
+            <LogOut id={`${id}-signout-icon`} aria-hidden="true" size={15} />
+            Sign out
+          </SignOut>
+        )}
       </div>
     </>
   );
