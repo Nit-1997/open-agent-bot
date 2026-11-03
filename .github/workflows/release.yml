@@ -1,0 +1,504 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  gate:
+    if: github.repository == 'Nit-1997/open-agent-bot' && github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.gate.outputs.version }}
+      prerelease: ${{ steps.gate.outputs.prerelease }}
+      tag: ${{ steps.gate.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Fetch the tag object
+        env:
+          TAG: ${{ github.ref_name }}
+        run: git fetch --force origin "+refs/tags/$TAG:refs/tags/$TAG"
+      - name: Gate (tag, annotated, on main, no published release, policy, compose hash)
+        id: gate
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/gate.mjs --tag "$TAG"
+
+  push:
+    name: push ${{ matrix.image }} ${{ matrix.platform }}
+    needs: [gate]
+    runs-on: ${{ matrix.runner }}
+    environment: release
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { image: open-agent, name: ghcr.io/nit-1997/open-agent, arch: amd64, platform: linux/amd64, runner: ubuntu-24.04, context: ., dockerfile: packages/core/Dockerfile, content: /app }
+          - { image: open-agent, name: ghcr.io/nit-1997/open-agent, arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm, context: ., dockerfile: packages/core/Dockerfile, content: /app }
+          - { image: open-agent-search, name: ghcr.io/nit-1997/open-agent-search, arch: amd64, platform: linux/amd64, runner: ubuntu-24.04, context: local/searxng, dockerfile: local/searxng/Dockerfile, content: /opt/open-agent }
+          - { image: open-agent-search, name: ghcr.io/nit-1997/open-agent-search, arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm, context: local/searxng, dockerfile: local/searxng/Dockerfile, content: /opt/open-agent }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: v0.38.2
+          driver-opts: image=moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build without any cache and load it for the checks
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            OPEN_AGENT_VERSION=${{ needs.gate.outputs.version }}
+            OPEN_AGENT_REVISION=${{ github.sha }}
+          tags: ${{ matrix.image }}:check
+          no-cache: true
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+      - name: No env files, keys or factory evidence in the image
+        env:
+          IMAGE: ${{ matrix.image }}:check
+          CONTENT_DIR: ${{ matrix.content }}
+        run: node scripts/release/image-checks.mjs content --image "$IMAGE" --dir "$CONTENT_DIR"
+      - name: Labels carry the version and revision
+        env:
+          IMAGE: ${{ matrix.image }}:check
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: node scripts/release/image-checks.mjs labels --image "$IMAGE" --version "$VERSION" --revision "$GITHUB_SHA"
+      - name: Push the same build (this job's builder, no external cache) by digest with provenance and an SBOM
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            OPEN_AGENT_VERSION=${{ needs.gate.outputs.version }}
+            OPEN_AGENT_REVISION=${{ github.sha }}
+          outputs: type=image,name=${{ matrix.name }},push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+          sbom: true
+      - name: Pull the pushed digest
+        env:
+          IMAGE: ${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: docker pull --quiet "$IMAGE"
+      - name: No env files, keys or factory evidence in the pushed digest
+        env:
+          IMAGE: ${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          CONTENT_DIR: ${{ matrix.content }}
+        run: node scripts/release/image-checks.mjs content --image "$IMAGE" --dir "$CONTENT_DIR"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ matrix.name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Record the digest
+        env:
+          ARCH: ${{ matrix.arch }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: node scripts/release/refs.mjs record --arch "$ARCH" --digest "$DIGEST" --dir "$RUNNER_TEMP/digests"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge ${{ matrix.image }}
+    needs: [gate, push]
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        include:
+          - { image: open-agent, name: ghcr.io/nit-1997/open-agent }
+          - { image: open-agent-search, name: ghcr.io/nit-1997/open-agent-search }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: v0.38.2
+          driver-opts: image=moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Per-arch refs and the :<version> and :sha-<7> tags
+        id: inputs
+        env:
+          NAME: ${{ matrix.name }}
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: node scripts/release/refs.mjs merge-inputs --dir "$RUNNER_TEMP/digests" --name "$NAME" --version "$VERSION" --sha "$GITHUB_SHA"
+      - name: Create the multi-arch index
+        env:
+          VERSION_TAG: ${{ steps.inputs.outputs.version_tag }}
+          SHA_TAG: ${{ steps.inputs.outputs.sha_tag }}
+          AMD64: ${{ steps.inputs.outputs.amd64 }}
+          ARM64: ${{ steps.inputs.outputs.arm64 }}
+        run: docker buildx imagetools create --metadata-file "$RUNNER_TEMP/index-metadata.json" -t "$VERSION_TAG" -t "$SHA_TAG" "$AMD64" "$ARM64"
+      - name: Index digest
+        id: merge
+        env:
+          NAME: ${{ matrix.name }}
+          IMAGE: ${{ matrix.image }}
+        run: node scripts/release/image-checks.mjs merge-digest --metadata "$RUNNER_TEMP/index-metadata.json" --name "$NAME" --out "$RUNNER_TEMP/index/$IMAGE.json"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ matrix.name }}
+          subject-digest: ${{ steps.merge.outputs.digest }}
+          push-to-registry: true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: index-${{ matrix.image }}
+          path: ${{ runner.temp }}/index/${{ matrix.image }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+  lock:
+    needs: [gate, merge]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    env:
+      VERSION: ${{ needs.gate.outputs.version }}
+      TAG: ${{ needs.gate.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/index
+          pattern: index-*
+          merge-multiple: true
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm64
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: v0.38.2
+          driver-opts: image=moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Index refs from the merge job
+        id: refs
+        run: node scripts/release/refs.mjs lock-inputs --dir "$RUNNER_TEMP/index" --version "$VERSION" --out-dir "$RUNNER_TEMP/release-lock"
+      - name: Agent raw index
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+        run: docker buildx imagetools inspect "$AGENT" --raw > "$RUNNER_TEMP/release-lock/raw-agent.json"
+      - name: Agent version tag
+        env:
+          AGENT_TAG: ${{ steps.refs.outputs.agent_tag }}
+        run: docker buildx imagetools inspect "$AGENT_TAG" --format '{{json .Manifest}}' > "$RUNNER_TEMP/tag-agent.json"
+      - name: Agent version tag digest
+        id: tag-agent
+        run: node scripts/release/image-checks.mjs merge-digest --inspect "$RUNNER_TEMP/tag-agent.json"
+      - name: Agent index has exactly linux/amd64 and linux/arm64 and the tag did not move
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+          TAG_DIGEST: ${{ steps.tag-agent.outputs.digest }}
+        run: node scripts/release/verify-index.mjs --ref "$AGENT" --version "$VERSION" --raw "$RUNNER_TEMP/release-lock/raw-agent.json" --tag-digest "$TAG_DIGEST"
+      - name: Search raw index
+        env:
+          SEARCH: ${{ steps.refs.outputs.search }}
+        run: docker buildx imagetools inspect "$SEARCH" --raw > "$RUNNER_TEMP/release-lock/raw-search.json"
+      - name: Search version tag
+        env:
+          SEARCH_TAG: ${{ steps.refs.outputs.search_tag }}
+        run: docker buildx imagetools inspect "$SEARCH_TAG" --format '{{json .Manifest}}' > "$RUNNER_TEMP/tag-search.json"
+      - name: Search version tag digest
+        id: tag-search
+        run: node scripts/release/image-checks.mjs merge-digest --inspect "$RUNNER_TEMP/tag-search.json"
+      - name: Search index has exactly linux/amd64 and linux/arm64 and the tag did not move
+        env:
+          SEARCH: ${{ steps.refs.outputs.search }}
+          TAG_DIGEST: ${{ steps.tag-search.outputs.digest }}
+        run: node scripts/release/verify-index.mjs --ref "$SEARCH" --version "$VERSION" --raw "$RUNNER_TEMP/release-lock/raw-search.json" --tag-digest "$TAG_DIGEST"
+      - name: Agent runs Node 24 on linux/amd64
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+        run: node scripts/release/image-checks.mjs node --image "$AGENT" --platform linux/amd64
+      - name: Agent runs Node 24 on linux/arm64
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+        run: node scripts/release/image-checks.mjs node --image "$AGENT" --platform linux/arm64
+      - name: Agent labels
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+        run: node scripts/release/image-checks.mjs labels --image "$AGENT" --version "$VERSION" --revision "$GITHUB_SHA" --pull --platform linux/amd64
+      - name: Search labels
+        env:
+          SEARCH: ${{ steps.refs.outputs.search }}
+        run: node scripts/release/image-checks.mjs labels --image "$SEARCH" --version "$VERSION" --revision "$GITHUB_SHA" --pull --platform linux/amd64
+      - name: Agent attestation (release.yml, this tag, this commit, GitHub-hosted)
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "oci://$AGENT" --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref "refs/tags/$TAG" --source-digest "$GITHUB_SHA" --deny-self-hosted-runners --format json > "$RUNNER_TEMP/attestation-agent.json"
+      - name: Search attestation (release.yml, this tag, this commit, GitHub-hosted)
+        env:
+          SEARCH: ${{ steps.refs.outputs.search }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "oci://$SEARCH" --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref "refs/tags/$TAG" --source-digest "$GITHUB_SHA" --deny-self-hosted-runners --format json > "$RUNNER_TEMP/attestation-search.json"
+      - name: attested.json from both verification results
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+          SEARCH: ${{ steps.refs.outputs.search }}
+        run: node scripts/release/attested.mjs --tag "$TAG" --sha "$GITHUB_SHA" --agent "$AGENT" --search "$SEARCH" --agent-result "$RUNNER_TEMP/attestation-agent.json" --search-result "$RUNNER_TEMP/attestation-search.json" --out "$RUNNER_TEMP/release-lock/attested.json"
+      - name: Write the release lock and manifest
+        env:
+          AGENT: ${{ steps.refs.outputs.agent }}
+          SEARCH: ${{ steps.refs.outputs.search }}
+        run: node scripts/release/write-lock.mjs --version "$VERSION" --agent "$AGENT" --search "$SEARCH" --out-lock "$RUNNER_TEMP/release-lock/services.lock.json" --out-manifest "$RUNNER_TEMP/release-lock/open-agent-services.json" --attested "$RUNNER_TEMP/release-lock/attested.json"
+      - name: Assert the release lock
+        run: node scripts/release/assert-lock.mjs "$RUNNER_TEMP/release-lock/services.lock.json" --version "$VERSION" --attested "$RUNNER_TEMP/release-lock/attested.json"
+      - name: Release notes
+        run: node scripts/release/notes.mjs --version "$VERSION" --lock "$RUNNER_TEMP/release-lock/services.lock.json" --out "$RUNNER_TEMP/release-lock/notes.md" --ref "$GITHUB_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-lock
+          path: ${{ runner.temp }}/release-lock
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop:
+    needs: [gate, lock]
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.gate.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci --ignore-scripts
+      - run: npm run postinstall
+      - run: npm run electron:install -w @oab/desktop
+      - name: Rosetta for the x64 smoke
+        run: /usr/bin/pgrep -q oahd || sudo softwareupdate --install-rosetta --agree-to-license
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-lock
+          path: ${{ runner.temp }}/release-lock
+      - name: Stage the stack with the release lock
+        run: node apps/desktop/scripts/stage-stack.mjs --lock "$RUNNER_TEMP/release-lock/services.lock.json"
+      - name: Build the shell
+        run: node apps/desktop/scripts/build.mjs
+      - name: Both DMGs, ad-hoc signed, fuses flipped, version from the tag
+        working-directory: apps/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: ../../node_modules/.bin/electron-builder --mac --arm64 --x64 --publish never --config.extraMetadata.version="$VERSION"
+      - name: Packaged smoke with the bundled release lock
+        run: |
+          node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg" | tee "$RUNNER_TEMP/smoke.log"
+      - name: Both apps bundle kind=release at this version
+        run: |
+          test "$(grep -c -F "services.lock.json kind=release version=$VERSION images=" "$RUNNER_TEMP/smoke.log")" = 2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-dmgs
+          path: |
+            apps/desktop/release/Open-Agent-${{ needs.gate.outputs.version }}-arm64.dmg
+            apps/desktop/release/Open-Agent-${{ needs.gate.outputs.version }}-x64.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-dmgs:
+    needs: [gate, lock, desktop]
+    runs-on: macos-15
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-lock
+          path: ${{ runner.temp }}/release-lock
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-dmgs
+          path: ${{ runner.temp }}/release-dmgs
+      - name: Each DMG holds one Open Agent.app whose bundled lock is the lock job's
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+          LOCK: ${{ runner.temp }}/release-lock/services.lock.json
+          DMGS: ${{ runner.temp }}/release-dmgs
+        run: |
+          want="$(shasum -a 256 "$LOCK" | cut -d ' ' -f 1)"
+          echo "release-lock services.lock.json sha256 $want"
+          for arch in arm64 x64; do
+            dmg="$DMGS/Open-Agent-$VERSION-$arch.dmg"
+            mnt="$RUNNER_TEMP/m-$arch"
+            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+            apps="$(find "$mnt" -mindepth 1 -maxdepth 1 -name '*.app' | wc -l | tr -d ' ')"
+            echo "$arch: $apps app bundle(s) in the DMG"
+            test "$apps" = 1
+            app="$mnt/Open Agent.app"
+            test -d "$app"
+            test ! -L "$app"
+            lock="$app/Contents/Resources/stack/services.lock.json"
+            test -f "$lock"
+            test ! -L "$lock"
+            got="$(shasum -a 256 "$lock" | cut -d ' ' -f 1)"
+            echo "$arch: bundled services.lock.json sha256 $got"
+            test "$got" = "$want"
+            short="$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")"
+            echo "$arch: CFBundleShortVersionString $short"
+            test "$short" = "$VERSION"
+            hdiutil detach "$mnt"
+          done
+
+  attest:
+    needs: [gate, verify-dmgs]
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-lock
+          path: ${{ runner.temp }}/assets
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-dmgs
+          path: ${{ runner.temp }}/assets
+      - name: SHA256SUMS of the two DMGs and the lock job's manifest
+        working-directory: ${{ runner.temp }}/assets
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: |
+          sha256sum "Open-Agent-$VERSION-arm64.dmg" "Open-Agent-$VERSION-x64.dmg" open-agent-services.json > SHA256SUMS
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: ${{ runner.temp }}/assets/SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-sums
+          path: ${{ runner.temp }}/assets/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [gate, attest]
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.gate.outputs.tag }}
+      VERSION: ${{ needs.gate.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      ASSET_ARM64: Open-Agent-${{ needs.gate.outputs.version }}-arm64.dmg
+      ASSET_X64: Open-Agent-${{ needs.gate.outputs.version }}-x64.dmg
+      ASSET_MANIFEST: open-agent-services.json
+      ASSET_SUMS: SHA256SUMS
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-lock
+          path: ${{ runner.temp }}/release-lock
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-dmgs
+          path: ${{ runner.temp }}/release-dmgs
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-sums
+          path: ${{ runner.temp }}/release-sums
+      - name: No release (draft or published) exists for this tag
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | .id' > "$RUNNER_TEMP/existing-releases.txt"
+          cat "$RUNNER_TEMP/existing-releases.txt"
+          test ! -s "$RUNNER_TEMP/existing-releases.txt"
+      - name: Draft prerelease with the four assets
+        if: needs.gate.outputs.prerelease == 'true'
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md" --prerelease "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-x64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"
+      - name: Draft release with the four assets
+        if: needs.gate.outputs.prerelease != 'true'
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-x64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"
+      - name: The draft holds exactly the four assets
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets --jq '.isDraft == true and ([.assets[].name] | sort) == ([env.ASSET_ARM64, env.ASSET_X64, env.ASSET_MANIFEST, env.ASSET_SUMS] | sort)' > "$RUNNER_TEMP/draft-check.txt"
+          cat "$RUNNER_TEMP/draft-check.txt"
+          grep -qx true "$RUNNER_TEMP/draft-check.txt"

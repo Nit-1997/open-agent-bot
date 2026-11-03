@@ -7,7 +7,9 @@ import { parse } from "yaml";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const DIR = join(ROOT, ".github/workflows");
-const FILES = readdirSync(DIR).filter((f) => /\.ya?ml$/.test(f)).sort();
+const FILES = readdirSync(DIR)
+  .filter((f) => /\.ya?ml$/.test(f))
+  .sort();
 const read = (file) => readFileSync(join(DIR, file), "utf8");
 const doc = (file) => parse(read(file));
 const WRITE_SCOPES = ["contents", "packages", "id-token", "attestations"];
@@ -80,7 +82,14 @@ describe("ci.yml local-stack job", () => {
 
   it("builds, waits up to 300 s, runs the subset, probes, restarts, re-checks and tears down with -v in always()", () => {
     const text = stepsText(job);
-    for (const piece of ["build", "--wait-timeout 300", "npm run local -w e2e", "local-probes.mts", "npm run local:after-restart -w e2e", "down -v"]) {
+    for (const piece of [
+      "build",
+      "--wait-timeout 300",
+      "npm run local -w e2e",
+      "local-probes.mts",
+      "npm run local:after-restart -w e2e",
+      "down -v",
+    ]) {
       assert.ok(text.includes(piece), piece);
     }
     const teardown = job.steps.at(-1);
@@ -95,7 +104,10 @@ describe("ci.yml local-stack job", () => {
     assert.match(stepsText(node24), /--user pwuser/);
     assert.match(stepsText(node24), /mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-noble@sha256:[0-9a-f]{64} /);
     assert.doesNotMatch(stepsText(node24), /playwright:v[\d.]+-noble(?!@sha256:)/);
-    assert.match(node24.steps.map((s) => s.run ?? "").join("\n"), /case "\$\(node -p process\.versions\.node\)" in 24\.\*\) ;; \*\) echo "[^"]*" >&2; exit 1 ;; esac/);
+    assert.match(
+      node24.steps.map((s) => s.run ?? "").join("\n"),
+      /case "\$\(node -p process\.versions\.node\)" in 24\.\*\) ;; \*\) echo "[^"]*" >&2; exit 1 ;; esac/,
+    );
   });
 });
 
@@ -189,7 +201,10 @@ describe("ci.yml desktop jobs", () => {
     assert.equal(filter.run.includes("${{"), false);
     const text = runs(job);
     assert.match(text, /npm run dist -w @oab\/desktop -- --arm64 --x64/);
-    assert.match(text, /packagedSmoke\.mjs .*--app "apps\/desktop\/release\/mac-arm64\/Open Agent\.app" --app "apps\/desktop\/release\/mac\/Open Agent\.app"/);
+    assert.match(
+      text,
+      /packagedSmoke\.mjs .*--app "apps\/desktop\/release\/mac-arm64\/Open Agent\.app" --app "apps\/desktop\/release\/mac\/Open Agent\.app"/,
+    );
     assert.match(text, /--dmg/);
     const dist = job.steps.find((s) => (s.run ?? "").includes("npm run dist"));
     assert.equal(String(dist.env.CSC_IDENTITY_AUTO_DISCOVERY), "false");

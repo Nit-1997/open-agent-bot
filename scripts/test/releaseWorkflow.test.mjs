@@ -79,9 +79,19 @@ grep -qx true "$RUNNER_TEMP/draft-check.txt"
 const SMOKE_RUN = `node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg" | tee "$RUNNER_TEMP/smoke.log"\n`;
 const SMOKE_GREP_RUN = `test "$(grep -c -F "services.lock.json kind=release version=$VERSION images=" "$RUNNER_TEMP/smoke.log")" = 2\n`;
 const ROSETTA_RUN = "/usr/bin/pgrep -q oahd || sudo softwareupdate --install-rosetta --agree-to-license\n";
-const PINNED = { "verify-dmgs": [VERIFY_DMGS_RUN], attest: [SUMS_RUN], release: [RELEASE_EXISTING_RUN, RELEASE_VIEW_RUN], desktop: [SMOKE_RUN, SMOKE_GREP_RUN, ROSETTA_RUN] };
+const PINNED = {
+  "verify-dmgs": [VERIFY_DMGS_RUN],
+  attest: [SUMS_RUN],
+  release: [RELEASE_EXISTING_RUN, RELEASE_VIEW_RUN],
+  desktop: [SMOKE_RUN, SMOKE_GREP_RUN, ROSETTA_RUN],
+};
 
-const DESKTOP_NPM = [/^npm ci --ignore-scripts$/, /^npm run postinstall$/, /^npm run electron:install -w @oab\/desktop$/, /^npm rebuild [@a-z0-9/._-]+$/];
+const DESKTOP_NPM = [
+  /^npm ci --ignore-scripts$/,
+  /^npm run postinstall$/,
+  /^npm run electron:install -w @oab\/desktop$/,
+  /^npm rebuild [@a-z0-9/._-]+$/,
+];
 const DESKTOP_NODE = [
   /^node apps\/desktop\/scripts\/stage-stack\.mjs --lock "\$RUNNER_TEMP\/release-lock\/services\.lock\.json"$/,
   /^node apps\/desktop\/scripts\/build\.mjs$/,
@@ -227,7 +237,9 @@ describe("least privilege (AC 2)", () => {
   it("runs on the D2 runners; push builds natively on amd64 and arm64", () => {
     for (const [n, r] of Object.entries(RUNNERS)) assert.equal(job(n)["runs-on"], r, n);
     assert.equal(job("push")["runs-on"], "${{ matrix.runner }}");
-    const legs = job("push").strategy.matrix.include.map((l) => `${l.image} ${l.arch} ${l.platform} ${l.runner}`).sort();
+    const legs = job("push")
+      .strategy.matrix.include.map((l) => `${l.image} ${l.arch} ${l.platform} ${l.runner}`)
+      .sort();
     assert.deepEqual(legs, [
       "open-agent amd64 linux/amd64 ubuntu-24.04",
       "open-agent arm64 linux/arm64 ubuntu-24.04-arm",
@@ -304,25 +316,37 @@ describe("push: build, check, push the same build, check again, attest (AC 4, 31
     assert.equal(pushed.with.outputs, "type=image,name=${{ matrix.name }},push-by-digest=true,name-canonical=true,push=true");
     assert.equal(pushed.with.provenance, "mode=max");
     assert.equal(pushed.with.sbom, true);
-    for (const l of job("push").strategy.matrix.include)
-      assert.equal(l.name, `ghcr.io/nit-1997/${l.image}`, `${l.image} ${l.arch}`);
+    for (const l of job("push").strategy.matrix.include) assert.equal(l.name, `ghcr.io/nit-1997/${l.image}`, `${l.image} ${l.arch}`);
   });
 
   it("content and labels before the push; pull, content again, attest, record after", () => {
     const [check, pushed] = builds();
     const i = (s) => steps("push").indexOf(s);
     const contentBefore = runAt("push", /^node scripts\/release\/image-checks\.mjs content --image "\$IMAGE" --dir "\$CONTENT_DIR"$/);
-    const labels = runAt("push", /^node scripts\/release\/image-checks\.mjs labels --image "\$IMAGE" --version "\$VERSION" --revision "\$GITHUB_SHA"$/);
+    const labels = runAt(
+      "push",
+      /^node scripts\/release\/image-checks\.mjs labels --image "\$IMAGE" --version "\$VERSION" --revision "\$GITHUB_SHA"$/,
+    );
     const pull = runAt("push", /^docker pull --quiet "\$IMAGE"$/);
     const contentAfter = steps("push").findIndex(
       (s, k) => k > pull && /^node scripts\/release\/image-checks\.mjs content --image "\$IMAGE" --dir "\$CONTENT_DIR"$/.test(s.run ?? ""),
     );
     const attest = at("push", (s) => String(s.uses ?? "").startsWith("actions/attest-build-provenance@"));
-    const record = runAt("push", /^node scripts\/release\/refs\.mjs record --arch "\$ARCH" --digest "\$DIGEST" --dir "\$RUNNER_TEMP\/digests"$/);
+    const record = runAt(
+      "push",
+      /^node scripts\/release\/refs\.mjs record --arch "\$ARCH" --digest "\$DIGEST" --dir "\$RUNNER_TEMP\/digests"$/,
+    );
     const upload = at("push", (s) => String(s.uses ?? "").startsWith("actions/upload-artifact@"));
     const order = [i(check), contentBefore, labels, i(pushed), pull, contentAfter, attest, record, upload];
-    assert.deepEqual([...order].sort((a, b) => a - b), order, order.join(","));
-    assert.ok(order.every((k) => k >= 0), order.join(","));
+    assert.deepEqual(
+      [...order].sort((a, b) => a - b),
+      order,
+      order.join(","),
+    );
+    assert.ok(
+      order.every((k) => k >= 0),
+      order.join(","),
+    );
     assert.equal(steps("push")[contentBefore].env.IMAGE, "${{ matrix.image }}:check");
     assert.equal(steps("push")[labels].env.IMAGE, "${{ matrix.image }}:check");
     assert.equal(steps("push")[labels].env.VERSION, "${{ needs.gate.outputs.version }}");
@@ -358,7 +382,10 @@ describe("merge: index tags :<version> and :sha-<7> via scripts (AC 4)", () => {
     );
     const attest = at("merge", (s) => String(s.uses ?? "").startsWith("actions/attest-build-provenance@"));
     const upload = at("merge", (s) => String(s.uses ?? "").startsWith("actions/upload-artifact@"));
-    assert.ok(inputs >= 0 && create > inputs && digest > create && attest > digest && upload > attest, [inputs, create, digest, attest, upload].join());
+    assert.ok(
+      inputs >= 0 && create > inputs && digest > create && attest > digest && upload > attest,
+      [inputs, create, digest, attest, upload].join(),
+    );
     const s = steps("merge");
     assert.equal(s[inputs].id, "inputs");
     assert.equal(s[inputs].env.VERSION, "${{ needs.gate.outputs.version }}");
@@ -395,18 +422,36 @@ describe("lock: verified index, pinned attestation checks before the lock (AC 5,
   it("raw index, tag digest and verify-index for both images, then Node 24 on both platforms and the labels", () => {
     for (const svc of ["agent", "search"]) {
       const S = svc.toUpperCase();
-      const raw = runAt("lock", new RegExp(`^docker buildx imagetools inspect "\\$${S}" --raw > "\\$OUT/raw-${svc}\\.json"$`));
-      const tag = runAt("lock", new RegExp(`^docker buildx imagetools inspect "\\$${S}_TAG" --format '\\{\\{json \\.Manifest\\}\\}' > "\\$RUNNER_TEMP/tag-${svc}\\.json"$`));
-      const td = runAt("lock", new RegExp(`^node scripts/release/image-checks\\.mjs merge-digest --inspect "\\$RUNNER_TEMP/tag-${svc}\\.json"$`));
+      const raw = runAt(
+        "lock",
+        new RegExp(`^docker buildx imagetools inspect "\\$${S}" --raw > "\\$RUNNER_TEMP/release-lock/raw-${svc}\\.json"$`),
+      );
+      const tag = runAt(
+        "lock",
+        new RegExp(
+          `^docker buildx imagetools inspect "\\$${S}_TAG" --format '\\{\\{json \\.Manifest\\}\\}' > "\\$RUNNER_TEMP/tag-${svc}\\.json"$`,
+        ),
+      );
+      const td = runAt(
+        "lock",
+        new RegExp(`^node scripts/release/image-checks\\.mjs merge-digest --inspect "\\$RUNNER_TEMP/tag-${svc}\\.json"$`),
+      );
       const vi = runAt(
         "lock",
-        new RegExp(`^node scripts/release/verify-index\\.mjs --ref "\\$${S}" --version "\\$VERSION" --raw "\\$OUT/raw-${svc}\\.json" --tag-digest "\\$TAG_DIGEST"$`),
+        new RegExp(
+          `^node scripts/release/verify-index\\.mjs --ref "\\$${S}" --version "\\$VERSION" --raw "\\$RUNNER_TEMP/release-lock/raw-${svc}\\.json" --tag-digest "\\$TAG_DIGEST"$`,
+        ),
       );
       assert.ok(raw >= 0 && tag > raw && td > tag && vi > td, `${svc}: ${[raw, tag, td, vi]}`);
       assert.equal(steps("lock")[td].id, `tag-${svc}`);
       assert.equal(steps("lock")[vi].env.TAG_DIGEST, `\${{ steps.tag-${svc}.outputs.digest }}`);
       assert.ok(
-        runAt("lock", new RegExp(`^node scripts/release/image-checks\\.mjs labels --image "\\$${S}" --version "\\$VERSION" --revision "\\$GITHUB_SHA" --pull --platform linux/amd64$`)) >= 0,
+        runAt(
+          "lock",
+          new RegExp(
+            `^node scripts/release/image-checks\\.mjs labels --image "\\$${S}" --version "\\$VERSION" --revision "\\$GITHUB_SHA" --pull --platform linux/amd64$`,
+          ),
+        ) >= 0,
         `labels ${svc}`,
       );
     }
@@ -420,33 +465,45 @@ describe("lock: verified index, pinned attestation checks before the lock (AC 5,
     const lastIndex = Math.max(...["agent", "search"].map((s) => runAt("lock", new RegExp(`verify-index\\.mjs .*raw-${s}`))));
     const attested = runAt(
       "lock",
-      /^node scripts\/release\/attested\.mjs --tag "\$TAG" --sha "\$GITHUB_SHA" --agent "\$AGENT" --search "\$SEARCH" --agent-result "\$RUNNER_TEMP\/attestation-agent\.json" --search-result "\$RUNNER_TEMP\/attestation-search\.json" --out "\$OUT\/attested\.json"$/,
+      /^node scripts\/release\/attested\.mjs --tag "\$TAG" --sha "\$GITHUB_SHA" --agent "\$AGENT" --search "\$SEARCH" --agent-result "\$RUNNER_TEMP\/attestation-agent\.json" --search-result "\$RUNNER_TEMP\/attestation-search\.json" --out "\$RUNNER_TEMP\/release-lock\/attested\.json"$/,
     );
     const write = runAt(
       "lock",
-      /^node scripts\/release\/write-lock\.mjs --version "\$VERSION" --agent "\$AGENT" --search "\$SEARCH" --out-lock "\$OUT\/services\.lock\.json" --out-manifest "\$OUT\/open-agent-services\.json" --attested "\$OUT\/attested\.json"$/,
+      /^node scripts\/release\/write-lock\.mjs --version "\$VERSION" --agent "\$AGENT" --search "\$SEARCH" --out-lock "\$RUNNER_TEMP\/release-lock\/services\.lock\.json" --out-manifest "\$RUNNER_TEMP\/release-lock\/open-agent-services\.json" --attested "\$RUNNER_TEMP\/release-lock\/attested\.json"$/,
     );
-    const assertLock = runAt("lock", /^node scripts\/release\/assert-lock\.mjs "\$OUT\/services\.lock\.json" --version "\$VERSION" --attested "\$OUT\/attested\.json"$/);
-    const notes = runAt("lock", /^node scripts\/release\/notes\.mjs --version "\$VERSION" --lock "\$OUT\/services\.lock\.json" --out "\$OUT\/notes\.md" --ref "\$GITHUB_SHA"$/);
+    const assertLock = runAt(
+      "lock",
+      /^node scripts\/release\/assert-lock\.mjs "\$RUNNER_TEMP\/release-lock\/services\.lock\.json" --version "\$VERSION" --attested "\$RUNNER_TEMP\/release-lock\/attested\.json"$/,
+    );
+    const notes = runAt(
+      "lock",
+      /^node scripts\/release\/notes\.mjs --version "\$VERSION" --lock "\$RUNNER_TEMP\/release-lock\/services\.lock\.json" --out "\$RUNNER_TEMP\/release-lock\/notes\.md" --ref "\$GITHUB_SHA"$/,
+    );
     const order = [lastIndex, vAgent, vSearch, attested, write, assertLock, notes];
-    assert.ok(order.every((k) => k >= 0), order.join());
-    assert.deepEqual([...order].sort((a, b) => a - b), order, order.join());
+    assert.ok(
+      order.every((k) => k >= 0),
+      order.join(),
+    );
+    assert.deepEqual(
+      [...order].sort((a, b) => a - b),
+      order,
+      order.join(),
+    );
     for (const k of [vAgent, vSearch]) assert.equal(steps("lock")[k].env.GH_TOKEN, "${{ github.token }}");
   });
 
-  it("refs come from refs.mjs lock-inputs and every lock step reads them from env", () => {
-    const k = runAt("lock", /^node scripts\/release\/refs\.mjs lock-inputs --dir "\$RUNNER_TEMP\/index" --version "\$VERSION" --out-dir "\$OUT"$/);
+  it("refs come from refs.mjs lock-inputs; every step that names an image reads it from that step's outputs", () => {
+    const k = runAt(
+      "lock",
+      /^node scripts\/release\/refs\.mjs lock-inputs --dir "\$RUNNER_TEMP\/index" --version "\$VERSION" --out-dir "\$RUNNER_TEMP\/release-lock"$/,
+    );
     assert.ok(k >= 0);
     assert.equal(steps("lock")[k].id, "refs");
-    assert.deepEqual(job("lock").env, {
-      VERSION: "${{ needs.gate.outputs.version }}",
-      TAG: "${{ needs.gate.outputs.tag }}",
-      OUT: "${{ runner.temp }}/release-lock",
-      AGENT: "${{ steps.refs.outputs.agent }}",
-      SEARCH: "${{ steps.refs.outputs.search }}",
-      AGENT_TAG: "${{ steps.refs.outputs.agent_tag }}",
-      SEARCH_TAG: "${{ steps.refs.outputs.search_tag }}",
-    });
+    assert.deepEqual(job("lock").env, { VERSION: "${{ needs.gate.outputs.version }}", TAG: "${{ needs.gate.outputs.tag }}" });
+    const OUTPUT = { AGENT: "agent", SEARCH: "search", AGENT_TAG: "agent_tag", SEARCH_TAG: "search_tag" };
+    for (const s of runsOf("lock"))
+      for (const [v, o] of Object.entries(OUTPUT))
+        if (new RegExp(`"\\$${v}"`).test(s.run)) assert.equal(s.env?.[v], `\${{ steps.refs.outputs.${o} }}`, `${v} in ${s.run}`);
   });
 
   it("uploads release-lock from the lock dir (lock, manifest, attested, notes, raw)", () => {
@@ -483,8 +540,15 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     const grep = at("desktop", (s) => s.run === SMOKE_GREP_RUN);
     const upload = at("desktop", (s) => String(s.uses ?? "").startsWith("actions/upload-artifact@"));
     const order = [stage, build, eb, smoke, grep, upload];
-    assert.ok(order.every((k) => k >= 0), order.join());
-    assert.deepEqual([...order].sort((a, b) => a - b), order, order.join());
+    assert.ok(
+      order.every((k) => k >= 0),
+      order.join(),
+    );
+    assert.deepEqual(
+      [...order].sort((a, b) => a - b),
+      order,
+      order.join(),
+    );
     assert.equal(String(steps("desktop")[eb].env.CSC_IDENTITY_AUTO_DISCOVERY), "false");
     assert.equal(steps("desktop")[eb]["working-directory"], "apps/desktop");
   });
@@ -572,9 +636,10 @@ describe("attest: SHA256SUMS from the lock job's manifest and the DMGs (AC 12, 2
 
 describe("release: a draft with exactly four assets (AC 13, 28)", () => {
   const creates = () => runsOf("release").filter((s) => s.run.startsWith("gh release create"));
-  const ASSETS = '"$DMGS/Open-Agent-$VERSION-arm64.dmg" "$DMGS/Open-Agent-$VERSION-x64.dmg" "$LOCK_DIR/open-agent-services.json" "$SUMS/SHA256SUMS"';
+  const ASSETS =
+    '"$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-x64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"';
   const CREATE = (pre) =>
-    `gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$LOCK_DIR/notes.md"${pre ? " --prerelease" : ""} ${ASSETS}`;
+    `gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md"${pre ? " --prerelease" : ""} ${ASSETS}`;
 
   it("needs attest, no checkout, downloads the three artifacts into their own folders", () => {
     assert.deepEqual(needsOf("release"), ["gate", "attest"]);
@@ -588,9 +653,6 @@ describe("release: a draft with exactly four assets (AC 13, 28)", () => {
       TAG: "${{ needs.gate.outputs.tag }}",
       VERSION: "${{ needs.gate.outputs.version }}",
       GH_TOKEN: "${{ github.token }}",
-      LOCK_DIR: "${{ runner.temp }}/release-lock",
-      DMGS: "${{ runner.temp }}/release-dmgs",
-      SUMS: "${{ runner.temp }}/release-sums",
       ASSET_ARM64: "Open-Agent-${{ needs.gate.outputs.version }}-arm64.dmg",
       ASSET_X64: "Open-Agent-${{ needs.gate.outputs.version }}-x64.dmg",
       ASSET_MANIFEST: "open-agent-services.json",

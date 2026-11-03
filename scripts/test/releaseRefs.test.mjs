@@ -28,7 +28,13 @@ const run = (name, args, env = {}) => {
   rmSync(dir, { recursive: true, force: true });
   return { ...r, outputs };
 };
-const outputsOf = (text) => Object.fromEntries(text.split("\n").filter(Boolean).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+const outputsOf = (text) =>
+  Object.fromEntries(
+    text
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
+  );
 
 describe("refs.mjs record (push job)", () => {
   it("writes the per-arch digest to <dir>/<arch>", () => {
@@ -93,7 +99,15 @@ describe("image-checks.mjs merge-digest --out / --inspect", () => {
   it("--out writes {name, digest} for the index artifact", () => {
     const dir = scratch();
     const out = join(dir, "index/open-agent.json");
-    const r = run("image-checks.mjs", ["merge-digest", "--metadata", join(FIX, "imagetools-create-metadata.json"), "--name", AGENT, "--out", out]);
+    const r = run("image-checks.mjs", [
+      "merge-digest",
+      "--metadata",
+      join(FIX, "imagetools-create-metadata.json"),
+      "--name",
+      AGENT,
+      "--out",
+      out,
+    ]);
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(JSON.parse(readFileSync(out, "utf8")), {
       name: AGENT,
@@ -104,7 +118,13 @@ describe("image-checks.mjs merge-digest --out / --inspect", () => {
 
   it("--out needs --name", () => {
     const dir = scratch();
-    const r = run("image-checks.mjs", ["merge-digest", "--metadata", join(FIX, "imagetools-create-metadata.json"), "--out", join(dir, "x.json")]);
+    const r = run("image-checks.mjs", [
+      "merge-digest",
+      "--metadata",
+      join(FIX, "imagetools-create-metadata.json"),
+      "--out",
+      join(dir, "x.json"),
+    ]);
     assert.equal(r.status, 1);
     assert.equal(existsSync(join(dir, "x.json")), false);
     rmSync(dir, { recursive: true });
@@ -166,7 +186,10 @@ describe("refs.mjs lock-inputs (lock job)", () => {
 describe("attested.mjs (lock job, after gh attestation verify)", () => {
   const result = (digest, o = {}) => ({
     verificationResult: {
-      statement: { subject: [{ name: o.name ?? AGENT, digest: { sha256: digest.slice(7) } }], predicateType: "https://slsa.dev/provenance/v1" },
+      statement: {
+        subject: [{ name: o.name ?? AGENT, digest: { sha256: digest.slice(7) } }],
+        predicateType: "https://slsa.dev/provenance/v1",
+      },
       signature: {
         certificate: {
           buildSignerURI: o.signer ?? SIGNER,
@@ -221,7 +244,10 @@ describe("attested.mjs (lock job, after gh attestation verify)", () => {
     "another commit": [[result(D("c"), { sha: "f".repeat(40) })], [result(D("d"), { name: SEARCH })]],
     "a self-hosted runner": [[result(D("c"))], [result(D("d"), { name: SEARCH, runner: "self-hosted" })]],
     "another repository": [[result(D("c"), { repo: "https://github.com/evil/open-agent-bot" })], [result(D("d"), { name: SEARCH })]],
-    "one good and one bad result for the same image": [[result(D("c")), result(D("c"), { sha: "f".repeat(40) })], [result(D("d"), { name: SEARCH })]],
+    "one good and one bad result for the same image": [
+      [result(D("c")), result(D("c"), { sha: "f".repeat(40) })],
+      [result(D("d"), { name: SEARCH })],
+    ],
     "output that is not JSON": ["Loaded digest sha256:…", [result(D("d"), { name: SEARCH })]],
   };
   for (const [why, [a, s]] of Object.entries(refused))
