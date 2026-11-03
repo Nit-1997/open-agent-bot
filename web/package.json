@@ -20,7 +20,7 @@
     "@ag-ui/client": "1.0.2",
     "@copilotkit/react-core": "^1.83.0",
     "@copilotkit/runtime": "^1.83.0",
-    "@oab/shared": "*",
+    "@oab/shared": "1.0.0",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.118.0",
     "hono": "^4.13.14",

@@ -2,10 +2,12 @@
 
 The chat UI: Next.js with CopilotKit, talking to the agent over AG-UI.
 
+Install and run from the repository root (one npm workspace, one `package-lock.json`):
+
 ```bash
 npm ci
-npm run dev   # needs the env vars below; sign-in cookies are Secure, so use https://app.localhost through Caddy or http://localhost
-npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
+npm run dev -w web   # needs the env vars below; sign-in cookies are Secure, so use https://app.localhost through Caddy or http://localhost
+npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web
 ```
 
 Every variable is required and checked on first use; nothing falls back to a default.

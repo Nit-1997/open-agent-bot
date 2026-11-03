@@ -16,7 +16,7 @@ web (Next.js + CopilotKit) → AG-UI → agent (Node + pi SDK) → model provide
 
 Open Agent is invite-only. Accounts, sessions and every user's data live in one Supabase project; the agent and the web app keep nothing on disk.
 
-1. Install Docker and Node 22.
+1. Install Docker, Node 22 and `jq` (the preview preflight uses it).
 2. Fill in the env files (git-ignored; templates with names only are in `deploy-config/env.examples/`):
    - `deploy-config/.env-agent`: Supabase URL and keys, `AGENT_SERVICE_SECRET` (`openssl rand -hex 32`), `CREDENTIAL_KEYS` (`v1:` + `openssl rand -base64 32`), `ACCESS_REQUEST_PEPPER` (`openssl rand -base64 32`), `APP_ORIGIN=https://app.localhost`.
    - `deploy-config/.env-renderer`: only `RENDERER_SECRET` (`openssl rand -hex 32`); put the same value in `.env-agent`.
@@ -29,7 +29,7 @@ Open Agent is invite-only. Accounts, sessions and every user's data live in one 
 
 Visitors ask for access at `/request-access`; the admin approves them at `/admin`, which sends the invite email. Users add their own model keys in the app; keys are encrypted by the agent and never sent back to the browser.
 
-To run a preview beside a running stack, use another project name and the preview override, for example `docker compose -p oab-preview --env-file .env --env-file deploy-config/.env-nextjs -f docker-compose.yml -f deploy-config/compose.preview.yml --profile local up -d --build search renderer agent web` (agent on 127.0.0.1:18800, web on http://localhost:18300; source `scripts/preview-preflight.sh` and run `preflight <same command>` first), and keep a git-ignored root `.env` with `COMPOSE_PROJECT_NAME=<other name>` in any second checkout so unqualified compose commands there never reach the live project.
+To run a preview beside a running stack, first create a git-ignored root `.env` containing `COMPOSE_PROJECT_NAME=oab-<name>` (`printf 'COMPOSE_PROJECT_NAME=oab-guard\n' > .env`; do the same in any second checkout), so unqualified compose commands there never reach the live project; `docker compose config --format json | jq -r .name` must print that name. Then use another project name and the preview override: `. scripts/preview-preflight.sh`, `P="docker compose -p oab-preview --env-file .env --env-file deploy-config/.env-nextjs -f docker-compose.yml -f deploy-config/compose.preview.yml --profile local"`, `preflight $P && $P up -d --build search renderer agent web` (agent on 127.0.0.1:18800, web on http://localhost:18300). `preflight` returns 1 unless the project name starts with `oab-`, every published port is on 127.0.0.1 and at 18000 or above, and any `PREVIEW_AGENT_PORT` / `PREVIEW_WEB_PORT` is in 18000–19999; scripts call it as `preflight … || exit 1`.
 
 Ports bound to 127.0.0.1: Caddy 80/443 and the agent's 8000 for debugging (LiteLLM 4000 and Ollama 11434 when turned on). SearXNG is reachable only from the agent.
 

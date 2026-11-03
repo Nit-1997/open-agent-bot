@@ -1,3 +1,5 @@
+const PAGE_SIZE = 1000;
+
 const required = (name) => {
   const v = process.env[name]?.trim();
   if (!v) throw new Error(`missing ${name} (load deploy-config/env-files/.env-supabase-admin)`);
@@ -27,6 +29,18 @@ export function createAdmin({ url, key }) {
 
   const rest = (method, path, body, prefer) => call(method, `/rest/v1/${path}`, body, prefer ? { prefer } : {});
 
+  async function headCount(label, path) {
+    const res = await fetch(`${url}/rest/v1/${path}`, {
+      method: "HEAD",
+      headers: { apikey: key, prefer: "count=exact" },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
+    const count = Number(res.headers.get("content-range")?.split("/")[1]);
+    if (!Number.isInteger(count)) throw new Error(`${label}: no count in the response`);
+    return count;
+  }
+
   return {
     async inviteEmail(email) {
       await rest("POST", "invited_emails?on_conflict=email", { email }, "resolution=ignore-duplicates,return=minimal");
@@ -38,9 +52,12 @@ export function createAdmin({ url, key }) {
     async profilesLike(pattern) {
       return rest("GET", `profiles?select=user_id,email&email=like.${encodeURIComponent(pattern)}`);
     },
-    async countUsers() {
-      const res = await fetch(`${url}/rest/v1/profiles?select=user_id`, { method: "HEAD", headers: { apikey: key, prefer: "count=exact" } });
-      return Number(res.headers.get("content-range")?.split("/")[1] ?? Number.NaN);
+    countUsers: () => headCount("profiles", "profiles?select=user_id"),
+    countLike: (table, pattern) => headCount(table, `${table}?select=*&email=like.${encodeURIComponent(pattern)}`),
+    pageSize: PAGE_SIZE,
+    async listUsers(page) {
+      const data = await call("GET", `/auth/v1/admin/users?page=${page}&per_page=${PAGE_SIZE}`);
+      return data?.users ?? [];
     },
     getUser: (id) => call("GET", `/auth/v1/admin/users/${id}`),
     createUser: (attrs) => call("POST", "/auth/v1/admin/users", attrs),
