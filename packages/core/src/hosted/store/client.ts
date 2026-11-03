@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { CloudConfig } from "../config.js";
+import type { HostedEnvConfig } from "../config.js";
 import type { Database } from "./database.types.js";
 
 export type Db = SupabaseClient<Database>;
@@ -25,8 +25,8 @@ function client(url: string, key: string, opts: ClientOptions): Db {
   });
 }
 
-export const createServiceClient = (cfg: Pick<CloudConfig, "supabaseUrl" | "supabaseSecretKey">, opts: ClientOptions = {}): Db =>
+export const createServiceClient = (cfg: Pick<HostedEnvConfig, "supabaseUrl" | "supabaseSecretKey">, opts: ClientOptions = {}): Db =>
   client(cfg.supabaseUrl, cfg.supabaseSecretKey, opts);
 
-export const createAnonClient = (cfg: Pick<CloudConfig, "supabaseUrl" | "supabasePublishableKey">, opts: ClientOptions = {}): Db =>
+export const createAnonClient = (cfg: Pick<HostedEnvConfig, "supabaseUrl" | "supabasePublishableKey">, opts: ClientOptions = {}): Db =>
   client(cfg.supabaseUrl, cfg.supabasePublishableKey, opts);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CredentialIntegrityError, open, type Sealed } from "../../src/secrets/envelope.js";
 import { LocalKeyWrapper } from "../../src/secrets/keyWrapper.js";
-import { parseCredentialKeys } from "../../src/hosted/config.js";
+import { parseCredentialKeys } from "../../src/secrets/keys.js";
 import { TEST_KEY_B64 } from "../fixtures/config.js";
 import { ALICE, BOB } from "../fixtures/users.js";
 

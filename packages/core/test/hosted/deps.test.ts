@@ -16,7 +16,8 @@ describe("hostedAgentDeps", () => {
     const cfg = testConfig();
     const { deps, status } = hostedAgentDeps(cfg, clients);
     expect(deps.host).toBe("0.0.0.0");
-    expect(deps.port).toBe(cfg.port);
+    expect(deps.port).toBeUndefined();
+    expect(deps.config.port).toBe(cfg.port);
     expect(deps.identity.kind).toBe("hosted");
     expect(deps.config).toBe(cfg);
     expect(status).toBeDefined();

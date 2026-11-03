@@ -29,8 +29,6 @@ import { SessionStore } from "./session/sessionStore.js";
 import { registry } from "./sources/index.js";
 import type { Store } from "./store/types.js";
 
-export type { GatewayLike };
-
 export type CoreHandles = Readonly<{
   limiter: RateLimiter;
   forgetUser(userId: string): Promise<void>;

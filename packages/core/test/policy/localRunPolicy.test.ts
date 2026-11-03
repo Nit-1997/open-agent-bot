@@ -25,6 +25,9 @@ describe("LocalRunPolicy", () => {
     expect(error).toEqual(rateLimitError(600));
     expect(error.kind).toBe("rate_limited");
     expect(error.opts.retryAfter).toBe(600);
+    const bob = ticketOf(await policy.admit(runOf(BOB)));
+    bob.end();
+    expect(errorOf(await policy.admit(runOf(ALICE))).opts.retryAfter).toBe(600);
   });
 
   it("refuses a third concurrent run with retryAfter 5 after consuming the rate token", async () => {
