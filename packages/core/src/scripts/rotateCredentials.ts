@@ -1,6 +1,6 @@
 import { loadConfig } from "../config.js";
-import { rotateStale } from "../hosted/secrets/rotate.js";
 import { LocalKeyWrapper } from "../crypto/keyWrapper.js";
+import { rotateStale } from "../hosted/secrets/rotate.js";
 import { createServiceClient } from "../hosted/store/client.js";
 import { createRotationRepo } from "../hosted/store/rotation.js";
 

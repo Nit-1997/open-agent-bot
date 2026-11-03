@@ -45,5 +45,55 @@
       "semicolons": "always",
       "arrowParentheses": "always"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts", "!src/app.ts", "!src/auth/verify.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "message": "Nothing outside cloud/ may import from cloud/."
+                  },
+                  {
+                    "group": ["**/hosted/**", "@supabase/*", "jose", "@oab/core", "@oab/core/**"],
+                    "message": "Core must not import hosted implementations."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/hosted/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "message": "Nothing outside cloud/ may import from cloud/."
+                  },
+                  {
+                    "group": ["@oab/core/hosted", "@oab/core/hosted/**"],
+                    "message": "Hosted files import other hosted files by relative path."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

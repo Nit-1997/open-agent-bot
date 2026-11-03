@@ -91,6 +91,7 @@ export type UserRepos = Readonly<{
   credentials: CredentialRepo;
 }>;
 
-export const ARTIFACTS_BUCKET = "artifacts";
-
-export const artifactPath = (userId: string, id: string, file: ArtifactFile) => `${userId}/${id}.${file}`;
+export interface Store {
+  forUser(userId: string): UserRepos;
+  close?(): Promise<void>;
+}

@@ -91,7 +91,7 @@ describe("hosted boundary rules on fixture trees", () => {
   });
 });
 
-describe.skip("hosted boundary on src/", () => {
+describe("hosted boundary on src/", () => {
   const tree = readSourceTree(SRC);
 
   it("has a hosted folder", () => {
@@ -108,7 +108,7 @@ describe.skip("hosted boundary on src/", () => {
   });
 });
 
-describe.skip("Biome enforces B1, B3 and B4", () => {
+describe("Biome enforces B1, B3 and B4", () => {
   const { lint, dispose } = biomeFixtures("hosted-boundary-");
   afterAll(dispose);
 

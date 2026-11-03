@@ -13,7 +13,7 @@ const nodeImport = (specifier: string) =>
     encoding: "utf8",
   });
 
-describe.skip("@oab/core self-reference", () => {
+describe("@oab/core self-reference", () => {
   let work = "";
 
   beforeAll(() => {
