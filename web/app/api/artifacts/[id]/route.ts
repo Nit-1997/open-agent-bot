@@ -1,6 +1,6 @@
 import { ARTIFACT_CSP, ARTIFACT_ID_RE } from "@oab/shared/artifacts";
 import { agentFetch, authFailure, jsonError, unreachableUnlessMisconfigured } from "@/lib/agentServer";
-import { artifactErrorPage, type Format, formatOf, isFramedReport } from "@/lib/artifactFrame";
+import { artifactErrorPage, type Format, formatOf, isFramedReport } from "@oab/bff";
 import { type AgentAuth, getAgentAuth } from "@/lib/auth";
 
 const PRIVATE = { "cache-control": "private, no-store", "x-content-type-options": "nosniff" };

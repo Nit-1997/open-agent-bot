@@ -23,6 +23,7 @@
     "@fontsource-variable/dm-sans": "5.3.0",
     "@fontsource/dm-mono": "5.3.0",
     "@fontsource/instrument-serif": "5.3.0",
+    "@oab/bff": "1.0.0",
     "@oab/shared": "1.0.0",
     "@oab/ui": "1.0.0",
     "@supabase/ssr": "0.12.7",

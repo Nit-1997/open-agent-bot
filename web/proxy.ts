@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { artifactErrorPage, isFramedReport } from "@/lib/artifactFrame";
+import { artifactErrorPage, isFramedReport } from "@oab/bff";
 import { safeNext } from "@/lib/auth";
 import { YOUTUBE_EMBED_ORIGIN } from "@/lib/youtube";
 import { contentSecurityPolicy, newNonce } from "@/lib/csp";
