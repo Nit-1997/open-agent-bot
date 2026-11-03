@@ -2,7 +2,8 @@ export const PREVIEW_PORTS = { min: 18000, max: 19999 } as const;
 export const ALLOW_LIVE_ENV = "E2E_ALLOW_LIVE";
 
 const PREVIEW_HOSTS = new Set(["localhost", "127.0.0.1"]);
-const EXAMPLE = "APP_ORIGIN=http://localhost:18300";
+const EXAMPLE_ORIGIN = "http://localhost:18300";
+const EXAMPLE = `APP_ORIGIN=${EXAMPLE_ORIGIN}`;
 
 function parse(value: string): URL | undefined {
   try {
@@ -12,10 +13,10 @@ function parse(value: string): URL | undefined {
   }
 }
 
-export function previewOriginProblem(raw: string | undefined): string | undefined {
+export function previewOriginProblem(raw: string | undefined, name = "APP_ORIGIN"): string | undefined {
   const value = raw?.trim() ?? "";
-  if (!value) return `APP_ORIGIN is not set; e2e runs need it explicitly, e.g. ${EXAMPLE}`;
-  const rule = `APP_ORIGIN must be http://localhost or http://127.0.0.1 on a port in ${PREVIEW_PORTS.min}-${PREVIEW_PORTS.max}`;
+  if (!value) return `${name} is not set; e2e runs need it explicitly, e.g. ${name}=${EXAMPLE_ORIGIN}`;
+  const rule = `${name} must be http://localhost or http://127.0.0.1 on a port in ${PREVIEW_PORTS.min}-${PREVIEW_PORTS.max}`;
   const url = parse(value);
   if (!url) return `${rule}; got an invalid URL`;
   const port = Number(url.port);

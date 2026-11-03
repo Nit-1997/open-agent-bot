@@ -13,7 +13,7 @@ const E2E = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLAYWRIGHT = createRequire(import.meta.url).resolve("@playwright/test/cli");
 const LIVE = "https://app.localhost";
 const PREVIEW = "http://localhost:18300";
-const PROJECTS = ["desktop", "tablet", "phone", "smoke", "preview-m1"];
+const PROJECTS = ["desktop", "tablet", "phone", "smoke", "preview-m1", "preview-m2"];
 
 describe("previewOriginProblem", () => {
   for (const ok of ["http://localhost:18000", "http://localhost:18300", "http://127.0.0.1:19999", "http://127.0.0.1:18443"]) {
@@ -42,6 +42,24 @@ describe("previewOriginProblem", () => {
   ]) {
     it(`refuses ${JSON.stringify(bad)}`, () => assert.match(previewOriginProblem(bad) ?? "", /APP_ORIGIN/));
   }
+  for (const ok of ["http://localhost:18300", "http://127.0.0.1:18800"]) {
+    it(`accepts the preview pair member ${ok}`, () => assert.equal(previewOriginProblem(ok), undefined));
+  }
+  for (const bad of [
+    "http://localhost:18300.evil.com",
+    "http://user:pw@localhost:18300",
+    "http://localhost:18300@evil.com",
+    "https://app.localhost",
+    "http://127.0.0.1:8000",
+    "http://localhost:18300/x",
+  ]) {
+    it(`refuses the look-alike ${bad}`, () => assert.match(previewOriginProblem(bad) ?? "", /APP_ORIGIN/));
+  }
+  it("names the variable it checks", () => {
+    assert.match(previewOriginProblem("http://localhost:18300.evil.com", "AGENT_ORIGIN") ?? "", /^AGENT_ORIGIN must be/);
+    assert.match(previewOriginProblem(undefined, "AGENT_ORIGIN") ?? "", /^AGENT_ORIGIN is not set/);
+    assert.equal(previewOriginProblem("http://127.0.0.1:18800", "AGENT_ORIGIN"), undefined);
+  });
 });
 
 describe("liveOriginProblem", () => {
@@ -128,6 +146,12 @@ describe("playwright config", () => {
     const run = spawnSync(process.execPath, [PLAYWRIGHT, "test", "--list"], { cwd: E2E, env, encoding: "utf8" });
     assert.notEqual(run.status, 0);
     assert.match(`${run.stdout}${run.stderr}`, /must be http:\/\/localhost/);
+  });
+  it("the auth probes ignore the live opt-in", () => {
+    const env: NodeJS.ProcessEnv = { ...process.env, APP_ORIGIN: LIVE, AGENT_ORIGIN: "http://127.0.0.1:18800", [ALLOW_LIVE_ENV]: "1" };
+    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", resolve(E2E, "scripts/auth-probes.mts")], { env, encoding: "utf8" });
+    assert.equal(run.status, 1, `${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /refusing to probe: APP_ORIGIN must be/);
   });
   it("the live origin loads only with E2E_ALLOW_LIVE=1", () => {
     assert.equal(list("desktop", LIVE, { [ALLOW_LIVE_ENV]: "1" }).status, 0);
