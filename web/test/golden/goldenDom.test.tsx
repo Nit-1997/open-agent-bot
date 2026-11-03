@@ -34,8 +34,6 @@ const reportId = (n: number) => `report${String(n).padStart(6, "0")}`;
 const HOUR = 3_600_000;
 const NOW = Date.parse("2026-11-02T12:00:00Z");
 
-const USER = { email: "ntn@example.test", name: "Nitin Bhat" };
-
 const onboarded = (): Profile => ({ ...emptyProfile(), name: "Nitin Bhat", onboardedAt: "2026-10-30" });
 
 const chats = Array.from({ length: 7 }, (_, i) => ({
@@ -190,9 +188,9 @@ async function settle() {
   for (let i = 0; i < 20; i++) await act(async () => {});
 }
 
-async function capture(ui: ReactNode, path: string, ready: string, after?: () => Promise<void>) {
+async function capture(ui: ReactNode, path: string, ready: string, after?: () => Promise<void>, opts: { isAdmin?: boolean } = {}) {
   nav.reset(path);
-  const { container } = render(wrapGolden(ui));
+  const { container } = render(wrapGolden(ui, opts));
   await waitFor(() => expect(document.querySelector(ready)).not.toBeNull());
   await settle();
   if (after) {
@@ -202,7 +200,7 @@ async function capture(ui: ReactNode, path: string, ready: string, after?: () =>
   return goldenHtml(container);
 }
 
-const shell = (children: ReactNode = null, isAdmin = false) => <AppShell user={{ ...USER, isAdmin }}>{children}</AppShell>;
+const shell = (children: ReactNode = null) => <AppShell>{children}</AppShell>;
 
 async function openAccountMenu() {
   await act(async () => {
@@ -227,7 +225,7 @@ const views: View[] = [
   },
   {
     name: "app-shell-menu-admin",
-    run: () => capture(shell(null, true), "/", "#chat-list-sidebar-groups li", openAccountMenu),
+    run: () => capture(shell(), "/", "#chat-list-sidebar-groups li", openAccountMenu, { isAdmin: true }),
   },
   {
     name: "signed-out-banner",

@@ -5,7 +5,8 @@ import { hostedPlatform } from "@/lib/platform/hosted";
 
 export const TEST_USER = { email: "ntn@example.test", name: "Nitin Bhat" };
 
-export const hostedTestPlatform = (): Platform => hostedPlatform(TEST_USER);
+export const hostedTestPlatform = (opts: { isAdmin?: boolean } = {}): Platform =>
+  hostedPlatform({ ...TEST_USER, isAdmin: opts.isAdmin ?? false });
 
 export const withPlatform = (ui: ReactNode, platform: Platform = hostedTestPlatform()) => (
   <PlatformProvider platform={platform}>{ui}</PlatformProvider>
