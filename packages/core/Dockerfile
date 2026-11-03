@@ -11,6 +11,7 @@ COPY packages/core/package.json packages/core/
 COPY packages/ui/package.json packages/ui/
 COPY packages/local-web/package.json packages/local-web/
 COPY web/package.json web/
+COPY apps/desktop/package.json apps/desktop/
 COPY e2e/package.json e2e/
 RUN npm ci -w @oab/local-web -w @oab/ui -w @oab/shared --include-workspace-root
 COPY packages/shared/src packages/shared/src
@@ -31,6 +32,7 @@ COPY packages/core/package.json packages/core/
 COPY packages/ui/package.json packages/ui/
 COPY packages/local-web/package.json packages/local-web/
 COPY web/package.json web/
+COPY apps/desktop/package.json apps/desktop/
 COPY e2e/package.json e2e/
 RUN npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
 RUN grep -q "closeAllConnections() { }" node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-chatgpt.js

@@ -5,15 +5,25 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-export const ID_ROOTS = ["packages/ui/src", "packages/local-web/src", "web/app", "web/components"];
+export const ID_ROOTS = ["packages/ui/src", "packages/local-web/src", "web/app", "web/components", "apps/desktop/src/screens"];
 export const BASE_COUNT = 1005;
 export const ALLOWLIST = JSON.parse(readFileSync(join(REPO, "scripts/id-spread-allowlist.json"), "utf8"));
 
-function tsxFiles(dir) {
+function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const path = join(dir, e.name);
-    if (e.isDirectory()) return tsxFiles(path);
-    return e.name.endsWith(".tsx") ? [path] : [];
+    if (e.isDirectory()) return sourceFiles(path);
+    return e.name.endsWith(".tsx") || e.name.endsWith(".html") ? [path] : [];
+  });
+}
+
+function htmlElements(repo, path) {
+  const file = relative(repo, path);
+  const text = readFileSync(path, "utf8").replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, " "));
+  return [...text.matchAll(/<([a-zA-Z][\w-]*)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*\/?>/g)].map((m) => {
+    const line = text.slice(0, m.index).split("\n").length;
+    const tag = m[1].toLowerCase();
+    return { at: `${file}:${line} <${tag}>`, file, tag, id: /(?:^|\s)id\s*=/.test(m[2]), spread: false };
   });
 }
 
@@ -43,7 +53,9 @@ function intrinsicElements(repo, path) {
 }
 
 export function scanIds({ repo, roots, allowlist }) {
-  const elements = roots.flatMap((root) => tsxFiles(join(repo, root))).flatMap((path) => intrinsicElements(repo, path));
+  const elements = roots
+    .flatMap((root) => sourceFiles(join(repo, root)))
+    .flatMap((path) => (path.endsWith(".html") ? htmlElements(repo, path) : intrinsicElements(repo, path)));
   const allowed = (e) => e.spread && allowlist.some((a) => a.file === e.file && a.tag === e.tag);
   const unusedAllowlist = allowlist.filter((a) => !elements.some((e) => e.file === a.file && e.tag === a.tag && e.spread && !e.id));
   return {

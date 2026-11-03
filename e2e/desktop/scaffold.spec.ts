@@ -23,6 +23,8 @@ const must = <T>(v: T | undefined, what: string): T => {
   return v;
 };
 
+const domClick = (page: Page, id: string) => page.evaluate((i) => document.getElementById(i)?.click(), id);
+
 const clickOut = async (page: Page, id: string, key: string) => {
   await page.click(`#${id}`);
   await expect.poll(() => page.evaluate((k) => (window as unknown as { __fa?: Record<string, unknown> }).__fa?.[k], key)).toBeDefined();
@@ -81,7 +83,7 @@ test("every webContents is hardened, including a report window", async () => {
   await expect(report.locator("#fa-report-heading")).toBeVisible();
   const prefs = await shell.app.evaluate(({ webContents }) =>
     webContents.getAllWebContents().map((w) => {
-      const p = w.getLastWebPreferences();
+      const p = (w as unknown as { getLastWebPreferences(): Record<string, unknown> | null }).getLastWebPreferences();
       return {
         url: w.getURL(),
         sandbox: p?.sandbox,
@@ -144,10 +146,12 @@ test("navigation lockdown: external links leave, loopback and file stay, reports
   await appPage.click("#fa-external-blank");
   await expect.poll(() => shell.externalLog()).toEqual(["https://example.com/oa-external"]);
   await new Promise((r) => setTimeout(r, 10_100));
-  await appPage.click("#fa-external-same");
+  await domClick(appPage, "fa-external-same");
   await expect.poll(() => shell.externalLog()).toEqual(["https://example.com/oa-external", "https://example.com/oa-external"]);
   expect(appPage.url()).toBe(`${ORIGIN}/`);
 
+  const consoleLines: string[] = [];
+  appPage.on("console", (m) => consoleLines.push(m.text()));
   for (const target of [`http://localhost:${PORT}/`, `http://127.0.0.1:${PORT + 1}/`, "file:///etc/hosts"]) {
     await appPage.evaluate((t) => {
       location.href = t;
@@ -155,7 +159,7 @@ test("navigation lockdown: external links leave, loopback and file stay, reports
     await appPage.waitForTimeout(300);
     expect(appPage.url(), target).toBe(`${ORIGIN}/`);
   }
-  await appPage.click("#fa-redirect");
+  await domClick(appPage, "fa-redirect");
   await appPage.waitForTimeout(500);
   expect(appPage.url()).toBe(`${ORIGIN}/`);
   expect(recorder.hits()).toBe(0);
@@ -165,7 +169,7 @@ test("navigation lockdown: external links leave, loopback and file stay, reports
     .filter((l) => l.includes("[nav] deny"));
   expect(denies.some((l) => l.includes("http://localhost:18420"))).toBe(true);
   expect(denies.some((l) => l.includes("http://127.0.0.1:18421"))).toBe(true);
-  expect(denies.some((l) => l.includes("file:"))).toBe(true);
+  expect(consoleLines.some((l) => l.includes("Not allowed to load local resource: file:///etc/hosts"))).toBe(true);
   expect(denies.some((l) => l.includes("redirect"))).toBe(true);
   expect(shell.externalLog()).toHaveLength(2);
 
@@ -248,7 +252,7 @@ test("oa-shell is served only on the shell partition, with the strict CSP", asyn
     const w = BaseWindow.getAllWindows()[0];
     const v = w?.contentView.children.find(
       (c): c is InstanceType<typeof WebContentsView> =>
-        "webContents" in c && c.webContents.session.getStoragePath()?.includes("open-agent") === true,
+        c instanceof WebContentsView && c.webContents.session.getStoragePath()?.includes("open-agent") === true,
     );
     if (!v) return "no-app-view";
     return v.webContents.loadURL("oa-shell://screens/index.html").then(

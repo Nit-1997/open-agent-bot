@@ -33,7 +33,8 @@ describe("validateExternalUrl (S3)", () => {
     ["https://example.com/a/../b", "not_canonical"],
     ["http://127.0.0.1:18420/", "loopback"],
     ["http://localhost:3000/", "loopback"],
-    ["not a url", "invalid"],
+    ["notaurl", "invalid"],
+    ["https://exa mple.com/", "control_or_space"],
   ];
   for (const [url, reason] of refused)
     it(`refuses ${JSON.stringify(url).slice(0, 60)} (${reason})`, () => expect(validateExternalUrl(url)).toEqual({ ok: false, reason }));
