@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { completeOnboardingIfShown } from "./support/onboarding";
 
 const composer = (page: Page) => page.locator("main [id$='-composer-input']:visible");
 const status = (page: Page) => page.locator("[id$='-header-status']:visible");
@@ -24,22 +25,7 @@ async function send(page: Page, text: string): Promise<void> {
 
 test("preview: onboarding, a streamed reply and stop @smoke", async ({ page }) => {
   await test.step("1. Onboarding", async () => {
-    await page.goto("/");
-    await expect(page.locator("#onboarding-step")).toContainText("01 /");
-    await page.locator("#agent-section-onboarding-name-input").fill("Sage");
-    await page.locator("#agent-section-onboarding-look-ember").click();
-    await page.locator("#agent-section-onboarding-tone-brief").click();
-    await expect(page.locator("#agent-section-onboarding-title")).toHaveText("Hi, I'm Sage.");
-    await page.locator("#onboarding-next").click();
-    for (let i = 0; i < 6; i++) {
-      const title = await page.locator("#onboarding-step").innerText();
-      if (/model/i.test(title)) await page.getByRole("radio", { name: /DeepSeek V4 Flash/ }).click();
-      if (/all set/i.test(title)) break;
-      await page.locator("#onboarding-next").click();
-    }
-    await expect(page.locator("#onboarding-summary")).toContainText("Sage · brief · ember look");
-    await page.locator("#onboarding-next").click();
-    await expect(page.locator("#rail")).toBeVisible();
+    expect(await completeOnboardingIfShown(page)).toBe(true);
   });
 
   await test.step("2. A new chat starts a run", async () => {
