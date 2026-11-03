@@ -91,18 +91,20 @@ describe("LoginFlows", () => {
     expect(flows.get(A, id)).toMatchObject({ status: "running" });
   });
 
-  it("keeps one running flow per user and one ChatGPT flow per process", async () => {
+  it("keeps one running flow per user and lets different users sign in to ChatGPT at the same time", async () => {
     const flows = new LoginFlows(async (_user, _id, ui: Interaction) => {
       await ui.prompt({ type: "manual_code", message: "Paste" });
     });
     const first = flows.start(ALICE, "openai");
-    expect(() => flows.start(BOB, "openai")).toThrow(/Another sign-in/);
+    const bob = flows.start(BOB, "openai");
     const second = flows.start(ALICE, "openai");
     await tick();
     expect(flows.get(A, first)).toBeUndefined();
     expect(flows.get(A, second)).toMatchObject({ status: "running" });
+    expect(flows.get(BOB.id, bob)).toMatchObject({ status: "running" });
+    expect(flows.get(A, bob)).toBeUndefined();
     flows.cancelAll(A);
     expect(flows.get(A, second)).toBeUndefined();
-    expect(() => flows.start(BOB, "openai")).not.toThrow();
+    expect(flows.get(BOB.id, bob)).toMatchObject({ status: "running" });
   });
 });

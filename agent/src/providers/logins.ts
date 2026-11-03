@@ -7,7 +7,6 @@ import { UserError } from "../lib/errors.js";
 type Interaction = AuthInteraction & { signal: AbortSignal };
 type Login = (user: AuthUser, providerId: string, interaction: Interaction) => Promise<void>;
 
-const PROCESS_WIDE = new Set(["openai"]);
 const EXPIRED = "This sign-in expired. Start it again.";
 
 type FlowState = {
@@ -51,11 +50,6 @@ export class LoginFlows {
         this.flows.delete(id);
       }
     }
-    if (
-      PROCESS_WIDE.has(providerId) &&
-      [...this.flows.values()].some((f) => f.state.providerId === providerId && f.state.status === "running")
-    )
-      throw new UserError("Another sign-in is in progress. Try again in a minute.", "conflict", { code: "login_busy" });
     const id = randomUUID();
     const flow: Flow = { userId, state: { providerId, status: "running" }, createdAt: this.now(), abort: new AbortController() };
     this.flows.set(id, flow);

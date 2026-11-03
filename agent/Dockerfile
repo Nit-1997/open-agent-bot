@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/playwright:v1.64.1-noble
 WORKDIR /app/agent
 COPY agent/package.json agent/package-lock.json ./
+COPY agent/patches ./patches
 RUN npm ci
 COPY shared /app/shared
 COPY agent/tsconfig.json ./

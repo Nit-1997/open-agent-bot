@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type LoginState, type ProviderView, providersApi } from "@/lib/providers";
 import { input, solid } from "./styles";
 
@@ -10,17 +10,36 @@ export function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollM
   const [state, setState] = useState<LoginState | null>(null);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const settled = useRef(false);
 
   useEffect(() => {
     let alive = true;
     providersApi
       .startLogin(p.id)
-      .then((f) => alive && setFlow(f))
+      .then((f) => {
+        if (alive) setFlow(f);
+        else void providersApi.cancelLogin(f).catch(() => {});
+      })
       .catch((e: Error) => alive && setError(e.message));
     return () => {
       alive = false;
     };
   }, [p.id]);
+
+  useEffect(() => {
+    if (!flow) return;
+    settled.current = false;
+    const stop = () => {
+      if (settled.current) return;
+      settled.current = true;
+      void providersApi.cancelLogin(flow).catch(() => {});
+    };
+    window.addEventListener("pagehide", stop);
+    return () => {
+      window.removeEventListener("pagehide", stop);
+      stop();
+    };
+  }, [flow]);
 
   useEffect(() => {
     if (!flow) return;
@@ -30,6 +49,7 @@ export function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollM
         const s = await providersApi.loginState(flow);
         if (!alive) return;
         setState(s);
+        if (s.status !== "running") settled.current = true;
         if (s.status === "done") onDone();
         else if (s.status === "running") timer = setTimeout(poll, pollMs);
       } catch (e) {
@@ -44,7 +64,10 @@ export function SignIn({ p, pollMs, onDone, onCancel }: { p: ProviderView; pollM
   }, [flow, pollMs, onDone]);
 
   const cancel = () => {
-    if (flow && state?.status === "running") void providersApi.cancelLogin(flow).catch(() => {});
+    if (flow && !settled.current) {
+      settled.current = true;
+      void providersApi.cancelLogin(flow).catch(() => {});
+    }
     onCancel();
   };
 

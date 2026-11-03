@@ -1,3 +1,5 @@
+import { OPENAI_CODEX_MODELS } from "@earendil-works/pi-ai/providers/openai-codex.models";
+
 export type ProviderKind = "cloud" | "local";
 
 export type CatalogEntry = {
@@ -9,8 +11,11 @@ export type CatalogEntry = {
   oauthLabel?: string;
   defaultBaseUrl?: string;
   recommended?: string[];
+  signin?: { models: ReadonlySet<string>; recommended: string[] };
   note?: string;
 };
+
+const CHATGPT_PLAN_MODELS: ReadonlySet<string> = new Set(Object.values(OPENAI_CODEX_MODELS).map((m) => m.id));
 
 export const CLOUD: CatalogEntry[] = [
   {
@@ -21,6 +26,7 @@ export const CLOUD: CatalogEntry[] = [
     keyUrl: "https://platform.openai.com/api-keys",
     oauthLabel: "Sign in with ChatGPT",
     recommended: ["gpt-5.5", "gpt-5.4-mini"],
+    signin: { models: CHATGPT_PLAN_MODELS, recommended: ["gpt-6.1-sol", "gpt-6-luna"] },
   },
   {
     id: "anthropic",

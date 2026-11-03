@@ -47,7 +47,7 @@ export const providersApi = {
   startLogin: (id: string) => call<{ flow: string }>(`/${id}/login`, { method: "POST" }).then((r) => r.flow),
   loginState: (flow: string) => call<LoginState>(`/logins/${flow}`),
   answerLogin: (flow: string, value: string) => call(`/logins/${flow}/answer`, { method: "POST", body: JSON.stringify({ value }) }),
-  cancelLogin: (flow: string) => call(`/logins/${flow}`, { method: "DELETE" }),
+  cancelLogin: (flow: string) => call(`/logins/${flow}`, { method: "DELETE", keepalive: true }),
 };
 
 export function contextLabel(tokens: number): string {

@@ -244,12 +244,17 @@ describe("provider sign-in flows", () => {
     expect(await (await call(ALICE, `/providers/logins/${flow}`)).json()).toMatchObject({ status: "done" });
   });
 
-  it("allows one ChatGPT sign-in per agent process", async () => {
+  it("lets two users run ChatGPT sign-ins at the same time", async () => {
     const { call } = await makeApp({ logins: flows() });
-    expect((await call(ALICE, "/providers/openai/login", { method: "POST" })).status).toBe(200);
-    const busy = await call(BOB, "/providers/openai/login", { method: "POST" });
-    expect(busy.status).toBe(409);
-    expect(await busy.json()).toMatchObject({ error: "login_busy" });
+    const alice = await call(ALICE, "/providers/openai/login", { method: "POST" });
+    const bob = await call(BOB, "/providers/openai/login", { method: "POST" });
+    expect(alice.status).toBe(200);
+    expect(bob.status).toBe(200);
+    const { flow: aliceFlow } = (await alice.json()) as { flow: string };
+    const { flow: bobFlow } = (await bob.json()) as { flow: string };
+    expect(aliceFlow).not.toBe(bobFlow);
+    expect((await call(BOB, `/providers/logins/${aliceFlow}`)).status).toBe(404);
+    expect((await call(ALICE, `/providers/logins/${bobFlow}`)).status).toBe(404);
   });
 });
 
