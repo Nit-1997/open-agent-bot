@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { type NavContext, type NavDecision, navigationDecision, SHELL_URL, subframeDecision } from "../src/main/navigation.ts";
+import {
+  createOpenBudget,
+  type NavContext,
+  type NavDecision,
+  navigationDecision,
+  SHELL_URL,
+  subframeDecision,
+} from "../src/main/navigation.ts";
 
 const P = 18420;
 const O = `http://127.0.0.1:${P}`;
@@ -31,7 +38,8 @@ const rows: [string, NavContext, NavDecision][] = [
   [`http://user:pw@127.0.0.1:${P}/`, app("navigate"), deny],
   [`http://user@example.com/`, app("navigate"), deny],
   ["https://example.com/oa-external", app("navigate"), external("https://example.com/oa-external")],
-  ["https://example.com/oa-external", report("navigate"), external("https://example.com/oa-external")],
+  ["https://example.com/oa-external", report("navigate"), deny],
+  ["https://example.com/oa-external", report("redirect"), deny],
   ["https://example.com/oa-external", app("redirect"), deny],
   ["https://example.com/oa-external", app("navigate", false), deny],
   ["http://example.com/", app("navigate"), external("http://example.com/")],
@@ -100,5 +108,21 @@ describe("subframeDecision", () => {
     expect(subframeDecision(`${O}/`, "null")).toBe("cancel");
     expect(subframeDecision(`${O}/`, undefined)).toBe("cancel");
     expect(subframeDecision("not a url", O)).toBe("cancel");
+  });
+});
+
+describe("report window open budget (S1)", () => {
+  it("allows three external opens per window, then denies", () => {
+    const budget = createOpenBudget(3);
+    expect([budget.take(), budget.take(), budget.take(), budget.take(), budget.take()]).toEqual([true, true, true, false, false]);
+    expect(budget.spent()).toBe(true);
+  });
+
+  it("each window gets its own budget", () => {
+    const a = createOpenBudget(3);
+    const b = createOpenBudget(3);
+    for (let i = 0; i < 3; i++) a.take();
+    expect(a.take()).toBe(false);
+    expect(b.take()).toBe(true);
   });
 });

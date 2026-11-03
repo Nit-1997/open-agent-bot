@@ -48,6 +48,8 @@ describe("loadShellConfig outside test mode", () => {
         "OPEN_AGENT_SHELL_SINGLE_INSTANCE_ID",
         "OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET",
         "OPEN_AGENT_SHELL_FAKE_LOCATION",
+        "OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS",
+        "OPEN_AGENT_SHELL_FAKE_APPS",
       ].sort(),
     );
   });
@@ -60,7 +62,11 @@ describe("loadShellConfig outside test mode", () => {
           ? "outside"
           : name.endsWith("SOCKET")
             ? "1"
-            : "/tmp/x";
+            : name.endsWith("_MS")
+              ? "100"
+              : name.endsWith("FAKE_APPS")
+                ? "docker-desktop"
+                : "/tmp/x";
       const cfg = loadShellConfig({ [name]: value }, real);
       expect(cfg.test).toBe(false);
       expect(cfg.ignored).toEqual([name]);
@@ -72,8 +78,47 @@ describe("loadShellConfig outside test mode", () => {
       expect(cfg.fakeOutside).toBe(false);
       expect(cfg.allowSystemSocket).toBe(false);
       expect(cfg.portRange).toEqual([41100, 41199]);
+      expect(cfg.externalWindowMs).toBeUndefined();
+      expect(cfg.fakeApps).toBeUndefined();
     });
   }
+
+  it("OPEN_AGENT_SHELL_FAKE_APPS reports the Docker apps in test mode (none when unset)", () => {
+    const env = {
+      OPEN_AGENT_SHELL_TEST: "1",
+      OPEN_AGENT_SHELL_STATE_DIR: "/tmp/oab-x",
+      OPEN_AGENT_SHELL_PROJECT: "oab-x",
+      OPEN_AGENT_SHELL_DATA_VOLUME: "oab-x-data",
+      OPEN_AGENT_SHELL_KEYS_VOLUME: "oab-x-keys",
+      OPEN_AGENT_SHELL_PORT_RANGE: "18420-18429",
+    };
+    expect(loadShellConfig(env, real).fakeApps).toEqual({ dockerDesktop: false, orbstack: false });
+    expect(loadShellConfig({ ...env, OPEN_AGENT_SHELL_FAKE_APPS: "docker-desktop" }, real).fakeApps).toEqual({
+      dockerDesktop: true,
+      orbstack: false,
+    });
+    expect(loadShellConfig({ ...env, OPEN_AGENT_SHELL_FAKE_APPS: "orbstack,docker-desktop" }, real).fakeApps).toEqual({
+      dockerDesktop: true,
+      orbstack: true,
+    });
+    expect(() => loadShellConfig({ ...env, OPEN_AGENT_SHELL_FAKE_APPS: "colima" }, real)).toThrow(ShellConfigError);
+  });
+
+  it("OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS sets the link rate and de-duplication window in test mode, 0–60000 only", () => {
+    const env = {
+      OPEN_AGENT_SHELL_TEST: "1",
+      OPEN_AGENT_SHELL_STATE_DIR: "/tmp/oab-x",
+      OPEN_AGENT_SHELL_PROJECT: "oab-x",
+      OPEN_AGENT_SHELL_DATA_VOLUME: "oab-x-data",
+      OPEN_AGENT_SHELL_KEYS_VOLUME: "oab-x-keys",
+      OPEN_AGENT_SHELL_PORT_RANGE: "18420-18429",
+    };
+    expect(loadShellConfig(env, real).externalWindowMs).toBeUndefined();
+    expect(loadShellConfig({ ...env, OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS: "0" }, real).externalWindowMs).toBe(0);
+    expect(loadShellConfig({ ...env, OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS: "1500" }, real).externalWindowMs).toBe(1500);
+    for (const bad of ["-1", "60001", "1e3", "x"])
+      expect(() => loadShellConfig({ ...env, OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS: bad }, real), bad).toThrow(ShellConfigError);
+  });
 
   it("ignores OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET=1 outside test mode", () => {
     const cfg = loadShellConfig({ OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET: "1" }, real);

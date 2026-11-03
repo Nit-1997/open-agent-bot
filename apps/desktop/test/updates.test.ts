@@ -190,4 +190,42 @@ describe("act routing", () => {
     expect(t.settings.get().checkForUpdates).toBe(false);
     expect(t.u.act({ type: "restartServices" })).toBeUndefined();
   });
+
+  it("a manual check while an automatic one runs marks the result as manual", async () => {
+    let release: (r: UpdateResult) => void = () => {};
+    const settings = memorySettings();
+    const u = createUpdates({
+      appVersion: "1.4.0",
+      settings,
+      now: () => NOW,
+      log: silentLog,
+      onChange: () => {},
+      openExternal: () => {},
+      check: () => new Promise<UpdateResult>((r) => (release = r)),
+    });
+    const auto = u.auto();
+    const manual = u.manual();
+    release({ ok: false, reason: "network" });
+    await Promise.all([auto, manual]);
+    expect(u.view()).toMatchObject({ checked: true, error: "network" });
+  });
+
+  it("a manual check while an automatic one runs still marks checked on success", async () => {
+    let release: (r: UpdateResult) => void = () => {};
+    const u = createUpdates({
+      appVersion: "1.4.0",
+      settings: memorySettings(),
+      now: () => NOW,
+      log: silentLog,
+      onChange: () => {},
+      openExternal: () => {},
+      check: () => new Promise<UpdateResult>((r) => (release = r)),
+    });
+    const auto = u.auto();
+    const manual = u.manual();
+    release({ ok: true });
+    await Promise.all([auto, manual]);
+    expect(u.view()).toMatchObject({ checked: true });
+    expect(u.view().error).toBeUndefined();
+  });
 });

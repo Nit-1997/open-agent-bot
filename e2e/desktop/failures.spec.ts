@@ -184,8 +184,7 @@ test("quit during a slow pull: the pull child is gone and no up was called", asy
   await setup({ slow: { pullMs: 30_000 } });
   const s = await launch("quit-pull");
   await expect.poll(() => s.status()?.phase, { timeout: 20_000 }).toBe("pulling");
-  await expect.poll(() => fake.calls().length + (s.log().includes("[docker] manifest") ? 1 : 0)).toBeGreaterThan(0);
-  await new Promise((r) => setTimeout(r, 800));
+  await expect.poll(() => fake.started().some((c) => c.argv[0] === "pull"), { timeout: 20_000 }).toBe(true);
   await s.app.close();
   shell = undefined;
   const pull = fake.calls().find((c) => c.argv[0] === "pull");
@@ -201,7 +200,7 @@ test("quit during a slow up: compose stop is recorded and the next launch classi
   });
   const s = await launch("quit-up");
   await expect.poll(() => s.status()?.phase, { timeout: 20_000 }).toBe("creating");
-  await new Promise((r) => setTimeout(r, 800));
+  await expect.poll(() => fake.started().some((c) => subOf(c) === "up"), { timeout: 20_000 }).toBe(true);
   await s.app.close();
   shell = undefined;
   const calls = fake.calls();

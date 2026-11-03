@@ -115,19 +115,33 @@ test("real Docker: pull with progress, health, the local UI, stop-on-quit, token
 
   const s1 = await launch("1-fresh");
   const shellPage = await s1.shellPage();
-  const seen = new Set<string>();
-  const deadline = Date.now() + 600_000;
-  while (Date.now() < deadline && s1.status()?.screen !== "app") {
-    const t = await shellPage
-      .locator("#screen-progress-download-detail")
-      .textContent({ timeout: 500 })
-      .catch(() => null);
-    if (t && /layer \d+ of \d+/.test(t)) seen.add(t);
-    if (s1.status()?.screen?.startsWith("screen-") && s1.status()?.screen !== "screen-progress") break;
-    await shellPage.waitForTimeout(250);
-  }
-  say(`progress values seen: ${[...seen].length}: ${[...seen].slice(0, 6).join(" | ")}`);
-  if (pulls) expect(seen.size).toBeGreaterThanOrEqual(3);
+  await shellPage.evaluate(() => {
+    const w = window as unknown as { progressSeen: string[] };
+    w.progressSeen = [];
+    const read = () => {
+      const t = document.getElementById("screen-progress-download-detail")?.textContent ?? "";
+      if (t && w.progressSeen.at(-1) !== t) w.progressSeen.push(t);
+    };
+    read();
+    new MutationObserver(read).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+  });
+  const progressSeen = () =>
+    shellPage.evaluate(() => (window as unknown as { progressSeen?: string[] }).progressSeen ?? []).catch(() => [] as string[]);
+  const counted = (all: string[]) => [...new Set(all.filter((t) => /layer \d+ of [1-9]\d*/.test(t) && !/ of 0\b/.test(t)))];
+  await expect
+    .poll(
+      async () => {
+        const screen = s1.status()?.screen;
+        return screen === "app" || (screen !== undefined && screen !== "screen-progress");
+      },
+      { timeout: 600_000, intervals: [500] },
+    )
+    .toBe(true);
+  const recorded = await progressSeen();
+  const seen = counted(recorded);
+  say(`progress values seen: ${seen.length}: ${seen.slice(0, 6).join(" | ")}`);
+  expect(recorded.some((t) => / of 0\b/.test(t))).toBe(false);
+  if (pulls) expect(seen.length).toBeGreaterThanOrEqual(3);
   await expect(shellPage.locator("#screen-progress-docker-detail")).toHaveText(`${ENGINE} is running`);
   const page = await ready(s1);
   await everyElementHasUniqueId(shellPage);

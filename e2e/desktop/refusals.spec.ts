@@ -95,10 +95,16 @@ test("kek_missing → Reset requires typing reset → exactly one up with RESET=
   const ups = fake.calls().filter((c) => subOf(c) === "up");
   expect(ups.map((u) => u.reset)).toEqual([false, true]);
   expect(ups[1]?.tokenFp).not.toBe(ups[0]?.tokenFp);
+  await s.appPage();
   await (await s.shellPage()).evaluate(() =>
     (window as unknown as { shell: { act(a: unknown): Promise<unknown> } }).shell.act({ type: "restartServices" }),
   );
   await expect.poll(() => fake.calls().filter((c) => subOf(c) === "up").length, { timeout: 30_000 }).toBe(3);
+  await s.waitScreen("screen-refusal-kek_missing");
+  const restartLog = s.log().slice(s.log().lastIndexOf("[action] restartServices"));
+  expect(restartLog.indexOf("[app] app view unloaded")).toBeGreaterThan(0);
+  expect(restartLog.indexOf("[app] app view unloaded")).toBeLessThan(restartLog.indexOf("[state] token created"));
+  expect(s.app.windows().some((p) => p.url().startsWith("http://127.0.0.1:"))).toBe(false);
   expect(
     fake
       .calls()

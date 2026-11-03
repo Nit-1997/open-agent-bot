@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import {
@@ -128,9 +128,12 @@ test("fresh start: layer counts rise, the app loads with the cookie, stop-on-qui
   expect(shell.stack()?.launchToken).toBe(first?.launchToken);
   expect(starts(after)[0]?.tokenFp).toBe(fp(first?.launchToken ?? ""));
 
-  writeFileSync(join(env.stateDir, "settings.json"), JSON.stringify({ schema: 1, stopOnQuit: false, checkForUpdates: true }), {
-    mode: 0o600,
-  });
+  await (await shell.shellPage()).evaluate(() =>
+    (window as unknown as { shell: { act(a: unknown): Promise<unknown> } }).shell.act({ type: "setStopOnQuit", value: false }),
+  );
+  await expect
+    .poll(() => (JSON.parse(readFileSync(join(env.stateDir, "settings.json"), "utf8")) as { stopOnQuit: boolean }).stopOnQuit)
+    .toBe(false);
   await shell.app.close();
   shell = undefined;
   const afterQuit = fake.calls().length;

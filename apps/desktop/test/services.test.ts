@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { compareSemver, effectivePins, type ServicePins, validatePins } from "../src/main/services.ts";
+import { compareSemver, effectivePins, type ServicePins, stackRefs, validatePins } from "../src/main/services.ts";
 
 const SHA = "1".repeat(64);
 const D = (c: string) => c.repeat(64);
@@ -64,7 +66,10 @@ describe("validatePins (D12, D22)", () => {
     ["minShellVersion newer than the app", release({ minShellVersion: "1.5.0" }), prod, "shell_too_old"],
     ["minShellVersion equal", release({ minShellVersion: "1.4.0" }), prod, true],
     ["images: null", release({ images: null }), prod, "no_pins"],
-    ["the dev template", { schema: 1, version: "dev", composeSha256: SHA, images: null }, prod, "no_pins"],
+    ["the committed template", { schema: 1, kind: "release", version: "dev", composeSha256: SHA, images: null }, prod, "no_pins"],
+    ["a lock without kind", { schema: 1, version: "dev", composeSha256: SHA, images: null }, prod, "kind"],
+    ["a release without kind", { ...release(), kind: undefined }, prod, "kind"],
+    ["a dev file without kind in test mode", { ...release(), kind: undefined }, test_, "kind"],
     ["schema 2", release({ schema: 2 }), prod, "schema"],
     [
       "an extra image",
@@ -190,5 +195,37 @@ describe("effectivePins", () => {
     expect(compareSemver("1.10.0", "1.9.9")).toBe(1);
     expect(compareSemver("1.4.0-rc.1", "1.4.0")).toBe(-1);
     expect(compareSemver("0.0.0-m4a", "0.0.0-m4b")).toBe(-1);
+  });
+  it("compares prerelease identifiers by semver precedence", () => {
+    expect(compareSemver("1.4.0-rc.10", "1.4.0-rc.9")).toBe(1);
+    expect(compareSemver("1.4.0-rc.9", "1.4.0-rc.10")).toBe(-1);
+    expect(compareSemver("1.4.0-rc.2", "1.4.0-rc.2")).toBe(0);
+    expect(compareSemver("1.4.0-alpha", "1.4.0-alpha.1")).toBe(-1);
+    expect(compareSemver("1.4.0-alpha.1", "1.4.0-alpha.beta")).toBe(-1);
+    expect(compareSemver("1.4.0-alpha.beta", "1.4.0-beta")).toBe(-1);
+    expect(compareSemver("1.4.0-beta.11", "1.4.0-beta.2")).toBe(1);
+    expect(compareSemver("1.4.0-1", "1.4.0-alpha")).toBe(-1);
+    expect(compareSemver("1.4.0-rc.1", "1.4.0")).toBe(-1);
+    expect(compareSemver("1.4.0+b2", "1.4.0+b1")).toBe(0);
+  });
+});
+
+describe("the committed services.lock.json", () => {
+  it("names its kind and has no pins until a release fills them", () => {
+    const lock = JSON.parse(readFileSync(join(__dirname, "../services.lock.json"), "utf8")) as Record<string, unknown>;
+    expect(lock.kind).toBe("release");
+    expect(validatePins(lock, { test: false, composeSha256: String(lock.composeSha256), shellVersion: "1.4.0" })).toEqual({
+      ok: false,
+      reason: "no_pins",
+    });
+  });
+});
+
+describe("stackRefs (S4)", () => {
+  const ids = { agent: `sha256:${D("e")}`, search: `sha256:${D("f")}` };
+  it("a local lock runs by image Id; other pins run by their refs", () => {
+    const base = { version: "v", composeSha256: SHA, images: { agent: "open-agent:local", search: "open-agent-search:local" } };
+    expect(stackRefs({ ...base, kind: "local", imageIds: ids, pull: false })).toEqual(ids);
+    expect(stackRefs({ ...base, kind: "dev", pull: false })).toEqual(base.images);
   });
 });

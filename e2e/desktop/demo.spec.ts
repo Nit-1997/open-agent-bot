@@ -462,7 +462,7 @@ test.describe("part A: real Docker", () => {
     const argv = s
       .log()
       .split("\n")
-      .find((l) => /\[docker\] run --rm -i --network none .* export/.test(l));
+      .find((l) => /\[docker\] run --rm -i --init --name [a-z0-9-]+-export-[0-9a-f]{12} --network none .* export/.test(l));
     say(`4: export argv: ${argv?.replace(/^.*\[docker\] /, "")}`);
     expect(argv).toContain(`-v ${DATA}:/data`);
     expect(argv).not.toContain("/keys");
@@ -614,10 +614,19 @@ test.describe("part A: real Docker", () => {
     say(`7: providers after  ${after.slice(0, 200)}`);
     expect(ups).toHaveLength(1);
     expect(after).not.toBe(before);
-    const origin = new URL(page2.url()).origin;
-    await page2.goto(`${origin}/models`).catch(() => {});
+    const hints = [...before.matchAll(/"hint":"([^"]+)"/g)].map((m) => m[1] ?? "").filter(Boolean);
+    await page2.locator("#account-menu-button").click();
+    await page2.locator("#account-menu-models").click();
+    await expect(page2.locator("#models-panel")).toBeVisible();
+    await expect(page2.locator("#models-providers")).toBeVisible({ timeout: 30_000 });
+    await expect(page2.locator("#models-panel-loading")).toHaveCount(0, { timeout: 30_000 });
+    const models = await page2.locator("#models-providers").innerText();
+    say(`7: Models panel after the reset: ${models.replace(/\s+/g, " ").slice(0, 240)}`);
+    expect(models).not.toMatch(/Connected · (API key|signed in)/);
+    for (const h of hints) expect(models).not.toContain(h);
     await hold(page2, 8);
-    await page2.goto(`${origin}/`);
+    await page2.locator("#models-panel-close").click();
+    await expect(page2.locator("#models-panel")).toHaveCount(0);
   });
 
   test("8. a foreign stack from the repo compose file → the foreign screen, read-only until Use the app's services", async () => {
@@ -733,8 +742,25 @@ test.describe("part A: real Docker", () => {
     await hold(sp, 6);
     rememberToken(tokens, s.stack()?.launchToken);
     const from = logLines();
+    const between: string[] = [];
+    let watching = true;
+    const watch = (async () => {
+      while (watching && between.length === 0) {
+        if (logFrom(from).includes(`volume rm ${DATA} ${KEYS}`)) {
+          const ours = docker(["volume", "ls", "--format", "{{.Name}}"])
+            .split("\n")
+            .filter((v) => v === DATA || v === KEYS);
+          if (ours.length === 0) between.push(`docker volume ls → neither ${DATA} nor ${KEYS} exists`);
+        }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    })();
     await sp.locator("#screen-confirm-delete-confirm").click();
     const page = await appReady(s);
+    watching = false;
+    await watch;
+    say(`11: between down -v and the restart: ${between[0] ?? "not observed"}`);
+    expect(between).toHaveLength(1);
     await expect(page.locator("#onboarding-step")).toBeVisible({ timeout: 60_000 });
     const tail = logFrom(from);
     const downAt = tail.search(/\[docker\] compose .* down -v --remove-orphans/);

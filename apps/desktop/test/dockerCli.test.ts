@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  cliPluginDirs,
   cliPluginsProblem,
   composeAtLeast,
   type DockerCli,
@@ -12,6 +13,7 @@ import {
   ENV_ALLOWLIST,
   engineOf,
   locateDocker,
+  pluginPathsProblem,
   probeDocker,
   type RunResult,
   trustedPath,
@@ -22,7 +24,7 @@ const FIX = join(dirname(fileURLToPath(import.meta.url)), "fixtures/docker");
 const UID = 501;
 const HOME = "/Users/tester";
 
-type Node = { kind: FsStat["kind"]; uid?: number; gid?: number; mode?: number; target?: string; exec?: boolean };
+type Node = { kind: FsStat["kind"]; uid?: number; gid?: number; mode?: number; target?: string; exec?: boolean; text?: string };
 
 function fakeFs(nodes: Record<string, Node>): FsProbe {
   const resolveLink = (p: string, depth = 0): string | undefined => {
@@ -52,6 +54,17 @@ function fakeFs(nodes: Record<string, Node>): FsProbe {
     executable: (p) => {
       const r = resolveLink(p);
       return r !== undefined && nodes[r]?.exec !== false;
+    },
+    list: (p) => {
+      if (nodes[p]?.kind !== "dir") return undefined;
+      const prefix = `${p}/`;
+      return Object.keys(nodes)
+        .filter((k) => k.startsWith(prefix) && !k.slice(prefix.length).includes("/"))
+        .map((k) => k.slice(prefix.length));
+    },
+    readText: (p) => {
+      const r = resolveLink(p);
+      return r ? nodes[r]?.text : undefined;
     },
   };
 }
@@ -202,6 +215,132 @@ describe("PATH and cli-plugins filters", () => {
   });
 });
 
+describe("docker CLI plugins (S3)", () => {
+  const home = { [`${HOME}/.docker`]: dir({ uid: UID }), [`${HOME}/.docker/cli-plugins`]: dir({ uid: UID, mode: 0o700 }) };
+  const pluginsAt = (d: string) => `${d}/docker-compose`;
+  const DD = "/Applications/Docker.app/Contents/Resources/cli-plugins";
+
+  it("checks ~/.docker/cli-plugins, the config's cliPluginsExtraDirs and the system plugin dirs", () => {
+    const fs = fakeFs({
+      ...BASE,
+      ...home,
+      [`${HOME}/.docker/config.json`]: {
+        kind: "file",
+        uid: UID,
+        mode: 0o600,
+        text: JSON.stringify({ cliPluginsExtraDirs: ["/opt/homebrew/lib/docker/cli-plugins", "relative/x"] }),
+      },
+    });
+    expect(cliPluginDirs({ fs, home: HOME })).toEqual([
+      `${HOME}/.docker/cli-plugins`,
+      "/opt/homebrew/lib/docker/cli-plugins",
+      "/usr/local/lib/docker/cli-plugins",
+      "/usr/local/libexec/docker/cli-plugins",
+      "/usr/lib/docker/cli-plugins",
+      "/usr/libexec/docker/cli-plugins",
+    ]);
+  });
+
+  it("accepts Docker Desktop's links into its app bundle", () => {
+    const fs = fakeFs({
+      ...BASE,
+      ...home,
+      [DD]: dir(),
+      [pluginsAt(DD)]: exe(),
+      [pluginsAt(`${HOME}/.docker/cli-plugins`)]: { kind: "symlink", uid: UID, target: pluginsAt(DD) },
+    });
+    expect(cliPluginsProblem({ fs, uid: UID, home: HOME })).toBeUndefined();
+  });
+
+  it("rejects a plugin that links into a world-writable folder", () => {
+    const fs = fakeFs({
+      ...BASE,
+      ...home,
+      "/tmp": dir({ mode: 0o1777 }),
+      "/tmp/docker-compose": exe({ uid: UID }),
+      [pluginsAt(`${HOME}/.docker/cli-plugins`)]: { kind: "symlink", uid: UID, target: "/tmp/docker-compose" },
+    });
+    expect(cliPluginsProblem({ fs, uid: UID, home: HOME })).toEqual({
+      path: pluginsAt(`${HOME}/.docker/cli-plugins`),
+      reason: `${pluginsAt(`${HOME}/.docker/cli-plugins`)}: parent /tmp is other-writable`,
+    });
+  });
+
+  it("skips a broken plugin link (the CLI can't run it either)", () => {
+    const fs = fakeFs({ ...BASE, ...home, [`${HOME}/.docker/cli-plugins/docker-dev`]: { kind: "symlink", uid: UID, target: "/nope" } });
+    expect(cliPluginsProblem({ fs, uid: UID, home: HOME })).toBeUndefined();
+  });
+
+  it("rejects a group-writable extra dir from config.json and a group-writable system dir", () => {
+    const extra = fakeFs({
+      ...BASE,
+      ...home,
+      [`${HOME}/.docker/config.json`]: { kind: "file", uid: UID, text: JSON.stringify({ cliPluginsExtraDirs: ["/opt/x/cli-plugins"] }) },
+      "/opt": dir(),
+      "/opt/x": dir(),
+      "/opt/x/cli-plugins": dir({ uid: UID, gid: 20, mode: 0o775 }),
+    });
+    expect(cliPluginsProblem({ fs: extra, uid: UID, home: HOME })?.path).toBe("/opt/x/cli-plugins");
+    const system = fakeFs({
+      ...BASE,
+      "/usr/local/lib": dir(),
+      "/usr/local/lib/docker": dir(),
+      "/usr/local/lib/docker/cli-plugins": dir({ gid: 20, mode: 0o775 }),
+    });
+    expect(cliPluginsProblem({ fs: system, uid: UID, home: HOME })?.path).toBe("/usr/local/lib/docker/cli-plugins");
+  });
+
+  const infoCli = (stdout: string, code = 0): DockerCli & { calls: string[][] } => {
+    const calls: string[][] = [];
+    return {
+      path: "/usr/local/bin/docker",
+      calls,
+      run: async (args) => {
+        calls.push([...args]);
+        return { code, stdout, stderr: "", ms: 1 };
+      },
+    };
+  };
+
+  it("checks every plugin path the CLI reports with trustedPath", async () => {
+    const fs = fakeFs({
+      ...BASE,
+      ...home,
+      [DD]: dir(),
+      [pluginsAt(DD)]: exe(),
+      "/tmp": dir({ mode: 0o1777 }),
+      "/tmp/docker-x": exe({ uid: UID }),
+    });
+    const good = infoCli(JSON.stringify([{ Name: "compose", Path: pluginsAt(DD) }]));
+    expect(await pluginPathsProblem(good, {}, { fs, uid: UID })).toEqual({ checked: 1 });
+    expect(good.calls).toEqual([["info", "--format", "{{json .ClientInfo.Plugins}}"]]);
+    const bad = infoCli(
+      JSON.stringify([
+        { Name: "compose", Path: pluginsAt(DD) },
+        { Name: "x", Path: "/tmp/docker-x", Err: "bad" },
+      ]),
+    );
+    expect(await pluginPathsProblem(bad, {}, { fs, uid: UID })).toEqual({
+      checked: 2,
+      problem: { path: "/tmp/docker-x", reason: "/tmp/docker-x: parent /tmp is other-writable" },
+    });
+  });
+
+  it("still reads the plugin list when the engine is down (exit 1)", async () => {
+    const fs = fakeFs({ ...BASE, "/tmp": dir({ mode: 0o1777 }), "/tmp/docker-x": exe({ uid: UID }) });
+    const r = await pluginPathsProblem(infoCli(JSON.stringify([{ Path: "/tmp/docker-x" }]), 1), {}, { fs, uid: UID });
+    expect(r.problem?.path).toBe("/tmp/docker-x");
+  });
+
+  it("an unreadable plugin list is reported, not trusted silently", async () => {
+    expect(await pluginPathsProblem(infoCli("not json"), {}, { fs: fakeFs(BASE), uid: UID })).toEqual({
+      checked: 0,
+      problem: { path: "docker info", reason: "the CLI plugin list couldn't be read" },
+    });
+    expect(await pluginPathsProblem(infoCli("null"), {}, { fs: fakeFs(BASE), uid: UID })).toEqual({ checked: 0 });
+  });
+});
+
 describe("dockerEnv (D11)", () => {
   const parent = {
     PATH: "/evil/bin:/usr/bin",
@@ -211,6 +350,7 @@ describe("dockerEnv (D11)", () => {
     TMPDIR: "/tmp/x",
     LANG: "en_US.UTF-8",
     DOCKER_CONTEXT: "desktop-linux",
+    DOCKER_CONFIG: "/tmp/evil-config",
     COMPOSE_FILE: "/tmp/evil.yml",
     COMPOSE_PROJECT_NAME: "evil",
     OPEN_AGENT_IMAGE: "evil:latest",

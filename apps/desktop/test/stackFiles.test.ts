@@ -34,9 +34,15 @@ describe("stage-stack (D12)", () => {
     expect(readFileSync(join(out, "services.lock.json"))).toEqual(readFileSync(join(APP, "services.lock.json")));
   });
 
-  it("the committed lock template is the dev template and pins the root compose file's SHA-256", () => {
+  it("the committed lock template is a release lock without pins and pins the root compose file's SHA-256", () => {
     const lock = JSON.parse(readFileSync(join(APP, "services.lock.json"), "utf8"));
-    expect(lock).toEqual({ schema: 1, version: "dev", composeSha256: sha(join(REPO, "docker-compose.yml")), images: null });
+    expect(lock).toEqual({
+      schema: 1,
+      kind: "release",
+      version: "dev",
+      composeSha256: sha(join(REPO, "docker-compose.yml")),
+      images: null,
+    });
   });
 
   it("refuses a lock whose composeSha256 doesn't match", () => {

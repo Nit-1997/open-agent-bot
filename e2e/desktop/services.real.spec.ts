@@ -13,7 +13,7 @@ const PROJECT = process.env.DESKTOP_REAL_PROJECT ?? "oab-factory-m4-3-real";
 const SERVICES = process.env.DESKTOP_REAL_SERVICES ?? "";
 const RANGE = process.env.DESKTOP_REAL_RANGE ?? "18460-18462";
 const STUB_PORT = Number(process.env.STUB_PORT ?? 18463);
-const AGENT_IMAGE = process.env.DESKTOP_REAL_AGENT_IMAGE ?? "oab-m4-3-agent:dev";
+const AGENT_IMAGE = process.env.DESKTOP_REAL_AGENT_IMAGE ?? "";
 const DATA = `${PROJECT}-data`;
 const KEYS = `${PROJECT}-keys`;
 const WORDING = "Saved model keys are not included. Chats, reports and your profile are.";
@@ -56,6 +56,8 @@ const say = (m: string) => process.stdout.write(`[real-4.3] ${m}\n`);
 
 test.beforeAll(async () => {
   if (!existsSync(SERVICES)) throw new Error("DESKTOP_REAL_SERVICES must point at a dev services file");
+  if (!AGENT_IMAGE)
+    throw new Error("DESKTOP_REAL_AGENT_IMAGE must name the agent image the services file pins (for example oab-dev-agent:dev)");
   mkdirSync(evidence, { recursive: true });
   const stateDir = newStateDir("real-43");
   env = {
@@ -196,7 +198,7 @@ test("real Docker: a chat and a report, Services & data from the account menu, l
     s
       .log()
       .split("\n")
-      .find((l) => /\[docker\] run --rm -i --network none .* export /.test(l)) ?? "";
+      .find((l) => /\[docker\] run --rm -i --init --name [a-z0-9-]+-export-[0-9a-f]{12} --network none .* export /.test(l)) ?? "";
   say(`export argv: ${exportLine.replace(/^.*\[docker\] /, "")}`);
   expect(exportLine).toContain(`-v ${DATA}:/data`);
   expect(exportLine).not.toContain("/keys");

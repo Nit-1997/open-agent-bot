@@ -86,6 +86,7 @@ export type FakeDocker = Readonly<{
   scenario(patch: FakeScenario): void;
   daemon(v: "up" | "down"): void;
   calls(): CallRecord[];
+  started(): CallRecord[];
   composeCalls(): CallRecord[];
   state(): {
     containers: Record<string, Record<string, Record<string, unknown>>>;
@@ -127,18 +128,19 @@ export async function createFakeDocker(label: string, scenario: FakeScenario = {
       return f;
     }
   };
-  const calls = () =>
+  const records = () =>
     (existsSync(join(home, "calls.jsonl")) ? readFileSync(join(home, "calls.jsonl"), "utf8") : "")
       .split("\n")
       .filter(Boolean)
-      .map((l) => JSON.parse(l) as CallRecord)
-      .filter((r) => r.phase !== "start");
+      .map((l) => JSON.parse(l) as CallRecord);
+  const calls = () => records().filter((r) => r.phase !== "start");
   const self: FakeDocker = {
     home,
     bin: docker,
     scenario: (patch) => writeFileSync(join(home, "scenario.json"), JSON.stringify({ ...read(join(home, "scenario.json"), {}), ...patch })),
     daemon: (v) => writeFileSync(join(home, "daemon.txt"), v),
     calls,
+    started: () => records().filter((r) => r.phase === "start"),
     composeCalls: () => calls().filter((r) => r.argv[0] === "compose" && subOf(r) !== undefined),
     state: () => ({ containers: {}, images: {}, ...read(join(home, "state.json"), {}) }),
     writeState: (v) => writeFileSync(join(home, "state.json"), JSON.stringify(v)),

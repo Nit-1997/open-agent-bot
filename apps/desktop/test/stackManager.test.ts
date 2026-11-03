@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ShellState } from "../src/shared/actions.ts";
 import type { Compose, ComposeRun, ContainerInspect, ProjectSpec } from "../src/main/compose.ts";
 import type { DockerCli, DockerProbe, RunResult } from "../src/main/dockerCli.ts";
@@ -12,7 +12,7 @@ import { createPortPicker } from "../src/main/portPicker.ts";
 import type { ServicePins } from "../src/main/services.ts";
 import { DEFAULT_SETTINGS, type Settings, type SettingsStore } from "../src/main/settings.ts";
 import { loadShellConfig } from "../src/main/shellConfig.ts";
-import { createStackManager, type ManagerDeps, type StackManager } from "../src/main/stackManager.ts";
+import { createStackManager, type ManagerDeps, type StackManager, type Timings } from "../src/main/stackManager.ts";
 import { resolvePaths, writeStateFile } from "../src/main/statePaths.ts";
 import { buildZip } from "./fake-docker/zip.mjs";
 
@@ -40,6 +40,8 @@ type World = {
   dockerDown: boolean;
   exportMode: "ok" | "slow";
   versions: Record<string, string>;
+  statsThrows: boolean;
+  probeThrows: number;
 };
 
 let dir: string;
@@ -59,6 +61,8 @@ beforeEach(() => {
     dockerDown: false,
     exportMode: "ok",
     versions: {},
+    statsThrows: false,
+    probeThrows: 0,
   };
   managers = [];
 });
@@ -193,6 +197,7 @@ const cli: DockerCli = {
     if (a === "run") {
       world.calls.push({ kind: "run", args: [...args] });
       const cmd = args[args.indexOf("dist/local/dataTools.js") + 1];
+      if (cmd === "stats" && world.statsThrows) throw new Error("spawn EBADF");
       if (cmd === "stats") return ok(JSON.stringify({ schema: 1, dbBytes: 2 * 1024 * 1024, reports: 1, chats: 4, reportBytes: 100 }));
       if (cmd === "check") return ok(JSON.stringify({ credentials: 0, schema: 1 }));
       if (cmd === "export" && world.exportMode === "slow") return waitAbort(o.signal);
@@ -253,6 +258,8 @@ function build(
     savePath?: string;
     log?: ManagerDeps["log"];
     updates?: ManagerDeps["updates"];
+    timings?: Partial<Timings>;
+    pluginPaths?: { path: string; reason: string };
   } = {},
 ): Built {
   const cfg = loadShellConfig({
@@ -288,10 +295,17 @@ function build(
     pins: () => ({ ok: true, pins: o.pins ?? PINS }),
     locate: () => ({ kind: "found", path: cli.path, searched: [cli.path], rejected: [] }),
     pluginsProblem: () => undefined,
+    pluginPaths: async () => o.pluginPaths,
     makeCli: () => cli,
     envFor: () => ({}),
     endpoint: async () => ({ ok: true, endpoint: "unix:///x.sock", socket: "/x.sock", owner: 501 }),
-    probe: async () => (world.dockerDown ? { kind: "stopped", client: "29", stderrTail: "Cannot connect" } : probe),
+    probe: async () => {
+      if (world.probeThrows > 0) {
+        world.probeThrows -= 1;
+        throw new Error("probe crashed");
+      }
+      return world.dockerDown ? { kind: "stopped", client: "29", stderrTail: "Cannot connect" } : probe;
+    },
     compose: (_c, spec) => fakeCompose(spec),
     http: { get: async (port) => health(port) },
     ports: createPortPicker(async (p) => !busy.has(p) && !world.containers.some((c) => c.port === p && c.status === "running")),
@@ -321,6 +335,7 @@ function build(
       deleteWaitMs: 500,
       settleMs: 30,
       servicesPollMs: 20,
+      ...o.timings,
     },
   };
   const m = createStackManager(deps);
@@ -728,7 +743,9 @@ describe("Services & data (4.3)", () => {
     expect(b.views.length).toBe(views);
     expect(mutations()).toEqual([]);
     const stats = world.calls.find((c) => c.kind === "run");
-    expect(stats?.args.slice(0, 5)).toEqual(["run", "--rm", "-i", "--network", "none"]);
+    expect(stats?.args.slice(0, 5)).toEqual(["run", "--rm", "-i", "--init", "--name"]);
+    expect(stats?.args[5]).toMatch(new RegExp(`^${PROJECT}-export-[0-9a-f]{12}$`));
+    expect(stats?.args.slice(6, 8)).toEqual(["--network", "none"]);
     expect(stats?.args).toContain(`${PROJECT}-data:/data`);
     expect(stats?.args.join(" ")).not.toContain("/keys");
     const after = world.calls.filter((c) => c.kind === "ps").length;
@@ -940,6 +957,33 @@ describe("service update (D12, 4.4)", () => {
     expect(b.m.state()).toMatchObject({ screen: "app", servicesVersion: PINS.version });
   });
 
+  it("a local build passes its image Ids to compose (S4)", async () => {
+    const local: ServicePins = {
+      kind: "local",
+      version: "local-abc1234",
+      composeSha256: "x",
+      images: { agent: "oab-m4-agent:local", search: "oab-m4-search:local" },
+      imageIds: { agent: ID_A, search: ID_S },
+      pull: false,
+    };
+    world.images = { [local.images.agent]: ID_A, [local.images.search]: ID_S, [ID_A]: ID_A, [ID_S]: ID_S };
+    world.versions = { [ID_A]: "local-abc1234" };
+    const b = build({ pins: local });
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("app");
+    const agent = world.containers.find((c) => c.service === "agent");
+    expect(agent?.image).toBe(ID_A);
+    expect(world.containers.find((c) => c.service === "search")?.image).toBe(ID_S);
+    world.calls = [];
+    await b.m.quit();
+    const again = build({ pins: local });
+    world.calls = [];
+    await again.m.boot();
+    await again.m.idle();
+    expect(mutations()).toEqual(["start"]);
+  });
+
   it("a local build never applies a manifest", async () => {
     const local: ServicePins = {
       kind: "local",
@@ -980,5 +1024,142 @@ describe("service update (D12, 4.4)", () => {
     b.m.refresh();
     expect(b.states.length).toBe(n + 1);
     expect(b.m.state()).toMatchObject({ screen: "app", update: { shell: "99.0.0" } });
+  });
+});
+
+describe("review fixes (M4 review)", () => {
+  const readyApp = async (o: Parameters<typeof build>[0] = {}) => {
+    const b = build(o);
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("app");
+    return b;
+  };
+  const exporting = async (b: Built) => {
+    world.exportMode = "slow";
+    expect(await b.m.act({ type: "exportData" })).toEqual({ ok: true });
+    await until(() => existsSync(join(dir, "saved.zip.partial")));
+  };
+
+  it("C3: Restart and Update services refuse with busy while an export runs", async () => {
+    const b = await readyApp();
+    b.m.openServices();
+    await exporting(b);
+    world.calls = [];
+    expect(await b.m.act({ type: "restartServices" })).toEqual({ ok: false, error: "busy" });
+    expect(await b.m.act({ type: "updateServices" })).toEqual({ ok: false, error: "busy" });
+    expect(mutations()).toEqual([]);
+    expect(b.m.state().phase).toBe("exporting");
+  });
+
+  it("C3: Delete all data refuses with busy while an export runs", async () => {
+    const b = await readyApp();
+    b.m.openServices();
+    await exporting(b);
+    await b.m.act({ type: "confirmDelete" });
+    expect(b.m.state().screen).toBe("screen-confirm-delete");
+    world.calls = [];
+    expect(await b.m.act({ type: "deleteData", confirm: "delete" })).toEqual({ ok: false, error: "busy" });
+    expect(mutations()).toEqual([]);
+    expect(b.settings.get().pendingDelete).toBeUndefined();
+  });
+
+  it("C3: Reset credentials refuses with busy while an export from the refusal screen runs", async () => {
+    world.up = { refuse: "kek_missing", exit: 82 };
+    const b = build();
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("screen-refusal-kek_missing");
+    world.up = "healthy";
+    await exporting(b);
+    await b.m.act({ type: "confirmReset" });
+    expect(b.m.state().screen).toBe("screen-confirm-reset");
+    world.calls = [];
+    expect(await b.m.act({ type: "resetCredentials", confirm: "reset" })).toEqual({ ok: false, error: "busy" });
+    expect(mutations()).toEqual([]);
+  });
+
+  it.each<[string, (b: Built) => Promise<unknown>]>([
+    ["setPort", (b) => b.m.act({ type: "setPort", port: 18429 })],
+    ["restartServices", (b) => b.m.act({ type: "restartServices" })],
+    ["updateServices", (b) => b.m.act({ type: "updateServices" })],
+  ])("C4: %s hides the app before it recreates the containers", async (_name, run) => {
+    const b = await readyApp();
+    b.m.openServices();
+    const before = b.views.length;
+    world.up = "slow";
+    await run(b);
+    await until(() => b.m.state().phase === "creating");
+    expect(b.views.slice(before)).toEqual(["close"]);
+    expect(await b.m.act({ type: "closeServices" })).toEqual({ ok: false, error: "not_available" });
+    expect(b.m.state().screen).not.toBe("app");
+  });
+
+  it("C4: reset credentials and delete hide the app first", async () => {
+    const b = await readyApp();
+    b.m.openServices();
+    await b.m.act({ type: "confirmDelete" });
+    const before = b.views.length;
+    await b.m.act({ type: "deleteData", confirm: "delete" });
+    await b.m.idle();
+    expect(b.views.slice(before)[0]).toBe("close");
+    expect(b.m.state().screen).toBe("app");
+  });
+
+  it("C6: a stats failure shows a data problem instead of an unhandled rejection", async () => {
+    world.statsThrows = true;
+    const b = await readyApp();
+    b.m.openServices();
+    await until(() => b.m.state().servicesInfo?.dataProblem !== undefined);
+    expect(b.m.state().servicesInfo?.dataProblem).toMatch(/couldn't be read/);
+  });
+
+  it("C6: a throwing probe while polling Docker keeps polling", async () => {
+    world.dockerDown = true;
+    const b = build();
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state().screen).toBe("screen-docker-stopped");
+    world.probeThrows = 2;
+    world.dockerDown = false;
+    await until(() => b.m.state().screen === "app");
+  });
+
+  it("C7: quit during delete clears its wait timer", async () => {
+    const b = await readyApp({ timings: { deleteWaitMs: 4321 } });
+    b.m.openServices();
+    await b.m.act({ type: "confirmDelete" });
+    const setSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearSpy = vi.spyOn(globalThis, "clearTimeout");
+    try {
+      const quitting = new Promise<unknown>((resolve) => {
+        const off = b.m.on((st) => {
+          if (st.phase !== "deleting") return;
+          off();
+          resolve(b.m.quit());
+        });
+      });
+      await b.m.act({ type: "deleteData", confirm: "delete" });
+      expect(await quitting).toEqual({ kind: "done" });
+      const ids = setSpy.mock.calls.flatMap((c, i) => (c[1] === 4321 ? [setSpy.mock.results[i]?.value] : []));
+      expect(ids).toHaveLength(1);
+      expect(clearSpy.mock.calls.map((c) => c[0])).toContain(ids[0]);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+});
+
+describe("plugin paths the CLI reports (S3)", () => {
+  it("an untrusted plugin path → Docker missing with the reason, before any compose call", async () => {
+    const b = build({ pluginPaths: { path: "/tmp/docker-compose", reason: "/tmp/docker-compose: parent /tmp is other-writable" } });
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state()).toMatchObject({
+      screen: "screen-docker-missing",
+      docker: { rejected: [{ path: "/tmp/docker-compose", reason: "/tmp/docker-compose: parent /tmp is other-writable" }] },
+    });
+    expect(world.calls).toEqual([]);
   });
 });

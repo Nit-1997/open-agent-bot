@@ -22,6 +22,7 @@ const must = <T>(v: T | undefined, what: string): T => {
   return v;
 };
 
+const EXTERNAL_WINDOW_MS = 1000;
 const domClick = (page: Page, id: string) => page.evaluate((i) => document.getElementById(i)?.click(), id);
 
 const clickOut = async (page: Page, id: string, key: string) => {
@@ -42,6 +43,7 @@ test.beforeEach(async () => {
     services: fakeServices(stateDir),
     externalLog: join(stateDir, "external.log"),
     savePath: join(stateDir, "saved.bin"),
+    extra: { OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS: String(EXTERNAL_WINDOW_MS) },
   };
   recorder = await startRecorder(PORT + 1);
   shell = await launchShell(env, info);
@@ -145,9 +147,16 @@ test("navigation lockdown: external links leave, loopback and file stay, reports
   const appPage = await shell.appPage();
   await appPage.click("#fa-external-blank");
   await expect.poll(() => shell.externalLog()).toEqual(["https://example.com/oa-external"]);
-  await new Promise((r) => setTimeout(r, 10_100));
-  await domClick(appPage, "fa-external-same");
-  await expect.poll(() => shell.externalLog()).toEqual(["https://example.com/oa-external", "https://example.com/oa-external"]);
+  await expect
+    .poll(
+      async () => {
+        await domClick(appPage, "fa-external-same");
+        return shell.externalLog().length;
+      },
+      { timeout: 10_000, intervals: [EXTERNAL_WINDOW_MS / 2] },
+    )
+    .toBe(2);
+  expect(shell.externalLog()).toEqual(["https://example.com/oa-external", "https://example.com/oa-external"]);
   expect(appPage.url()).toBe(`${ORIGIN}/`);
 
   const consoleLines: string[] = [];
@@ -179,6 +188,38 @@ test("navigation lockdown: external links leave, loopback and file stay, reports
   await expect(report.locator("#fa-report-heading")).toHaveText("Report AbCdEfGhIjKl");
   expect(report.url()).toBe(`${ORIGIN}/api/artifacts/AbCdEfGhIjKl`);
   expect(await report.evaluate(() => fetch("/api/whoami").then((r) => r.status))).toBe(200);
+});
+
+test("report windows: a same-tab external navigation is denied; window.open has a budget of 3 per window", async () => {
+  const appPage = await shell.appPage();
+  const [report] = await Promise.all([shell.app.waitForEvent("window"), appPage.click("#fa-report")]);
+  await expect(report.locator("#fa-report-heading")).toBeVisible();
+  await domClick(report, "fa-report-external");
+  await expect.poll(() => shell.log()).toContain("[nav] deny report navigate https://example.com");
+  expect(report.url()).toBe(`${ORIGIN}/api/artifacts/AbCdEfGhIjKl`);
+  expect(shell.externalLog()).toEqual([]);
+  const open = (n: number) => report.evaluate((i) => void window.open(`https://example.com/oa-report-${i}`), n);
+  let n = 0;
+  await expect
+    .poll(
+      async () => {
+        await open(n++);
+        return shell.externalLog().length;
+      },
+      { timeout: 20_000, intervals: [EXTERNAL_WINDOW_MS / 2] },
+    )
+    .toBe(3);
+  await expect
+    .poll(
+      async () => {
+        await open(n++);
+        return shell.log().includes("(budget of 3 spent)");
+      },
+      { timeout: 10_000, intervals: [EXTERNAL_WINDOW_MS / 2] },
+    )
+    .toBe(true);
+  expect(shell.externalLog()).toHaveLength(3);
+  expect(shell.externalLog().every((u) => u.startsWith("https://example.com/oa-report-"))).toBe(true);
 });
 
 test("downloads: same-origin saved to the test path, cross-origin cancelled, shell partition cancelled", async () => {
