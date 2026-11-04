@@ -9,6 +9,14 @@ import type { PageResponse } from "@oab/shared/pages";
 import { type RequestAction, SEARCH_MAX, type UserAction } from "@/lib/admin";
 import { getClaimsOrNull } from "@/lib/auth";
 import { parsePage } from "@oab/shared/pages";
+import {
+  type AdminUsageDetail,
+  type AdminUsageRow,
+  type AdminUsageSummary,
+  isUsageFilter,
+  USAGE_PAGE_MAX,
+  USAGE_QUERY_MAX,
+} from "@oab/shared/usage";
 
 const REQUEST_ACTIONS: readonly RequestAction[] = ["approve", "reject", "resend"];
 const USER_ACTIONS: readonly UserAction[] = ["deactivate", "reactivate"];
@@ -52,4 +60,23 @@ export async function deleteUser(id: unknown, confirmEmail: unknown): Promise<Ac
   const userId = normalizeId(id);
   if (!userId || typeof confirmEmail !== "string" || confirmEmail.length > SEARCH_MAX) return invalid("Type the user's email to confirm.");
   return adminCall(`/admin/users/${userId}`, { method: "DELETE", ...jsonBody({ confirmEmail: confirmEmail.trim() }) });
+}
+
+export async function usageSummary(): Promise<ActionResult<AdminUsageSummary>> {
+  return adminCall("/admin/usage/summary");
+}
+
+export async function listUsage(page: unknown, query: unknown, filter: unknown): Promise<ActionResult<PageResponse<AdminUsageRow>>> {
+  const n = parsePage(page);
+  const q = typeof query === "string" ? query.trim() : "";
+  if (n === null || n > USAGE_PAGE_MAX || !isUsageFilter(filter) || q.length > USAGE_QUERY_MAX) return invalid("That search isn't valid.");
+  const params = new URLSearchParams({ page: String(n), filter });
+  if (q) params.set("q", q);
+  return adminCall(`/admin/usage/users?${params}`);
+}
+
+export async function usageDetail(id: unknown): Promise<ActionResult<AdminUsageDetail>> {
+  const userId = normalizeId(id);
+  if (!userId) return invalid("That user isn't valid.");
+  return adminCall(`/admin/usage/users/${userId}`);
 }

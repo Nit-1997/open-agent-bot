@@ -8,7 +8,7 @@ import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { type AgentDeps, type RunningAgent, startAgent } from "@oab/core/startAgent.js";
 import { coreDeps } from "../../../packages/core/test/fixtures/agent.js";
-import { fakeUsageDeps } from "./fixtures/usage.js";
+import { fakeAdminUsageDeps, fakeUsageDeps } from "./fixtures/usage.js";
 import { FakeAccounts } from "./fixtures/hostedApp.js";
 
 const running: RunningAgent[] = [];
@@ -25,6 +25,7 @@ async function start(over: Partial<AgentDeps> = {}) {
 
 function hostedMounts(limiter = new RateLimiter()): RouteMount[] {
   const accounts = new FakeAccounts();
+  const usage = fakeUsageDeps(limiter);
   return hostedRoutes({
     access: createAccessService({
       pepper: Buffer.alloc(32, 9),
@@ -40,7 +41,8 @@ function hostedMounts(limiter = new RateLimiter()): RouteMount[] {
     }),
     adminGuard: createAdminGuard({ isLiveAdmin: async () => true }),
     limiter,
-    usage: fakeUsageDeps(limiter),
+    usage,
+    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users),
   });
 }
 

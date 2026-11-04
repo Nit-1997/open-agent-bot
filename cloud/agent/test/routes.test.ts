@@ -8,12 +8,13 @@ import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { checkMounts } from "@oab/core/startAgent.js";
 import { FakeAccounts, makeHostedApp } from "./fixtures/hostedApp.js";
 import { TEST_SECRET } from "./fixtures/config.js";
-import { fakeUsageDeps } from "./fixtures/usage.js";
+import { fakeAdminUsageDeps, fakeUsageDeps } from "./fixtures/usage.js";
 import { ADMIN, ALICE } from "./fixtures/users.js";
 
 function mounts() {
   const accounts = new FakeAccounts();
   const limiter = new RateLimiter();
+  const usage = fakeUsageDeps(limiter);
   const adminGuard = createAdminGuard({ isLiveAdmin: async () => true });
   const list = hostedRoutes({
     access: createAccessService({
@@ -26,7 +27,8 @@ function mounts() {
     admin: createAdminService({ repo: accounts.repo(), auth: accounts.auth(), hooks: { onDisabled: async () => {}, onEnabled: () => {} } }),
     adminGuard,
     limiter,
-    usage: fakeUsageDeps(limiter),
+    usage,
+    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users),
   });
   return { list, adminGuard };
 }

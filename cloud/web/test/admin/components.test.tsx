@@ -15,6 +15,9 @@ vi.mock("@/app/admin/actions", () => ({
   listUsers: vi.fn(),
   setUserStatus: vi.fn(),
   deleteUser: vi.fn(),
+  usageSummary: vi.fn(),
+  listUsage: vi.fn(),
+  usageDetail: vi.fn(),
 }));
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -241,7 +244,14 @@ describe("UsersList", () => {
 describe("AdminView", () => {
   it("switches between the requests and users tabs with unique ids", () => {
     const { container } = render(
-      <AdminView email="admin@example.test" selfId={uuid(100)} requests={pageOf([request(1)], 1, 1)} users={pageOf([user(0)], 1, 1)} />,
+      <AdminView
+        email="admin@example.test"
+        selfId={uuid(100)}
+        requests={pageOf([request(1)], 1, 1)}
+        users={pageOf([user(0)], 1, 1)}
+        usageSummary={fail(503, "usage_unavailable", "Can't load usage right now.")}
+        usage={pageOf([], 1, 0)}
+      />,
     );
     expect(screen.getByRole("tab", { name: "Requests" })).toHaveAttribute("aria-selected", "true");
     expect(byId("admin-panel-users")).not.toBeVisible();

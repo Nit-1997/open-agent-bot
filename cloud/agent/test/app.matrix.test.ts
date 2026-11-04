@@ -89,6 +89,9 @@ const ROUTES: Probe[] = [
   { route: "/admin/users/:id/deactivate", method: "POST", path: `/admin/users/${BOB.id}/deactivate`, body: {} },
   { route: "/admin/users/:id/reactivate", method: "POST", path: `/admin/users/${BOB.id}/reactivate`, body: {} },
   { route: "/admin/users/:id", method: "DELETE", path: `/admin/users/${BOB.id}`, body: { confirmEmail: BOB.email } },
+  { route: "/admin/usage/summary", method: "GET", path: "/admin/usage/summary" },
+  { route: "/admin/usage/users", method: "GET", path: "/admin/usage/users" },
+  { route: "/admin/usage/users/:id", method: "GET", path: `/admin/usage/users/${ALICE.id}` },
 ];
 
 const EXTRAS: Probe[] = [
