@@ -8,6 +8,7 @@ import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { checkMounts } from "@oab/core/startAgent.js";
 import { FakeAccounts, makeHostedApp } from "./fixtures/hostedApp.js";
 import { TEST_SECRET } from "./fixtures/config.js";
+import { fakeUsageDeps } from "./fixtures/usage.js";
 import { ADMIN, ALICE } from "./fixtures/users.js";
 
 function mounts() {
@@ -25,16 +26,18 @@ function mounts() {
     admin: createAdminService({ repo: accounts.repo(), auth: accounts.auth(), hooks: { onDisabled: async () => {}, onEnabled: () => {} } }),
     adminGuard,
     limiter,
+    usage: fakeUsageDeps(limiter),
   });
   return { list, adminGuard };
 }
 
 describe("hostedRoutes", () => {
-  it("mounts access as public at / and admin as protected at /admin, and passes the mount checks", () => {
+  it("mounts access as public at /, admin and usage as protected, and passes the mount checks", () => {
     const { list } = mounts();
     expect(list.map((m) => [m.stage, m.basePath])).toEqual([
       ["public", "/"],
       ["protected", "/admin"],
+      ["protected", "/usage"],
     ]);
     expect(() => checkMounts(list)).not.toThrow();
   });

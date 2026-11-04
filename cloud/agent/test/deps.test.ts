@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import { adminHooks, hostedAgentDeps } from "../src/deps.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { adminHooks, hostedAgentDeps, startLimitTimers } from "../src/deps.js";
+import { HostedRunPolicy } from "../src/limits/policy.js";
+import { FakeUsageStore } from "./limits/fakeUsage.js";
 import { hostedGateway } from "../src/gateway.js";
 import type { Db } from "../src/store/client.js";
 import type { Identity } from "@oab/core/identity/types.js";
@@ -25,6 +27,7 @@ describe("hostedAgentDeps", () => {
     expect(mounts.map((m) => [m.stage, m.basePath])).toEqual([
       ["public", "/"],
       ["protected", "/admin"],
+      ["protected", "/usage"],
     ]);
   });
 
@@ -43,6 +46,41 @@ describe("hostedAgentDeps", () => {
       apiKey: "k",
       models: [{ id: "m1", label: "Model One" }],
     });
+  });
+});
+
+describe("hostedAgentDeps request limits", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("builds one HostedRunPolicy on the shared limiter for runs and the usage route, over the seamed usage repo", async () => {
+    const usage = new FakeUsageStore().repo({ caps: { perMonth: 50, perHour: 10 } });
+    const { deps, usage: shown } = hostedAgentDeps(testConfig(), clients, { usage });
+    expect(shown).toBe(usage);
+    const core = handles();
+    deps.routes!(core);
+    const policy = deps.runPolicy!({ limiter: core.limiter });
+    expect(policy).toBeInstanceOf(HostedRunPolicy);
+    expect(deps.runPolicy!({ limiter: core.limiter })).toBe(policy);
+  });
+
+  it("sweeps stale slots every 30 s and prunes the usage log every hour, logging a failed prune", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const policy = { sweep: vi.fn() };
+    const usage = { prune: vi.fn(async () => Promise.reject(new Error("down"))) };
+    const stop = startLimitTimers(policy, usage);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(policy.sweep).toHaveBeenCalledTimes(2);
+    expect(usage.prune).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(3_540_000);
+    expect(usage.prune).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls.flat().join(" ")).toContain("[limits] usage prune failed");
+    stop();
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    expect(usage.prune).toHaveBeenCalledTimes(1);
   });
 });
 

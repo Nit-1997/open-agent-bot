@@ -35,7 +35,7 @@ describe("loadHostedConfig", () => {
     expect(cfg.accessRequestPepper).toHaveLength(32);
   });
 
-  it("returns exactly the config the single loader returned before the split", () => {
+  it("returns exactly the config the single loader returned before the split, plus the default request limits", () => {
     expect(loadHostedConfig(TEST_ENV)).toStrictEqual({
       port: 8000,
       llmBaseUrl: "http://llm:4000/v1",
@@ -53,6 +53,7 @@ describe("loadHostedConfig", () => {
       credentialKeys: { current: 1, keys: new Map([[1, Buffer.alloc(32, 7)]]) },
       appOrigin: "https://app.localhost",
       accessRequestPepper: Buffer.alloc(32, 9),
+      limits: { runningPerUser: 1, perHour: 10, perMonth: 50, runningServer: 8 },
       runTimeLimitSeconds: 280,
       rendererUrl: "http://renderer:8100",
       rendererSecret: "b".repeat(64),

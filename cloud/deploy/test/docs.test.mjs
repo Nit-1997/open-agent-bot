@@ -235,13 +235,22 @@ describe("cloud/SECURITY.md", () => {
   const SEC = read("cloud/SECURITY.md");
   const ROOT_SEC = read("SECURITY.md");
   const fixture = read("cloud/deploy/test/fixtures/security-pre-m6.md");
-  it("holds the hosted threat model that left SECURITY.md, verbatim but for the moved test command", () => {
+  it("holds the hosted threat model that left SECURITY.md, verbatim but for the moved test command and the M7 request-limit edits", () => {
     const old = fixture.slice(fixture.indexOf("### Threat model"));
     const want = old
       .replace("`npm run test:supabase -w @oab/core`", "`npm run test:supabase -w @oab/cloud-agent`")
       .replace(" The full design is `docs/superpowers/specs/2026-10-31-supabase-auth-design.md`.", "");
     assert.notEqual(want, old);
-    assert.ok(SEC.includes(want.trimEnd()), "cloud/SECURITY.md differs from the moved section");
+    const limits = SEC.slice(SEC.indexOf("- **Request limits.**"), SEC.indexOf("- **Agent host.**"));
+    assert.match(limits, /^- \*\*Request limits\.\*\* .+\n$/s);
+    const m7 = want
+      .replace("- **Agent host.**", `${limits}- **Agent host.**`)
+      .replace(
+        "(up to 1 hour), and a chat session opened while they were an admin keeps its model connections until it goes idle (up to 30 more minutes).",
+        "(up to 1 hour); the first run after the token's role claim changes rebuilds the chat session without them.",
+      );
+    assert.notEqual(m7, want);
+    assert.ok(SEC.includes(m7.trimEnd()), "cloud/SECURITY.md differs from the moved section plus the M7 edits");
     assert.match(linesOf(SEC)[0], /^# /);
     assert.deepEqual(htmlProblems(SEC), []);
   });
