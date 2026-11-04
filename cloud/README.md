@@ -186,7 +186,7 @@ AGENT_HOST="<public agent host>"
    docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Label "com.docker.compose.service"}}' | sort
    ```
 
-   Then Then retag the images of the built services (agent, renderer, web), so `up --build` can't overwrite them; SearXNG and Caddy are pulled images pinned by digest and need nothing:
+   Then retag the images of the built services (agent, renderer, web), so `up --build` can't overwrite them; SearXNG and Caddy are pulled images pinned by digest and need nothing:
 
    ```bash
    git -C "$OLD" rev-parse HEAD
