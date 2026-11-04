@@ -86,7 +86,7 @@ hosted_free() {
   test ! -e packages/core/dist/hosted || { echo "packages/core/dist/hosted exists" >&2; return 1; }
   test ! -e packages/core/dist/server.js || { echo "packages/core/dist/server.js exists" >&2; return 1; }
   local rc=0
-  grep -rlE '@supabase/|from "jose"' packages/core/src packages/core/dist || rc=$?
+  grep -rlE '@supabase/|["'\'']jose["'\'']' packages/core/src packages/core/dist || rc=$?
   echo "grep for @supabase/ and jose in packages/core: exit $rc (1 = no match = pass)"
   [ "$rc" = 1 ]
 }

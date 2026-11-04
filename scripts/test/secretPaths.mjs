@@ -26,6 +26,14 @@ export const SECRET_PATHS = Object.freeze([
   "cloud/agent/.env",
   "web/.env.local",
   "packages/core/.env",
+  "cloud/supabase/.temp/project-ref",
+  "cloud/supabase/.branches/_current_branch",
+  ".vercel/project.json",
+  "cloud/web/.vercel/project.json",
+  "x.crt",
+  "cloud/deploy/caddy/site.crt",
+  "x.p12",
+  "certs/client.p12",
 ]);
 
 export const NEW_RULES = Object.freeze([

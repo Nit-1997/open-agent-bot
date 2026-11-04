@@ -15,3 +15,14 @@
 /scripts/move/ @Nit-1997
 /.gitignore @Nit-1997
 /.dockerignore @Nit-1997
+/cloud/supabase/ @Nit-1997
+/cloud/agent/src/identity/ @Nit-1997
+/cloud/web/proxy.ts @Nit-1997
+/cloud/web/next.config.ts @Nit-1997
+/scripts/postinstall.mjs @Nit-1997
+/scripts/preview-preflight.sh @Nit-1997
+/patches/ @Nit-1997
+/package.json @Nit-1997
+/package-lock.json @Nit-1997
+/packages/core/Dockerfile @Nit-1997
+/docker-compose.yml @Nit-1997

@@ -223,6 +223,22 @@ describe("standalone.sh steps", () => {
     assert.match(r.out, /^\[standalone hosted-free\] exit 1$/m);
   });
 
+  for (const line of [
+    'const j = await import("jose");',
+    "const j = require('jose');",
+    'import { jwtVerify } from "jose";',
+    'import { createClient } from "@supabase/supabase-js";',
+  ])
+    it(`--hosted-free fails when core dist has ${line}`, () => {
+      const bad = clone(WORK, { "packages/core/src/a.ts": "export const a = 1;\n" });
+      mkdirSync(join(bad, "packages/core/dist"), { recursive: true });
+      writeFileSync(join(bad, "packages/core/dist/a.js"), `${line}\n`);
+      const r = run(bad, { env: ALLOW, args: ["--hosted-free"] });
+      assert.equal(r.status, 1, r.out);
+      assert.match(r.out, /packages\/core\/dist\/a\.js/);
+      assert.match(r.out, /^\[standalone hosted-free\] exit 1$/m);
+    });
+
   it("never runs npm prune or npm install", () => {
     const text = readFileSync(SCRIPT, "utf8");
     assert.doesNotMatch(text, /npm\s+(prune|install|i)\b/);
