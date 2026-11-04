@@ -1,26 +1,40 @@
-# Open Agent Bot
+# Open Agent
 
-Personal, read-only research and planning agent: chat, widgets, and HTML artifacts.
+Open Agent is a research and planning agent that runs on your computer. You chat with it; it searches the web, reads pages and answers with widgets and reports you can save as PDFs. It uses your own model keys, or a local model through Ollama or LM Studio.
+
+**Mac app.** Download `Open-Agent-1.0.0-arm64.dmg` (Apple silicon) or `Open-Agent-1.0.0-x64.dmg` (Intel) from the [latest release](https://github.com/Nit-1997/open-agent-bot/releases/latest), open it and drag "Open Agent" to Applications. It needs Docker Desktop, OrbStack or Colima. The app isn't signed with an Apple Developer ID, so macOS blocks the first open: click "Done", then System Settings → Privacy & Security → "Open Anyway". Every step, with download checks: [docs/INSTALL.md](docs/INSTALL.md).
+
+**No Mac app** (any computer with Docker and Git):
+
+```bash
+git clone --branch v1.0.0 --depth 1 https://github.com/Nit-1997/open-agent-bot
+cd open-agent-bot
+docker compose up -d --build
+```
+
+Then open http://127.0.0.1:3000. Prebuilt images, updates and removal: [section 9 of the install guide](docs/INSTALL.md#9-no-mac-app-any-os-with-docker).
+
+**Security.** Everything stays on your computer: the app listens on 127.0.0.1 only, so other computers can't reach it, and there is no account and no telemetry. Residual risk: other programs that run as you (and, in the browser-only path, other user accounts on this computer) can call the local API and use your chats, reports and saved model keys. The Mac app's launch key keeps other user accounts out. Details: [SECURITY.md](SECURITY.md).
+
+A hosted demo will be linked here later.
+
+## How it works
 
 ```
-web (Next.js + @oab/ui) → @oab/bff (/api) → agent /copilotkit (CopilotKit runtime) → AG-UI run (Node + pi SDK) → model providers you add in the app
-                                        ├─ search (SearXNG)
-                                        ├─ Chromium (guest-mode browsing)
-                                        └─ renderer (sandboxed Chromium: report thumbnails and PDFs, no secrets)
+browser or Mac app → agent on 127.0.0.1:<port> (UI + /api + chat stream; Node + pi SDK) → model providers you add in the app
+                       ├─ search (SearXNG)
+                       ├─ Chromium (guest-mode browsing, inside the agent)
+                       └─ renderer (sandboxed Chromium: report thumbnails and PDFs, no secrets)
 ```
 
-- Design: `docs/superpowers/specs/2026-10-27-open-agent-bot-design.md`
+The Mac app (`apps/desktop`) is a thin shell: it starts this stack in your own Docker and shows the UI from 127.0.0.1. The agent never runs inside the app. Chats, reports and settings live in SQLite on a Docker volume.
+
+- Design: `docs/superpowers/specs/2026-10-27-open-agent-bot-design.md`; the local stack: `docs/superpowers/specs/2026-11-03-m3-local-stack-design.md`; the Mac app: `docs/superpowers/specs/2026-11-03-m4-mac-shell-design.md`
 - What we learned about the stack: `docs/findings.md`
 
 ## Run it on your computer
 
-You need Docker and nothing else: no account, no login and no env files.
-
-```bash
-docker compose up -d --build
-```
-
-Then open http://127.0.0.1:3000 and go through onboarding. The first build takes several minutes. The stack is the project `open-agent`: `agent` (the app on one port: UI, API and chat stream), `search` (SearXNG) and `renderer` (thumbnails and PDFs).
+The Mac app and the browser-only path above run the same stack in Docker: no account, no login and no env files. In the browser-only path the first build takes several minutes; then open http://127.0.0.1:3000 and go through onboarding. The stack is the project `open-agent`: `agent` (the app on one port: UI, API and chat stream), `search` (SearXNG) and `renderer` (thumbnails and PDFs).
 
 - **Models.** Add a cloud provider key in Models, or use a model server on this computer through `host.docker.internal`: Ollama `http://host.docker.internal:11434/v1`, LM Studio `http://host.docker.internal:1234/v1`, llama.cpp `http://host.docker.internal:8080/v1`.
 - **Port.** `OPEN_AGENT_PORT=3100 docker compose up -d` serves http://127.0.0.1:3100 instead (1024–65535). The port is always bound to 127.0.0.1. `GET /health` answers `{"ok":true,"app":"open-agent","version":…,"schema":…}`.
@@ -33,7 +47,7 @@ Then open http://127.0.0.1:3000 and go through onboarding. The first build takes
 - The port is published on 127.0.0.1 only, so other computers can't reach it.
 - Websites open in your browser can't use it. Every request must name `127.0.0.1:<port>` or `localhost:<port>` as its `Host` (which refuses DNS rebinding), writes must come from that origin, and requests a browser marks as cross-site or same-site are refused. No response carries CORS headers.
 - **Any program, and any other user account, on this computer can use the API** by calling the port directly. They get the same access as you: your chats, your reports, and your saved model keys (used, never shown). This is the same trade-off as other local developer tools. The Mac app adds a launch token that keeps out other user accounts and programs that can't use Docker.
-- With `OPEN_AGENT_LAUNCH_TOKEN` set (the Mac app sets it), every `/api` request needs the matching `oa_launch` cookie. Opening http://127.0.0.1:<port> in a plain browser then still loads the pages, but every API call gets 401 `launch_required`, so the UI there stops working. Unset the variable to use a browser.
+- With `OPEN_AGENT_LAUNCH_TOKEN` set (the Mac app sets it), every `/api` request needs the matching `oa_launch` cookie. Opening `http://127.0.0.1:<port>` in a plain browser then still loads the pages, but every API call gets 401 `launch_required`, so the UI there stops working. Unset the variable to use a browser.
 - The `search` and `renderer` containers can reach the agent inside Docker. Both run images this stack pins, and neither runs your or the model's code outside Chromium's sandbox, so they are trusted.
 
 ### Reset saved model keys
@@ -52,7 +66,7 @@ When the agent can't start safely it prints one line, `[startup] refused code=<c
 
 | Code | Exit | What to do |
 | --- | --- | --- |
-| `config` | 78 | A setting is invalid, or a hosted setting (`SUPABASE_*`, `AGENT_SERVICE_SECRET`, `CREDENTIAL_KEYS`) is set. Fix or unset the variable the message names |
+| `config` | 78 | A setting is invalid, or a setting of the hosted deployment is set. Fix or unset the variable the message names |
 | `db_corrupt` | 79 | The database failed its integrity check. Restore `open-agent-data` from a backup |
 | `db_newer` | 80 | A newer Open Agent wrote the database. Run that version or newer |
 | `db_migration` | 81 | An upgrade failed and was rolled back; the message names the backup in `/data/backups`. Report the line as a bug |
@@ -61,68 +75,6 @@ When the agent can't start safely it prints one line, `[startup] refused code=<c
 | `ui_missing` | 84 | The image has no UI build. Rebuild with `docker compose build` |
 | `identity` | 85 | Internal wiring error. Report it as a bug |
 | `listen` | 86 | Only when the entry runs outside compose (`OPEN_AGENT_LISTEN_PORT`, the Mac app): the port is in use or can't be opened. Free it or pick another. Under compose a busy host port fails earlier, when Docker publishes the port (`docker compose up` reports `port is already allocated` or `address already in use`), and the agent never starts; pick another `OPEN_AGENT_PORT` |
-
-## Run the hosted stack
-
-> **Warning.** The root `docker-compose.yml` is the local stack (project `open-agent`). Every hosted command needs `-f compose.hosted.yml`: bare `docker compose ps`, `logs`, `down`, `restart` and `up` target the local project, not the hosted one. `compose.hosted.yml` pins the project name `open-agent-bot`, so the existing containers and volumes are reused.
-
-Open Agent is invite-only. Accounts, sessions and every user's data live in one Supabase project; the agent and the web app keep nothing on disk.
-
-1. Install Docker, Node 22 and `jq` (the preview preflight uses it).
-2. Fill in the env files (git-ignored; templates with names only are in `deploy-config/env.examples/`):
-   - `deploy-config/.env-agent`: Supabase URL and keys, `AGENT_SERVICE_SECRET` (`openssl rand -hex 32`), `CREDENTIAL_KEYS` (`v1:` + `openssl rand -base64 32`), `ACCESS_REQUEST_PEPPER` (`openssl rand -base64 32`), `APP_ORIGIN=https://app.localhost`.
-   - `deploy-config/.env-renderer`: only `RENDERER_SECRET` (`openssl rand -hex 32`); put the same value in `.env-agent`.
-   - `deploy-config/.env-nextjs`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, and the same `AGENT_SERVICE_SECRET`.
-   - `deploy-config/env-files/.env-supabase-admin` (owner's machine only): the Management API token, the `admin_scripts` secret key, Google OAuth client, Resend key.
-3. Set up Supabase once: apply `supabase/migrations/` in order, then `set -a; . deploy-config/env-files/.env-supabase-admin; set +a; node supabase/scripts/configure-auth.mjs --apply` and `node supabase/scripts/bootstrap-admin.mjs <your email>`.
-4. `docker compose -f compose.hosted.yml --env-file deploy-config/.env-nextjs --profile local up -d --build` (the env file feeds the web image's `NEXT_PUBLIC_*` build args).
-5. Trust Caddy's local CA once: `docker compose -f compose.hosted.yml cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt && sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt`.
-6. Open https://app.localhost and sign in with Google using the bootstrapped email. The agent is at https://agent.localhost (it needs the service secret and a user token).
-
-Visitors ask for access at `/request-access`; the admin approves them at `/admin`, which sends the invite email. Users add their own model keys in the app; keys are encrypted by the agent and never sent back to the browser.
-
-To run a preview beside a running stack, work in a second checkout or worktree, never the one that runs the stack. In that checkout, first create a git-ignored root `.env` containing `COMPOSE_PROJECT_NAME=oab-<name>` (`printf 'COMPOSE_PROJECT_NAME=oab-guard\n' > .env`), so unqualified compose commands there never reach the live project; `docker compose config --format json | jq -r .name` must print that name. Then use another project name and the preview override: `. scripts/preview-preflight.sh`, `P="docker compose -p oab-preview --env-file .env --env-file deploy-config/.env-nextjs -f compose.hosted.yml -f deploy-config/compose.preview.yml --profile local"`, `preflight $P && $P up -d --build search renderer agent web` (agent on 127.0.0.1:18800, web on http://localhost:18300). `preflight` returns 1 unless the project name starts with `oab-`, every published port is on 127.0.0.1 and at 18000 or above, and any `PREVIEW_AGENT_PORT` / `PREVIEW_WEB_PORT` is in 18000–19999; scripts call it as `preflight … || exit 1`. For a second local stack, use `-p oab-<name>` with `OPEN_AGENT_PORT` in 18000–19999 and `OPEN_AGENT_DATA_VOLUME` / `OPEN_AGENT_KEYS_VOLUME` starting with `oab-`; `preflight` refuses any volume name that doesn't start with `oab-`.
-
-Ports bound to 127.0.0.1: Caddy 80/443 and the agent's 8000 for debugging (LiteLLM 4000 and Ollama 11434 when turned on). SearXNG is reachable only from the agent.
-
-The agent refuses to start if a provider key such as `OPENAI_API_KEY` is set in its environment, because it would serve every user. The operator LiteLLM gateway (`LLM_API_KEY`) and private-network model servers are available to the admin only.
-
-### Deploy
-
-The web app runs on Vercel (Root Directory `web`, "Include files outside the root directory" on, Production env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, `AGENT_URL=https://<AGENT_HOST>`, `AGENT_SERVICE_SECRET`; nothing for Preview). The agent, SearXNG and Caddy run on EC2: create `deploy-config/.env-agent` (same `CREDENTIAL_KEYS` and pepper as local, `APP_ORIGIN=https://<APP_HOST>`, a new `RENDERER_SECRET`), `deploy-config/.env-renderer` (that `RENDERER_SECRET` only) and `deploy-config/.env-caddy` (`AGENT_HOST`, `ACME_EMAIL`), then `CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose -f compose.hosted.yml up -d --build`. Require IMDSv2 with hop limit 1, open 80/443 only, and set `PROD_ORIGIN`/`SITE_URL` in `.env-supabase-admin` before rerunning `configure-auth.mjs --apply`. The renderer runs Chromium with its sandbox, which needs unprivileged user namespaces: Amazon Linux 2023 allows them; on Ubuntu 23.10 or later, check `sysctl kernel.apparmor_restrict_unprivileged_userns` is `0` (or give Docker an AppArmor profile that allows `userns`). If the sandbox can't start, the renderer exits and stays unhealthy, and cards show the plain fallback until it's fixed; the agent keeps working. Runs end at `RUN_TIME_LIMIT_SECONDS` (default 280) to stay inside Vercel's `maxDuration = 300`. The full checklist is in the design spec's "Rollout and deploy".
-
-### Optional: Ollama in Docker
-
-`docker compose -f compose.hosted.yml --profile ollama up -d` runs Ollama on port 11434. As the admin, add it in the app: Models → Ollama → Connect (`http://host.docker.internal:11434/v1`).
-
-### Optional: LiteLLM gateway
-
-The gateway is an opt-in profile and is offered to the admin only. Create `deploy-config/.env-llm` with `LITELLM_MASTER_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_OPENAI_BASE_URL` and `OLLAMA_CHAT_MODEL` for the models in `deploy-config/litellm/config.yaml`, and set `LLM_API_KEY` in `deploy-config/.env-agent` to the same master key. Then add the `litellm` profile to the compose command.
-
-### Settings reference
-
-Agent settings live in `deploy-config/.env-agent` (git-ignored).
-
-| Variable | Default | What it does |
-| --- | --- | --- |
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | required | The Supabase project; the secret key is the agent's own `sb_secret_…` key |
-| `AGENT_SERVICE_SECRET` | required | 64 hex chars shared with the web app |
-| `CREDENTIAL_KEYS` | required | Master keys for stored provider keys, `v2:<base64>,v1:<base64>`, first is current. Rotate with `docker compose -f compose.hosted.yml exec agent node dist/scripts/rotateCredentials.js` |
-| `ACCESS_REQUEST_PEPPER` | required | Base64 of 32 bytes; hashes visitor IPs |
-| `APP_ORIGIN` | required | The web app's origin, used for email links |
-| `RUN_TIME_LIMIT_SECONDS` | `280` | A run ends cleanly after this long |
-| `RENDERER_SECRET` | required | 64 hex chars shared with the renderer (`deploy-config/.env-renderer`); must differ from `AGENT_SERVICE_SECRET` |
-| `RENDERER_URL` | `http://renderer:8100` | Where the renderer is |
-| `LLM_API_KEY` | unset | Turns on the LiteLLM gateway provider for the admin (with the `litellm` profile) |
-| `LLM_BASE_URL` | `http://llm:4000/v1` | Where the gateway is |
-| `AGENT_MODELS` | all gateway models | Gateway models to offer: `id=Label=note\|id2=Label` |
-| `AGENT_MODEL_CAPS` | Sonnet models get `codemode` | Per-model capabilities: `provider/model=codemode\|other=none` |
-| `JEV_MODEL` | `typesafe/jev-latest`, then `openrouter/typesafe/jev-1.14` | Pin the Jev classifier to one provider/model |
-| `JEV_CONCURRENCY` | `64` | Jev requests in flight across all chats |
-| `COPILOTKIT_TELEMETRY_DISABLED` | required, `true` | The agent refuses to start without it, so CopilotKit never sends telemetry. The agent image sets it; set it for a host-run agent, scripts and evals |
-| `COPILOT_CONNECTS_PER_USER` | `8` | Open `/copilotkit` connect streams per user (1–100); over the cap answers 429 `too_many_connections` |
-| `COPILOT_CONNECT_MAX_MS` | `1800000` (30 min) | Longest a connect stream stays open (60000–86400000 ms) |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs prompts, tool arguments and the profile |
 
 ## Search and pictures
 
@@ -135,69 +87,25 @@ Agent settings live in `deploy-config/.env-agent` (git-ignored).
 
 - **Follow-ups**: the model ends its answer with `<followups>a | b</followups>`; the agent turns that line into the buttons under the reply.
 - **Skills** live in `packages/core/skills/<name>/SKILL.md` (frontmatter `name`, `description`, then a playbook). The core prompt lists them and the agent loads one with `load_skill`. A new use case is a new folder; no code change.
-- **Jev** (TypeSafe's calibrated classifier) judges product matches in `shop`, hotel brand/area/vibe wishes in `stays`, music cover art, which search hits to read, and research claims. It uses whichever key you added in the app: TypeSafe first, then OpenRouter (`JEV_MODEL` pins one). If Jev is unreachable, every feature falls back to its non-Jev behavior.
-- **Codemode**: Claude Sonnet models (from any provider), or models tagged `codemode` in `AGENT_MODEL_CAPS`, can write one script that runs many lookups and does the maths in code. A failed script turns codemode off for the rest of that chat.
-- **Workspace and chats**: Chats and their messages are saved in Supabase, and a chat continues after an agent restart. Carts, trips, events and shortlists are working state for the conversation: they live in the agent's session only. Cards from earlier sessions stay in the chat, read-only and dated; ask again for fresh prices. The app shell has a sidebar of chats (Today, This week, Earlier), and its own views for **Reports** (every report, with PDF download) and **Search** (chat titles, message text and report titles). Every view has a URL. A report shows in the chat as a card with a thumbnail and opens in a resizable panel beside the chat (an overlay on tablets, a full-screen viewer on phones), with previous/next, PDF and a new-tab link; the open report is in the URL, and the agent knows which report is open, so "what's the cheapest option in this report?" just works.
+- **Jev** (TypeSafe's calibrated classifier) judges product matches in `shop`, hotel brand/area/vibe wishes in `stays`, music cover art, which search hits to read, and research claims. It uses whichever key you added in the app: TypeSafe first, then OpenRouter. If Jev is unreachable, every feature falls back to its non-Jev behavior.
+- **Codemode**: Claude Sonnet models (from any provider) can write one script that runs many lookups and does the maths in code. A failed script turns codemode off for the rest of that chat.
+- **Workspace and chats**: Chats and their messages are saved in the local database, and a chat continues after a restart. Carts, trips, events and shortlists are working state for the conversation: they live in the agent's session only. Cards from earlier sessions stay in the chat, read-only and dated; ask again for fresh prices. The app shell has a sidebar of chats (Today, This week, Earlier), and its own views for **Reports** (every report, with PDF download) and **Search** (chat titles, message text and report titles). Every view has a URL. A report shows in the chat as a card with a thumbnail and opens in a resizable panel beside the chat (an overlay on tablets, a full-screen viewer on phones), with previous/next, PDF and a new-tab link; the open report is in the URL, and the agent knows which report is open, so "what's the cheapest option in this report?" just works.
 - **Your agent**: users name their agent, pick its look and how it talks (brief, warm or thorough) in the first onboarding step or the profile drawer. The name and tone go into the system prompt as a quoted name under the hard rules.
 
 Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`, `docs/findings.md`.
 
-## End-to-end demo
-
-`e2e/` drives a preview stack with Playwright on desktop, tablet and phone sizes. It creates `oab-e2e+shell@example.test` and `oab-e2e+other@example.test`, seeds chats, reports and saved cards, and removes them afterwards with `supabase/scripts/cleanup-e2e.mjs`. It reads `deploy-config/env-files/.env-supabase-admin` and needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e` (saved through the app's API, never typed or logged; the run uses DeepSeek V4 Flash).
-
-Every Playwright project (`desktop`, `tablet`, `phone`, `smoke`, `preview-m1`, `preview-m2`) needs `APP_ORIGIN` set on the command, and refuses anything but `http://localhost` or `http://127.0.0.1` on a port in 18000–19999. `APP_ORIGIN` and the opt-in below are never read from the env files. To target any other origin on purpose, also set `E2E_ALLOW_LIVE=1` on the command.
-
-```bash
-npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w e2e
-```
-
-`make-demo.mjs` needs `ffmpeg` and joins the recordings into `~/Downloads/app-shell-demo.mp4`.
-
-The `smoke` project (`e2e/preview-smoke.spec.ts`) runs on its own against a fresh preview: `APP_ORIGIN=http://localhost:18300 npm run smoke -w e2e` signs in, completes onboarding, and checks that a reply streams and that Stop ends a run. `APP_ORIGIN=http://localhost:18300 npm run m1 -w e2e` runs the M1 preview checks.
-
-### Local stack
-
-`e2e/playwright.local.config.ts` drives the local stack (no Supabase, no sign-in) on a desktop viewport with video on. It has two projects:
-
-- `local`: the stub-model subset in `e2e/local/` (every spec but `demo.spec.ts`): onboarding, streaming and Stop, a report with its PDF, search and the shell.
-- `local-demo`: `e2e/local/demo.spec.ts`, the recorded demo on a real model, including the check that pages on other origins can't use the API.
-
-`APP_ORIGIN` must be set on the command to the local stack, and must be `http://127.0.0.1` or `http://localhost` on a port in 18000–19999 (this config has no `E2E_ALLOW_LIVE` opt-in). Run a separate stack on a test port with its own project and `oab-` volumes, so the run starts from an empty database and never touches your own:
-
-```bash
-OPEN_AGENT_PORT=18330 OPEN_AGENT_DATA_VOLUME=oab-e2e-data OPEN_AGENT_KEYS_VOLUME=oab-e2e-keys docker compose -p oab-e2e up -d --build --wait
-npx tsx e2e/support/stubModel.ts &
-APP_ORIGIN=http://127.0.0.1:18330 npm run local -w e2e
-```
-
-- **Stub model.** `e2e/support/stubModel.ts` is an OpenAI-compatible server that streams scripted replies and creates a report on request, so `local` needs no key and costs nothing. It listens on `STUB_PORT` (default 18341, 18000–19999 only) and binds `127.0.0.1` unless `STUB_BIND` says otherwise; set `STUB_BIND=0.0.0.0` where the agent container can't reach the host's loopback (Linux). The specs connect it in onboarding as a custom provider at `http://$STUB_HOST:$STUB_PORT/v1` (`STUB_HOST` defaults to `host.docker.internal`).
-- **After a restart.** `npm run local -w e2e` skips the tests tagged `@after-restart`. Run `docker compose -p oab-e2e down` and the same `up` command (the volumes are kept), then `APP_ORIGIN=http://127.0.0.1:18330 npm run local:after-restart -w e2e` checks that the chat, the report and the provider survived and that a new reply streams.
-- **Demo.** `APP_ORIGIN=http://127.0.0.1:18330 npm run local:demo -w e2e -- --grep-invert @after-restart` runs the demo on a fresh stack; after a down and up, `-- --grep @after-restart` runs its second part. It needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e`, which it saves through the API before the UI opens (never typed or logged). `DEMO_SLOWMO=<ms>` slows it down for recording.
-
-Remove the test stack and its volumes afterwards with `docker compose -p oab-e2e down -v`.
-
-## Evals
-
-- `cd packages/core && npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5` runs the scenarios in `packages/core/evals/scenarios/` against the running agent and writes `packages/core/evals/results/<date>-<label>-<model>/report.md`, diffed against `packages/core/evals/baseline/<model>.json`. Live runs cost money; `--only a,b` and `--runs N` keep them small. Evals sign in as `EVAL_USER_EMAIL` (default `oab-eval@example.test`, created once with `bootstrap-admin.mjs oab-eval@example.test --user` and given a provider key in the app), reading `deploy-config/.env-agent` and `.env-supabase-admin`.
-- `npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` runs the same scenarios against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. `--target hosted` (the default) keeps the signed-in path above.
-- `npm run eval:rank` scores shop ranking on the ESCI grocery slice (Exact@1, NDCG@3); add `-- --judge` with an OpenRouter key to score the Jev re-rank.
-- `npx tsx evals/run.ts --rescore <results dir>` re-grades saved runs after assertions change.
-
 ## Develop
 
-- Install once from the repo root with `npm ci` (one workspace, one `package-lock.json`); `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` checks every package.
-- Agent: `npm run lint -w @oab/core && npm run format:check -w @oab/core && npm run typecheck -w @oab/core && npm test -w @oab/core && npm run build -w @oab/core` (live pi test: `LLM_BASE_URL=http://localhost:4000/v1 LLM_API_KEY=sk-local-dev npm test -w @oab/core`; Supabase integration tests against the real project: `npm run test:supabase -w @oab/core`)
-- Web: `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web`
-- Shared UI and API handler: the same five commands with `-w @oab/ui` (no build; consumed as source) and `-w @oab/bff`.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the code layout, how to add a tool, and conventions. Report security issues as described in [SECURITY.md](SECURITY.md).
+- [CONTRIBUTING.md](CONTRIBUTING.md): setup, checks, the code layout, the Mac app, tests and evals on the local stack, and how to add a tool.
+- [docs/RELEASING.md](docs/RELEASING.md): how a release is made (owner only).
+- [docs/hosted.md](docs/hosted.md): the invite-only hosted deployment (Supabase, Vercel, EC2), its end-to-end checks and evals.
+- Report security issues as described in [SECURITY.md](SECURITY.md).
 
 ## Safety rails
 
 - The browser tool works as a guest. Code refuses checkout, cart, payment, login, sign-up and booking steps and hands back the link.
 - Artifacts are served with `Content-Security-Policy: sandbox allow-scripts` and shown in a sandboxed iframe.
-- Thumbnails and PDFs are made by the `renderer` service: a non-root, read-only container with Chromium's sandbox on (Playwright's seccomp profile, `cap_drop: ALL` plus `SYS_CHROOT` for the sandbox), no secrets but `RENDERER_SECRET`, and only the agent can reach it (an internal `render` network); it isn't behind Caddy. Its Chromium resolves only `fonts.googleapis.com` and `fonts.gstatic.com`, aborts every other request, and the report's resource hints, speculation rules and `meta refresh` are stripped first.
+- Thumbnails and PDFs are made by the `renderer` service: a non-root, read-only container with Chromium's sandbox on (Playwright's seccomp profile, `cap_drop: ALL` plus `SYS_CHROOT` for the sandbox), no secrets but `RENDERER_SECRET`, and only the agent can reach it (an internal `render` network). Its Chromium resolves only `fonts.googleapis.com` and `fonts.gstatic.com`, aborts every other request, and the report's resource hints, speculation rules and `meta refresh` are stripped first.
 
 ## License
 

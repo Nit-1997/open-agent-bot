@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const MANIFEST_FILE = join(REPO, "scripts/docs/doc-commands.json");
-export const COVERED_FILES = Object.freeze(["docs/INSTALL.md"]);
+export const COVERED_FILES = Object.freeze(["README.md", "docs/INSTALL.md"]);
 export const MODES = Object.freeze(["run", "env", "subst", "owner"]);
 export const CWDS = Object.freeze(["downloads"]);
 const SHELL_INFO = new Set(["bash", "sh", "zsh"]);
@@ -474,12 +474,14 @@ export function imageTagProblems(text) {
   );
 }
 
-export function attestationProblems(text, version) {
-  const need = [`--signer-workflow ${SIGNER}`, `--source-ref refs/tags/v${version}`, "--deny-self-hosted-runners"];
+export function attestationProblems(text, version, { tagVariable } = {}) {
+  const ref = `--source-ref refs/tags/v${version}`;
+  const refs = tagVariable ? [ref, `--source-ref "refs/tags/${tagVariable}"`] : [ref];
+  const need = [[`--signer-workflow ${SIGNER}`], refs, ["--deny-self-hosted-runners"]];
   const out = [];
   text.split("\n").forEach((line, i) => {
     if (!/gh attestation verify\s+\S/.test(line)) return;
-    const missing = need.filter((n) => !line.includes(n));
+    const missing = need.filter((alts) => !alts.some((n) => line.includes(n))).map((alts) => alts[0]);
     if (missing.length) out.push(`line ${i + 1}: gh attestation verify lacks ${missing.join(", ")}`);
   });
   return out;

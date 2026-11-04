@@ -6,7 +6,7 @@ export const LINKS: Readonly<Record<LinkId, string>> = {
   "get-docker-desktop": "https://www.docker.com/products/docker-desktop/",
   "get-orbstack": "https://orbstack.dev/",
   "get-colima": "https://github.com/abiosoft/colima",
-  "install-guide": "https://github.com/Nit-1997/open-agent-bot#install",
+  "install-guide": "https://github.com/Nit-1997/open-agent-bot/blob/main/docs/INSTALL.md",
   github: "https://github.com/Nit-1997/open-agent-bot",
   "release-page": "https://github.com/Nit-1997/open-agent-bot/releases/",
   "startup-errors": "https://github.com/Nit-1997/open-agent-bot#startup-errors",

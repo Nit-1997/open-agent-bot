@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { createExternalOpener, LINKS, validateExternalUrl } from "../src/main/externalLinks.ts";
 import { LINK_IDS } from "../src/shared/actions.ts";
@@ -54,6 +57,13 @@ describe("LINKS", () => {
   it("maps every LinkId to a fixed https URL that passes the guard", () => {
     expect(Object.keys(LINKS).sort()).toEqual([...LINK_IDS].sort());
     for (const url of Object.values(LINKS)) expect(validateExternalUrl(url)).toEqual({ ok: true, url });
+  });
+  it("opens the install guide on main and the README's startup errors table, both of which exist", () => {
+    const repo = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+    expect(LINKS["install-guide"]).toBe("https://github.com/Nit-1997/open-agent-bot/blob/main/docs/INSTALL.md");
+    expect(existsSync(join(repo, "docs/INSTALL.md"))).toBe(true);
+    expect(LINKS["startup-errors"]).toBe("https://github.com/Nit-1997/open-agent-bot#startup-errors");
+    expect(readFileSync(join(repo, "README.md"), "utf8")).toMatch(/^#{2,3} Startup errors$/m);
   });
 });
 

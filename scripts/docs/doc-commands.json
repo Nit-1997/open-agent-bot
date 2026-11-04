@@ -1,6 +1,31 @@
 {
   "commands": [
     {
+      "file": "README.md",
+      "command": "git clone --branch v1.0.0 --depth 1 https://github.com/Nit-1997/open-agent-bot",
+      "mode": "subst",
+      "subst": [
+        "clone-url",
+        "clone-branch"
+      ]
+    },
+    {
+      "file": "README.md",
+      "command": "cd open-agent-bot",
+      "mode": "run"
+    },
+    {
+      "file": "README.md",
+      "command": "docker compose up -d --build",
+      "mode": "env"
+    },
+    {
+      "file": "README.md",
+      "command": "OPEN_AGENT_RESET_CREDENTIALS=1 docker compose up -d",
+      "mode": "owner",
+      "reason": "a recovery step for an install whose key file is missing; the scratch stack has its key file, and the runner never runs variable assignments"
+    },
+    {
       "file": "docs/INSTALL.md",
       "command": "brew install colima docker docker-compose",
       "mode": "owner",

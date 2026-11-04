@@ -10,12 +10,12 @@ You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model
 npm ci && npx playwright install chromium
 ```
 
-To run the whole stack, follow **Run** in the [README](README.md). To work on one side, run the other in Docker and point at it:
+To run the local stack, follow the [README](README.md); the hosted stack (Supabase, web app, Caddy) is in [docs/hosted.md](docs/hosted.md). To work on one side of the hosted stack, run the other in Docker and point at it:
 
-- Agent: `cd packages/core && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared` and then the agent into `packages/core/dist/`; settings in the README's reference table). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
+- Agent: `cd packages/core && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared` and then the agent into `packages/core/dist/`; settings in the reference table in docs/hosted.md). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
 - Web: `cd web && set -a && . ../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
-Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see **Run** in the README). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
+Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" in docs/hosted.md). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
 
 ## Checks
 
@@ -44,6 +44,46 @@ docker run --rm --user pwuser -v "$PWD":/src:ro -e ELECTRON_SKIP_BINARY_DOWNLOAD
 ```
 
 It copies the source without `node_modules` and runs `npm ci` inside the container, because the host's macOS `node_modules` don't run on Linux. It runs as `pwuser`, not root, because root can read the mode-0000 key files the tests expect to be refused.
+
+## Releases
+
+The owner makes releases from a `v*` tag with `.github/workflows/release.yml`; every step, the GitHub settings and the rollback are in [docs/RELEASING.md](docs/RELEASING.md).
+
+- Release logic lives in `scripts/release/`, one script per step, and is tested by `scripts/test/release.test.mjs`, `scripts/test/releaseWorkflow.test.mjs` and `scripts/test/workflowPins.test.mjs`. The workflow only calls those scripts (plus `gh` and `docker`); don't add release logic inline in a `run:` step. `npm run lint:workflows` runs actionlint from a pinned image over every workflow.
+- `.github/CODEOWNERS` names the owner for the workflows, `scripts/release/` and `apps/desktop/release-policy.json` (the `minShellVersion` every release manifest carries).
+- **Dry run.** It runs every workflow step that doesn't need GitHub on this Mac: builds and pushes both images for both platforms to a local registry, writes the release lock and manifest, builds and checks both DMGs, and writes `SHA256SUMS`, the notes and the draft release. It needs test mode, a `0.0.0-dryrun.<n>` version, a registry on `127.0.0.1:18xxx` and an `oab-` builder:
+
+```bash
+docker run -d --name oab-factory-m5-registry -p 127.0.0.1:18501:5000 registry:2
+printf '[registry."127.0.0.1:18501"]\n  http = true\n  insecure = true\n' > /tmp/oab-buildkitd.toml
+docker buildx create --name oab-factory-m5-builder --driver docker-container --driver-opt network=host --buildkitd-config /tmp/oab-buildkitd.toml
+OPEN_AGENT_SHELL_TEST=1 npm run release:dry-run -- --version 0.0.0-dryrun.1 --registry 127.0.0.1:18501 --builder oab-factory-m5-builder --out .factory/m5/release-dry-run/0.0.0-dryrun.1
+```
+
+The output folder holds `lock/`, `dmgs/`, `release/` (the four release assets, `draft-release.json` and `notes.md`) and `mock-release/`. `--services-only` skips the DMGs, and `--platforms linux/arm64` builds one platform while you iterate (the lock step then refuses the index, as a release would). The amd64 agent image builds under emulation on an Apple silicon Mac and takes a while. Afterwards: `docker rm -f -v oab-factory-m5-registry && docker buildx rm oab-factory-m5-builder`.
+
+## End-to-end tests and evals on the local stack
+
+`e2e/playwright.local.config.ts` drives the local stack (no Supabase, no sign-in) on a desktop viewport with video on. It has two projects:
+
+- `local`: the stub-model subset in `e2e/local/` (every spec but `demo.spec.ts`): onboarding, streaming and Stop, a report with its PDF, search and the shell.
+- `local-demo`: `e2e/local/demo.spec.ts`, the recorded demo on a real model, including the check that pages on other origins can't use the API.
+
+`APP_ORIGIN` must be set on the command to the local stack, and must be `http://127.0.0.1` or `http://localhost` on a port in 18000–19999 (this config has no `E2E_ALLOW_LIVE` opt-in). Run a separate stack on a test port with its own project and `oab-` volumes, so the run starts from an empty database and never touches your own:
+
+```bash
+OPEN_AGENT_PORT=18330 OPEN_AGENT_DATA_VOLUME=oab-e2e-data OPEN_AGENT_KEYS_VOLUME=oab-e2e-keys docker compose -p oab-e2e up -d --build --wait
+npx tsx e2e/support/stubModel.ts &
+APP_ORIGIN=http://127.0.0.1:18330 npm run local -w e2e
+```
+
+- **Stub model.** `e2e/support/stubModel.ts` is an OpenAI-compatible server that streams scripted replies and creates a report on request, so `local` needs no key and costs nothing. It listens on `STUB_PORT` (default 18341, 18000–19999 only) and binds `127.0.0.1` unless `STUB_BIND` says otherwise; set `STUB_BIND=0.0.0.0` where the agent container can't reach the host's loopback (Linux). The specs connect it in onboarding as a custom provider at `http://$STUB_HOST:$STUB_PORT/v1` (`STUB_HOST` defaults to `host.docker.internal`).
+- **After a restart.** `npm run local -w e2e` skips the tests tagged `@after-restart`. Run `docker compose -p oab-e2e down` and the same `up` command (the volumes are kept), then `APP_ORIGIN=http://127.0.0.1:18330 npm run local:after-restart -w e2e` checks that the chat, the report and the provider survived and that a new reply streams.
+- **Demo.** `APP_ORIGIN=http://127.0.0.1:18330 npm run local:demo -w e2e -- --grep-invert @after-restart` runs the demo on a fresh stack; after a down and up, `-- --grep @after-restart` runs its second part. It needs `E2E_OPENROUTER_KEY` in `deploy-config/env-files/.env-e2e`, which it saves through the API before the UI opens (never typed or logged). `DEMO_SLOWMO=<ms>` slows it down for recording.
+
+Remove the test stack and its volumes afterwards with `docker compose -p oab-e2e down -v`.
+
+`npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` (from `packages/core`, with `COPILOTKIT_TELEMETRY_DISABLED=true`) runs the scenarios in `packages/core/evals/scenarios/` against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. Live runs cost money; `--only a,b` and `--runs N` keep them small. `--target hosted` (the default) is the signed-in path in docs/hosted.md "Evals".
 
 ## Mac app
 
@@ -88,7 +128,7 @@ cd .. && DESKTOP_REAL_DOCKER=1 DESKTOP_REAL_AGENT_IMAGE=oab-dev-agent:dev DESKTO
 
 The compose contract test needs both image variables and fails without them. The same packaged smoke runs against real Docker with `--docker /usr/local/bin/docker --services /tmp/oab-dev-services.json` (project `oab-smoke-<arch>`, port 18486). Afterwards remove the dev images with `docker image rm oab-dev-agent:dev oab-dev-search:dev`. On Linux CI the engine socket belongs to root, so the `desktop-real` job also sets `OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET=1`, `DESKTOP_REAL_DOCKER_CLI=/usr/bin/docker`, `DESKTOP_REAL_ENGINE=Docker` and `STUB_BIND=0.0.0.0` (the agent container reaches the stub through `host.docker.internal`).
 
-**Local build (Gate 4: dogfood the DMG before any GHCR publish).** `npm run dist:local -w @oab/desktop` builds `open-agent:local` and `open-agent-search:local` from your checkout with plain `docker build` (no compose project is created), writes a `kind:"local"` lock with their image Ids, and packages a DMG for your Mac's arch. The app shows "Local build (local-<sha>)" and "Open Agent — Local build" in its title, and refuses to start (`local_images_changed`) if either image is later rebuilt or removed; run `dist:local` again then. "Update services" is not available for local builds.
+**Local build (Gate 4: dogfood the DMG before any GHCR publish).** `npm run dist:local -w @oab/desktop` builds `open-agent:local` and `open-agent-search:local` from your checkout with plain `docker build` (no compose project is created), writes a `kind:"local"` lock with their image Ids, and packages a DMG for your Mac's arch. The app shows "Local build (`local-<sha>`)" and "Open Agent — Local build" in its title, and refuses to start (`local_images_changed`) if either image is later rebuilt or removed; run `dist:local` again then. "Update services" is not available for local builds.
 
 1. `git clone https://github.com/Nit-1997/open-agent-bot && cd open-agent-bot && git checkout <merged M4 commit>`
 2. `npm ci`
@@ -234,7 +274,14 @@ web/
                        exactly app/, components/, lib/ and packages/ui/src (never tests or fixtures)
   components/          cloud-only UI: admin, landing, auth, session (the hosted platform slots)
   lib/                 hosted platform (platform/hosted.tsx), Supabase auth, route rules, CSP, env
-e2e/                   Playwright demo and preview checks against a preview stack (see README "End-to-end demo")
+e2e/                   Playwright checks: the local stack (see "End-to-end tests and evals on the local stack"), the Mac
+                       app (playwright.desktop.config.ts) and the hosted preview (docs/hosted.md "End-to-end demo")
+scripts/release/       one script per release step (gate, image checks, index and lock checks, notes, sums, dry run);
+                       release.yml and the dry run call only these, and scripts/test/ tests each one
+scripts/docs/          the docs-commands extractor, its manifest (doc-commands.json), the scratch-clone runner and
+                       fill-digests.mjs (the release digests in INSTALL section 9)
+scripts/demo/          the milestone demo parts the verifier records (part-<n>.sh)
+scripts/test/          node --test suites for the root scripts, the workflows, the base pins and the docs
 ```
 
 ### Hosted boundary
@@ -294,6 +341,8 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 - Context for an agent run goes through `useThreadContext` (scoped to one chat's agent). `useAgentContext` is blocked by lint because it reaches every mounted chat.
 - Keys are added in the app and stored encrypted by the agent. Settings live in `deploy-config/.env-*` and `deploy-config/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `deploy-config/env.examples/`.
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
+- **Base pins.** The Playwright base image (the `v<x>-noble` tag with its `@sha256:` digest, as in the Node 24 command above) is the same everywhere it appears (the agent Dockerfile, the workflows, this file, the README, `docs/` and `scripts/`), and `<x>` equals the `playwright` pin in `packages/core/package.json` and `@playwright/test` in `e2e/package.json`; the SearXNG base is pinned by digest, and no workflow image runs without a digest. `scripts/test/basePins.test.mjs` enforces it, so a base change is one PR that updates all of them.
+- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). Keep other docs' commands in inline code or non-shell blocks.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).
 
 ## Safety rails
