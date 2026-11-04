@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import type { AuthHeaders } from "../types.js";
+import type { TransportInput } from "../run.js";
+import type { AuthHeaders, Transport } from "../types.js";
 
 export function readEnvFile(path: string): Record<string, string> {
   let text: string;
@@ -65,4 +66,8 @@ function memoryStorage() {
     setItem: (k: string, v: string) => void items.set(k, v),
     removeItem: (k: string) => void items.delete(k),
   };
+}
+
+export async function hostedTarget(input: TransportInput): Promise<Transport> {
+  return { url: input.url, headers: await evalAuth(input.repoRoot, input.env ?? process.env) };
 }

@@ -1,17 +1,7 @@
-import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import {
-  B1_EXCEPTIONS,
-  B3_EXCEPTIONS,
-  boundaryViolations,
-  ENTRIES,
-  importSpecifiers,
-  readSourceTree,
-  type SourceTree,
-} from "./boundary.js";
+import { B1_EXCEPTIONS, B3_EXCEPTIONS, boundaryViolations, ENTRIES, importSpecifiers, type SourceTree } from "./boundary.js";
 import { biomeFixtures } from "./biomeFixture.js";
 
-const SRC = join(import.meta.dirname, "../../src");
 const BOUNDARY_MESSAGE = "Core must not import hosted implementations.";
 
 describe("import scanner", () => {
@@ -116,23 +106,6 @@ describe("hosted boundary rules on fixture trees", () => {
     expect(boundaryViolations({ "startAgent.ts": 'import { hostedRoutes } from "./hosted/routes.js";\n' })).toEqual([
       { rule: "B1", file: "startAgent.ts", specifier: "./hosted/routes.js" },
     ]);
-  });
-});
-
-describe("hosted boundary on src/", () => {
-  const tree = readSourceTree(SRC);
-
-  it("has a hosted folder", () => {
-    expect(Object.keys(tree).filter((f) => f.startsWith("hosted/")).length).toBeGreaterThan(10);
-  });
-
-  it("has no B1–B6 violations", () => {
-    expect(boundaryViolations(tree)).toEqual([]);
-  });
-
-  it("needs no temporary exception", () => {
-    const strict = boundaryViolations(tree, { b1: ENTRIES, b3: [] });
-    expect(strict).toEqual([]);
   });
 });
 

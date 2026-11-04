@@ -1,40 +1,14 @@
 import { readFileSync } from "node:fs";
-import { join, posix } from "node:path";
+import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { biomeFixtures } from "./biomeFixture.js";
-import { importSpecifiers, readSourceTree, type SourceTree } from "./boundary.js";
+import { readSourceTree, type SourceTree } from "./boundary.js";
+import { type LocalRule, localViolations, withAppended } from "./localRules.js";
 
 const SRC = join(import.meta.dirname, "../../src");
 const SQLITE_MESSAGE = "node:sqlite is used only inside src/local/store.";
 const LOCAL_MESSAGE = "Hosted code must not use the local store.";
 const LOCAL_ONLY_MESSAGE = "Only src/local may import local modules.";
-
-type LocalRule = "B7" | "B8" | "B9";
-type LocalViolation = { rule: LocalRule; file: string; specifier: string };
-
-const isSqlite = (s: string) => s === "node:sqlite" || s === "sqlite";
-const resolveTarget = (file: string, s: string) =>
-  s.startsWith(".")
-    ? posix.normalize(posix.join(posix.dirname(file), s))
-    : s.startsWith("@oab/core/")
-      ? s.slice("@oab/core/".length)
-      : undefined;
-
-function localViolations(tree: SourceTree): LocalViolation[] {
-  const out: LocalViolation[] = [];
-  for (const [file, code] of Object.entries(tree)) {
-    const hosted = file.startsWith("hosted/");
-    for (const specifier of importSpecifiers(code)) {
-      const to = resolveTarget(file, specifier);
-      if (isSqlite(specifier) && !file.startsWith("local/store/")) out.push({ rule: "B8", file, specifier });
-      if (hosted && (isSqlite(specifier) || to?.toLowerCase().startsWith("local/"))) out.push({ rule: "B7", file, specifier });
-      if (!hosted && !file.startsWith("local/") && to?.startsWith("local/")) out.push({ rule: "B9", file, specifier });
-    }
-  }
-  return out;
-}
-
-const withAppended = (tree: SourceTree, file: string, line: string): SourceTree => ({ ...tree, [file]: `${tree[file]}${line}` });
 
 describe("local store boundary rules on fixture trees", () => {
   it.each<[LocalRule, SourceTree, string]>([
@@ -72,15 +46,11 @@ describe("local store boundary on src/", () => {
   });
 
   it("flags injected imports in real files without changing them", () => {
-    const before = { chats: readFileSync(join(SRC, "http/chats.ts"), "utf8"), deps: readFileSync(join(SRC, "hosted/deps.ts"), "utf8") };
+    const before = { chats: readFileSync(join(SRC, "http/chats.ts"), "utf8") };
     expect(localViolations(withAppended(tree, "http/chats.ts", 'import "node:sqlite";\n'))).toEqual([
       { rule: "B8", file: "http/chats.ts", specifier: "node:sqlite" },
     ]);
-    expect(localViolations(withAppended(tree, "hosted/deps.ts", 'import "@oab/core/local/store/sqliteStore.js";\n'))).toEqual([
-      { rule: "B7", file: "hosted/deps.ts", specifier: "@oab/core/local/store/sqliteStore.js" },
-    ]);
     expect(readFileSync(join(SRC, "http/chats.ts"), "utf8")).toBe(before.chats);
-    expect(readFileSync(join(SRC, "hosted/deps.ts"), "utf8")).toBe(before.deps);
   });
 });
 
@@ -106,9 +76,6 @@ describe("Biome enforces B7, B8 and B9", () => {
     const chats = lint("core", "src/http/chats.ts", `${real("http/chats.ts")}import "node:sqlite";\n`);
     expect(chats.out).toContain(SQLITE_MESSAGE);
     expect(chats.status).not.toBe(0);
-    const deps = lint("core", "src/hosted/deps.ts", `${real("hosted/deps.ts")}import "@oab/core/local/store/sqliteStore.js";\n`);
-    expect(deps.out).toContain(LOCAL_MESSAGE);
-    expect(deps.status).not.toBe(0);
   });
 
   it("allows node:sqlite inside src/local/store and the store from core", () => {

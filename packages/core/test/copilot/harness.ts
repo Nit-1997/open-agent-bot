@@ -11,7 +11,7 @@ import { ConcurrencyGate, RateLimiter } from "../../src/lib/rateLimit.js";
 import { LocalRunPolicy } from "../../src/policy/localRunPolicy.js";
 import type { Admission, RunPolicy, RunRequest } from "../../src/policy/types.js";
 import { SessionStore } from "../../src/session/sessionStore.js";
-import { type IdentitySeams, makeApp, tokenFor } from "../fixtures/app.js";
+import { type AppOverrides, type Harness, makeApp, tokenFor } from "../fixtures/app.js";
 import { TEST_SECRET } from "../fixtures/config.js";
 
 export const T1 = "0b7c3f5e-3a52-4f8b-9a6e-8f1c2d3e4f50";
@@ -91,13 +91,14 @@ export type HarnessOptions = {
   connectsPerUser?: number;
   connectMaxMs?: number;
   heartbeatMs?: number;
-  seams?: IdentitySeams;
   owners?: ThreadOwners;
   gate?: CountingGate;
   agentUrl?: () => string;
 };
 
-export async function copilotHarness(opts: HarnessOptions) {
+export type AppBuilder<H extends Harness> = (over: AppOverrides) => Promise<H>;
+
+export async function copilotHarness<H extends Harness = Harness>(opts: HarnessOptions, build: AppBuilder<H> = makeApp as AppBuilder<H>) {
   ɵGLOBAL_STORE.clear();
   const limiter = new RateLimiter();
   const gate = opts.gate ?? new CountingGate(8);
@@ -112,7 +113,7 @@ export async function copilotHarness(opts: HarnessOptions) {
   const slots = new ConnectSlots(opts.connectsPerUser ?? 8);
   const contexts: RunContext[] = [];
   const agents: unknown[] = [];
-  let h: Awaited<ReturnType<typeof makeApp>> | undefined;
+  let h: H | undefined;
   const context = (user: Principal): RunContext => {
     const repos = h!.db.forUser(user.id);
     const ctx: RunContext = { user, chats: repos.chats, messages: repos.messages, timeLimitMs: 60_000 };
@@ -131,13 +132,12 @@ export async function copilotHarness(opts: HarnessOptions) {
     agents.push(made);
     return made;
   };
-  h = await makeApp({
+  h = await build({
     runPolicy: policy,
     limiter,
     store,
     runContext: context,
     handleRun: opts.handle,
-    seams: opts.seams,
     copilot: {
       agent,
       owners,

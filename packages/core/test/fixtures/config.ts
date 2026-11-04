@@ -1,18 +1,11 @@
-import { type HostedConfig, loadHostedConfig } from "../../src/hosted/config.js";
+import { type CoreConfig, loadCoreConfig } from "../../src/config.js";
 
 export const TEST_SECRET = "a".repeat(64);
 export const TEST_KEY_B64 = Buffer.alloc(32, 7).toString("base64");
 
-export const TEST_ENV: NodeJS.ProcessEnv = {
-  SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
-  SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
-  SUPABASE_SECRET_KEY: "sb_secret_test",
-  AGENT_SERVICE_SECRET: TEST_SECRET,
-  CREDENTIAL_KEYS: `v1:${TEST_KEY_B64}`,
-  APP_ORIGIN: "https://app.localhost",
-  ACCESS_REQUEST_PEPPER: Buffer.alloc(32, 9).toString("base64"),
+export const CORE_TEST_ENV: NodeJS.ProcessEnv = {
   RENDERER_SECRET: "b".repeat(64),
   COPILOTKIT_TELEMETRY_DISABLED: "true",
 };
 
-export const testConfig = (extra: NodeJS.ProcessEnv = {}): HostedConfig => loadHostedConfig({ ...TEST_ENV, ...extra });
+export const testConfig = (extra: NodeJS.ProcessEnv = {}): CoreConfig => loadCoreConfig({ ...CORE_TEST_ENV, ...extra });

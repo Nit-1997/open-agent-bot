@@ -30,8 +30,6 @@ describe("@oab/core self-reference", () => {
     const viaSelf = await import("@oab/core/lib/errors.js");
     const viaPath = await import("../../src/lib/errors.ts");
     expect(viaSelf).toBe(viaPath);
-    const { dbError } = await import("../../src/hosted/store/errors.ts");
-    expect(dbError("x", { code: "23505", status: 409 })).toBeInstanceOf(viaPath.UserError);
   });
 
   it("tsconfig.evals.json maps @oab/core/* to src and keeps the typebox paths", () => {

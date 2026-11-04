@@ -20,6 +20,11 @@ const EXEMPT: Exemption[] = [
   { file: "test/lint/localBoundary.test.ts", allow: ["string"], reason: "B7 refusal fixtures name src/hosted files" },
   { file: "test/lint/selfReference.test.ts", allow: ["string"], reason: "R2 refusal fixtures: @oab/core/hosted/* is not exported" },
   { file: "test/local/importGraph.test.ts", allow: ["string"], reason: "the local graph's hosted, @supabase/* and jose refusal fixtures" },
+  {
+    file: "test/evals/localTarget.test.ts",
+    allow: ["string:vendor"],
+    reason: "a test name says --target local never loads @supabase/supabase-js",
+  },
   { file: "test/evals/moduleGraph.ts", allow: ["string"], reason: "the probe that proves --target local never loads @supabase/*" },
   {
     file: "test/deploy/copilotTelemetry.test.ts",
