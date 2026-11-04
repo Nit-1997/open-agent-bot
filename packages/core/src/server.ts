@@ -1,1 +1,0 @@
-import "./hosted/main.js";
