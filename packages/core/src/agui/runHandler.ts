@@ -192,21 +192,6 @@ export async function* handleRun(
     return;
   }
   if (signal.aborted) return;
-  entry.busy = true;
-  entry.lastRunId = runId;
-  const openReport = await openReportFor(ctx, readOpenReport(input), entry.openReport);
-  if (openReport) entry.openReport = openReport;
-  entry.setOpenReport?.(openReport ? openReportNote(openReport) : undefined);
-  const reportEvidence = openReport ? new Evidence() : undefined;
-  reportEvidence?.add(openReport?.text ?? "");
-  const savedPrompt = await persist(
-    ctx,
-    threadId,
-    runId,
-    [{ role: "user", content: prompt.slice(0, 200_000), status: "complete" }],
-    chatTitleFrom(prompt),
-  );
-  if (!savedPrompt) yield custom(NOT_SAVED_EVENT, { message: PROMPT_NOT_SAVED });
   const transcript = new Transcript();
   let saved = false;
   const saveReply = async (outcome: "complete" | "interrupted") => {
@@ -218,7 +203,22 @@ export async function* handleRun(
       { role: "assistant", content: text.slice(0, 200_000), status: outcome, ...(parts && { parts }) },
     ]);
   };
+  entry.busy = true;
+  entry.lastRunId = runId;
   try {
+    const openReport = await openReportFor(ctx, readOpenReport(input), entry.openReport);
+    if (openReport) entry.openReport = openReport;
+    entry.setOpenReport?.(openReport ? openReportNote(openReport) : undefined);
+    const reportEvidence = openReport ? new Evidence() : undefined;
+    reportEvidence?.add(openReport?.text ?? "");
+    const savedPrompt = await persist(
+      ctx,
+      threadId,
+      runId,
+      [{ role: "user", content: prompt.slice(0, 200_000), status: "complete" }],
+      chatTitleFrom(prompt),
+    );
+    if (!savedPrompt) yield custom(NOT_SAVED_EVENT, { message: PROMPT_NOT_SAVED });
     for await (const e of runTurn({
       input,
       entry,
