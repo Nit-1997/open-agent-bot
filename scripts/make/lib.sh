@@ -17,4 +17,4 @@ need_docker() {
 }
 
 PREVIEW_PROJECT=oab-preview
-PREVIEW_FILES=(-f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local)
+PREVIEW_FILES=(-f cloud/deploy-config/compose.hosted.yml -f cloud/deploy-config/compose.preview.yml --profile local)

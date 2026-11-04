@@ -6,7 +6,7 @@ import { after, describe, it } from "node:test";
 import { composeNames, REQUIRED } from "../scripts/env-check.mjs";
 import { composeConfig, ROOT, standIn } from "./support/composeConfig.mjs";
 
-const HOSTED = join(ROOT, "cloud/deploy/compose.hosted.yml");
+const HOSTED = join(ROOT, "cloud/deploy-config/compose.hosted.yml");
 const WORK = mkdtempSync(join(tmpdir(), "env-check-"));
 const STAND_IN = standIn();
 after(() => {
@@ -21,7 +21,7 @@ describe("env-check.mjs", () => {
     const { services } = composeConfig(["-f", HOSTED, "--profile", "local", "--profile", "litellm", "--profile", "ollama"], {
       envFile: ["--env-file", env],
       standInDir: STAND_IN.dir,
-      projectDir: "cloud/deploy",
+      projectDir: "cloud/deploy-config",
     });
     const want = new Set(Object.values(services).flatMap((s) => Object.keys(s.environment ?? {})));
     assert.deepEqual([...composeNames(readFileSync(HOSTED, "utf8"))].sort(), [...want].sort());

@@ -137,7 +137,7 @@
         "reason": "\"web\" is the SearXNG search category, not a path"
       },
       {
-        "file": "cloud/deploy/test/composeHosted.test.mjs",
+        "file": "cloud/deploy-config/test/composeHosted.test.mjs",
         "reason": "checks the pre-M6 baseline fixture's old web build path and cache tmpfs against the moved ones"
       },
       {
@@ -149,7 +149,7 @@
         "reason": "the Gate 6/7 switch-over names the old checkout's web/Dockerfile and the old Vercel Root Directory"
       },
       {
-        "file": "cloud/deploy/test/fixtures/**",
+        "file": "cloud/deploy-config/test/fixtures/**",
         "reason": "the pre-M6 hosted compose file kept verbatim as the equivalence baseline"
       },
       {
@@ -181,7 +181,7 @@
         "reason": "\"supabase\" is a needle the local bundle must not contain, not a path"
       },
       {
-        "file": "cloud/deploy/test/docs.test.mjs",
+        "file": "cloud/deploy-config/test/docs.test.mjs",
         "reason": "asserts cloud/README.md no longer names the root supabase/ folder"
       }
     ]
@@ -240,19 +240,19 @@
         "reason": "the core rule keeps refusing deploy-config/ paths; its patterns and refusal fixtures name the folder"
       },
       {
-        "file": "cloud/deploy/scripts/env-files.mjs",
+        "file": "cloud/deploy-config/scripts/env-files.mjs",
         "reason": "the env-file helper takes --from <old checkout>/deploy-config (D10)"
       },
       {
-        "file": "cloud/deploy/test/envFiles.test.mjs",
+        "file": "cloud/deploy-config/test/envFiles.test.mjs",
         "reason": "tests the helper from a deploy-config/ source and that legacy names stay ignored (D10)"
       },
       {
-        "file": "cloud/deploy/test/composeHosted.test.mjs",
+        "file": "cloud/deploy-config/test/composeHosted.test.mjs",
         "reason": "checks the pre-M6 baseline fixture's deploy-config/ values against the moved ones (D9)"
       },
       {
-        "file": "cloud/deploy/test/docs.test.mjs",
+        "file": "cloud/deploy-config/test/docs.test.mjs",
         "reason": "asserts cloud/README.md names deploy-config/ only in the env-files.mjs migration line"
       },
       {
@@ -264,12 +264,16 @@
         "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       },
       {
-        "file": "cloud/deploy/test/fixtures/**",
+        "file": "cloud/deploy-config/test/fixtures/**",
         "reason": "the pre-M6 hosted compose file kept verbatim as the equivalence baseline"
       },
       {
-        "file": "cloud/deploy/test/preflight.test.mjs",
+        "file": "cloud/deploy-config/test/preflight.test.mjs",
         "reason": "builds a temp copy of the cloud/deploy and cloud/deploy-config layout so the frontend env file resolves"
+      },
+      {
+        "file": "cloud/deploy-config/test/support/composeConfig.mjs",
+        "reason": "stand-in env files at the pre-M6 deploy-config paths so the baseline root compose file resolves"
       }
     ]
   },
@@ -287,11 +291,11 @@
         "reason": "the move verifier names the moved paths to classify the move commits"
       },
       {
-        "file": "cloud/deploy/test/preflight.test.mjs",
+        "file": "cloud/deploy-config/test/preflight.test.mjs",
         "reason": "copies cloud/deploy/compose.hosted.yml into a temp folder under its own name"
       },
       {
-        "file": "cloud/deploy/test/docs.test.mjs",
+        "file": "cloud/deploy-config/test/docs.test.mjs",
         "reason": "asserts cloud/README.md no longer says -f compose.hosted.yml"
       },
       {
@@ -322,7 +326,7 @@
         "reason": "the move verifier names the moved paths to classify the move commits"
       },
       {
-        "file": "cloud/deploy/test/docs.test.mjs",
+        "file": "cloud/deploy-config/test/docs.test.mjs",
         "reason": "asserts cloud/README.md no longer links docs/hosted.md"
       },
       {
@@ -830,6 +834,57 @@
       {
         "file": "scripts/test/secretPaths.mjs",
         "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy",
+    "new": "cloud/deploy-config",
+    "pr": "one-deploy-folder",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/move/**",
+        "reason": "the move verifier names the moved paths to classify the move commits"
+      },
+      {
+        "file": "cloud/deploy-config/scripts/env-files.mjs",
+        "reason": "accepts the M6 cloud/deploy layout (its .env-* files) as a migration source"
+      },
+      {
+        "file": "cloud/deploy-config/test/envFiles.test.mjs",
+        "reason": "tests the migration from the M6 cloud/deploy layout and that its old env file names stay git-ignored"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "the M6 cloud/deploy env file names stay git-ignored; names only, never read"
+      },
+      {
+        "file": "scripts/test/movedPaths.test.mjs",
+        "reason": "fixture-only rows written into temp repos"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture-only paths of the M6 move written into temp repos"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo records the M6 layout (cloud/deploy) as it was when M6 was verified"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only M6 demo command lines checked as strings, never read from disk"
+      },
+      {
+        "file": "cloud/deploy-config/test/workspaceLayout.test.mjs",
+        "reason": "checks that cloud/deploy no longer exists"
+      },
+      {
+        "file": "scripts/test/cloudBoundary.test.mjs",
+        "reason": "fixture-only cloud names written into temp repos, never read from this repo"
       }
     ]
   }

@@ -115,13 +115,18 @@ describe("ci.yml local-stack job", () => {
 describe("ci.yml desktop jobs", () => {
   const wf = doc("ci.yml");
   const jobs = wf.jobs;
-  const DESKTOP_JOBS = ["desktop", "desktop-real", "desktop-package"];
+  const DESKTOP_JOBS = ["desktop"];
   const runs = (job) => job.steps.map((s) => s.run ?? "").join("\n");
   const usesStep = (job, prefix) => job.steps.find((s) => String(s.uses ?? "").startsWith(prefix));
 
   it("triggers only on pull_request and push to main", () => {
     assert.deepEqual(Object.keys(wf.on).sort(), ["pull_request", "push"]);
     assert.deepEqual(wf.on.push, { branches: ["main"] });
+  });
+
+  it("runs only the quick jobs; the Electron e2e and the DMG build run locally (make test-e2e) and in release.yml", () => {
+    assert.deepEqual(Object.keys(jobs).sort(), ["cloud", "compose", "core", "desktop", "local-stack", "sqlite-node24", "standalone"]);
+    assert.equal(JSON.stringify(jobs).includes("macos-"), false);
   });
 
   for (const name of DESKTOP_JOBS) {
@@ -141,7 +146,7 @@ describe("ci.yml desktop jobs", () => {
     for (const name of ["core", "cloud", "local-stack"]) assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
   });
 
-  it("desktop: Ubuntu, checks and unit tests for @oab/desktop, then the fake-docker e2e under xvfb", () => {
+  it("desktop: Ubuntu, checks, unit tests and the build for @oab/desktop, no Electron e2e", () => {
     const job = jobs.desktop;
     assert.equal(job["runs-on"], "ubuntu-24.04");
     const text = runs(job);
@@ -153,65 +158,10 @@ describe("ci.yml desktop jobs", () => {
       "npm test -w @oab/desktop",
       "npm run build -w @oab/desktop",
       "npm run stage -w @oab/desktop",
-      "xvfb-run -a npx playwright test -c playwright.desktop.config.ts --project desktop-fake",
     ])
       assert.ok(text.includes(piece), piece);
-    assert.doesNotMatch(text, /DESKTOP_REAL_DOCKER/);
-  });
-
-  it("desktop-real: Ubuntu with real Docker, local images, the stub on 18341, oab-ci-desktop on 18350-18359, torn down in always()", () => {
-    const job = jobs["desktop-real"];
-    assert.equal(job["runs-on"], "ubuntu-24.04");
-    assert.equal(String(job.env.DESKTOP_REAL_DOCKER), "1");
-    assert.equal(String(job.env.OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET), "1");
-    assert.equal(job.env.DESKTOP_REAL_PROJECT, "oab-ci-desktop");
-    assert.equal(job.env.DESKTOP_REAL_RANGE, "18350-18359");
-    assert.equal(String(job.env.STUB_PORT), "18341");
-    assert.equal(job.env.STUB_BIND, "0.0.0.0");
-    assert.equal(job.env.STUB_HOST, "host.docker.internal");
-    const text = runs(job);
-    for (const piece of [
-      "docker build -f packages/core/Dockerfile",
-      "-t oab-ci-agent:dev",
-      "-t oab-ci-search:dev local/searxng",
-      "DESKTOP_REAL_SERVICES=",
-      "e2e/support/stubModel.ts",
-      "xvfb-run -a npx playwright test -c playwright.desktop.config.ts --project desktop-real",
-    ])
-      assert.ok(text.includes(piece), piece);
-    const teardown = job.steps.at(-1);
-    assert.equal(teardown.if, "always()");
-    assert.match(teardown.run, /down -v/);
-    assert.match(teardown.run, /oab-ci-desktop/);
-  });
-
-  it("desktop-package: macOS 15, only when the shell, the stack files or the workflow change (or on main), both DMGs and the packaged smoke", () => {
-    const job = jobs["desktop-package"];
-    assert.equal(job["runs-on"], "macos-15");
-    assert.deepEqual([job.needs].flat(), ["desktop-changes"]);
-    assert.equal(job.if, "needs.desktop-changes.outputs.desktop == 'true'");
-    const changes = jobs["desktop-changes"];
-    assert.equal(changes["runs-on"], "ubuntu-24.04");
-    assert.deepEqual(changes.permissions, { contents: "read" });
-    assert.equal(changes.outputs.desktop, `\${{ steps.filter.outputs.desktop }}`);
-    const filter = changes.steps.find((s) => s.id === "filter");
-    for (const path of ["apps/desktop/", "docker-compose\\.yml", "local/renderer/seccomp\\.json", "\\.github/workflows/ci\\.yml"])
-      assert.ok(filter.run.includes(path), path);
-    assert.match(filter.run, /git diff --name-only "\$BASE_SHA" "\$HEAD_SHA"/);
-    assert.equal(JSON.stringify(filter).includes("${{ github.event.pull_request"), true);
-    assert.equal(filter.run.includes("${{"), false);
-    const text = runs(job);
-    assert.match(text, /npm run dist -w @oab\/desktop -- --arm64 --x64/);
-    assert.match(
-      text,
-      /packagedSmoke\.mjs .*--app "apps\/desktop\/release\/mac-arm64\/Open Agent\.app" --app "apps\/desktop\/release\/mac\/Open Agent\.app"/,
-    );
-    assert.match(text, /--dmg/);
-    const dist = job.steps.find((s) => (s.run ?? "").includes("npm run dist"));
-    assert.equal(String(dist.env.CSC_IDENTITY_AUTO_DISCOVERY), "false");
-    const upload = usesStep(job, "actions/upload-artifact@");
-    assert.equal(Number(upload.with["retention-days"]), 7);
-    assert.match(upload.with.path, /\.dmg/);
+    assert.doesNotMatch(text, /DESKTOP_REAL_DOCKER|xvfb|playwright test/);
+    assert.equal(usesStep(job, "actions/upload-artifact@"), undefined);
   });
 });
 
@@ -305,7 +255,7 @@ describe("ci.yml cloud job (M6 D14)", () => {
 describe("ci.yml private temp dirs", () => {
   it("every job that sets TMPDIR makes it a 0700 folder it owns before any action runs", () => {
     const jobs = Object.entries(doc("ci.yml").jobs).filter(([, job]) => job.env?.TMPDIR);
-    assert.deepEqual(jobs.map(([name]) => name).sort(), ["desktop", "desktop-real", "standalone"]);
+    assert.deepEqual(jobs.map(([name]) => name).sort(), ["desktop", "standalone"]);
     for (const [name, job] of jobs) assert.equal(job.steps[0].run?.trim(), PRIVATE_TMPDIR, name);
   });
 });

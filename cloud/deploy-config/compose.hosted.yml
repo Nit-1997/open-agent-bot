@@ -131,7 +131,7 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
     env_file:
-      - path: ../deploy-config/env-files/frontend/.env
+      - path: ./env-files/frontend/.env
         required: true
     environment:
       AGENT_URL: http://agent:8000
