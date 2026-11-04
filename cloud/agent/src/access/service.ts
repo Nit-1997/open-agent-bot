@@ -5,7 +5,11 @@ import { ipKey } from "@oab/core/lib/ipKey.js";
 import { log } from "@oab/core/lib/log.js";
 import { LIMITS, type RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { normalizeEmail as parseEmail } from "@oab/shared/email";
+import { humanCheckUnavailable, refusalOf } from "../captcha/refusals.js";
+import type { HumanVerifier } from "../captcha/turnstile.js";
 import type { SubmitOutcome } from "../store/admin.js";
+
+export type EmailLinkCaptcha = { required: () => Promise<boolean>; verifier?: HumanVerifier };
 
 export type AccessDeps = {
   pepper: Buffer;
@@ -13,6 +17,7 @@ export type AccessDeps = {
   queue: BackgroundQueue;
   submit: (input: { name: string; email: string; note: string; ipHash: Buffer }) => Promise<SubmitOutcome>;
   sendMagicLink: (email: string) => Promise<{ code?: string }>;
+  captcha?: EmailLinkCaptcha;
   now?: () => number;
 };
 
@@ -78,9 +83,18 @@ export function createAccessService(deps: AccessDeps) {
       });
     },
 
-    emailLink(email: string, ip: string): void {
+    async emailLink(email: string, ip: string, captchaToken?: unknown): Promise<void> {
       const ipHash = hashIp(deps.pepper, ip);
       const tag = tagOf(ipHash);
+      if (deps.captcha && (await deps.captcha.required())) {
+        const refusal = deps.captcha.verifier
+          ? refusalOf(await deps.captcha.verifier.verify(captchaToken, { action: "email_link", remoteIp: ip }))
+          : humanCheckUnavailable();
+        if (refusal) {
+          log.warn(`[access] email link refused code=${refusal.code} ip=${tag}`);
+          throw refusal;
+        }
+      }
       const ipHex = ipHash.toString("hex");
       const addr = createHash("sha256").update(email, "utf8").digest("hex");
       if (!deps.limiter.take(`email-link-ip:${ipHex}`, LIMITS.emailLinkIp).ok) {

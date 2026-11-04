@@ -31,6 +31,7 @@ export async function createUser(email: string): Promise<void> {
   if (!isTestEmail(email)) throw new Error(`refusing to create non-test user ${email}`);
   script("bootstrap-admin.mjs", ["--user", email]);
   await assertNotAdmin(email);
+  script("test-users.mjs", ["--human-checked"]);
 }
 
 export function cleanupE2e(): number {

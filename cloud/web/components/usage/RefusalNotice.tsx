@@ -2,6 +2,8 @@
 
 import type { RunRefusalNoticeProps } from "@oab/ui/platform";
 import { useEffect, useState } from "react";
+import { HumanCheckDialog } from "@/components/auth/HumanCheckDialog";
+import { HUMAN_CHECK_COPY } from "@/lib/humanCheckCopy";
 import { countdownText, DESKTOP_URL, NOTICE_COPY, refusalCopy, retryDeadline, secondsUntil } from "@/lib/usageCopy";
 
 const BUTTON =
@@ -14,6 +16,7 @@ export function RefusalNotice({ id, refusal, onRetry, onDismiss }: RunRefusalNot
   const left = secondsUntil(deadline, now);
   const copy = refusalCopy(refusal, secondsUntil(deadline, receivedAt), receivedAt);
   const ticking = copy.countdown && left > 0;
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (!ticking) return;
@@ -50,6 +53,16 @@ export function RefusalNotice({ id, refusal, onRetry, onDismiss }: RunRefusalNot
             {NOTICE_COPY.sendAgain}
           </button>
         )}
+        {refusal.code === "human_check_required" && (
+          <button
+            id={`${id}-check-open`}
+            type="button"
+            onClick={() => setChecking(true)}
+            className={`${BUTTON} bg-charcoal text-on-charcoal`}
+          >
+            {HUMAN_CHECK_COPY.noticeOpen}
+          </button>
+        )}
         {copy.macLink && (
           <a
             id={`${id}-mac-link`}
@@ -65,6 +78,15 @@ export function RefusalNotice({ id, refusal, onRetry, onDismiss }: RunRefusalNot
           {NOTICE_COPY.dismiss}
         </button>
       </div>
+      {checking && (
+        <HumanCheckDialog
+          onCancel={() => setChecking(false)}
+          onDone={() => {
+            setChecking(false);
+            onRetry();
+          }}
+        />
+      )}
     </div>
   );
 }

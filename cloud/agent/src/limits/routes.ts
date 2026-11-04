@@ -5,7 +5,7 @@ import { type RateLimiter, rateLimitError } from "@oab/core/lib/rateLimit.js";
 import { type HumanCheckState, type Limits, nextUtcMonth, type UsageView } from "@oab/shared/usage";
 import { Hono } from "hono";
 import { USAGE_ROUTE } from "./config.js";
-import type { HumanCheckGate } from "./humanCheckStub.js";
+import type { HumanCheckGate } from "../signup/humanCheck.js";
 import { type HostedRunPolicy, usageUnavailable } from "./policy.js";
 import type { UsageRepo } from "./usageRepo.js";
 

@@ -5,6 +5,7 @@ import { YOUTUBE_EMBED_ORIGIN } from "@/lib/youtube";
 import { contentSecurityPolicy, newNonce } from "@/lib/csp";
 import { appOrigin, supabaseEnv } from "@/lib/env";
 import { decideRoute, type RouteDecision } from "@/lib/routeRules";
+import { TURNSTILE_ORIGIN, turnstileSiteKey } from "@/lib/turnstile";
 import { updateSession } from "@/lib/supabase/proxy";
 
 const NOT_FOUND_PATH = "/__not-found";
@@ -45,7 +46,8 @@ export async function proxy(request: NextRequest) {
   const page = !pathname.startsWith("/api/");
   const nonce = newNonce();
   const dev = process.env.NODE_ENV === "development";
-  const csp = contentSecurityPolicy(nonce, supabaseEnv().url, dev);
+  const turnstile = turnstileSiteKey() ? [TURNSTILE_ORIGIN] : [];
+  const csp = contentSecurityPolicy(nonce, supabaseEnv().url, dev, turnstile, turnstile);
   const forwardHeaders = new Headers(request.headers);
   if (page) {
     forwardHeaders.set("x-nonce", nonce);
@@ -64,7 +66,7 @@ export async function proxy(request: NextRequest) {
   if (page)
     result.headers.set(
       "content-security-policy",
-      landing ? contentSecurityPolicy(nonce, supabaseEnv().url, dev, [YOUTUBE_EMBED_ORIGIN]) : csp,
+      landing ? contentSecurityPolicy(nonce, supabaseEnv().url, dev, [YOUTUBE_EMBED_ORIGIN, ...turnstile], turnstile) : csp,
     );
   return result;
 }

@@ -5,6 +5,7 @@ import { log } from "@oab/core/lib/log.js";
 import type { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { AgentDeps, CoreHandles } from "@oab/core/startAgent.js";
 import { createAccessService } from "./access/service.js";
+import { createTurnstileVerifier, type HumanVerifier, isTestSecret } from "./captcha/turnstile.js";
 import { createAuthAdmin } from "./admin/authAdmin.js";
 import { type AccountHooks, createAdminService } from "./admin/service.js";
 import type { HostedConfig } from "./config.js";
@@ -16,11 +17,12 @@ import { UserStatusCache } from "./identity/status.js";
 import { createSupabaseIdentity } from "./identity/supabaseIdentity.js";
 import { createVerifier } from "./identity/verify.js";
 import { PRUNE_MS, STALE_GRACE_S, SWEEP_MS } from "./limits/config.js";
-import { humanCheckOff } from "./limits/humanCheckStub.js";
 import { HostedRunPolicy } from "./limits/policy.js";
 import { RunSlots } from "./limits/slots.js";
 import { createUsageRepo, type UsageRepo } from "./limits/usageRepo.js";
 import { hostedRoutes } from "./routes.js";
+import { gateApplies, LiveHumanCheckGate } from "./signup/humanCheck.js";
+import { createSignupSettings, type SignupSettings } from "./signup/settings.js";
 import { createAdminRepo } from "./store/admin.js";
 import { createAnonClient, createServiceClient, type Db } from "./store/client.js";
 import { createSupabaseStore } from "./store/supabaseStore.js";
@@ -37,7 +39,27 @@ export const adminHooks = (status: Pick<UserStatusCache, "invalidate">, core: Pi
   },
 });
 
-export type HostedSeams = { identity?: Identity; usage?: UsageRepo; liveRole?: LiveRoleCache };
+export type HostedSeams = {
+  identity?: Identity;
+  usage?: UsageRepo;
+  liveRole?: LiveRoleCache;
+  signup?: SignupSettings;
+  verifier?: HumanVerifier;
+};
+
+export function humanVerifierFor(cfg: Pick<HostedConfig, "turnstile" | "appOrigin" | "localStack">): HumanVerifier | undefined {
+  if (!cfg.turnstile) {
+    log.warn("[signup] open mode needs TURNSTILE_SECRET_KEY");
+    return undefined;
+  }
+  const { secret, verifyUrl } = cfg.turnstile;
+  return createTurnstileVerifier({
+    secret,
+    hostname: new URL(cfg.appOrigin).hostname,
+    ...(verifyUrl && { verifyUrl }),
+    allowTestResponse: cfg.localStack === true && isTestSecret(secret),
+  });
+}
 
 export type HostedAgent = { deps: AgentDeps; status: UserStatusCache; usage: UsageRepo };
 
@@ -75,7 +97,9 @@ export function hostedAgentDeps(
   if (identity.kind !== "hosted") throw new Error(`the hosted agent needs a hosted identity, got "${identity.kind}"`);
 
   const usage = seams.usage ?? createUsageRepo(clients.db, { caps: { perMonth: cfg.limits.perMonth, perHour: cfg.limits.perHour } });
-  const humanCheck = humanCheckOff;
+  const signup = seams.signup ?? createSignupSettings(clients.db);
+  const verifier = "verifier" in seams ? seams.verifier : humanVerifierFor(cfg);
+  const humanCheck = new LiveHumanCheckGate({ mode: () => signup.mode(), checks: usage.humanCheck, verifierConfigured: !!verifier });
   const slots = new RunSlots({ staleAfterMs: (cfg.runTimeLimitSeconds + STALE_GRACE_S) * 1000 });
   let policy: HostedRunPolicy | undefined;
   const policyFor = (limiter: RateLimiter) => {
@@ -107,6 +131,7 @@ export function hostedAgentDeps(
             const r = await authAdmin.magicLink(email);
             return r.ok ? {} : { code: r.code };
           },
+          captcha: { required: async () => gateApplies(await signup.mode()), verifier },
         }),
         admin: createAdminService({ repo: adminRepo, auth: authAdmin, hooks }),
         adminGuard: createAdminGuard({ isLiveAdmin: (user) => liveRole.isAdmin(user.id), roleUnverified: hostedIdentity.roleUnverified }),
@@ -117,8 +142,10 @@ export function hostedAgentDeps(
           policy: policyFor(core.limiter),
           limits: cfg.limits,
           profiles: adminRepo.users,
-          signupMode: async () => "waitlist",
+          signupMode: () => signup.mode(),
+          signupStats: () => signup.stats(),
         },
+        signup: { mode: () => signup.mode(), gate: humanCheck, verifier, limiter: core.limiter },
       });
     },
   };

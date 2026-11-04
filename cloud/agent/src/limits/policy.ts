@@ -5,7 +5,7 @@ import type { Admission, RunPolicy, RunRequest } from "@oab/core/policy/types.js
 import type { RunRefusalCode, RunRefusalWindow } from "@oab/shared/runRefusals";
 import type { Limits } from "@oab/shared/usage";
 import { ADMIT_ATTEMPTS, BUSY_RETRY_S, RUNNING_RETRY_S, UNAVAILABLE_RETRY_S } from "./config.js";
-import type { HumanCheckGate } from "./humanCheckStub.js";
+import type { HumanCheckGate } from "../signup/humanCheck.js";
 import type { RunSlots } from "./slots.js";
 import { type AdmitResult, USAGE_TIMEOUT_MS, type UsageRepo } from "./usageRepo.js";
 

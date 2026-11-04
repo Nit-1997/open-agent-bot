@@ -7,6 +7,7 @@ import { accessRoutes } from "./http/access.js";
 import { adminRoutes } from "./http/admin.js";
 import { type AdminUsageDeps, usageAdminRoutes } from "./limits/adminRoutes.js";
 import { type UsageRouteDeps, usageRoutes } from "./limits/routes.js";
+import { humanCheckRoutes, type SignupRouteDeps, signupModeRoutes } from "./signup/routes.js";
 
 export type HostedRouteDeps = {
   access: AccessService;
@@ -15,11 +16,13 @@ export type HostedRouteDeps = {
   limiter: RateLimiter;
   usage: UsageRouteDeps;
   adminUsage: AdminUsageDeps;
+  signup: SignupRouteDeps;
 };
 
 export function hostedRoutes(deps: HostedRouteDeps): RouteMount[] {
   const access = new Hono<AuthEnv>();
   access.route("/", accessRoutes({ access: deps.access }));
+  access.route("/", signupModeRoutes(deps.signup));
   const admin = new Hono<AuthEnv>();
   admin.use("/admin", deps.adminGuard);
   admin.use("/admin/*", deps.adminGuard);
@@ -29,5 +32,6 @@ export function hostedRoutes(deps: HostedRouteDeps): RouteMount[] {
     { stage: "public", basePath: "/", routes: access },
     { stage: "protected", basePath: "/admin", routes: admin },
     { stage: "protected", basePath: "/usage", routes: usageRoutes(deps.usage) },
+    { stage: "protected", basePath: "/human-check", routes: humanCheckRoutes(deps.signup) },
   ];
 }

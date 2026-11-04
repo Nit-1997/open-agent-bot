@@ -103,6 +103,18 @@ export type Database = {
           },
         ]
       }
+      blocked_email_domains: {
+        Row: {
+          domain: string
+        }
+        Insert: {
+          domain: string
+        }
+        Update: {
+          domain?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           chat_id: string
@@ -353,6 +365,33 @@ export type Database = {
         }
         Relationships: []
       }
+      signup_settings: {
+        Row: {
+          id: boolean
+          mode: string
+          signups_per_day: number
+          signups_per_hour: number
+          signups_per_ip_day: number
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          mode?: string
+          signups_per_day?: number
+          signups_per_hour?: number
+          signups_per_ip_day?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          mode?: string
+          signups_per_day?: number
+          signups_per_hour?: number
+          signups_per_ip_day?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -424,6 +463,24 @@ export type Database = {
           p_user: string
         }
         Returns: Json
+      }
+      signup_settings_get: {
+        Args: never
+        Returns: {
+          mode: string
+          signups_per_day: number
+          signups_per_hour: number
+          signups_per_ip_day: number
+        }[]
+      }
+      signup_stats: {
+        Args: { p_now?: string }
+        Returns: {
+          cap_day: number
+          cap_hour: number
+          last_day: number
+          last_hour: number
+        }[]
       }
       usage_tombstone: {
         Args: { p_now?: string; p_user: string }

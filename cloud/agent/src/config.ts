@@ -3,6 +3,7 @@ import type { CredentialKeys } from "@oab/core/secrets/keyWrapper.js";
 import { decode32, parseCredentialKeys } from "@oab/core/secrets/keys.js";
 import { log } from "@oab/core/lib/log.js";
 import type { Limits } from "@oab/shared/usage";
+import { isTestSecret } from "./captcha/turnstile.js";
 import { limitsFrom } from "./limits/config.js";
 
 export type HostedEnvConfig = {
@@ -17,8 +18,11 @@ export type HostedEnvConfig = {
   llmApiKey?: string;
   models: ModelOption[];
   limits: Limits;
+  turnstile?: TurnstileConfig;
   localStack?: true;
 };
+
+export type TurnstileConfig = { secret: string; verifyUrl?: string };
 
 export type HostedConfig = CoreConfig & HostedEnvConfig;
 
@@ -43,6 +47,29 @@ const HOSTED_SUPABASE = /^https:\/\/[a-z]{20}\.supabase\.co$/;
 const LOCAL_PORT = "(187[0-4][0-9])";
 const LOCAL_SUPABASE = new RegExp(`^http://127\\.0\\.0\\.1:${LOCAL_PORT}$`);
 const LOCAL_ORIGIN = new RegExp(`^http://localhost:${LOCAL_PORT}$`);
+const LOCAL_VERIFY_URL = new RegExp(`^http://127\\.0\\.0\\.1:${LOCAL_PORT}(/[A-Za-z0-9/_-]*)?$`);
+const TURNSTILE_SECRET = /^[0-9]x[A-Za-z0-9_-]{20,200}$/;
+
+function turnstileFrom(env: NodeJS.ProcessEnv, local: boolean, problems: string[]): TurnstileConfig | undefined {
+  const secret = env.TURNSTILE_SECRET_KEY?.trim();
+  const verifyUrl = env.TURNSTILE_VERIFY_URL?.trim();
+  if (verifyUrl && !local) problems.push("TURNSTILE_VERIFY_URL is accepted only with SUPABASE_LOCAL_STACK=1");
+  else if (verifyUrl && !LOCAL_VERIFY_URL.test(verifyUrl))
+    problems.push("TURNSTILE_VERIFY_URL must be http://127.0.0.1:<18700-18749>[/path]");
+  if (!secret) {
+    if (verifyUrl) problems.push("TURNSTILE_VERIFY_URL needs TURNSTILE_SECRET_KEY");
+    return undefined;
+  }
+  if (!TURNSTILE_SECRET.test(secret)) {
+    problems.push("TURNSTILE_SECRET_KEY is not a Turnstile secret key");
+    return undefined;
+  }
+  if (isTestSecret(secret) && !local) {
+    problems.push("TURNSTILE_SECRET_KEY is a Cloudflare test secret; test secrets are accepted only with SUPABASE_LOCAL_STACK=1");
+    return undefined;
+  }
+  return { secret, ...(verifyUrl && local && { verifyUrl }) };
+}
 
 function localStackFlag(env: NodeJS.ProcessEnv, problems: string[]): boolean {
   const v = env.SUPABASE_LOCAL_STACK;
@@ -84,6 +111,7 @@ export function loadHostedConfig(env: NodeJS.ProcessEnv): HostedConfig {
   const accessRequestPepper = need("ACCESS_REQUEST_PEPPER", decode32, "must be base64 of exactly 32 bytes");
   const core = coreConfigFrom(env, problems);
   const limits = limitsFrom(env, problems);
+  const turnstile = turnstileFrom(env, local, problems);
   if (core.rendererSecret && core.rendererSecret === serviceSecret) problems.push("RENDERER_SECRET must differ from AGENT_SERVICE_SECRET");
 
   if (problems.length) throw new ConfigError(problems);
@@ -102,6 +130,7 @@ export function loadHostedConfig(env: NodeJS.ProcessEnv): HostedConfig {
     appOrigin,
     accessRequestPepper,
     limits,
+    ...(turnstile && { turnstile }),
     ...(local && { localStack: true as const }),
   };
 }

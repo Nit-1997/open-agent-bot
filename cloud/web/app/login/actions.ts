@@ -11,6 +11,7 @@ import { appOrigin, ConfigError } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
 const UNAVAILABLE = "Can't send links right now. Try again in a minute.";
+const NOT_VERIFIED = "We couldn't verify that. Try again.";
 
 export async function signInWithGoogle(form: FormData): Promise<void> {
   const origin = appOrigin();
@@ -34,13 +35,16 @@ export async function requestEmailLink(_prev: EmailLinkState, form: FormData): P
   const email = normalizeEmail(form.get("email"));
   if (!email) return { status: "invalid", message: "Enter a valid email address." };
   const ip = clientIp(await headers());
+  const captcha = form.get("captchaToken");
+  const captchaToken = typeof captcha === "string" && captcha ? captcha.slice(0, 2048) : undefined;
   try {
     const res = await agentFetch("/auth/email-link", null, {
       method: "POST",
       headers: { "content-type": "application/json", ...(ip && { "x-client-ip": ip }) },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, ...(captchaToken && { captchaToken }) }),
     });
     if (res.status >= 500) return { status: "error", message: UNAVAILABLE };
+    if (res.status === 403) return { status: "invalid", message: NOT_VERIFIED };
   } catch (e) {
     if (e instanceof ConfigError) throw e;
     return { status: "error", message: UNAVAILABLE };
