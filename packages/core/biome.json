@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["src/**/*.ts", "!src/hosted/store/database.types.ts", "evals/**/*.ts", "test/**/*.ts"]
+    "includes": ["src/**/*.ts", "evals/**/*.ts", "test/**/*.ts"]
   },
   "formatter": {
     "enabled": true,
@@ -48,7 +48,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/**", "!src/hosted/**", "!src/server.ts", "!src/scripts/rotateCredentials.ts", "!src/local/store/**"],
+      "includes": ["src/**", "!src/local/store/**"],
       "linter": {
         "rules": {
           "style": {
@@ -95,70 +95,6 @@
                   {
                     "group": ["**/hosted/**", "@supabase/*", "jose", "@oab/core", "@oab/core/**"],
                     "message": "Core must not import hosted implementations."
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "includes": ["src/server.ts", "src/scripts/rotateCredentials.ts"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "patterns": [
-                  {
-                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
-                    "message": "Nothing outside cloud/ may import from cloud/."
-                  },
-                  {
-                    "group": ["node:sqlite"],
-                    "message": "node:sqlite is used only inside src/local/store."
-                  },
-                  {
-                    "group": ["**/local/**", "@oab/core/local", "@oab/core/local/**"],
-                    "message": "Only src/local may import local modules."
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "includes": ["src/hosted/**"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "patterns": [
-                  {
-                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
-                    "message": "Nothing outside cloud/ may import from cloud/."
-                  },
-                  {
-                    "group": ["@oab/core/hosted", "@oab/core/hosted/**"],
-                    "message": "Hosted files import other hosted files by relative path."
-                  },
-                  {
-                    "group": ["@oab/core/scripts", "@oab/core/scripts/**"],
-                    "message": "Scripts are entry points; hosted code must not import them."
-                  },
-                  {
-                    "group": ["@oab/core/identity/local*", "@oab/core/identity/local*/**"],
-                    "message": "Hosted code must not use a local identity."
-                  },
-                  {
-                    "group": ["@oab/core/local", "@oab/core/local/**", "node:sqlite"],
-                    "message": "Hosted code must not use the local store."
                   }
                 ]
               }

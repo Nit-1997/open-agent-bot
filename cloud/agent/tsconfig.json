@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false,
+    "resolveJsonModule": true,
+    "rewriteRelativeImportExtensions": true,
+    "paths": {
+      "typebox": [
+        "../../node_modules/typebox/build/index.d.mts"
+      ],
+      "typebox/value": [
+        "../../node_modules/typebox/build/value/index.d.mts"
+      ]
+    },
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/shared"
+    },
+    {
+      "path": "../../packages/bff"
+    }
+  ]
+}

@@ -41,22 +41,28 @@ describe("@oab/core self-reference", () => {
     });
   });
 
-  it("exports everything in dist except hosted/*, local/* and scripts/*", () => {
+  it("exports everything in dist except local/* and scripts/*", () => {
     const pkg = JSON.parse(readFileSync(join(CORE, "package.json"), "utf8"));
-    expect(pkg.exports).toEqual({ "./*": "./dist/*", "./hosted/*": null, "./local/*": null, "./scripts/*": null });
+    expect(pkg.exports).toEqual({ "./*": "./dist/*", "./local/*": null, "./scripts/*": null });
   });
 
-  it.each([
-    "@oab/core/hosted/config.js",
-    "@oab/core/hosted/store/client.js",
-    "@oab/core/scripts/rotateCredentials.js",
-    "@oab/core/local/start.js",
-    "@oab/core/local/store/sqliteStore.js",
-  ])("R2: node refuses %s with ERR_PACKAGE_PATH_NOT_EXPORTED", (specifier) => {
-    const r = nodeImport(specifier);
-    expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain("ERR_PACKAGE_PATH_NOT_EXPORTED");
-  });
+  it.each(["@oab/core/hosted/config.js", "@oab/core/hosted/store/client.js"])(
+    "R2: node finds no %s (core has no hosted modules)",
+    (specifier) => {
+      const r = nodeImport(specifier);
+      expect(r.status).not.toBe(0);
+      expect(r.stderr).toContain("ERR_MODULE_NOT_FOUND");
+    },
+  );
+
+  it.each(["@oab/core/scripts/rotateCredentials.js", "@oab/core/local/start.js", "@oab/core/local/store/sqliteStore.js"])(
+    "R2: node refuses %s with ERR_PACKAGE_PATH_NOT_EXPORTED",
+    (specifier) => {
+      const r = nodeImport(specifier);
+      expect(r.status).not.toBe(0);
+      expect(r.stderr).toContain("ERR_PACKAGE_PATH_NOT_EXPORTED");
+    },
+  );
 
   it("R2: node resolves @oab/core/lib/errors.js from the build", () => {
     const r = nodeImport("@oab/core/lib/errors.js");

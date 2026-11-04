@@ -58,5 +58,5 @@ ENV NODE_ENV=production
 ENV COPILOTKIT_TELEMETRY_DISABLED=true
 ENV OPEN_AGENT_VERSION=${OPEN_AGENT_VERSION}
 WORKDIR /app/packages/core
-EXPOSE 8000
-CMD ["node", "dist/server.js"]
+EXPOSE 3000
+CMD ["node", "dist/local/main.js"]

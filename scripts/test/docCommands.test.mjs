@@ -988,7 +988,7 @@ describe("hosted docs moved out of the README", () => {
       "`docker compose -f compose.hosted.yml --profile ollama up -d`",
       "`docker compose -f compose.hosted.yml exec agent node dist/scripts/rotateCredentials.js`",
       "npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w e2e",
-      "`cd packages/core && npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5`",
+      "`cd cloud/agent && COPILOTKIT_TELEMETRY_DISABLED=true npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5`",
     ])
       assert.ok(HOSTED.includes(s), `docs/hosted.md lacks ${s}`);
   });

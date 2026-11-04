@@ -1,1 +1,81 @@
-[]
+[
+  {
+    "old": "packages/core/src/hosted",
+    "new": "cloud/agent/src",
+    "pr": "6.4",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/move/**",
+        "reason": "the move verifier names the moved paths to classify the move commits"
+      }
+    ]
+  },
+  {
+    "old": "packages/core/src/server.ts",
+    "new": "cloud/agent/src/server.ts",
+    "pr": "6.4",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/move/**",
+        "reason": "the move verifier names the moved paths to classify the move commits"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture-only paths written into a temp repo to test the deleted-entry case"
+      }
+    ]
+  },
+  {
+    "old": "packages/core/src/scripts/rotateCredentials.ts",
+    "new": "cloud/agent/src/scripts/rotateCredentials.ts",
+    "pr": "6.4",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/move/**",
+        "reason": "the move verifier names the moved paths to classify the move commits"
+      }
+    ]
+  },
+  {
+    "old": "packages/core/test/hosted",
+    "new": "cloud/agent/test",
+    "pr": "6.4",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/move/**",
+        "reason": "the move verifier names the moved paths to classify the move commits"
+      }
+    ]
+  },
+  {
+    "old": "packages/core/evals/auth/hosted.ts",
+    "new": "cloud/agent/evals/auth/hosted.ts",
+    "pr": "6.4",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/move/**",
+        "reason": "the move verifier names the moved paths to classify the move commits"
+      }
+    ]
+  }
+]

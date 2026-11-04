@@ -9,7 +9,8 @@
     "packages/*",
     "apps/*",
     "web",
-    "e2e"
+    "e2e",
+    "cloud/*"
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",

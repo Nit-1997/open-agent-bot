@@ -8,7 +8,8 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": "src",
-    "declaration": false,
+    "composite": true,
+    "declaration": true,
     "resolveJsonModule": true,
     "rewriteRelativeImportExtensions": true,
     "paths": {

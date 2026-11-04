@@ -8,13 +8,15 @@ const json = <T>(path: string) => JSON.parse(read(path)) as T;
 
 function workspaceDirs(): string[] {
   const { workspaces } = json<{ workspaces: string[] }>("package.json");
-  return workspaces.flatMap((glob) => {
-    if (!glob.endsWith("/*")) return [glob];
-    const parent = glob.slice(0, -2);
-    return readdirSync(join(ROOT, parent), { withFileTypes: true })
-      .filter((d) => d.isDirectory() && existsSync(join(ROOT, parent, d.name, "package.json")))
-      .map((d) => `${parent}/${d.name}`);
-  });
+  return workspaces
+    .filter((glob) => !glob.startsWith("cloud/"))
+    .flatMap((glob) => {
+      if (!glob.endsWith("/*")) return [glob];
+      const parent = glob.slice(0, -2);
+      return readdirSync(join(ROOT, parent), { withFileTypes: true })
+        .filter((d) => d.isDirectory() && existsSync(join(ROOT, parent, d.name, "package.json")))
+        .map((d) => `${parent}/${d.name}`);
+    });
 }
 
 const DOCKERFILES = ["packages/core/Dockerfile", "web/Dockerfile"];

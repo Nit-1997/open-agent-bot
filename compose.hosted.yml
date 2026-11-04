@@ -32,7 +32,7 @@ services:
   agent:
     build:
       context: .
-      dockerfile: packages/core/Dockerfile
+      dockerfile: cloud/agent/Dockerfile
     env_file:
       - path: deploy-config/.env-agent
         required: true

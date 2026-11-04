@@ -48,6 +48,28 @@ jobs:
         env:
           COPILOTKIT_TELEMETRY_DISABLED: "true"
 
+  cloud:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run lint -w @oab/cloud-agent
+      - run: npm run format:check -w @oab/cloud-agent
+      - run: npm run typecheck -w @oab/cloud-agent
+      - run: npm test -w @oab/cloud-agent
+      - run: npm run build -w @oab/cloud-agent
+
   compose:
     runs-on: ubuntu-latest
     steps:
@@ -117,7 +139,7 @@ jobs:
       - name: A private 0700 temp dir, as the desktop jobs use
         run: mkdir -m 700 "$TMPDIR"
       - name: Remove cloud/, then install, lint, type-check, test and build the rest; build and start the local stack; build the Mac app
-        run: bash scripts/ci/standalone.sh --docker
+        run: bash scripts/ci/standalone.sh --docker --hosted-free
 
   local-stack:
     if: github.event_name == 'pull_request'

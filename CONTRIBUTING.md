@@ -12,7 +12,7 @@ npm ci && npx playwright install chromium
 
 To run the local stack, follow the [README](README.md); the hosted stack (Supabase, web app, Caddy) is in [docs/hosted.md](docs/hosted.md). To work on one side of the hosted stack, run the other in Docker and point at it:
 
-- Agent: `cd packages/core && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared` and then the agent into `packages/core/dist/`; settings in the reference table in docs/hosted.md). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
+- Agent: `cd cloud/agent && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table in docs/hosted.md). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
 - Web: `cd web && set -a && . ../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" in docs/hosted.md). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
@@ -28,10 +28,11 @@ CI runs these on every pull request. Run them from the repo root before you push
 | `@oab/ui` | `npm run lint -w @oab/ui && npm run format:check -w @oab/ui && npm run typecheck -w @oab/ui && npm test -w @oab/ui` (no build: consumed as TypeScript source) |
 | `@oab/bff` | `npm run lint -w @oab/bff && npm run format:check -w @oab/bff && npm run typecheck -w @oab/bff && npm test -w @oab/bff && npm run build -w @oab/bff` |
 | `@oab/local-web` | `npm run lint -w @oab/local-web && npm run format:check -w @oab/local-web && npm run typecheck -w @oab/local-web && npm test -w @oab/local-web && npm run build -w @oab/local-web` (the Vite build lands in `packages/local-web/dist/`, which the local agent serves) |
+| `@oab/cloud-agent` | `npm run lint -w @oab/cloud-agent && npm run format:check -w @oab/cloud-agent && npm run typecheck -w @oab/cloud-agent && npm test -w @oab/cloud-agent && npm run build -w @oab/cloud-agent` (the hosted agent; unit tests only) |
 | `web` | `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web` |
 | root | `npm run lint:scripts && npm run format:check:scripts` (Biome over `scripts/**/*.mjs`, also run by the root `lint` and `format:check`) and `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, and the unique-id scan over `packages/ui/src`, `packages/local-web/src`, `web/app` and `web/components`; `node scripts/ids-static.mjs` prints `ids: N/N`) |
 
-Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `test/hosted/supabase/` run against the real Supabase project with `npm run test:supabase`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
+Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `cloud/agent/test/supabase/` run against the real Supabase project with `npm run test:supabase -w @oab/cloud-agent`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
 
 The local stack's store uses `node:sqlite`. The host and CI run Node 22, but the agent image runs Node 24, so CI's `sqlite-node24` job also runs the SQLite store and local entry tests in the agent's base image (Node 24). Run the same check from the repo root before you change `src/local/`:
 
@@ -83,7 +84,7 @@ APP_ORIGIN=http://127.0.0.1:18330 npm run local -w e2e
 
 Remove the test stack and its volumes afterwards with `docker compose -p oab-e2e down -v`.
 
-`npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` (from `packages/core`, with `COPILOTKIT_TELEMETRY_DISABLED=true`) runs the scenarios in `packages/core/evals/scenarios/` against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. Live runs cost money; `--only a,b` and `--runs N` keep them small. `--target hosted` (the default) is the signed-in path in docs/hosted.md "Evals".
+`npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` (from `packages/core`, with `COPILOTKIT_TELEMETRY_DISABLED=true`) runs the scenarios in `packages/core/evals/scenarios/` against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. Live runs cost money; `--only a,b` and `--runs N` keep them small. `local` is core's only target; the signed-in `--target hosted` runs from `cloud/agent` (docs/hosted.md "Evals").
 
 ## Mac app
 
@@ -143,7 +144,6 @@ Tests never write `open-agent:local`: with `OPEN_AGENT_SHELL_TEST=1` the script 
 
 ```
 packages/core/src/
-  server.ts            the container entry (Docker CMD node dist/server.js): only imports hosted/main.js
   startAgent.ts        the composition root: startAgent(deps) wires the store, identity, key wrapper,
                        run policy, provider hubs, sessions and extra routes, and starts the server
   app.ts               composes the HTTP routes in http/ and the mounted routes behind the guards
@@ -154,7 +154,6 @@ packages/core/src/
   secrets/             envelope AES-256-GCM for provider credentials, the KeyWrapper, CREDENTIAL_KEYS
                        parsing (keys.ts), hints, the credential store and secretsFor(store, wrapper)
   policy/              the RunPolicy port and LocalRunPolicy (per-user rate limit and concurrency)
-  scripts/             operator scripts run inside the container (credential key rotation)
   local/               the local single-user stack (one container, SQLite, no Supabase)
     main.ts            entry (Docker CMD node dist/local/main.js): sets umask 077 first, then startLocal,
                        refuses with a fixed exit code, and closes on SIGINT/SIGTERM
@@ -182,15 +181,6 @@ packages/core/src/
       files.ts         report files (html, pdf, jpg) under reports/<user id>/, with checked ids and paths
       errors.ts        StoreOpenError for the open-time refusals, and sqliteError (SQLite codes → user errors)
       clock.ts         a monotonic ISO clock, so timestamps never repeat or go backwards
-  hosted/              the hosted (Supabase) implementation; moves to cloud/agent in M6
-    main.ts            entry: loadHostedConfig → hostedAgentDeps → startAgent → signals
-    deps.ts, config.ts, gateway.ts, routes.ts, ambientEnv.ts
-    store/             Supabase client, the Store over Supabase, admin and rotation repositories
-    identity/          JWT verification (JWKS, ES256), active-user cache, capabilities, admin guard
-    admin/             approve/invite/deactivate/delete, Supabase Auth admin adapter
-    access/            request-access and email-link service (IP pepper, padding, limits)
-    http/              the access and admin routes
-    secrets/           credential key rotation
   http/                artifacts, chats, providers (model admin), profile, settings, onboarding
                        (places, chip options), reports, search, agui (chat stream), copilotkit (the
                        CopilotKit runtime at /copilotkit: allowlist, owner checks, connect cap, heartbeat);
@@ -274,6 +264,18 @@ web/
                        exactly app/, components/, lib/ and packages/ui/src (never tests or fixtures)
   components/          cloud-only UI: admin, landing, auth, session (the hosted platform slots)
   lib/                 hosted platform (platform/hosted.tsx), Supabase auth, route rules, CSP, env
+cloud/agent/src/       the @oab/cloud-agent package: the hosted (Supabase) implementation, built from cloud/agent/Dockerfile
+  server.ts            entry (Docker CMD node dist/server.js): loadHostedConfig → hostedAgentDeps → startAgent → signals
+  deps.ts, config.ts, gateway.ts, routes.ts, ambientEnv.ts
+  store/               Supabase client, the Store over Supabase, admin and rotation repositories
+  identity/            JWT verification (JWKS, ES256), active-user cache, capabilities, admin guard
+  admin/               approve/invite/deactivate/delete, Supabase Auth admin adapter
+  access/              request-access and email-link service (IP pepper, padding, limits)
+  http/                the access and admin routes
+  secrets/             credential key rotation
+  scripts/             operator scripts run inside the container (rotateCredentials.ts)
+cloud/agent/test/      the hosted tests and their harness (fixtures/hostedApp.ts wraps core's makeApp); evals/run.ts
+                       registers --target hosted on core's evals runner
 e2e/                   Playwright checks: the local stack (see "End-to-end tests and evals on the local stack"), the Mac
                        app (playwright.desktop.config.ts) and the hosted preview (docs/hosted.md "End-to-end demo")
 scripts/release/       one script per release step (gate, image checks, index and lock checks, notes, sums, dry run);
@@ -286,12 +288,12 @@ scripts/test/          node --test suites for the root scripts, the workflows, t
 
 ### Hosted boundary
 
-Core never depends on the hosted implementation; the hosted code depends on core only through its ports.
+Core never depends on the hosted implementation; the hosted code in `cloud/agent` depends on core only through its ports.
 
-- Hosted files import core as `@oab/core/<path>.js` (a self-reference through the `exports` map in `packages/core/package.json`) and other hosted files by relative path. No relative import in `hosted/` leaves `hosted/`.
-- `@oab/core/hosted/*` and `@oab/core/scripts/*` are blocked: the `exports` map sets them to `null`, and the boundary test refuses them in any letter case. Hosted code never imports `@oab/core/identity/local*`.
-- Outside `hosted/`, nothing imports `hosted/` (except the entries `server.ts` and `scripts/rotateCredentials.ts`), `@supabase/*`, `jose` or `@oab/core/*`.
-- Rules B1–B6 (spec `docs/superpowers/specs/2026-11-02-m1-seams-design.md`, "Boundary rules") are enforced by `packages/core/test/lint/hostedBoundary.test.ts` over every `src/**/*.ts` and by `noRestrictedImports` overrides in `packages/core/biome.json`.
+- Hosted files import core as `@oab/core/<path>.js` (core's `exports` map in `packages/core/package.json`; `cloud/agent` builds against core's declarations through a project reference) and other hosted files by relative path.
+- `@oab/core/scripts/*` and `@oab/core/local/*` are blocked: the `exports` map sets them to `null`. Core has no hosted modules. Hosted code never imports `@oab/core/identity/local*`, `@oab/core/local/*` or `node:sqlite` (`noRestrictedImports` in `cloud/agent/biome.json`).
+- Nothing in `packages/core` imports `cloud/`, `@supabase/*`, `jose` or `@oab/core/*`, with no exceptions: `noRestrictedImports` in `packages/core/biome.json` over all of `src/**`, and `packages/core/test/lint/noHostedInCoreTests.test.ts` over `src`, `test`, `evals` and `package.json`.
+- Rules B1–B6 (spec `docs/superpowers/specs/2026-11-02-m1-seams-design.md`, "Boundary rules") are checked by `cloud/agent/test/lint/hostedBoundary.test.ts` over core's `src/**/*.ts` together with `cloud/agent/src` (as `hosted/`), with the refusal fixtures in `packages/core/test/lint/hostedBoundary.test.ts`.
 
 ## Adding a tool
 

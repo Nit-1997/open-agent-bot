@@ -13,5 +13,11 @@
   { "file": "packages/core/test/lint/noCloudImports.test.ts", "reason": "Biome refusal fixtures: cloud import strings linted in a temp folder" },
   { "file": "packages/core/test/lint/hostedBoundary.test.ts", "reason": "Biome refusal fixture: a cloud import string linted in a temp folder" },
   { "file": "e2e/support/cloudImports.test.ts", "reason": "Biome refusal fixtures: cloud import strings linted in a temp folder" },
-  { "file": "web/test/lint/noCloudImports.test.ts", "reason": "ESLint refusal fixtures for the web app; the file is deleted when web moves to cloud/web (6.5, D8)" }
+  { "file": "web/test/lint/noCloudImports.test.ts", "reason": "ESLint refusal fixtures for the web app; the file is deleted when web moves to cloud/web (6.5, D8)" },
+  { "file": "package.json", "reason": "the root workspaces list includes \"cloud/*\" (D12); npm skips the folder when cloud/ is deleted" },
+  { "file": "compose.hosted.yml", "reason": "the hosted compose file builds cloud/agent/Dockerfile until it moves to cloud/deploy in 6.6 (D12; row deleted in 6.6)" },
+  { "file": "packages/core/test/deploy/workspaceLayout.test.ts", "reason": "skips the cloud/* workspace glob so the test covers non-cloud workspaces only and never reads cloud/ (D12 R2-3)" },
+  { "file": "scripts/test/workspaceLayout.test.mjs", "reason": "skips the cloud/* workspace glob so the test covers non-cloud workspaces only and never reads cloud/ (D12 R2-3)" },
+  { "file": "scripts/test/composeLayout.test.mjs", "reason": "compares the root compose.hosted.yml agent dockerfile value with the string cloud/agent/Dockerfile; never reads cloud/ (moves to cloud/deploy/test in 6.6)" },
+  { "file": "supabase/scripts/gen-types.mjs", "reason": "writes the generated types to cloud/agent/src/store/database.types.ts (D15); moves to cloud/supabase in 6.6" }
 ]

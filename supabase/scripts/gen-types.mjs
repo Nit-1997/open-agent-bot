@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "packages", "core", "src", "hosted", "store", "database.types.ts");
+const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "cloud", "agent", "src", "store", "database.types.ts");
 
 const env = (name) => {
   const v = process.env[name]?.trim();
