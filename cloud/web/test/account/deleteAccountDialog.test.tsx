@@ -56,6 +56,26 @@ describe("the profile's Delete my account (profileDanger)", () => {
     expect(el("delete-account-dialog")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(button));
   });
+
+  it("closes only the dialog on Escape, never the profile drawer behind it", () => {
+    const onClose = vi.fn();
+    renderWithPlatform(
+      <ProfileDrawer
+        profile={{ ...emptyProfile(), name: "Nitin", onboardedAt: "2026-10-30" }}
+        models={null}
+        onSave={async () => {}}
+        onClose={onClose}
+        onRestart={() => {}}
+        onClear={() => {}}
+      />,
+    );
+    fireEvent.click(el("profile-delete-account")!);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(el("delete-account-dialog")).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("DeleteAccountDialog", () => {
@@ -93,7 +113,7 @@ describe("DeleteAccountDialog", () => {
     const { onDeleted } = mount();
     type(TEST_USER.email);
     await act(async () => {
-      fireEvent.submit(el("delete-account-dialog")!);
+      fireEvent.submit(el("delete-account-form")!);
     });
     expect(el("delete-account-error")).toHaveAttribute("role", "alert");
     expect(el("delete-account-error")).toHaveTextContent(message);
@@ -105,7 +125,7 @@ describe("DeleteAccountDialog", () => {
     mount();
     type("someone@example.test");
     await act(async () => {
-      fireEvent.submit(el("delete-account-dialog")!);
+      fireEvent.submit(el("delete-account-form")!);
     });
     expect(deleteOwnAccount).not.toHaveBeenCalled();
   });

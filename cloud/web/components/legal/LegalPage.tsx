@@ -43,7 +43,10 @@ export function LegalPage({ id, doc }: { id: keyof typeof OTHER; doc: LegalDoc }
   const other = OTHER[id];
   return (
     <main id={id} className="min-h-dvh w-full px-4 py-10">
-      <article id={`${id}-card`} className="glass mx-auto w-full max-w-[720px] space-y-4 rounded-[28px] p-6 sm:p-10">
+      <article
+        id={`${id}-card`}
+        className="mx-auto w-full max-w-[720px] space-y-4 rounded-[28px] border border-border bg-bg p-6 shadow-lift sm:p-10"
+      >
         <nav id={`${id}-nav`} aria-label="Legal" className="flex justify-between text-[13px] text-text-muted">
           <Link id={`${id}-home`} href="/" className="underline-offset-2 hover:underline">
             Open Agent
