@@ -81,6 +81,18 @@ export async function sql<T extends pg.QueryResultRow = pg.QueryResultRow>(text:
   return (await pool.query<T>(text, params)).rows;
 }
 
+export function roleDbUrl(role: "supabase_auth_admin"): string {
+  const u = new URL(localEnv().dbUrl);
+  u.username = role;
+  return u.toString();
+}
+
+export async function connectAs(role: "supabase_auth_admin"): Promise<pg.Client> {
+  const client = new pg.Client({ connectionString: roleDbUrl(role) });
+  await client.connect();
+  return client;
+}
+
 export const testEmail = (tag = "user") => `oab-m7+${tag}-${randomUUID().slice(0, 8)}@example.test`;
 
 const tracked = new Set<string>();

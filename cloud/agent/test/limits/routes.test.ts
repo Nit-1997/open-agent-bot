@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type AuthEnv, NO_CAPABILITIES, type Principal } from "@oab/core/identity/types.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { HumanCheckState, Limits, UsageView } from "@oab/shared/usage";
-import type { HumanCheckGate } from "../../src/limits/humanCheckStub.js";
+import type { HumanCheckGate } from "../../src/signup/humanCheck.js";
 import { HostedRunPolicy } from "../../src/limits/policy.js";
 import { usageRoutes } from "../../src/limits/routes.js";
 import { RunSlots } from "../../src/limits/slots.js";

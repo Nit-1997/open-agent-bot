@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { adminHooks, hostedAgentDeps, startLimitTimers } from "../src/deps.js";
+import { adminHooks, hostedAgentDeps, humanVerifierFor, startLimitTimers } from "../src/deps.js";
 import { HostedRunPolicy } from "../src/limits/policy.js";
 import { FakeUsageStore } from "./limits/fakeUsage.js";
 import { hostedGateway } from "../src/gateway.js";
@@ -28,6 +28,7 @@ describe("hostedAgentDeps", () => {
       ["public", "/"],
       ["protected", "/admin"],
       ["protected", "/usage"],
+      ["protected", "/human-check"],
     ]);
   });
 
@@ -81,6 +82,38 @@ describe("hostedAgentDeps request limits", () => {
     stop();
     await vi.advanceTimersByTimeAsync(3_600_000);
     expect(usage.prune).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("humanVerifierFor", () => {
+  it("logs that open mode needs a secret and builds no verifier without one", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(humanVerifierFor({ appOrigin: "https://app.example" })).toBeUndefined();
+    expect(warn.mock.calls.flat().join(" ")).toContain("[signup] open mode needs TURNSTILE_SECRET_KEY");
+  });
+
+  it("checks APP_ORIGIN's hostname without the port, and accepts the recorded test response only for a test secret in local-stack mode", async () => {
+    const reply = (body: object) => vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(body)));
+    const ok = { success: true, hostname: "localhost", action: "human_check" };
+    const test = { success: true, hostname: "example.com", metadata: { result_with_testing_key: true } };
+    const pass = "1x0000000000000000000000000000000AA";
+    reply(ok);
+    expect(
+      await humanVerifierFor({ appOrigin: "http://localhost:18721", turnstile: { secret: pass }, localStack: true })!.verify("t", {
+        action: "human_check",
+      }),
+    ).toBe("ok");
+    reply(test);
+    expect(
+      await humanVerifierFor({ appOrigin: "http://localhost:18721", turnstile: { secret: pass }, localStack: true })!.verify("t", {
+        action: "human_check",
+      }),
+    ).toBe("ok");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    reply(test);
+    expect(
+      await humanVerifierFor({ appOrigin: "http://localhost:18721", turnstile: { secret: pass } })!.verify("t", { action: "human_check" }),
+    ).toBe("failed");
   });
 });
 

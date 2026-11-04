@@ -6,7 +6,7 @@ import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { Limits } from "@oab/shared/usage";
 import { drain, errorCodes, holdUntilAbort, pullUntil, runWorld, toolCallOf } from "../../../../packages/core/test/agui/runWorld.js";
 import type { Script } from "../../../../packages/core/test/agui/fakeSession.js";
-import { humanCheckOff } from "../../src/limits/humanCheckStub.js";
+import { humanCheckOff } from "../fixtures/humanCheck.js";
 import { HostedRunPolicy } from "../../src/limits/policy.js";
 import { RunSlots } from "../../src/limits/slots.js";
 import { CHAT_1, CHAT_2 } from "../fixtures/users.js";

@@ -53,6 +53,7 @@ const ROUTES: Probe[] = [
     body: { name: "A", email: "a@example.test", note: "", formToken: "" },
   },
   { route: "/auth/email-link", method: "POST", path: "/auth/email-link", body: { email: "a@example.test" } },
+  { route: "/signup", method: "GET", path: "/signup" },
   { route: "/agui", method: "POST", path: "/agui", body: { threadId: CHAT_1, runId: "run-1", messages: [] } },
   { route: "/chats", method: "GET", path: "/chats" },
   { route: "/chats/:id", method: "GET", path: `/chats/${CHAT_1}` },
@@ -81,6 +82,7 @@ const ROUTES: Probe[] = [
   { route: "/providers/:id/models", method: "PUT", path: "/providers/openrouter/models", body: { enabled: [] } },
   { route: "/artifacts/:file", method: "GET", path: `/artifacts/${ID}.pdf` },
   { route: "/usage", method: "GET", path: "/usage" },
+  { route: "/human-check", method: "POST", path: "/human-check", body: { token: "t" } },
   { route: "/admin/access-requests", method: "GET", path: "/admin/access-requests" },
   { route: "/admin/access-requests/:id/approve", method: "POST", path: `/admin/access-requests/${ID}/approve`, body: {} },
   { route: "/admin/access-requests/:id/reject", method: "POST", path: `/admin/access-requests/${ID}/reject`, body: {} },
@@ -127,6 +129,7 @@ const USER_PATHS = [
   "/reports/*",
   "/search",
   "/usage",
+  "/human-check",
 ];
 
 const key = (p: Probe) => `${p.method} ${p.path}`;

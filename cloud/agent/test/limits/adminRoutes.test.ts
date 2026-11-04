@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_CAPABILITIES, type Principal } from "@oab/core/identity/types.js";
 import type { PageResponse } from "@oab/shared/pages";
-import { type AdminUsageDetail, type AdminUsageRow, type AdminUsageSummary, type Limits, nextUtcMonth } from "@oab/shared/usage";
+import {
+  type AdminUsageDetail,
+  type AdminUsageRow,
+  type AdminUsageSummary,
+  type Limits,
+  nextUtcMonth,
+  type SignupMode,
+  type SignupStats,
+} from "@oab/shared/usage";
 import { UsageRepoError } from "../../src/limits/usageRepo.js";
 import { makeHostedApp } from "../fixtures/hostedApp.js";
 import { fakeUsageDeps, TEST_LIMITS } from "../fixtures/usage.js";
@@ -11,11 +19,18 @@ const T0 = Date.parse("2026-11-04T10:00:00.000Z");
 const LIMITS: Limits = { ...TEST_LIMITS, perMonth: 3 };
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
-async function seeded(n: number, opts: { limits?: Limits; signupMode?: () => Promise<"waitlist" | "unknown"> } = {}) {
+type SeedOptions = {
+  limits?: Limits;
+  signupMode?: () => Promise<SignupMode | "unknown">;
+  signupStats?: () => Promise<SignupStats>;
+};
+
+async function seeded(n: number, opts: SeedOptions = {}) {
   const clock = { now: T0 };
   const h = await makeHostedApp({
     usage: (limiter) => fakeUsageDeps(limiter, opts.limits ?? LIMITS, () => new Date(clock.now)),
     ...(opts.signupMode && { signupMode: opts.signupMode }),
+    ...(opts.signupStats && { signupStats: opts.signupStats }),
   });
   const people: Principal[] = [];
   for (let i = 1; i <= n; i++) {
@@ -77,7 +92,7 @@ describe("GET /admin/usage/summary", () => {
       running: { now: 1, limit: 8, staleReleased: 0 },
       limits: LIMITS,
       signupMode: "waitlist",
-      signups: null,
+      signups: { lastHour: 0, lastDay: 0, capHour: 20, capDay: 100 },
     });
     if (ticket.ok) ticket.ticket.end();
     expect((await get<AdminUsageSummary>("/admin/usage/summary")).body.running.now).toBe(0);
@@ -90,6 +105,26 @@ describe("GET /admin/usage/summary", () => {
     ).toBe("unknown");
     const broken = await seeded(0, { signupMode: async () => Promise.reject(new Error("down")) });
     expect((await broken.get<AdminUsageSummary>("/admin/usage/summary")).body.signupMode).toBe("unknown");
+  });
+
+  it("shows the real signup mode and the signup counts against their caps", async () => {
+    const { get } = await seeded(0, {
+      signupMode: async () => "open",
+      signupStats: async () => ({ lastHour: 4, lastDay: 31, capHour: 20, capDay: 100 }),
+    });
+    const { body } = await get<AdminUsageSummary>("/admin/usage/summary");
+    expect(body.signupMode).toBe("open");
+    expect(body.signups).toEqual({ lastHour: 4, lastDay: 31, capHour: 20, capDay: 100 });
+  });
+
+  it("shows signups as null when the signup stats lookup fails, and keeps the rest", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { get } = await seeded(1, { signupStats: async () => Promise.reject(new Error("stats down")) });
+    const { status, body } = await get<AdminUsageSummary>("/admin/usage/summary");
+    expect(status).toBe(200);
+    expect(body.signups).toBeNull();
+    expect(body.month.total).toBe(1);
+    expect(warn.mock.calls.flat().join(" ")).toContain("signup stats lookup failed");
   });
 
   it("answers 503 usage_unavailable when the database fails, never zero numbers", async () => {

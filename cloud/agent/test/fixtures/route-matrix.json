@@ -47,6 +47,7 @@
     "GET /reports/:id",
     "GET /search",
     "GET /settings",
+    "GET /signup",
     "GET /usage",
     "OPTIONS /*",
     "POST /access-requests",
@@ -57,6 +58,7 @@
     "POST /admin/users/:id/reactivate",
     "POST /agui",
     "POST /auth/email-link",
+    "POST /human-check",
     "POST /providers/:id/key",
     "POST /providers/:id/login",
     "POST /providers/local",
@@ -419,6 +421,125 @@
         "error": null,
         "content-type": "application/json",
         "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      }
+    },
+    "GET /signup": {
+      "NO_SECRET": {
+        "status": 401,
+        "error": "unauthorized",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "SECRET_NO_BEARER": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "WRONG_SECRET": {
+        "status": 401,
+        "error": "unauthorized",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ALICE": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "BOB": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ADMIN": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "DEACTIVATED": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "STATUS_THROWS": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "JWKS_DOWN": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "EXPIRED": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "INVALID": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ADMIN_NOT_LIVE": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ADMIN_LIVE_THROWS": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": "no-store",
         "content-security-policy": null,
         "x-content-type-options": null,
         "content-disposition": null
@@ -3638,6 +3759,125 @@
       }
     },
     "GET /usage": {
+      "NO_SECRET": {
+        "status": 401,
+        "error": "unauthorized",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "SECRET_NO_BEARER": {
+        "status": 401,
+        "error": "signed_out",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "WRONG_SECRET": {
+        "status": 401,
+        "error": "unauthorized",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ALICE": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "BOB": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ADMIN": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "DEACTIVATED": {
+        "status": 403,
+        "error": "account_disabled",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "STATUS_THROWS": {
+        "status": 503,
+        "error": "auth_unavailable",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "JWKS_DOWN": {
+        "status": 503,
+        "error": "auth_unavailable",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "EXPIRED": {
+        "status": 401,
+        "error": "signed_out",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "INVALID": {
+        "status": 401,
+        "error": "signed_out",
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ADMIN_NOT_LIVE": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      },
+      "ADMIN_LIVE_THROWS": {
+        "status": 200,
+        "error": null,
+        "content-type": "application/json",
+        "cache-control": null,
+        "content-security-policy": null,
+        "x-content-type-options": null,
+        "content-disposition": null
+      }
+    },
+    "POST /human-check": {
       "NO_SECRET": {
         "status": 401,
         "error": "unauthorized",

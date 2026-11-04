@@ -17,6 +17,7 @@ const FORBIDDEN = {
 const SCANNED_FILES = [
   "cloud/supabase/scripts/local-stack.mjs",
   "cloud/supabase/scripts/blocked-domains.mjs",
+  "cloud/supabase/scripts/managementApi.mjs",
   "cloud/supabase/scripts/gen-types.mjs",
 ];
 const SCANNED_DIRS = ["cloud/agent/test/local", "cloud/supabase/test", "scripts/demo/m7"];
@@ -30,6 +31,10 @@ const FIXTURES = {
   "cloud/supabase/test/genTypes.test.mjs": {
     counts: { linked: 2 },
     reason: "refusal fixtures: gen-types.mjs must refuse --linked and never pass it to the CLI",
+  },
+  "cloud/supabase/test/blockedDomains.test.mjs": {
+    counts: { "supabase-co": 1 },
+    reason: "refusal fixture: a live database host that blocked-domains.mjs --local must refuse",
   },
   "cloud/agent/test/local/harnessGuard.test.ts": {
     counts: { "supabase-co": 3 },

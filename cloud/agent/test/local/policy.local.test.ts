@@ -7,7 +7,7 @@ import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { Limits } from "@oab/shared/usage";
 import { nextUtcMonth } from "@oab/shared/usage";
 import { drain, errorCodes, holdUntilAbort, pullUntil, runWorld } from "../../../../packages/core/test/agui/runWorld.js";
-import { humanCheckOff } from "../../src/limits/humanCheckStub.js";
+import { humanCheckOff } from "../fixtures/humanCheck.js";
 import { HostedRunPolicy } from "../../src/limits/policy.js";
 import { RunSlots } from "../../src/limits/slots.js";
 import { checkUsageFunctions } from "../../src/limits/startup.js";

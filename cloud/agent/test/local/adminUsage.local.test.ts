@@ -4,6 +4,7 @@ import type { PageResponse } from "@oab/shared/pages";
 import type { AdminUsageDetail, AdminUsageRow, AdminUsageSummary, Limits } from "@oab/shared/usage";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createSignupSettings } from "../../src/signup/settings.js";
 import { usageAdminRoutes } from "../../src/limits/adminRoutes.js";
 import { createUsageRepo } from "../../src/limits/usageRepo.js";
 import { createAdminRepo } from "../../src/store/admin.js";
@@ -34,6 +35,7 @@ beforeAll(async () => {
     for (let n = 0; n < admits; n++) expect((await repo.admit(u.id)).ok).toBe(true);
   }
   const running = users[11]!.id;
+  const signup = createSignupSettings(db());
   app = new Hono<AuthEnv>();
   app.use(async (c, next) => {
     c.set("user", { id: randomUUID(), email: "admin@example.test", capabilities: { ...NO_CAPABILITIES, admin: true } });
@@ -46,7 +48,8 @@ beforeAll(async () => {
       policy: { snapshot: () => ({ running: 1, staleReleased: 0, runningOf: (id) => (id === running ? 1 : 0) }) },
       limits: LIMITS,
       profiles: createAdminRepo(db()).users,
-      signupMode: async () => "waitlist",
+      signupMode: () => signup.mode(),
+      signupStats: () => signup.stats(),
       now: () => clock.now,
     }),
   );
@@ -71,7 +74,7 @@ describe("admin usage routes on the local stack", () => {
       running: { now: 1, limit: 8 },
       limits: LIMITS,
       signupMode: "waitlist",
-      signups: null,
+      signups: { capHour: 20, capDay: 100, lastHour: expect.any(Number), lastDay: expect.any(Number) },
     });
   });
 
