@@ -66,6 +66,7 @@ describe(".dockerignore", () => {
     ".git",
     "node_modules",
     "docs/superpowers/specs/x-design.md",
+    ".claude/settings.local.json",
   ]) {
     it(`excludes ${name}`, () => assert.equal(ignored(name), true));
   }

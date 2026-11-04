@@ -28,3 +28,4 @@ cloud/supabase/.branches
 apps/desktop/release
 apps/desktop/build
 docs/superpowers
+**/.claude
