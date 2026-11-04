@@ -38,6 +38,14 @@ describe("desktopSlots", () => {
   it("a bridge → an accountMenuExtra item", () => {
     expect(Object.keys(desktopSlots({ openServices: () => {} }))).toEqual(["accountMenuExtra"]);
   });
+
+  it("never sets the hosted usage meter or the run refusal notice", () => {
+    for (const bridge of [undefined, null, {}, { openServices: () => {} }]) {
+      const slots = desktopSlots(bridge);
+      expect(slots.usageMeter).toBeUndefined();
+      expect(slots.runRefusal).toBeUndefined();
+    }
+  });
 });
 
 describe("the account menu with the desktop bridge", { timeout: 20000 }, () => {

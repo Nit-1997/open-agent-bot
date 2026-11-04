@@ -5,6 +5,9 @@ import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@oab/ui/components/AccountMenu.tsx";
 import { ProfileDrawer } from "@oab/ui/components/profile/ProfileDrawer.tsx";
+import { RUN_REFUSAL_CODES } from "@oab/shared/runRefusals";
+import { RefusalNotice } from "@/components/usage/RefusalNotice";
+import { UsageMeter } from "@/components/usage/UsageMeter";
 import { hostedPlatform, nextRouter } from "@/lib/platform/hosted";
 import { expectUniqueIds } from "../../../../packages/ui/test/support/ids.ts";
 import { nav } from "../support/navigation";
@@ -73,7 +76,7 @@ describe("hosted platform", () => {
     expectUniqueIds(container);
   });
 
-  it("uses native history, the given user and the hosted slots without a usage meter", () => {
+  it("uses native history, the given user and the hosted slots with the usage meter and the refusal notice", () => {
     const platform = hostedPlatform({ email: "a@b.test", name: "A", isAdmin: true });
     expect(platform.router).toBe(nextRouter);
     expect(platform.router.history).toBe(nativeHistory);
@@ -81,11 +84,19 @@ describe("hosted platform", () => {
     expect(Object.keys(platform.slots).sort()).toEqual([
       "accessDisabledNotice",
       "accountMenuExtra",
+      "runRefusal",
       "signOut",
       "signOutEverywhere",
       "signedOutNotice",
+      "usageMeter",
     ]);
-    expect(platform.slots.usageMeter).toBeUndefined();
+    expect(platform.slots.usageMeter).toBe(UsageMeter);
+    expect(platform.slots.runRefusal?.Notice).toBe(RefusalNotice);
+    expect([...(platform.slots.runRefusal?.codes ?? [])]).toEqual([...RUN_REFUSAL_CODES]);
+    const member = hostedPlatform({ email: "m@b.test", name: "M", isAdmin: false });
+    expect(member.slots.usageMeter).toBe(UsageMeter);
+    expect(member.slots.runRefusal).toBe(platform.slots.runRefusal);
+    expect(member.slots.accountMenuExtra).toBeUndefined();
   });
 
   it("configures the API client for /api once", () => {

@@ -59,6 +59,7 @@
   { "file": "api/reports/route.ts", "url": "/api/reports", "signedOut": "json 401", "user": "pass", "admin": "pass" },
   { "file": "api/search/route.ts", "url": "/api/search", "signedOut": "json 401", "user": "pass", "admin": "pass" },
   { "file": "api/settings/[[...path]]/route.ts", "url": "/api/settings", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/usage/route.ts", "url": "/api/usage", "signedOut": "json 401", "user": "pass", "admin": "pass" },
   {
     "file": "api/settings/[[...path]]/route.ts",
     "url": "/api/settings/brave-search/key",
