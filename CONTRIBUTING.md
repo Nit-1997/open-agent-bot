@@ -279,14 +279,15 @@ cloud/e2e/             the @oab/cloud-e2e package: hosted preview Playwright spe
 cloud/deploy/          the @oab/cloud-deploy package: the hosted compose file and its preview override, caddy/, litellm/,
                        renderer/, searxng/, env.examples/, scripts/env-files.mjs, doc-commands.json (the owner-only
                        commands of cloud/README.md) and the hosted deploy tests
-cloud/README.md        the hosted deployment: run, develop, e2e, evals, and the Gate 6/7 switch-over runbook
-cloud/SECURITY.md      the hosted threat model and known limitations
+cloud/README.md        the hosted deployment: run, develop, e2e, evals, request limits, signup modes, the Gate 6/7 switch-over
+                       and the Gate 8 (M7 migrations) and Gate 9 (open signups) runbooks
+cloud/SECURITY.md      the hosted threat model, the limits, signups and account deletion, and the accepted risks
 scripts/release/       one script per release step (gate, image checks, index and lock checks, notes, sums, dry run);
                        release.yml and the dry run call only these, and scripts/test/ tests each one
 scripts/docs/          the docs-commands extractor, its manifest (doc-commands.json), the scratch-clone runner and
                        fill-digests.mjs (the release digests in INSTALL section 9)
-scripts/demo/          the milestone demo parts the verifier records (m<n>/part-<n>.sh, m<n>/lib.sh) and their
-                       static checks (partChecks.mjs)
+scripts/demo/          the milestone demo parts the verifier records (m<n>/part-<n>.sh, m<n>/lib.sh), the M7 demo's
+                       local-stack helpers (m7/users.mjs, m7/browser.mjs) and their static checks (partChecks.mjs)
 scripts/boundary/      the cloud boundary check (cloud-boundary.mjs, allow.json) and the stale-path guard (moved-paths.*)
 scripts/move/          verify-move.mjs: classifies the commits of a move PR (renames, import lines, path lines, other)
 scripts/ci/            standalone.sh: removes cloud/ from a fresh clone and checks, builds and runs the rest
@@ -360,7 +361,7 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 - Keys are added in the app and stored encrypted by the agent. Settings live in `cloud/deploy/.env-*` and `cloud/deploy/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `cloud/deploy/env.examples/`. Move them from an older checkout with `cloud/deploy/scripts/env-files.mjs` (see cloud/README.md).
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
 - **Base pins.** The Playwright base image (the `v<x>-noble` tag with its `@sha256:` digest, as in the Node 24 command above) is the same everywhere it appears (the agent Dockerfile, the workflows, this file, the README, `docs/` and `scripts/`), and `<x>` equals the `playwright` pin in `packages/core/package.json` and `@playwright/test` in `e2e/package.json`; the SearXNG base is pinned by digest, and no workflow image runs without a digest. `scripts/test/basePins.test.mjs` enforces it, so a base change is one PR that updates all of them.
-- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). The shell blocks of `cloud/README.md` (the Gate 7 runbook) are listed in `cloud/deploy/doc-commands.json`, every one `owner` with a reason (`cloud/deploy/test/docs.test.mjs` checks it); pass `--owner-docs cloud/deploy/doc-commands.json` to the runner to list them in its log and TSV. Keep other docs' commands in inline code or non-shell blocks.
+- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). The shell blocks of `cloud/README.md` (the Gate 7, 8 and 9 runbooks) are listed in `cloud/deploy/doc-commands.json`, every one `owner` with a reason (`cloud/deploy/test/docs.test.mjs` checks it); pass `--owner-docs cloud/deploy/doc-commands.json` to the runner to list them in its log and TSV. Keep other docs' commands in inline code or non-shell blocks.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).
 
 ## Safety rails

@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { ghost, input } from "@oab/ui/components/profile/models/styles.ts";
 
-const danger =
-  "rounded-full bg-danger-bg px-3.5 py-1.5 text-[12px] font-medium text-danger-fg transition hover:opacity-85 disabled:opacity-40";
+const danger = "rounded-full bg-danger-fg px-3.5 py-1.5 text-[12px] font-medium text-bg transition hover:opacity-85 disabled:opacity-40";
 
 export function ConfirmDialog(props: {
   id: string;
@@ -36,48 +35,53 @@ export function ConfirmDialog(props: {
         disabled={busy}
         className="absolute inset-0 bg-black/30"
       />
-      <form
+      <div
         id={`${id}-panel`}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-body`}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ready && !busy) props.onConfirm(typed.trim());
-        }}
-        className="relative w-full max-w-[420px] space-y-3 rounded-2xl border border-border bg-bg p-5 shadow-lift"
+        className="relative w-full max-w-[420px] rounded-2xl border border-border bg-bg p-5 shadow-lift"
       >
-        <h2 id={`${id}-title`} className="font-display text-[22px] leading-none text-text-primary">
-          {props.title}
-        </h2>
-        <p id={`${id}-body`} className="text-sm text-text-secondary">
-          {props.body}
-        </p>
-        {requireText && (
-          <div id={`${id}-typed`} className="space-y-1">
-            <label id={`${id}-input-label`} htmlFor={`${id}-input`} className="block text-[12px] text-text-muted">
-              {`Type ${requireText} to confirm`}
-            </label>
-            <input
-              id={`${id}-input`}
-              autoFocus
-              autoComplete="off"
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              className={input}
-            />
+        <form
+          id={`${id}-form`}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (ready && !busy) props.onConfirm(typed.trim());
+          }}
+          className="space-y-3"
+        >
+          <h2 id={`${id}-title`} className="font-display text-[22px] leading-none text-text-primary">
+            {props.title}
+          </h2>
+          <p id={`${id}-body`} className="text-sm text-text-secondary">
+            {props.body}
+          </p>
+          {requireText && (
+            <div id={`${id}-typed`} className="space-y-1">
+              <label id={`${id}-input-label`} htmlFor={`${id}-input`} className="block text-[12px] text-text-muted">
+                {`Type ${requireText} to confirm`}
+              </label>
+              <input
+                id={`${id}-input`}
+                autoFocus
+                autoComplete="off"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                className={input}
+              />
+            </div>
+          )}
+          <div id={`${id}-actions`} className="flex justify-end gap-2">
+            <button id={`${id}-cancel`} type="button" autoFocus={!requireText} disabled={busy} onClick={onCancel} className={ghost}>
+              Cancel
+            </button>
+            <button id={`${id}-confirm`} type="submit" disabled={!ready || busy} className={danger}>
+              {busy ? "Working…" : props.confirmLabel}
+            </button>
           </div>
-        )}
-        <div id={`${id}-actions`} className="flex justify-end gap-2">
-          <button id={`${id}-cancel`} type="button" autoFocus={!requireText} disabled={busy} onClick={onCancel} className={ghost}>
-            Cancel
-          </button>
-          <button id={`${id}-confirm`} type="submit" disabled={!ready || busy} className={danger}>
-            {busy ? "Working…" : props.confirmLabel}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

@@ -14,6 +14,9 @@ const COMPOSE = "-f cloud/deploy/compose.hosted.yml";
 const SWITCH = "## Switch-over after M6 (owner only)";
 const GATE6 = "## Vercel (Gate 6)";
 const GATE7 = "## Move the live stack to `cloud/deploy` (Gate 7)";
+const GATE8 = "## Apply the M7 migrations (Gate 8)";
+const GATE9 = "## Open signups (Gate 9)";
+const CLOSE = "### Emergency close";
 const before = (text, heading) => (text.includes(heading) ? text.slice(0, text.indexOf(heading)) : text);
 const section = (from, to) => {
   const a = HOSTED.indexOf(from);
@@ -117,7 +120,20 @@ describe("hosted docs moved out of the README", () => {
 describe("switch-over runbook (Gates 6 and 7)", () => {
   it("orders the sections: run, develop, e2e, evals, then the switch-over and both gates", () => {
     let at = -1;
-    for (const h of ["## Run the hosted stack", "## Develop the hosted stack", "## End-to-end demo", "## Evals", SWITCH, GATE6, GATE7]) {
+    for (const h of [
+      "## Run the hosted stack",
+      "## Develop the hosted stack",
+      "## End-to-end demo",
+      "## Evals",
+      "## Request limits",
+      "## Signup modes",
+      SWITCH,
+      GATE6,
+      GATE7,
+      GATE8,
+      GATE9,
+      CLOSE,
+    ]) {
       const i = HOSTED.indexOf(`\n${h}\n`);
       assert.ok(i > at, `${h} missing or out of order`);
       at = i;
@@ -163,7 +179,7 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
       assert.ok(g6.includes(s), `Gate 6 lacks ${s}`);
   });
   it("Gate 7 holds the D18 commands, in order, with the retag rollback", () => {
-    const g7 = section(GATE7);
+    const g7 = section(GATE7, GATE8);
     const steps = [
       "**Never `git pull` the old checkout before the switch.**",
       'OLD="<path of the old checkout>"',
@@ -209,7 +225,7 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
     assert.doesNotMatch(HOSTED, /\/Users\/|worksimulation/);
     const g6 = section(GATE6, GATE7);
     assert.ok(g6.includes("do steps 3 to 5 of the sitting back to back instead"));
-    const g7 = section(GATE7);
+    const g7 = section(GATE7, GATE8);
     for (const s of [
       "`CADDYFILE`, `CADDY_BIND` and `COMPOSE_PROFILES`",
       "the same `--profile` flags",
@@ -231,6 +247,138 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
   });
 });
 
+const inOrder = (text, steps, what) => {
+  let at = -1;
+  for (const s of steps) {
+    const i = text.indexOf(s, at + 1);
+    assert.ok(i > at, `${what} lacks (or misorders) ${s}`);
+    at = i;
+  }
+};
+
+describe("M7 runbooks (Gates 8 and 9)", () => {
+  const LIVE = '"$LIVE_DB_URL"';
+  const PLAN = "node cloud/supabase/scripts/check-push-plan.mjs";
+  const BODIES = "node cloud/supabase/scripts/check-old-bodies.mjs";
+  const ADMIN_ENV = "set -a; . cloud/deploy/env-files/.env-supabase-admin; set +a";
+
+  it("documents the request limits, the single-process slots and the three signup modes", () => {
+    const limits = section("## Request limits", "## Signup modes");
+    for (const s of ["`LIMIT_RUNNING_PER_USER`", "`LIMIT_REQUESTS_PER_MONTH`", "`usage_unavailable`", "admins included", "database leases"])
+      assert.ok(limits.includes(s), `Request limits lacks ${s}`);
+    const modes = section("## Signup modes", SWITCH);
+    for (const s of ["| `invite` |", "| `waitlist` |", "| `open` |", "`signups_per_ip_day`", "Turnstile", "two months"])
+      assert.ok(modes.includes(s), `Signup modes lacks ${s}`);
+    assert.match(HOSTED, /\| `TURNSTILE_SECRET_KEY` \| unset \|/);
+  });
+
+  it("Gate 8 runs D21 in order: check, URL, old bodies, dry run, history repair, push, check, agent, merge, smoke", () => {
+    const g8 = section(GATE8, GATE9);
+    inOrder(
+      g8,
+      [
+        "`20261104092535_request_usage.sql`",
+        "`20261104113650_signup_modes.sql`",
+        "don't use `supabase link`",
+        "needs no `config.toml`",
+        "**session pooler**",
+        "`?sslmode=require`",
+        ADMIN_ENV,
+        "node cloud/supabase/scripts/configure-auth.mjs --check",
+        "read -s LIVE_DB_URL",
+        "unset LIVE_DB_URL",
+        `psql ${LIVE} -XAtc "select pg_get_functiondef('private.before_user_created(jsonb)'::regprocedure)`,
+        `psql ${LIVE} -XAtc "$(${BODIES} --query)" | ${BODIES}`,
+        "exit 3 means the history needs repair",
+        `supabase --workdir cloud db push --db-url ${LIVE} --dry-run | ${PLAN}`,
+        "History repair, only after exit 3",
+        "may be empty",
+        "`pre-M7 objects present`",
+        `psql ${LIVE} -XAtc "$(${PLAN} --pre-m7-query)"`,
+        `supabase --workdir cloud migration repair --status applied $(${PLAN} --pre-m7-versions) --db-url ${LIVE}`,
+        `supabase --workdir cloud db push --db-url ${LIVE}\n`,
+        `supabase --workdir cloud db push --db-url ${LIVE} --dry-run | ${PLAN} --applied`,
+        "unset LIVE_DB_URL",
+        "`signup mode: waitlist, no drift`",
+        "`[limits]`",
+        LIVE_UP,
+        "Merge `revamp/m7` into `main`",
+        "test-users.mjs --human-checked",
+        "APP_ORIGIN=http://localhost:18300 npm run smoke -w @oab/cloud-e2e",
+        "**Rollback.**",
+        "read -s LIVE_DB_URL",
+        `psql ${LIVE} -v ON_ERROR_STOP=1 -f cloud/supabase/rollback/m7.sql`,
+        `psql ${LIVE} -XAtc "$(${BODIES} --query)" | ${BODIES}`,
+        "unset LIVE_DB_URL",
+      ],
+      "Gate 8",
+    );
+  });
+
+  it("Gate 8 never exports the URL, writes it to a file or puts it on a command line literally, and unsets it after every read", () => {
+    const g8 = section(GATE8, GATE9);
+    assert.doesNotMatch(HOSTED, /export\s+LIVE_DB_URL|LIVE_DB_URL=/);
+    assert.doesNotMatch(HOSTED, /postgres(?:ql)?:\/\/[^\s"`]*@/);
+    const cmds = extractCommands(g8, "cloud/README.md").map((c) => c.command);
+    const reads = cmds.filter((c) => c === "read -s LIVE_DB_URL").length;
+    assert.equal(reads, 2);
+    assert.ok(cmds.filter((c) => c === "unset LIVE_DB_URL").length >= reads);
+    for (const c of cmds.filter((x) => x.includes("LIVE_DB_URL") && !/^(read -s|unset) LIVE_DB_URL$/.test(x)))
+      assert.ok(c.includes(LIVE) || c.startsWith('case "$LIVE_DB_URL"'), `unquoted URL: ${c}`);
+    for (const c of cmds.filter((x) => /\bdb push\b/.test(x))) assert.ok(c.includes(`--db-url ${LIVE}`), c);
+    assert.ok(!cmds.some((c) => /supabase (link|config push)|--linked/.test(c)));
+  });
+
+  it("Gate 9 runs the owner steps in order and ends with the open command, then the emergency close", () => {
+    const g9 = section(GATE9);
+    inOrder(
+      g9,
+      [
+        "`LIMIT_REQUESTS_PER_MONTH`",
+        "`public.signup_settings`",
+        "update public.signup_settings set signups_per_hour",
+        "Turnstile → Add widget",
+        "Vercel preview hostname",
+        "`TURNSTILE_SECRET_KEY`",
+        "`NEXT_PUBLIC_TURNSTILE_SITE_KEY`",
+        "redeploy the web app on Vercel",
+        "redeploy the agent",
+        "grep -cE '^TURNSTILE_SECRET_KEY=[0-9]x0{30,}[A-Z]{2}$' cloud/deploy/.env-agent",
+        "grep -cE '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=[0-9]x0{20}[A-Z]{2}$' cloud/deploy/.env-nextjs",
+        ADMIN_ENV,
+        "node cloud/supabase/scripts/blocked-domains.mjs --apply",
+        "node cloud/supabase/scripts/blocked-domains.mjs --check",
+        "`<!-- DRAFT-NOT-REVIEWED -->`",
+        "grep -c DRAFT-NOT-REVIEWED cloud/web/content/terms.md cloud/web/content/privacy.md",
+        "Vercel → Firewall",
+        "`/login`, `/auth/*` and `/api/human-check`",
+        "client IP forwarding",
+        "Resend",
+        "`SMTP_SENDER_EMAIL`",
+        "`cloud-supabase`",
+        "browser tool from your egress IP",
+        "fill the global signup caps",
+        "SIGNUP_MODE=open node cloud/supabase/scripts/configure-auth.mjs --apply --i-confirm-open-signups",
+        "SIGNUP_MODE=open node cloud/supabase/scripts/configure-auth.mjs --check",
+        "admin Usage tab",
+        CLOSE,
+        "turns GoTrue's signups off first",
+        "existing accounts keep working",
+        ADMIN_ENV,
+        "SIGNUP_MODE=waitlist node cloud/supabase/scripts/configure-auth.mjs --apply",
+      ],
+      "Gate 9",
+    );
+  });
+
+  it("names the agent host only through the placeholder", () => {
+    const g9 = section(GATE9);
+    assert.ok(g9.includes('AGENT_HOST="<public agent host>"'));
+    assert.ok(g9.includes("`<APP_HOST>`"));
+    assert.doesNotMatch(g9, /https:\/\/[a-z0-9-]+\.[a-z]/i);
+  });
+});
+
 describe("cloud/SECURITY.md", () => {
   const SEC = read("cloud/SECURITY.md");
   const ROOT_SEC = read("SECURITY.md");
@@ -242,7 +390,10 @@ describe("cloud/SECURITY.md", () => {
       .replace(" The full design is `docs/superpowers/specs/2026-10-31-supabase-auth-design.md`.", "");
     assert.notEqual(want, old);
     const added = SEC.slice(SEC.indexOf("- **Request limits.**"), SEC.indexOf("- **Agent host.**"));
-    assert.match(added, /^- \*\*Request limits\.\*\* [^\n]+\n- \*\*Admin capabilities\.\*\* [^\n]+\n$/);
+    assert.match(
+      added,
+      /^- \*\*Request limits\.\*\* [^\n]+\n- \*\*Admin capabilities\.\*\* [^\n]+\n- \*\*Signups\.\*\* [^\n]+\n- \*\*Human check\.\*\* [^\n]+\n- \*\*Account deletion\.\*\* [^\n]+\n$/,
+    );
     const m7 = want
       .replace("- **Agent host.**", `${added}- **Agent host.**`)
       .replace(/\n### Known limitations\n\n- \*\*Stale admin capabilities\.\*\* [^\n]+\n/, "");
@@ -256,6 +407,30 @@ describe("cloud/SECURITY.md", () => {
     assert.match(linesOf(SEC)[0], /^# /);
     assert.deepEqual(htmlProblems(SEC), []);
   });
+  it("states the M7 signup, human-check and delete rules and ends with the accepted risks", () => {
+    for (const s of [
+      "only a Google sign-up",
+      "throwaway list",
+      "invited ones included",
+      "fails closed",
+      "test keys are refused outside the local test stack",
+      "peppered SHA-256 of the email",
+      "up to two months",
+    ])
+      assert.ok(SEC.includes(s), `cloud/SECURITY.md lacks ${s}`);
+    const risks = SEC.slice(SEC.indexOf("\n### Accepted risks\n"));
+    assert.ok(SEC.indexOf("\n### Accepted risks\n") > SEC.indexOf("- **Agent host.**"));
+    for (const s of [
+      "drive the agent's browser tool, and its requests leave from the owner's network and IP address",
+      "private-network guard stays on",
+      "fill the hourly or daily signup cap",
+      "Bots can drive Google's sign-in flow",
+      "best effort",
+      "Gate 9 in [README.md](README.md)",
+    ])
+      assert.ok(risks.includes(s), `Accepted risks lacks ${s}`);
+  });
+
   it("SECURITY.md keeps only the pointer", () => {
     const hosted = ROOT_SEC.slice(ROOT_SEC.indexOf("## Hosted service"));
     assert.match(hosted, /Hosted service: see \[cloud\/SECURITY\.md\]\(cloud\/SECURITY\.md\)\./);

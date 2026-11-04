@@ -218,6 +218,168 @@
       "command": "test \"$(wc -l < \"$HOME/open-agent-rollback.txt\")\" -eq \"$want\" && echo \"rollback tags: $want\" || echo \"STOP: expected $want rollback tags\"",
       "mode": "owner",
       "reason": "Gate 7 (owner): checks the owner's rollback note in the real home folder"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "set -a; . cloud/deploy/env-files/.env-supabase-admin; set +a",
+      "mode": "owner",
+      "reason": "Gates 8 and 9 (owner): loads the owner's Management API token and production keys; builders and verifiers never read this file in M7"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "node cloud/supabase/scripts/configure-auth.mjs --check",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): reads the production auth config through the Management API; the fake-API tests (configureAuth.test.mjs, demo part 6) cover it"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "read -s LIVE_DB_URL",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): reads the production database URL at a silent prompt, unexported and out of the history; nothing in the factory holds it"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "case \"$LIVE_DB_URL\" in *pooler.supabase.com:5432/*sslmode=require*) echo \"session pooler URL\" ;; *) echo \"STOP: not a session pooler URL with sslmode=require\"; unset LIVE_DB_URL ;; esac",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): checks the shape of the production URL the owner pasted; it names a live host pattern"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "psql \"$LIVE_DB_URL\" -XAtc \"select pg_get_functiondef('private.before_user_created(jsonb)'::regprocedure) union all select pg_get_functiondef('private.handle_new_user()'::regprocedure)\" > \"$HOME/open-agent-m7-old-functions.sql\"",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): saves the live function bodies into the owner's home folder; reads production"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "psql \"$LIVE_DB_URL\" -XAtc \"$(node cloud/supabase/scripts/check-old-bodies.mjs --query)\" | node cloud/supabase/scripts/check-old-bodies.mjs",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): compares the live bodies with rollback/m7.sql; rehearsed on oab-m7-g8 in demo part 2, unit-tested in checkOldBodies.test.mjs"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "supabase --workdir cloud db push --db-url \"$LIVE_DB_URL\" --dry-run | node cloud/supabase/scripts/check-push-plan.mjs",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): dry-runs the push against production; rehearsed against oab-m7-g8 in demo part 2, unit-tested in checkPushPlan.test.mjs"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "psql \"$LIVE_DB_URL\" -XAtc \"$(node cloud/supabase/scripts/check-push-plan.mjs --pre-m7-query)\"",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): history repair: confirms the pre-M7 objects on production (read-only); rehearsed on oab-m7-g8 in demo part 2"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "supabase --workdir cloud migration repair --status applied $(node cloud/supabase/scripts/check-push-plan.mjs --pre-m7-versions) --db-url \"$LIVE_DB_URL\"",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): history repair: writes the production migration history; rehearsed on oab-m7-g8 (history emptied first) in demo part 2"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "supabase --workdir cloud db push --db-url \"$LIVE_DB_URL\"",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): applies the two M7 migrations to production; rehearsed with local-stack.mjs push on oab-m7-g8 in demo part 2"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "supabase --workdir cloud db push --db-url \"$LIVE_DB_URL\" --dry-run | node cloud/supabase/scripts/check-push-plan.mjs --applied",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): confirms production has nothing left to push; rehearsed on oab-m7-g8 in demo part 2"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "unset LIVE_DB_URL",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): forgets the production URL in the owner's shell; part of the owner-only sequence above"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml logs --tail 50 agent | grep -E '\\[limits\\]|refusing to start'",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): reads the live agent's log; the factory never reads live container logs"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "P=\"docker compose -p oab-preview --env-file .env --env-file cloud/deploy/.env-nextjs -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local\"",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): the hosted preview against the production project, which can start on M7 code only after the push; a variable assignment"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "APP_ORIGIN=http://localhost:18300 npm run smoke -w @oab/cloud-e2e",
+      "mode": "owner",
+      "reason": "Gate 8 (owner): creates and removes real Supabase test users against the hosted preview; runs only after the push"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "psql \"$LIVE_DB_URL\" -v ON_ERROR_STOP=1 -f cloud/supabase/rollback/m7.sql",
+      "mode": "owner",
+      "reason": "Gate 8 rollback (owner): restores the old function bodies on production; rehearsed on oab-m7-g8 in demo part 2 and in tombstone.local.test.ts and signup.local.test.ts (applied in a rolled-back transaction)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "grep -cE '^TURNSTILE_SECRET_KEY=[0-9]x0{30,}[A-Z]{2}$' cloud/deploy/.env-agent",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): pattern check on the owner's production settings file (count only); the factory never reads .env-agent in M7"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "grep -cE '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=[0-9]x0{20}[A-Z]{2}$' cloud/deploy/.env-nextjs",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): pattern check on the owner's production settings file (count only)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "grep -c '^TURNSTILE_SECRET_KEY=.' cloud/deploy/.env-agent",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): checks the owner's real Turnstile secret is set (count only)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "grep -c '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=.' cloud/deploy/.env-nextjs",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): checks the owner's real Turnstile site key is set (count only)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "node cloud/supabase/scripts/blocked-domains.mjs --apply",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): writes the throwaway list to production through the Management API; --apply --local is tested on the local stack (signup.local.test.ts)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "node cloud/supabase/scripts/blocked-domains.mjs --check",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): reads the production list through the Management API"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "grep -c DRAFT-NOT-REVIEWED cloud/web/content/terms.md cloud/web/content/privacy.md",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): run after the owner replaces or approves the legal drafts; on the factory's drafts it prints 1 for each file"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "curl -s -o /dev/null -w '%{http_code}\\n' \"https://$AGENT_HOST/profile\"",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): calls the live agent's public host"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "SIGNUP_MODE=open node cloud/supabase/scripts/configure-auth.mjs --apply --i-confirm-open-signups",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): opens production signups; the preconditions and the write order are tested against the fake Management API (configureAuth.test.mjs, demo part 6)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "SIGNUP_MODE=open node cloud/supabase/scripts/configure-auth.mjs --check",
+      "mode": "owner",
+      "reason": "Gate 9 (owner): reads the production auth config after opening"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "SIGNUP_MODE=waitlist node cloud/supabase/scripts/configure-auth.mjs --apply",
+      "mode": "owner",
+      "reason": "Emergency close (owner): closes production signups; the close order (disable_signup first) is tested against the fake Management API"
     }
   ]
 }
