@@ -80,7 +80,6 @@ export async function launchShell(env: ShellEnv, info: TestInfo, o: { video?: st
   if (!existsSync(join(DESKTOP, "dist/main.cjs"))) throw new Error("apps/desktop is not built: run npm run build -w @oab/desktop");
   ensureStaged();
   const app = await _electron.launch({
-    executablePath: ELECTRON,
     args: [DESKTOP],
     env: shellEnv(env),
     recordVideo: { dir: info.outputPath(o.video ?? "video"), size: { width: 1200, height: 800 } },

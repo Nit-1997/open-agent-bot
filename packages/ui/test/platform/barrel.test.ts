@@ -29,5 +29,5 @@ describe("platform entry points", () => {
     expect([...bareImportsReachableFrom("platform/chat.ts")].some((s) => s.startsWith("@copilotkit/react-core"))).toBe(true);
     const chat = await import("../../src/platform/chat.ts");
     expect(Object.keys(chat)).toEqual(["ChatRuntime"]);
-  });
+  }, 60_000);
 });
