@@ -1,5 +1,6 @@
 "use client";
 
+import type { SignupMode } from "@oab/shared/usage";
 import { useActionState, useState } from "react";
 import { authInput, authSecondary } from "@/components/auth/AuthCard";
 import { Turnstile } from "@/components/auth/Turnstile";
@@ -8,8 +9,13 @@ import { requestEmailLink } from "./actions";
 
 const INITIAL: EmailLinkState = { status: "idle" };
 
-const COPY = {
-  closed: {
+const COPY: Record<SignupMode, { sent: string; toggle: string; label: string }> = {
+  invite: {
+    sent: "If this email has been invited, a sign-in link is on its way.",
+    toggle: "Invited, but no Google account? Get a sign-in link by email",
+    label: "Already invited? Get a sign-in link by email.",
+  },
+  waitlist: {
     sent: "If this email has been invited, a sign-in link is on its way. Not invited yet? Request access below.",
     toggle: "Invited, but no Google account? Get a sign-in link by email",
     label: "Already invited? Get a sign-in link by email. This doesn't request access.",
@@ -19,17 +25,17 @@ const COPY = {
     toggle: "Have an account but no Google? Get a sign-in link by email",
     label: "Get a sign-in link by email. Links sign in existing accounts; new accounts are created with Google.",
   },
-} as const;
+};
 
-type Props = { startOpen?: boolean; open?: boolean; siteKey?: string };
+type Props = { startOpen?: boolean; mode?: SignupMode; siteKey?: string };
 
-export function EmailLinkForm({ startOpen = false, open: signupsOpen = false, siteKey }: Props) {
+export function EmailLinkForm({ startOpen = false, mode = "waitlist", siteKey }: Props) {
   const [state, action, pending] = useActionState(requestEmailLink, INITIAL);
   const [open, setOpen] = useState(startOpen);
   const [token, setToken] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const copy = signupsOpen ? COPY.open : COPY.closed;
-  const widgetKey = signupsOpen ? siteKey : undefined;
+  const copy = COPY[mode];
+  const widgetKey = mode === "open" ? siteKey : undefined;
   if (state.status === "sent") {
     return (
       <p id="login-email-sent" role="status" className="rounded-xl bg-surface px-3.5 py-3 text-sm text-text-secondary">

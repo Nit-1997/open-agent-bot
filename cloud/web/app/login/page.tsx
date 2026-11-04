@@ -48,7 +48,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           .
         </p>
       )}
-      <EmailLinkForm startOpen={!!error} open={open} siteKey={siteKey} />
+      <EmailLinkForm startOpen={!!error} mode={mode} siteKey={siteKey} />
       {mode === "waitlist" && (
         <div id="login-request" className="space-y-2 border-t border-border pt-5">
           <p id="login-request-text" className="text-center text-[13px] text-text-secondary">

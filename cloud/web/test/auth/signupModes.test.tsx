@@ -2,6 +2,7 @@ import type { SignupMode } from "@oab/shared/usage";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmailLinkForm } from "@/app/login/EmailLinkForm";
+import { requestEmailLink } from "@/app/login/actions";
 import LoginPage from "@/app/login/page";
 import RequestAccessPage from "@/app/request-access/page";
 import { signupMode } from "@/lib/signupMode";
@@ -52,11 +53,14 @@ describe("/login by signup mode", () => {
     expect(el("login-email-submit")).not.toBeDisabled();
   });
 
-  it("invite drops the request link", async () => {
+  it("invite drops the request link and its hint", async () => {
     asMode("invite");
     const { container } = await login();
     expect(container.textContent).toContain("Open Agent is invite-only.");
     expect(el("login-request")).toBeNull();
+    fireEvent.click(el("login-email-toggle")!);
+    expect(el("login-email-label")).toHaveTextContent("Already invited? Get a sign-in link by email.");
+    expect(el("login-email-label")).not.toHaveTextContent("request access");
   });
 
   it("open says Google creates accounts, shows the Terms/Privacy line and puts Turnstile (email_link) on the email form", async () => {
@@ -105,9 +109,39 @@ describe("/request-access by signup mode", () => {
   });
 });
 
+describe("EmailLinkForm copy by mode", () => {
+  const sentText = async (mode: SignupMode) => {
+    vi.mocked(requestEmailLink).mockResolvedValueOnce({ status: "sent" });
+    const { unmount } = render(<EmailLinkForm startOpen mode={mode} />);
+    const label = el("login-email-label")!.textContent;
+    fireEvent.change(el("login-email-input")!, { target: { value: "ntn@example.test" } });
+    await act(async () => {
+      fireEvent.submit(el("login-email-form")!);
+    });
+    await waitFor(() => expect(el("login-email-sent")).not.toBeNull());
+    const sent = el("login-email-sent")!.textContent;
+    unmount();
+    return { label, sent };
+  };
+
+  it("invite mode never points at a request-access link that isn't there", async () => {
+    const { label, sent } = await sentText("invite");
+    expect(label).toBe("Already invited? Get a sign-in link by email.");
+    expect(sent).toBe("If this email has been invited, a sign-in link is on its way.");
+    expect(sent).not.toContain("Request access");
+  });
+
+  it("waitlist mode keeps the request-access hint, open mode talks about accounts", async () => {
+    expect((await sentText("waitlist")).sent).toBe(
+      "If this email has been invited, a sign-in link is on its way. Not invited yet? Request access below.",
+    );
+    expect((await sentText("open")).sent).toBe("If this email has an account, a sign-in link is on its way.");
+  });
+});
+
 describe("EmailLinkForm without a site key in open mode", () => {
   it("renders no widget and lets the agent answer (503 → can't send links)", () => {
-    render(<EmailLinkForm startOpen open siteKey={undefined} />);
+    render(<EmailLinkForm startOpen mode="open" siteKey={undefined} />);
     expect(el("login-email-turnstile")).toBeNull();
     expect(el("login-email-submit")).not.toBeDisabled();
   });

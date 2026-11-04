@@ -47,3 +47,30 @@ describe("CSP with Turnstile", () => {
     expect(on.get("connect-src")).toEqual(["'self'"]);
   });
 });
+
+describe("next.config at build time", () => {
+  const load = async () => {
+    vi.resetModules();
+    return (await import("../../next.config")).default;
+  };
+
+  it("fails the build on a malformed key or a test key without a local Supabase, naming only the variable", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "not-a-key");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", HOSTED);
+    await expect(load()).rejects.toThrow("NEXT_PUBLIC_TURNSTILE_SITE_KEY is invalid");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA");
+    await expect(load()).rejects.toThrow(/NEXT_PUBLIC_TURNSTILE_SITE_KEY is a Cloudflare test key/);
+  });
+
+  it("builds with no key, a real key, or a test key against a local stack", async () => {
+    for (const [key, url] of [
+      ["", HOSTED],
+      [REAL, HOSTED],
+      ["1x00000000000000000000AA", LOCAL],
+    ] as const) {
+      vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", key);
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", url);
+      expect((await load()).poweredByHeader, `${key} ${url}`).toBe(false);
+    }
+  });
+});
