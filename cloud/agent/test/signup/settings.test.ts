@@ -71,6 +71,35 @@ describe("createSignupSettings().mode()", () => {
   });
 });
 
+describe("createSignupSettings() after a lookup failure", () => {
+  it("serves the last known mode when a later lookup fails, and logs it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const clock = { now: 0 };
+    let next: Answer = { data: row("open") };
+    const { db, calls } = fakeDb({ signup_settings_get: () => next });
+    const s = createSignupSettings(db, { now: () => clock.now, timeoutMs: 20 });
+    expect(await s.mode()).toBe("open");
+    clock.now = SIGNUP_SETTINGS_TTL_MS;
+    next = { throws: true };
+    expect(await s.mode()).toBe("open");
+    next = { data: row("invite") };
+    expect(await s.mode()).toBe("invite");
+    expect(calls).toHaveLength(3);
+    expect(warn.mock.calls.flat().join(" ")).toContain("[signup] mode lookup failed, serving the last known mode open");
+  });
+});
+
+describe("createSignupSettings().probe()", () => {
+  it("returns the mode, and throws the lookup error instead of answering unknown", async () => {
+    let next: Answer = { data: row("waitlist") };
+    const { db } = fakeDb({ signup_settings_get: () => next });
+    const s = createSignupSettings(db);
+    expect(await s.probe()).toBe("waitlist");
+    next = { error: { code: "PGRST202" } };
+    await expect(s.probe()).rejects.toMatchObject({ name: "SignupLookupError", code: "PGRST202" });
+  });
+});
+
 describe("createSignupSettings().stats()", () => {
   it("maps the counts and caps", async () => {
     const { db } = fakeDb({ signup_stats: () => ({ data: [{ last_hour: 4, last_day: 31, cap_hour: 20, cap_day: 100 }] }) });

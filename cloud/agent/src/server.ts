@@ -5,7 +5,7 @@ import { ambientProviderEnv } from "./ambientEnv.js";
 import { type HostedConfig, loadHostedConfig } from "./config.js";
 import { hostedAgentDeps } from "./deps.js";
 import { limitsLine } from "./limits/config.js";
-import { checkUsageFunctions, GATE8_REFUSAL } from "./limits/startup.js";
+import { checkSignupFunctions, checkUsageFunctions, GATE8_REFUSAL } from "./limits/startup.js";
 
 function fail(message: string): never {
   console.error(message);
@@ -28,6 +28,7 @@ if (ambient.length) {
 const hosted = hostedAgentDeps(cfg);
 log.info(limitsLine(cfg.limits));
 if ((await checkUsageFunctions(hosted.usage)) === "missing") fail(GATE8_REFUSAL);
+if ((await checkSignupFunctions(hosted.signup, hosted.verifierConfigured)) === "missing") fail(GATE8_REFUSAL);
 
 const agent = await startAgent(hosted.deps);
 

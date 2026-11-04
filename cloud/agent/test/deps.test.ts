@@ -87,10 +87,10 @@ describe("hostedAgentDeps request limits", () => {
 });
 
 describe("humanVerifierFor", () => {
-  it("logs that open mode needs a secret and builds no verifier without one", () => {
+  it("builds no verifier without a secret and logs nothing (the startup check warns only in open mode)", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(humanVerifierFor({ appOrigin: "https://app.example" })).toBeUndefined();
-    expect(warn.mock.calls.flat().join(" ")).toContain("[signup] open mode needs TURNSTILE_SECRET_KEY");
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("checks APP_ORIGIN's hostname without the port, and accepts the recorded test response only for a test secret in local-stack mode", async () => {

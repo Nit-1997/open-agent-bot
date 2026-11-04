@@ -1,14 +1,13 @@
 "use client";
 
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { HUMAN_CHECK_COPY } from "@/lib/humanCheckCopy";
 import { turnstileSiteKey } from "@/lib/turnstile";
+import { restoreFocus, useModalKeys } from "@/lib/useModalKeys";
 import { Turnstile } from "./Turnstile";
 
 type Phase = { kind: "waiting" } | { kind: "sending" } | { kind: "error"; message: string };
-
-const FOCUSABLE = 'button:not([disabled]), [href], input, iframe, [tabindex]:not([tabindex="-1"])';
 
 function siteKeyOrNull(): string | null {
   try {
@@ -41,39 +40,32 @@ export function HumanCheckDialog({ onDone, onCancel }: { onDone: () => void; onC
   const [attempt, setAttempt] = useState(0);
   const panel = useRef<HTMLDivElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
+  const live = useRef(true);
 
   useEffect(() => {
+    live.current = true;
     const before = document.activeElement as HTMLElement | null;
     cancel.current?.focus();
-    return () => before?.focus?.();
+    return () => {
+      live.current = false;
+      restoreFocus(before);
+    };
   }, []);
+
+  const close = () => {
+    live.current = false;
+    onCancel();
+  };
+
+  useModalKeys(panel, close);
 
   const onToken = async (token: string) => {
     setPhase({ kind: "sending" });
     const r = await confirmToken(token);
+    if (!live.current) return;
     if (r.ok) return onDone();
     setPhase({ kind: "error", message: r.message });
     setAttempt((n) => n + 1);
-  };
-
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onCancel();
-      return;
-    }
-    if (e.key !== "Tab" || !panel.current) return;
-    const items = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-    if (!items.length) return;
-    const first = items[0]!;
-    const last = items[items.length - 1]!;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
   };
 
   return createPortal(
@@ -85,7 +77,6 @@ export function HumanCheckDialog({ onDone, onCancel }: { onDone: () => void; onC
         aria-modal="true"
         aria-labelledby="human-check-title"
         aria-describedby="human-check-body"
-        onKeyDown={onKeyDown}
         className="w-full max-w-[400px] space-y-3 rounded-2xl border border-border bg-bg p-5 shadow-lift"
       >
         <h2 id="human-check-title" className="font-display text-[22px] leading-none text-text-primary">
@@ -120,7 +111,7 @@ export function HumanCheckDialog({ onDone, onCancel }: { onDone: () => void; onC
             id="human-check-cancel"
             ref={cancel}
             type="button"
-            onClick={onCancel}
+            onClick={close}
             className="rounded-full border border-border px-3.5 py-1.5 text-[12px] font-medium text-text-primary hover:border-border-strong focus-visible:outline-2 focus-visible:outline-mist-500"
           >
             {HUMAN_CHECK_COPY.cancel}

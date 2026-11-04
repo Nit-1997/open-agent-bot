@@ -1,5 +1,6 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Overlay } from "@oab/ui/components/shell/Overlay.tsx";
 import { HumanCheckDialog } from "@/components/auth/HumanCheckDialog";
 import { loadTurnstile } from "@/components/auth/Turnstile";
 import { TURNSTILE_SCRIPT } from "@/lib/turnstile";
@@ -19,6 +20,17 @@ afterEach(() => {
   vi.unstubAllEnvs();
   delete window.turnstile;
 });
+
+function widgetButton(): HTMLElement {
+  const widget = el("human-check-widget")!;
+  const existing = widget.querySelector<HTMLElement>("#human-check-widget-fake-box");
+  if (existing) return existing;
+  const box = document.createElement("button");
+  box.id = "human-check-widget-fake-box";
+  box.type = "button";
+  widget.append(box);
+  return box;
+}
 
 function mount() {
   const onDone = vi.fn();
@@ -114,17 +126,85 @@ describe("HumanCheckDialog", () => {
     }
   });
 
-  it("closes on Cancel and on Escape, and keeps Tab inside the dialog", async () => {
-    installFakeTurnstile();
+  it("closes on Cancel and on Escape, and wraps Tab between the widget and Cancel", async () => {
+    const t = installFakeTurnstile();
     const { onCancel } = mount();
-    fireEvent.click(el("human-check-cancel")!);
-    fireEvent.keyDown(el("human-check-dialog")!, { key: "Escape" });
+    await waitFor(() => expect(t.rendered).toHaveLength(1));
+    const box = widgetButton();
+    const cancel = el("human-check-cancel")!;
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "Tab" });
+    expect(document.activeElement).toBe(box);
+    fireEvent.keyDown(box, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(cancel);
+    box.focus();
+    fireEvent.keyDown(box, { key: "Tab" });
+    expect(document.activeElement).toBe(box);
+    fireEvent.click(cancel);
+    fireEvent.keyDown(cancel, { key: "Escape" });
     expect(onCancel).toHaveBeenCalledTimes(2);
-    el("human-check-cancel")!.focus();
-    fireEvent.keyDown(el("human-check-dialog")!, { key: "Tab" });
-    expect(document.activeElement).toBe(el("human-check-cancel"));
-    fireEvent.keyDown(el("human-check-dialog")!, { key: "Tab", shiftKey: true });
-    expect(document.activeElement).toBe(el("human-check-cancel"));
+  });
+
+  it("keeps Tab and Escape inside the dialog when it opens from a focus-trapped overlay", async () => {
+    const t = installFakeTurnstile();
+    const onClose = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <Overlay id="account-sheet" label="Account" side="right" onClose={onClose}>
+        <button id="account-sheet-first" type="button">
+          First
+        </button>
+        <button id="account-sheet-last" type="button">
+          Last
+        </button>
+        <HumanCheckDialog onDone={() => {}} onCancel={onCancel} />
+      </Overlay>,
+    );
+    await waitFor(() => expect(t.rendered).toHaveLength(1));
+    const box = widgetButton();
+    const cancel = el("human-check-cancel")!;
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "Tab" });
+    expect(document.activeElement).toBe(box);
+    fireEvent.keyDown(box, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(cancel);
+    fireEvent.keyDown(cancel, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("never calls onDone when Cancel is pressed while the check is being sent", async () => {
+    const t = installFakeTurnstile();
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((r) => (answer = r)));
+    const { onDone, onCancel, unmount } = mount();
+    await waitFor(() => expect(t.rendered).toHaveLength(1));
+    act(() => t.last().callback("tok-1"));
+    await waitFor(() => expect(el("human-check-sending")).not.toBeNull());
+    fireEvent.click(el("human-check-cancel")!);
+    expect(onCancel).toHaveBeenCalledOnce();
+    unmount();
+    await act(async () => answer(Response.json({ humanCheck: "done" })));
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("returns focus to the opener, or to the composer when the opener is gone", () => {
+    installFakeTurnstile();
+    const composer = document.createElement("textarea");
+    composer.id = "pane-test-composer-input";
+    const opener = document.createElement("button");
+    opener.id = "human-check-opener";
+    document.body.append(composer, opener);
+    opener.focus();
+    const first = mount();
+    first.unmount();
+    expect(document.activeElement).toBe(opener);
+    opener.focus();
+    const second = mount();
+    opener.remove();
+    second.unmount();
+    expect(document.activeElement).toBe(composer);
+    composer.remove();
   });
 
   it("renders into document.body, outside the caller", () => {

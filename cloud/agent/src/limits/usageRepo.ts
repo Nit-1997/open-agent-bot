@@ -91,7 +91,10 @@ export function createUsageRepo(db: Db, opts: UsageRepoOptions): UsageRepo {
     const signal = AbortSignal.timeout(ms);
     let res: RpcResult;
     try {
-      res = await run(signal);
+      res = await new Promise<RpcResult>((resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        Promise.resolve(run(signal)).then(resolve, reject);
+      });
     } catch {
       throw new UsageRepoError(where, signal.aborted ? "timeout" : "unreachable");
     }

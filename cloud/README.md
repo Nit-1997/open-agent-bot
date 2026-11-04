@@ -118,7 +118,7 @@ The running slots live in one agent process, which is right for the one hosted a
 | `waitlist` | Only invited emails; visitors ask at `/request-access` and the admin approves them |
 | `open` | Anyone with a Google account whose email domain isn't on the throwaway list, within the signup caps (`signups_per_hour`, `signups_per_day`, `signups_per_ip_day` in the same row); email links stay sign-in only |
 
-In `open` mode every account, invited ones included, passes a one-time Cloudflare Turnstile check before its first counted run, and the email-link form needs it too. If the agent can't read the mode it treats it as `open` for the check and the web app shows `waitlist`, so neither side fails open. Deleting an account keeps a peppered hash of the email with that month's count and the human check for up to two months, so deleting and signing up again doesn't reset either.
+In `open` mode every account, invited ones included, passes a one-time Cloudflare Turnstile check before its first counted run, and the email-link form needs it too. If a mode lookup fails the agent keeps the last mode it read; if it has never read one it treats the mode as `open` for the check, and the web app shows `waitlist` with the check on the email-link form, so neither side fails open. The email-link check guards the app's own form only: GoTrue's `/auth/v1/otp` endpoint can be called directly with the publishable key and no captcha (see [SECURITY.md](SECURITY.md#accepted-risks)). Deleting an account keeps a peppered hash of the email with that month's count and the human check for up to two months, so deleting and signing up again doesn't reset either.
 
 ## Switch-over after M6 (owner only)
 
@@ -281,7 +281,9 @@ Work from a checkout of the M7 commit you will deploy, with Supabase CLI 2.111.0
 
    On any stop below, run `unset LIVE_DB_URL` before you leave the shell.
 
-2. Save the old function bodies, then check that live still runs the ones `cloud/supabase/rollback/m7.sql` restores. `check-old-bodies.mjs` compares each body (`prosrc`) with the rollback file and prints only function names; exit 0 means both match, exit 1 means one differs (stop: live was changed by hand, and the rollback file would not restore it).
+   While a `psql` or Supabase CLI command below runs, its URL argument, password included, shows in the process list (`ps`) to every user of the machine, so run Gates 8 and 9 on a machine only you use. For the `psql` steps you can keep the password out of the arguments: write it to `~/.pgpass` (mode `0600`, one line `<pooler host>:5432:postgres:<user>:<password>`), paste the URL without the password, and delete the file when you finish. The Supabase CLI's `--db-url` still carries it. Never export the URL or the password, and never leave either in a file after the gate.
+
+2. Save the old function bodies, then check that live still runs the ones `cloud/supabase/rollback/m7.sql` restores. `check-old-bodies.mjs` compares each body (`prosrc`) and its `security definer`, volatility and `set` settings with the rollback file and prints only function names; exit 0 means both match, exit 1 means one differs (stop: live was changed by hand, and the rollback file would not restore it).
 
    ```bash
    psql "$LIVE_DB_URL" -XAtc "select pg_get_functiondef('private.before_user_created(jsonb)'::regprocedure) union all select pg_get_functiondef('private.handle_new_user()'::regprocedure)" > "$HOME/open-agent-m7-old-functions.sql"
@@ -394,9 +396,9 @@ Gate 9 turns on `open` mode after Gate 8 has run and been burnt in. Do the steps
 
 ### Emergency close
 
-To stop new signups at once, go back to `waitlist`. It turns GoTrue's signups off first, then writes the mode; existing accounts keep working, and their limits and human checks stay. Open again with step 10.
+To stop new signups at once, go back to `waitlist`. `--close` needs only `SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN`: it turns GoTrue's signups off first, on their own (`disable_signup: true`, nothing else), checks that they are off, then writes the mode, so a key-drift or settings problem can't block it; existing accounts keep working, and their limits and human checks stay. Open again with step 10.
 
 ```bash
 set -a; . cloud/deploy/env-files/.env-supabase-admin; set +a
-SIGNUP_MODE=waitlist node cloud/supabase/scripts/configure-auth.mjs --apply
+SIGNUP_MODE=waitlist node cloud/supabase/scripts/configure-auth.mjs --close
 ```

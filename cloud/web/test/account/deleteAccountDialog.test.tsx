@@ -51,7 +51,9 @@ describe("the profile's Delete my account (profileDanger)", () => {
     expect(el("delete-account-dialog")).toHaveAttribute("role", "alertdialog");
     expect(el("delete-account-email-label")).toHaveTextContent(`Type ${TEST_USER.email} to confirm`);
     await waitFor(() => expect(document.activeElement).toBe(el("delete-account-email")));
+    expect(container.querySelector("#delete-account-dialog")).toBeNull();
     expectUniqueIds(container);
+    expectUniqueIds(el("delete-account-overlay")!);
     fireEvent.click(el("delete-account-cancel")!);
     expect(el("delete-account-dialog")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(button));
@@ -139,6 +141,25 @@ describe("DeleteAccountDialog", () => {
     expect(behind).not.toHaveBeenCalled();
     document.removeEventListener("keydown", behind);
     expect(screen.getByRole("alertdialog")).toBeTruthy();
+  });
+
+  it("renders into document.body so the overlay covers the whole page, not just the drawer", () => {
+    const { container } = mount();
+    expect(container.querySelector("#delete-account-dialog")).toBeNull();
+    expect(document.body.querySelector(":scope > #delete-account-overlay > #delete-account-dialog")).not.toBeNull();
+    expectUniqueIds(el("delete-account-overlay")!);
+  });
+
+  it("leaves for the site's origin with location.replace after a delete when no onDeleted is given", async () => {
+    vi.mocked(deleteOwnAccount).mockResolvedValue({ ok: true, data: { ok: true } });
+    const replace = vi.fn();
+    vi.stubGlobal("location", { ...window.location, origin: "http://localhost:18742", replace });
+    render(<DeleteAccountDialog email={TEST_USER.email} onCancel={() => {}} />);
+    type(TEST_USER.email);
+    await act(async () => {
+      fireEvent.click(el("delete-account-confirm")!);
+    });
+    expect(replace).toHaveBeenCalledExactlyOnceWith("http://localhost:18742");
   });
 
   it("keeps Tab inside the dialog", () => {

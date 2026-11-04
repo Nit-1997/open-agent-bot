@@ -3,11 +3,11 @@
 import { ghost, input } from "@oab/ui/components/profile/models/styles.ts";
 import { usePlatform } from "@oab/ui/platform";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { deleteOwnAccount } from "@/app/account/actions";
 import { DELETE_ACCOUNT_COPY as COPY } from "@/lib/accountCopy";
 import { runAction } from "@/lib/actionResult";
-
-const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+import { useModalKeys } from "@/lib/useModalKeys";
 
 const danger = "rounded-full bg-danger-fg px-3.5 py-1.5 text-[12px] font-medium text-bg transition hover:opacity-85 disabled:opacity-40";
 
@@ -39,34 +39,11 @@ export function DeleteAccountDialog({
     setBusy(false);
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const root = panel.current;
-      if (!root || (e.key !== "Escape" && e.key !== "Tab")) return;
-      e.stopPropagation();
-      if (e.key === "Escape") {
-        e.preventDefault();
-        if (!busy) onCancel();
-        return;
-      }
-      const items = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)];
-      if (!items.length) return;
-      const first = items[0]!;
-      const last = items[items.length - 1]!;
-      const inside = root.contains(document.activeElement);
-      if (e.shiftKey && (document.activeElement === first || !inside)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [busy, onCancel]);
+  useModalKeys(panel, () => {
+    if (!busy) onCancel();
+  });
 
-  return (
+  return createPortal(
     <div id="delete-account-overlay" className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <div
         id="delete-account-dialog"
@@ -114,7 +91,8 @@ export function DeleteAccountDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

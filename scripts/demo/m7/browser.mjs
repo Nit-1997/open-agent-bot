@@ -120,9 +120,10 @@ async function refusal(p, title) {
   return id;
 }
 const usageNow = async (p) => (await p.request.get(`${APP}/api/usage`)).json();
+const stamp = (t) => new Date(t).toISOString().slice(11, 23);
 async function untilIdle(p) {
   for (let i = 0; i < 160; i++) {
-    if ((await usageNow(p)).running?.mine === 0) return;
+    if ((await usageNow(p)).running?.mine === 0) return Date.now();
     await p.waitForTimeout(500);
   }
   throw new Error("the run never ended");
@@ -167,20 +168,34 @@ const scenarios = {
   async "limits-month"(browser) {
     const s = await signedIn(browser, "a", "3b-monthly-cap");
     const p = s.page;
-    await expect(meterCount(p)).toHaveText(/of 3 requests used/, { timeout: 30000 });
-    log(`meter: "${await meterCount(p).innerText()}"`);
+    const meter = p.locator("#sidebar-usage-meter");
+    await expect(meterCount(p)).toHaveText(/of 5 requests used/, { timeout: 30000 });
+    const start = Number((await meterCount(p).innerText()).split(" ")[0]);
+    await expect(meter).toHaveAttribute("data-level", "normal");
+    log(`meter: "${await meterCount(p).innerText()}" (normal)`);
+    await shot(p, "meter-normal");
     await newChat(p);
-    await send(p, "One more fact about lighthouses.");
-    await settled(p);
-    await expect(meterCount(p)).toHaveText("3 of 3 requests used", { timeout: 15000 });
-    await expect(p.locator("#sidebar-usage-meter")).toHaveAttribute("data-level", "exhausted");
+    for (let n = start + 1; n <= 5; n++) {
+      await send(p, `One more fact about lighthouses (${n}).`);
+      await settled(p);
+      await expect(meterCount(p)).toHaveText(`${n} of 5 requests used`, { timeout: 15000 });
+      const level = await meter.getAttribute("data-level");
+      log(`run ${n}: meter "${await meterCount(p).innerText()}", level ${level}`);
+      if (n === 4) {
+        await expect(meter).toHaveAttribute("data-level", "low");
+        await expect(p.locator("#sidebar-usage-meter-low")).toBeVisible();
+        log(`low: "${await p.locator("#sidebar-usage-meter-low").innerText()}"`);
+        await shot(p, "meter-low");
+      }
+    }
+    await expect(meter).toHaveAttribute("data-level", "exhausted");
     await shot(p, "meter-exhausted");
     await send(p, "And another one.");
-    const id = await refusal(p, "You've used this month's 3 requests");
+    const id = await refusal(p, "You've used this month's 5 requests");
     await expect(p.locator(`[id='${id}-body']`)).toHaveText(/Requests open again on 1 /);
     await expect(p.locator(`[id='${id}-mac-link']`)).toHaveText("Run it on your Mac");
     log(`Mac link: ${await p.locator(`[id='${id}-mac-link']`).getAttribute("href")}`);
-    await expect(meterCount(p)).toHaveText("3 of 3 requests used");
+    await expect(meterCount(p)).toHaveText("5 of 5 requests used");
     await shot(p, "notice-limit-monthly");
     log(`GET /api/usage -> ${JSON.stringify(await usageNow(p))}`);
     log(used("a"));
@@ -204,13 +219,16 @@ const scenarios = {
     await shot(b, "notice-limit-running");
     await a.bringToFront();
     await stopBtn(a).click();
-    log("stopped chat A during its run");
-    await untilIdle(a);
-    log("A's slot is free (running.mine = 0) only after the stopped run finished cleaning up");
+    const t0 = Date.now();
+    log(`t0 ${stamp(t0)}: stopped chat A during its run; running.mine = ${(await usageNow(a)).running?.mine}`);
+    const t1 = await untilIdle(a);
+    log(`t1 ${stamp(t1)} (+${t1 - t0} ms): A's cleanup finished, running.mine = 0; until then a send in B is refused limit_running`);
     await b.bringToFront();
     await b.locator(`[id='${id}-retry']`).click();
     await settled(b);
     await expect(notice(b)).toHaveCount(0);
+    const t2 = Date.now();
+    log(`t2 ${stamp(t2)} (+${t2 - t0} ms): chat B admitted after t1, no notice`);
     await shot(b, "chat-b-admitted");
     log(used("a"));
     const v = b.video();
@@ -239,7 +257,17 @@ const scenarios = {
     await expect(n.page.locator(`[id='${id}-countdown']`)).toHaveText("You can send again now.", { timeout: 75000 });
     await expect(n.page.locator(`[id='${id}-retry']`)).toBeEnabled();
     await shot(n.page, "notice-server-busy-countdown-done");
-    log(used("n"));
+    const before = Number(used("n").match(/: (\d+) counted/)[1]);
+    log(`N counted before Send again: ${before}`);
+    await n.page.locator(`[id='${id}-retry']`).click();
+    await settled(n.page);
+    await expect(notice(n.page)).toHaveCount(0);
+    await expect.poll(() => Number(used("n").match(/: (\d+) counted/)[1]), { timeout: 15000 }).toBe(before + 1);
+    const answer = (await redBanner(n.page).allInnerTexts()).join(" ") || "(no error)";
+    log(
+      `N's Send again was admitted (no Busy notice) and counted: ${before} -> ${before + 1}; N has no model, so the run ends with: ${answer}`,
+    );
+    await shot(n.page, "server-free-n-admitted");
     await close(n);
     await close(a);
   },
@@ -267,6 +295,21 @@ const scenarios = {
     await expect(notice(p)).toHaveCount(0);
     await shot(p, "sends-again-after-regrant");
     log(used("a"));
+    sql("revoke execute on function public.request_usage_get(uuid, timestamptz) from service_role");
+    sql("notify pgrst, 'reload schema'");
+    await p.waitForTimeout(1500);
+    await p.reload();
+    await expect(p.locator("#sidebar-usage-meter-unavailable")).toHaveText("Usage unavailable", { timeout: 30000 });
+    await expect(p.locator("#sidebar-usage-meter-retry")).toBeVisible();
+    log('request_usage_get revoked: the meter shows "Usage unavailable" with Retry');
+    await shot(p, "meter-unavailable");
+    sql("grant execute on function public.request_usage_get(uuid, timestamptz) to service_role");
+    sql("notify pgrst, 'reload schema'");
+    await p.waitForTimeout(1500);
+    await p.locator("#sidebar-usage-meter-retry").click();
+    await expect(meterCount(p)).toHaveText(/requests used/, { timeout: 15000 });
+    log(`re-granted, Retry: meter "${await meterCount(p).innerText()}"`);
+    await shot(p, "meter-back-after-retry");
     await close(s);
   },
 
@@ -276,6 +319,10 @@ const scenarios = {
     const [{ n }] = sql(
       "select count(*)::int as n from public.request_usage where month = date_trunc('month', now() at time zone 'utc')::date and count > 0",
     );
+    const [{ seeds }] = sql(
+      "select count(*)::int as seeds from public.request_usage u join auth.users a on a.id = u.user_id where u.month = date_trunc('month', now() at time zone 'utc')::date and u.count > 0 and a.email like 'oab-m7+demo-seed%'",
+    );
+    log(`the list total is dynamic: ${n} users with usage this month = ${seeds} seeds + ${n - seeds} users counted in part 3 (A, N)`);
     await p.goto(`${APP}/admin`);
     await p.locator("#admin-tab-usage").click();
     await expect(p.locator("#admin-panel-usage")).toBeVisible();
@@ -302,7 +349,7 @@ const scenarios = {
     await shot(p, "open-in-users");
     await p.locator("#admin-tab-usage").click();
     await p.locator("#admin-usage-search").pressSequentially("SEED0", { delay: 40 });
-    await expect(p.locator("#admin-usage-count")).toHaveText(/^Showing 1–5 of 7 /, { timeout: 15000 });
+    await expect(p.locator("#admin-usage-count")).toHaveText(new RegExp(`^Showing 1–5 of ${seeds} `), { timeout: 15000 });
     await shot(p, "search-seed");
     await p.locator("#admin-usage-search").fill("");
     await expect(p.locator("#admin-usage-count")).toHaveText(`Showing 1–5 of ${n} · newest first · 5 per page`, { timeout: 15000 });
@@ -384,6 +431,10 @@ const scenarios = {
     await expect(p.locator("#login-legal")).toHaveCount(0);
     await shot(p, "login-unknown-shows-waitlist");
     log("mode unknown (lookup revoked): the pages show waitlist");
+    await p.locator("#login-email-toggle").click();
+    log(`mode unknown: the email-link form still loads Turnstile from ${await turnstileFrame(p)}, so email-link sign-in keeps working`);
+    await expect(p.locator("#login-email-submit")).toBeEnabled({ timeout: 30000 });
+    await shot(p, "login-unknown-email-link-check");
     await close(s);
   },
 

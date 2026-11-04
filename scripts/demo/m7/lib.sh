@@ -12,7 +12,8 @@ EXITS="$DEMO_DIR/exit-codes.txt"
 APP=http://localhost:18721
 AGENT=http://127.0.0.1:18720
 STUB=http://127.0.0.1:18722
-PORTS_USED="18720 18721 18722"
+PORTS_USED="18720 18721 18722 18740 18741"
+M7_BASE="${M7_BASE:-revamp/clean}"
 TURNSTILE_SITE_PASS=1x00000000000000000000AA
 TURNSTILE_PASS=1x0000000000000000000000000000000AA
 TURNSTILE_FAIL=2x0000000000000000000000000000000AA
@@ -250,6 +251,38 @@ repair_g8() {
   return "$rc"
 }
 g8_bodies() { psql_g8 -XAtc "$(node cloud/supabase/scripts/check-old-bodies.mjs --query)" | node cloud/supabase/scripts/check-old-bodies.mjs; }
+
+scratch() {
+  local d
+  d="$(mktemp -d "${TMPDIR:-/tmp}/oab-m7-$1.XXXXXX")" && d="$(realpath "$d")" || exit 1
+  remember "scratch-$1" "$d"
+  printf '%s' "$d"
+}
+
+local_compose() {
+  OPEN_AGENT_IMAGE=oab-m7-local-agent:dev OPEN_AGENT_SEARCH_IMAGE=oab-m7-local-search:dev OPEN_AGENT_PORT=18740 \
+    OPEN_AGENT_DATA_VOLUME=oab-m7-local-data OPEN_AGENT_KEYS_VOLUME=oab-m7-local-keys APP_ORIGIN=http://127.0.0.1:18740 \
+    docker compose -p oab-m7-local --env-file /dev/null -f docker-compose.yml "$@"
+}
+down_local() {
+  OPEN_AGENT_IMAGE=oab-m7-local-agent:dev OPEN_AGENT_SEARCH_IMAGE=oab-m7-local-search:dev OPEN_AGENT_PORT=18740 \
+    OPEN_AGENT_DATA_VOLUME=oab-m7-local-data OPEN_AGENT_KEYS_VOLUME=oab-m7-local-keys APP_ORIGIN=http://127.0.0.1:18740 \
+    preflight docker compose -p oab-m7-local --env-file /dev/null -f docker-compose.yml || return 1
+  OPEN_AGENT_IMAGE=oab-m7-local-agent:dev OPEN_AGENT_SEARCH_IMAGE=oab-m7-local-search:dev OPEN_AGENT_PORT=18740 \
+    OPEN_AGENT_DATA_VOLUME=oab-m7-local-data OPEN_AGENT_KEYS_VOLUME=oab-m7-local-keys APP_ORIGIN=http://127.0.0.1:18740 \
+    docker compose -p oab-m7-local --env-file /dev/null -f docker-compose.yml down -v --remove-orphans
+}
+local_up() {
+  OPEN_AGENT_IMAGE=oab-m7-local-agent:dev OPEN_AGENT_SEARCH_IMAGE=oab-m7-local-search:dev OPEN_AGENT_PORT=18740 \
+    OPEN_AGENT_DATA_VOLUME=oab-m7-local-data OPEN_AGENT_KEYS_VOLUME=oab-m7-local-keys APP_ORIGIN=http://127.0.0.1:18740 \
+    preflight docker compose -p oab-m7-local --env-file /dev/null -f docker-compose.yml || return 1
+  local_compose build > "$DEMO_DIR/local-build.log" 2>&1 || return 1
+  local_compose up -d --wait --wait-timeout 300
+}
+ac2_leftovers() {
+  { docker ps -a --format '{{.Names}}'; docker volume ls --format '{{.Name}}'; docker image ls --format '{{.Repository}}:{{.Tag}}'; } \
+    | grep -E '^oab-m7-(local|oss)'
+}
 
 wait_port() {
   local i

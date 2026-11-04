@@ -278,6 +278,48 @@ describe("HostedRunPolicy cheap checks before the database", () => {
     expect(codeOf(await s.admit(alice))).toBe("ok");
   });
 
+  it("drops a refusal cached while the refund was still in flight once the refund lands", async () => {
+    let land: () => void = () => {};
+    const s = setup({
+      limits: { perMonth: 1, runningPerUser: 2 },
+      usage: (inner) => ({
+        ...inner,
+        refund: (id, logId) =>
+          new Promise<void>((resolve, reject) => {
+            land = () => inner.refund(id, logId).then(resolve, reject);
+          }),
+      }),
+    });
+    const alice = s.user();
+    const t = ticketOf(await s.admit(alice));
+    t.end();
+    t.refund?.();
+    expect(codeOf(await s.admit(alice))).toBe("limit_monthly");
+    land();
+    await vi.waitFor(() => expect(s.store.monthCount(alice.id, "2026-11-01")).toBe(0));
+    await vi.waitFor(async () => expect(codeOf(await s.admit(alice))).toBe("ok"));
+  });
+
+  it("refunds and refuses a run whose account started deleting while the database check was running", async () => {
+    const deleting = new DeletingUsers();
+    const s = setup({
+      deleting,
+      usage: (inner) => ({
+        ...inner,
+        admit: async (id) => {
+          const r = await inner.admit(id);
+          deleting.add(id);
+          return r;
+        },
+      }),
+    });
+    const alice = s.user();
+    const r = refusal(await s.admit(alice));
+    expect(r.body).toMatchObject({ error: "account_disabled" });
+    expect(s.policy.snapshot().running).toBe(0);
+    await vi.waitFor(() => expect(s.store.monthCount(alice.id, "2026-11-01")).toBe(0));
+  });
+
   it("checks attempts, then the cache, then the human check, then per-user, then the server, then the database", async () => {
     const order: string[] = [];
     const human = gate(async () => {
@@ -366,14 +408,14 @@ describe("HostedRunPolicy fails closed", () => {
     expect(codeOf(await s.admit(alice))).toBe("ok");
   });
 
-  it("answers 503 usage_unavailable when the database call takes longer than 3 s", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    const s = setup({ usage: (inner) => ({ ...inner, admit: () => new Promise(() => {}) }) });
-    const pending = s.admit(s.user());
-    await vi.advanceTimersByTimeAsync(3000);
-    expect(codeOf(await pending)).toBe("usage_unavailable");
+  it("answers 503 usage_unavailable when the usage repo times out, with no timer of its own", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const timer = vi.spyOn(globalThis, "setTimeout");
+    const s = setup({ usage: (inner) => ({ ...inner, admit: async () => Promise.reject(new UsageRepoError("admit", "timeout")) }) });
+    expect(codeOf(await s.admit(s.user()))).toBe("usage_unavailable");
     expect(s.policy.snapshot().running).toBe(0);
+    expect(timer).not.toHaveBeenCalled();
+    expect(warn.mock.calls.flat().join(" ")).toContain("usage admit failed (timeout)");
   });
 
   it("never reads the principal's capabilities", async () => {

@@ -4,22 +4,35 @@ import { ConfigError } from "@/lib/env";
 
 export const SIGNUP_MODE_TTL_MS = 60_000;
 
-let cached: { mode: SignupMode; at: number } | undefined;
+export type SignupSettings = { mode: SignupMode; captcha: boolean };
+
+const UNKNOWN: SignupSettings = Object.freeze({ mode: "waitlist", captcha: true });
+
+let cached: { settings: SignupSettings; at: number } | undefined;
 
 export function resetSignupModeCache(): void {
   cached = undefined;
 }
 
-export async function signupMode(now: () => number = Date.now): Promise<SignupMode> {
-  if (cached && now() - cached.at < SIGNUP_MODE_TTL_MS) return cached.mode;
+const parse = (body: unknown): SignupSettings | undefined => {
+  const b = body as { mode?: unknown; captcha?: unknown } | null | undefined;
+  return isSignupMode(b?.mode) && typeof b?.captcha === "boolean" ? { mode: b.mode, captcha: b.captcha } : undefined;
+};
+
+export async function signupSettings(now: () => number = Date.now): Promise<SignupSettings> {
+  if (cached && now() - cached.at < SIGNUP_MODE_TTL_MS) return cached.settings;
   try {
     const res = await agentFetch("/signup", null);
-    const body = res.ok ? ((await res.json()) as { mode?: unknown }) : undefined;
-    if (!isSignupMode(body?.mode)) return "waitlist";
-    cached = { mode: body.mode, at: now() };
-    return body.mode;
+    const settings = res.ok ? parse(await res.json()) : undefined;
+    if (!settings) return { ...UNKNOWN };
+    cached = { settings, at: now() };
+    return settings;
   } catch (e) {
     if (e instanceof ConfigError) throw e;
-    return "waitlist";
+    return { ...UNKNOWN };
   }
+}
+
+export async function signupMode(now: () => number = Date.now): Promise<SignupMode> {
+  return (await signupSettings(now)).mode;
 }
