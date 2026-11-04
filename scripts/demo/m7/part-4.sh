@@ -9,7 +9,7 @@ run stub "stub_up"
 run agent "agent_up 1 1000 1000 8"
 run web "web_up"
 run seed "users seed 7"
-note "the list counts every user with usage this month: A from part 3 and the 7 seeds (the spec's \"of 7\" is the seed search)"
+note "the list counts every user with usage this month: A and N from part 3 and the 7 seeds (the spec's \"of 7\" is the seed search)"
 run browser-admin "browser admin"
 
 step "4. bad page, filter and id answer 400 before any database call; a member gets 404 (route tests, verbose)"

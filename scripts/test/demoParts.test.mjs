@@ -862,6 +862,16 @@ describe("m7 demo part scripts", () => {
       assert.ok(b.includes(needle), needle);
   });
 
+  it("part 6 revokes the mode lookup only after the agent started, then shows the agent refusing to start while it is revoked", () => {
+    const p6 = read(join(M7, "part-6.sh"));
+    const unknown = p6.slice(p6.indexOf("the mode unknown"));
+    const at = (s) => unknown.indexOf(s);
+    assert.ok(at("agent_up 1 1000 1000 8 $TURNSTILE_PASS") >= 0 && at("agent_up 1 1000 1000 8 $TURNSTILE_PASS") < at("revoke execute"));
+    assert.ok(at("revoke execute") < at("browser pages-unknown"));
+    assert.ok(at("browser pages-unknown") < at("exits agent-refuses-signup 1 "));
+    assert.ok(at("exits agent-refuses-signup 1 ") < at("grant execute"));
+  });
+
   it("names no revamp-only commit hash", () => {
     for (const f of readdirSync(M7))
       for (const h of read(join(M7, f)).match(/(?<![0-9A-Za-z])[0-9a-f]{7,40}(?![0-9A-Za-z])/g) ?? [])

@@ -322,7 +322,7 @@ const scenarios = {
     const [{ seeds }] = sql(
       "select count(*)::int as seeds from public.request_usage u join auth.users a on a.id = u.user_id where u.month = date_trunc('month', now() at time zone 'utc')::date and u.count > 0 and a.email like 'oab-m7+demo-seed%'",
     );
-    log(`the list total is dynamic: ${n} users with usage this month = ${seeds} seeds + ${n - seeds} other demo users (A)`);
+    log(`the list total is dynamic: ${n} users with usage this month = ${seeds} seeds + ${n - seeds} users counted in part 3 (A, N)`);
     await p.goto(`${APP}/admin`);
     await p.locator("#admin-tab-usage").click();
     await expect(p.locator("#admin-panel-usage")).toBeVisible();
@@ -431,6 +431,10 @@ const scenarios = {
     await expect(p.locator("#login-legal")).toHaveCount(0);
     await shot(p, "login-unknown-shows-waitlist");
     log("mode unknown (lookup revoked): the pages show waitlist");
+    await p.locator("#login-email-toggle").click();
+    log(`mode unknown: the email-link form still loads Turnstile from ${await turnstileFrame(p)}, so email-link sign-in keeps working`);
+    await expect(p.locator("#login-email-submit")).toBeEnabled({ timeout: 30000 });
+    await shot(p, "login-unknown-email-link-check");
     await close(s);
   },
 
