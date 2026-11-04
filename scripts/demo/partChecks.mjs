@@ -176,7 +176,8 @@ export function supabaseProblems(line, { inLib = false } = {}) {
   const out = [];
   if (SUPABASE_CLI.test(line) && !LOCAL_REPAIR.test(line))
     out.push("run the Supabase CLI only through local-stack.mjs, or the migration repair rehearsal against a 127.0.0.1 --db-url");
-  if (PRODUCTION_ENV.test(line)) out.push("M7 never reads the production settings files (cloud/deploy/.env-*, env-files/)");
+  if (PRODUCTION_ENV.test(line))
+    out.push("M7 never reads the production settings files (the old .env-* files, cloud/deploy-config/env-files/)");
   const stack = STACK_NAME.exec(line)?.[1];
   if (stack && !/^oab-m7-(?:demo|g8)$/.test(stack)) out.push(`local stacks are oab-m7-demo and oab-m7-g8 (got ${stack})`);
   if (/\.supabase\.co\b/.test(line)) out.push("write the live host pattern as [.]supabase[.]co so the static safety scan stays at 0");

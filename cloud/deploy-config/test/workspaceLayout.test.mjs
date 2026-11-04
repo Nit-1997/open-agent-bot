@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -31,8 +32,18 @@ describe("cloud workspace layout", () => {
   const cloud = all.filter((ws) => ws.startsWith("cloud/"));
 
   it("finds the cloud workspaces through the cloud/* entry", () => {
-    for (const ws of ["cloud/agent", "cloud/web", "cloud/deploy", "cloud/e2e"]) assert.ok(cloud.includes(ws), ws);
+    for (const ws of ["cloud/agent", "cloud/web", "cloud/deploy-config", "cloud/e2e"]) assert.ok(cloud.includes(ws), ws);
     assert.ok(all.includes("packages/core") && all.includes("e2e"));
+  });
+
+  it("keeps every deployment artifact and the env files in the one folder cloud/deploy-config", () => {
+    const tracked = execFileSync("git", ["ls-files", "--", "cloud/deploy/"], { cwd: ROOT, encoding: "utf8" });
+    assert.equal(tracked, "", "git tracks nothing under cloud/deploy (an older checkout's ignored env files may stay there)");
+    for (const entry of ["compose.hosted", "compose.preview"]) assert.ok(existsSync(join(ROOT, `cloud/deploy-config/${entry}.yml`)), entry);
+    for (const entry of ["caddy", "searxng", "renderer", "litellm", "scripts", "test", "env-files"])
+      assert.ok(existsSync(join(ROOT, "cloud/deploy-config", entry)), entry);
+    for (const group of ["backend", "frontend", "ops"])
+      assert.ok(existsSync(join(ROOT, "cloud/deploy-config/env-files", group, ".env.example")), group);
   });
 
   it("names every cloud package @oab/cloud-*", () => {

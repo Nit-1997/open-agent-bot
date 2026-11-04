@@ -103,7 +103,7 @@ describe(".dockerignore", () => {
     "packages/core/src/local/main.ts",
     "packages/local-web/index.html",
     "deploy-config/env.examples/agent.env.example",
-    "cloud/deploy/compose.hosted.yml",
+    "cloud/deploy-config/compose.hosted.yml",
     "package-lock.json",
   ]) {
     it(`keeps ${name}`, () => assert.equal(ignored(name), false));

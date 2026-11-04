@@ -68,7 +68,7 @@ describe("hosted agent image (cloud/agent/Dockerfile)", () => {
   });
 
   it("is the image the hosted compose file builds for the agent, and the lockfile knows the workspace", () => {
-    expect(read("cloud/deploy/compose.hosted.yml")).toMatch(
+    expect(read("cloud/deploy-config/compose.hosted.yml")).toMatch(
       /^ {2}agent:\n {4}build:\n {6}context: \.\.\/\.\.\n {6}dockerfile: cloud\/agent\/Dockerfile$/m,
     );
     expect(json<{ packages: Record<string, { name?: string }> }>("package-lock.json").packages["cloud/agent"]?.name).toBe(

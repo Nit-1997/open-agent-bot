@@ -36,7 +36,7 @@ describe(".gitignore", () => {
     ...NEW_RULES,
     "!cloud/deploy-config/env-files/*/",
     "!cloud/deploy-config/env-files/*/.env.example",
-    "cloud/deploy/.env*",
+    "cloud/deploy-config/.env*",
     ...LEGACY_RULES,
   ]) {
     it(`lists ${rule}`, () => assert.ok(RULES.includes(rule), rule));
@@ -46,7 +46,7 @@ describe(".gitignore", () => {
     ".env.example",
     "deploy-config/env.examples/agent.env.example",
     ...ENV_EXAMPLES,
-    "cloud/deploy/compose.hosted.yml",
+    "cloud/deploy-config/compose.hosted.yml",
     "cloud/e2e/support/env.ts",
     "e2e/support/env.ts",
     "package-lock.json",

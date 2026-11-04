@@ -28,7 +28,7 @@ deploy-config/**/.env*
 !cloud/deploy-config/env-files/*/
 !cloud/deploy-config/env-files/*/.env.example
 **/.auth/
-cloud/deploy/.env*
+cloud/deploy-config/.env*
 cloud/e2e/test-results/
 cloud/e2e/playwright-report/
 

@@ -109,9 +109,9 @@ describe("loadHostedConfig local-stack mode", () => {
       "cloud/agent/Dockerfile",
       "cloud/web/Dockerfile",
       "docker-compose.yml",
-      ...readdirSync(join(ROOT, "cloud/deploy"))
+      ...readdirSync(join(ROOT, "cloud/deploy-config"))
         .filter((f) => /^compose\..*\.ya?ml$/.test(f))
-        .map((f) => `cloud/deploy/${f}`),
+        .map((f) => `cloud/deploy-config/${f}`),
       ...["backend", "frontend", "ops"].map((g) => `cloud/deploy-config/env-files/${g}/.env.example`),
     ];
     expect(files.length).toBeGreaterThanOrEqual(8);

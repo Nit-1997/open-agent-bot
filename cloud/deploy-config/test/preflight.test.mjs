@@ -20,18 +20,18 @@ function preflight(command, env, cwd) {
 
 describe("preflight on the hosted stack", () => {
   const TOP = mkdtempSync(join(tmpdir(), "preflight-hosted-"));
-  const HOSTED = join(TOP, "deploy");
-  const ENV = join(TOP, "deploy-config/env-files");
+  const HOSTED = join(TOP, "deploy-config");
+  const ENV = join(HOSTED, "env-files");
   mkdirSync(HOSTED);
   mkdirSync(join(ENV, "frontend"), { recursive: true });
   mkdirSync(join(ENV, "backend"));
-  for (const f of ["compose.hosted.yml", "compose.preview.yml"]) copyFileSync(join(ROOT, "cloud/deploy", f), join(HOSTED, f));
+  for (const f of ["compose.hosted.yml", "compose.preview.yml"]) copyFileSync(join(ROOT, "cloud/deploy-config", f), join(HOSTED, f));
   writeFileSync(join(ENV, "frontend/.env"), "", { mode: 0o600 });
   writeFileSync(join(ENV, "backend/.env"), "RENDERER_SECRET=placeholder-not-a-secret\n", { mode: 0o600 });
   after(() => rmSync(TOP, { recursive: true, force: true }));
 
   it("aborts on the pinned live project name", () => {
-    const r = preflight("docker compose --env-file ../deploy-config/env-files/backend/.env -f compose.hosted.yml", {}, HOSTED);
+    const r = preflight("docker compose --env-file env-files/backend/.env -f compose.hosted.yml", {}, HOSTED);
     assert.equal(r.status, 1, r.out);
     assert.match(r.out, /ABORT/);
     assert.doesNotMatch(r.out, /AFTER/);
@@ -40,7 +40,7 @@ describe("preflight on the hosted stack", () => {
 
   it("passes the hosted preview under an oab- project", () => {
     const r = preflight(
-      "docker compose -p oab-factory-m3-5-hosted --env-file ../deploy-config/env-files/backend/.env -f compose.hosted.yml -f compose.preview.yml --profile local",
+      "docker compose -p oab-factory-m3-5-hosted --env-file env-files/backend/.env -f compose.hosted.yml -f compose.preview.yml --profile local",
       {},
       HOSTED,
     );

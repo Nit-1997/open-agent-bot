@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const FIXTURES = ["cloud/deploy/test/fixtures/migrations-pre-m6.sha256", "cloud/deploy/test/fixtures/migrations-m7.sha256"];
+const FIXTURES = ["cloud/deploy-config/test/fixtures/migrations-pre-m6.sha256", "cloud/deploy-config/test/fixtures/migrations-m7.sha256"];
 const MIGRATIONS = join(ROOT, "cloud/supabase/migrations");
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 const pinnedIn = (fixture) =>

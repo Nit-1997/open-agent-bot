@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -10,7 +10,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const WORK = mkdtempSync(join(tmpdir(), "makefile-"));
 after(() => rmSync(WORK, { recursive: true, force: true }));
 const SECRET = "dummy-secret-7c41e0";
-const HOSTED = existsSync(join(ROOT, "cloud/deploy/compose.hosted.yml"));
+const HOSTED = existsSync(join(ROOT, "cloud/deploy-config/compose.hosted.yml"));
 const STANDALONE = !HOSTED && "cloud/ is removed in the standalone check";
 
 let n = 0;
@@ -65,12 +65,12 @@ const FULL_FRONTEND = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISH
   .join("");
 
 describe("Makefile", () => {
-  it("has help, run, app, web and stop, and help is the default", () => {
+  it("has help, run, app, web, stop and test-e2e, and help is the default", () => {
     const text = readFileSync(join(ROOT, "Makefile"), "utf8");
-    for (const t of ["help", "run", "app", "web", "stop"]) assert.match(text, new RegExp(`^${t}:`, "m"), t);
+    for (const t of ["help", "run", "app", "web", "stop", "test-e2e"]) assert.match(text, new RegExp(`^${t}:`, "m"), t);
     const r = make([]);
     assert.equal(r.status, 0, r.out);
-    for (const s of ["make run app", "make run web", "make stop", "make help"]) assert.ok(r.out.includes(s), s);
+    for (const s of ["make run app", "make run web", "make stop", "make test-e2e", "make help"]) assert.ok(r.out.includes(s), s);
     assert.deepEqual(
       text.split("\n").filter((l) => l.trim().startsWith("#")),
       [],
@@ -84,7 +84,33 @@ describe("Makefile", () => {
     assert.deepEqual(make(["-n", "app"]).out.trim().split("\n"), ["bash scripts/make/app.sh"]);
     assert.deepEqual(make(["-n", "web"]).out.trim().split("\n"), ["bash scripts/make/web.sh"]);
     assert.deepEqual(make(["-n", "stop"]).out.trim().split("\n"), ["bash scripts/make/stop.sh"]);
+    assert.deepEqual(make(["-n", "test-e2e"]).out.trim().split("\n"), ["bash scripts/make/test-e2e.sh"]);
     assert.ok(make(["run"]).out.includes("make run app"));
+  });
+
+  it("test-e2e refuses a world-writable temp parent before it runs npm or docker", () => {
+    const f = fakeBin({ dockerInfo: 1 });
+    const open = join(WORK, `open-${n++}`);
+    mkdirSync(open);
+    chmodSync(open, 0o777);
+    const link = join(WORK, `link-${n++}`);
+    symlinkSync(open, link);
+    for (const parent of [open, link]) {
+      const r = make(["test-e2e"], { bin: f.bin, env: { OAB_E2E_TMP_PARENT: parent } });
+      assert.notEqual(r.status, 0, r.out);
+      assert.match(r.out, /make test-e2e: .* is writable by others/);
+    }
+    assert.equal(f.calls(), "");
+  });
+
+  it("test-e2e stops before npm with a clear error when Docker is not running", () => {
+    const f = fakeBin({ dockerInfo: 1 });
+    const parent = join(WORK, `private-${n++}`);
+    mkdirSync(parent, { mode: 0o700 });
+    const r = make(["test-e2e"], { bin: f.bin, env: { OAB_E2E_TMP_PARENT: parent } });
+    assert.notEqual(r.status, 0, r.out);
+    assert.match(r.out, /make test-e2e: Docker is not running/);
+    assert.equal(f.calls().includes("npm"), false, f.calls());
   });
 
   it("app stops before npm with a clear error when Docker is not running", () => {
@@ -106,7 +132,7 @@ describe("Makefile", () => {
     assert.equal(down.length, 1, f.calls());
     assert.match(
       down[0],
-      /^docker compose -p oab-preview --env-file \/dev\/null -f cloud\/deploy\/compose\.hosted\.yml -f cloud\/deploy\/compose\.preview\.yml --profile local down$/,
+      /^docker compose -p oab-preview --env-file \/dev\/null -f cloud\/deploy-config\/compose\.hosted\.yml -f cloud\/deploy-config\/compose\.preview\.yml --profile local down$/,
     );
     assert.match(f.calls(), /^docker stop abc123$/m);
     assert.doesNotMatch(f.calls(), / -v\b|--volumes|open-agent-bot/);
@@ -127,7 +153,7 @@ describe("make web sanity check", { skip: STANDALONE }, () => {
     const r = make(["run", "web"], { bin: f.bin, env: { ENV_DIR: dir } });
     assert.notEqual(r.status, 0, r.out);
     for (const w of want) assert.ok(r.out.includes(w), `${w}\n${r.out}`);
-    assert.ok(r.out.includes("cloud/deploy/scripts/env-files.mjs"), r.out);
+    assert.ok(r.out.includes("cloud/deploy-config/scripts/env-files.mjs"), r.out);
     assert.equal(r.out.includes(SECRET), false);
     assert.equal(f.calls().includes("docker"), false, f.calls());
     return r;

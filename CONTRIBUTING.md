@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `e2e`, and the hosted `cloud/agent`, `cloud/web`, `cloud/e2e`, `cloud/deploy`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `e2e`, and the hosted `cloud/agent`, `cloud/web`, `cloud/e2e`, `cloud/deploy-config`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -26,8 +26,11 @@ CI runs these on every pull request. Run them from the repo root before you push
 | `@oab/cloud-agent` | `npm run lint -w @oab/cloud-agent && npm run format:check -w @oab/cloud-agent && npm run typecheck -w @oab/cloud-agent && npm test -w @oab/cloud-agent && npm run build -w @oab/cloud-agent` (the hosted agent; unit tests only) |
 | `@oab/cloud-web` | `npm run lint -w @oab/cloud-web && npm run format:check -w @oab/cloud-web && npm run typecheck -w @oab/cloud-web && npm test -w @oab/cloud-web && npm run build -w @oab/cloud-web` (the hosted Next.js app; Vercel builds it from Root Directory `cloud/web`) |
 | `@oab/cloud-e2e` | `npm run lint -w @oab/cloud-e2e && npm run format:check -w @oab/cloud-e2e && npm run typecheck -w @oab/cloud-e2e && npm test -w @oab/cloud-e2e` (the hosted Playwright specs; `test` runs only the unit tests, never a browser) |
-| `@oab/cloud-deploy` | `npm run lint -w @oab/cloud-deploy && npm run format:check -w @oab/cloud-deploy && npm test -w @oab/cloud-deploy` (hosted deploy checks: cloud workspaces and Dockerfiles, the hosted compose file against its pre-M6 baseline fixture, preflight, the `local/` twins, migrations pinned by a SHA-256 fixture, the hosted docs, `scripts/env-files.mjs` and `scripts/env-check.mjs`) |
+| `@oab/cloud-deploy` | `npm run lint -w @oab/cloud-deploy && npm run format:check -w @oab/cloud-deploy && npm test -w @oab/cloud-deploy` (hosted deploy checks: cloud workspaces and Dockerfiles, the hosted compose file against its pre-M6 baseline fixture, preflight, the `local/` twins, migrations pinned by a SHA-256 fixture, the hosted docs, `scripts/env-files.mjs` and `scripts/env-check.mjs`; the hosted compose checks need Docker Compose 5 or later, which CI installs with `scripts/ci/compose-plugin.sh`) |
 | root | `npm run lint:scripts && npm run format:check:scripts` (Biome over `scripts/**/*.mjs`, also run by the root `lint` and `format:check`) and `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, the root `Makefile`, and the unique-id scan over `packages/ui/src`, `packages/local-web/src` and `apps/desktop/src/screens`; `node scripts/ids-static.mjs` prints `ids: N/N`; `cloud/web/test/idsStatic.test.ts` scans those plus `cloud/web/app` and `cloud/web/components`) |
+| e2e | local only, `make test-e2e`, ~15 min: the Mac app's Electron e2e with the fake docker CLI and against real Docker (project `oab-e2e-desktop`, ports 18480–18485, a private 0700 temp folder; set `OAB_E2E_TMP_PARENT` if `$TMPDIR` is writable by others), then the hosted preview smoke (`make web`, `/health` and `/login`) when `cloud/deploy-config/env-files/{backend,frontend}/.env` exist (skipped otherwise). Run it before you push a change to `apps/desktop/`, `docker-compose.yml` or the hosted stack. The DMGs are built and verified by `release.yml` on tags |
+
+The required pull request checks are the CI jobs `core`, `cloud`, `compose`, `sqlite-node24`, `local-stack`, `standalone` and `desktop` (lint, typecheck, unit tests and build of `@oab/desktop`; no Electron e2e). CI stays quick: end-to-end tests run locally only.
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `cloud/agent/test/supabase/` run against the real Supabase project with `npm run test:supabase -w @oab/cloud-agent`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
 
@@ -38,10 +41,11 @@ docker run --rm --user pwuser -v "$PWD":/src:ro -e ELECTRON_SKIP_BINARY_DOWNLOAD
   mkdir -p /tmp/repo && cd /src && tar --exclude=./node_modules --exclude="./*/node_modules" --exclude="./*/*/node_modules" --exclude=./.git --exclude=./.factory -cf - . | tar -C /tmp/repo -xf -
   cd /tmp/repo && node --version && case "$(node -p process.versions.node)" in 24.*) ;; *) echo "Node 24 required, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
   npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
+  npm run build -w @oab/core
   cd packages/core && npx vitest run test/local test/store'
 ```
 
-It copies the source without `node_modules` and runs `npm ci` inside the container, because the host's macOS `node_modules` don't run on Linux. It runs as `pwuser`, not root, because root can read the mode-0000 key files the tests expect to be refused.
+It copies the source without `node_modules` and runs `npm ci` inside the container, because the host's macOS `node_modules` don't run on Linux. The build compiles `@oab/shared` and `@oab/bff` (which the local entry imports from `dist/`) and `packages/core/dist/local/main.js`, which the entry tests start. It runs as `pwuser`, not root, because root can read the mode-0000 key files the tests expect to be refused.
 
 ## Releases
 
@@ -124,7 +128,7 @@ cd .. && DESKTOP_REAL_DOCKER=1 DESKTOP_REAL_AGENT_IMAGE=oab-dev-agent:dev DESKTO
   DESKTOP_REAL_PROJECT=oab-dev-contract DESKTOP_REAL_PORT=18487 npm test -w @oab/desktop -- compose.contract
 ```
 
-The compose contract test needs both image variables and fails without them. The same packaged smoke runs against real Docker with `--docker /usr/local/bin/docker --services /tmp/oab-dev-services.json` (project `oab-smoke-<arch>`, port 18486). Afterwards remove the dev images with `docker image rm oab-dev-agent:dev oab-dev-search:dev`. On Linux CI the engine socket belongs to root, so the `desktop-real` job also sets `OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET=1`, `DESKTOP_REAL_DOCKER_CLI=/usr/bin/docker`, `DESKTOP_REAL_ENGINE=Docker` and `STUB_BIND=0.0.0.0` (the agent container reaches the stub through `host.docker.internal`).
+The compose contract test needs both image variables and fails without them. The same packaged smoke runs against real Docker with `--docker /usr/local/bin/docker --services /tmp/oab-dev-services.json` (project `oab-smoke-<arch>`, port 18486). Afterwards remove the dev images with `docker image rm oab-dev-agent:dev oab-dev-search:dev`. On Linux the engine socket belongs to root, so a run there also sets `OPEN_AGENT_SHELL_ALLOW_SYSTEM_SOCKET=1`, `DESKTOP_REAL_DOCKER_CLI=/usr/bin/docker`, `DESKTOP_REAL_ENGINE=Docker` and `STUB_BIND=0.0.0.0` (the agent container reaches the stub through `host.docker.internal`).
 
 **Local build (Gate 4: dogfood the DMG before any GHCR publish).** `npm run dist:local -w @oab/desktop` builds `open-agent:local` and `open-agent-search:local` from your checkout with plain `docker build` (no compose project is created), writes a `kind:"local"` lock with their image Ids, and packages a DMG for your Mac's arch. The app shows "Local build (`local-<sha>`)" and "Open Agent — Local build" in its title, and refuses to start (`local_images_changed`) if either image is later rebuilt or removed; run `dist:local` again then. "Update services" is not available for local builds.
 
@@ -276,10 +280,10 @@ cloud/agent/test/      the hosted tests and their harness (fixtures/hostedApp.ts
 e2e/                   Playwright checks: the local stack (see "End-to-end tests and evals on the local stack") and the Mac
                        app (playwright.desktop.config.ts); support/ also holds origin.ts and onboarding.ts for cloud/e2e
 cloud/e2e/             the @oab/cloud-e2e package: hosted preview Playwright specs (the "End-to-end demo" section of cloud/README.md)
-cloud/deploy/          the @oab/cloud-deploy package: the hosted compose file and its preview override, caddy/, litellm/,
-                       renderer/, searxng/, scripts/env-files.mjs and env-check.mjs, doc-commands.json (the owner-only
-                       commands of cloud/README.md) and the hosted deploy tests
-cloud/deploy-config/   env-files/{backend,frontend,ops}/: a tracked .env.example (names only) beside each git-ignored .env
+cloud/deploy-config/   the one deployment folder, the @oab/cloud-deploy package: the hosted compose file and its preview
+                       override, caddy/, litellm/, renderer/, searxng/, scripts/env-files.mjs and env-check.mjs,
+                       doc-commands.json (the owner-only commands of cloud/README.md), the hosted deploy tests, and
+                       env-files/{backend,frontend,ops}/: a tracked .env.example (names only) beside each git-ignored .env
 cloud/README.md        the hosted deployment: run, develop, e2e, evals, request limits, signup modes, the Gate 6/7 switch-over
                        and the Gate 8 (M7 migrations) and Gate 9 (open signups) runbooks
 cloud/SECURITY.md      the hosted threat model, the limits, signups and account deletion, and the accepted risks
@@ -359,10 +363,10 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 - Code explains itself through names. Add a comment only for a non-obvious reason.
 - Every rendered HTML element in `cloud/web/` and `packages/ui/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
 - Context for an agent run goes through `useThreadContext` (scoped to one chat's agent). `useAgentContext` is blocked by lint because it reaches every mounted chat.
-- Keys are added in the app and stored encrypted by the agent. Settings live in three git-ignored files, `cloud/deploy-config/env-files/backend/.env` (every backend container; compose hands each service only its own names), `frontend/.env` (the Next.js app) and `ops/.env` (scripts, evals and e2e on the owner's machine); never commit them. The names are in the tracked `.env.example` beside each one. Merge the files of an older checkout into them with `cloud/deploy/scripts/env-files.mjs` (see cloud/README.md).
+- Keys are added in the app and stored encrypted by the agent. Settings live in three git-ignored files, `cloud/deploy-config/env-files/backend/.env` (every backend container; compose hands each service only its own names), `frontend/.env` (the Next.js app) and `ops/.env` (scripts, evals and e2e on the owner's machine); never commit them. The names are in the tracked `.env.example` beside each one. Merge the files of an older checkout into them with `cloud/deploy-config/scripts/env-files.mjs` (see cloud/README.md).
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
 - **Base pins.** The Playwright base image (the `v<x>-noble` tag with its `@sha256:` digest, as in the Node 24 command above) is the same everywhere it appears (the agent Dockerfile, the workflows, this file, the README, `docs/` and `scripts/`), and `<x>` equals the `playwright` pin in `packages/core/package.json` and `@playwright/test` in `e2e/package.json`; the SearXNG base is pinned by digest, and no workflow image runs without a digest. `scripts/test/basePins.test.mjs` enforces it, so a base change is one PR that updates all of them.
-- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). The shell blocks of `cloud/README.md` (the Gate 7, 8 and 9 runbooks) are listed in `cloud/deploy/doc-commands.json`, every one `owner` with a reason (`cloud/deploy/test/docs.test.mjs` checks it); pass `--owner-docs cloud/deploy/doc-commands.json` to the runner to list them in its log and TSV. Keep other docs' commands in inline code or non-shell blocks.
+- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). The shell blocks of `cloud/README.md` (the Gate 7, 8 and 9 runbooks) are listed in `cloud/deploy-config/doc-commands.json`, every one `owner` with a reason (`cloud/deploy-config/test/docs.test.mjs` checks it); pass `--owner-docs cloud/deploy-config/doc-commands.json` to the runner to list them in its log and TSV. Keep other docs' commands in inline code or non-shell blocks.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).
 
 ## Safety rails
