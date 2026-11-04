@@ -609,6 +609,22 @@ describe("chat ownership and persistence", () => {
     expect(out.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED });
   });
 
+  it("frees the thread when the client stops at the not-saved notice before the model runs", async () => {
+    const { store, session } = setup();
+    const r = db.forUser(ALICE.id);
+    const messages = { ...r.messages, append: async () => Promise.reject(new UserError("down", "unavailable")) };
+    const gen = run(input(), store, new AbortController().signal, runCtx({ messages }))[Symbol.asyncIterator]();
+    let next = await gen.next();
+    while (!next.done && !(next.value.type === EventType.CUSTOM && "name" in next.value && next.value.name === NOT_SAVED_EVENT))
+      next = await gen.next();
+    expect(next.done).toBe(false);
+    await gen.return?.(undefined);
+    expect(session.prompts).toEqual([]);
+    expect(store.get(OWNER)?.busy).toBe(false);
+    const again = await collect(run(input({ runId: "run-after-stop" }), store, new AbortController().signal));
+    expect(again.at(-1)).toMatchObject({ type: EventType.RUN_FINISHED });
+  });
+
   it("refuses another user's chat id with NOT_FOUND before any work", async () => {
     const { store, session } = setup();
     await db.forUser(BOB.id).chats.claim(CHAT_1, {});
