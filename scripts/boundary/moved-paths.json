@@ -151,6 +151,10 @@
       {
         "file": "cloud/deploy/test/fixtures/**",
         "reason": "the pre-M6 hosted compose file kept verbatim as the equivalence baseline"
+      },
+      {
+        "file": "scripts/test/makefile.test.mjs",
+        "reason": "\"web\" is the make target name (make run web), not a path"
       }
     ]
   },
@@ -262,6 +266,10 @@
       {
         "file": "cloud/deploy/test/fixtures/**",
         "reason": "the pre-M6 hosted compose file kept verbatim as the equivalence baseline"
+      },
+      {
+        "file": "cloud/deploy/test/preflight.test.mjs",
+        "reason": "builds a temp copy of the cloud/deploy and cloud/deploy-config layout so the frontend env file resolves"
       }
     ]
   },
@@ -606,6 +614,222 @@
       {
         "file": "scripts/test/secretPaths.mjs",
         "reason": "shared secret-path list keeps the legacy e2e/.auth name (D10)"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/.env-agent",
+    "new": "cloud/deploy-config/env-files/backend/.env",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/.env-renderer",
+    "new": "cloud/deploy-config/env-files/backend/.env",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/.env-caddy",
+    "new": "cloud/deploy-config/env-files/backend/.env",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/.env-llm",
+    "new": "cloud/deploy-config/env-files/backend/.env",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/.env-search",
+    "new": "cloud/deploy-config/env-files/backend/.env",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/.env-nextjs",
+    "new": "cloud/deploy-config/env-files/frontend/.env",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/env-files",
+    "new": "cloud/deploy-config/env-files/ops/.env",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
+      }
+    ]
+  },
+  {
+    "old": "cloud/deploy/env.examples",
+    "new": "cloud/deploy-config/env-files",
+    "pr": "env-layout",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo, recorded at M6, rehearses the M6 env-file layout that env-files.mjs now migrates from; it is not re-run on the new layout"
+      },
+      {
+        "file": "scripts/test/demoParts.test.mjs",
+        "reason": "fixture-only demo command strings checked by the m6 static rules, never read from disk"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the M6 env-file names ignored on purpose: files left in an M6 checkout must stay out of git and builds"
       }
     ]
   }

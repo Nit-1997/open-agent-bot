@@ -5,9 +5,11 @@ services:
     image: ghcr.io/berriai/litellm:main-stable@sha256:7d6ae6c8d73d1b6aea4cb75d07c4a8a953f0809b0764522b8eab693734c5e905
     profiles: ["litellm"]
     command: ["--config", "/app/config.yaml", "--port", "4000"]
-    env_file:
-      - path: .env-llm
-        required: false
+    environment:
+      - LITELLM_MASTER_KEY
+      - ANTHROPIC_API_KEY
+      - OLLAMA_OPENAI_BASE_URL
+      - OLLAMA_CHAT_MODEL
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
     extra_hosts:
@@ -20,9 +22,6 @@ services:
     # pinned so restarts don't pull a different SearXNG
     image: searxng/searxng:latest@sha256:0f48ffe2152f388f5eaede27f96b610449cebfc890d0ad457304475a54ad7b6e
     entrypoint: ["/bin/sh", "/opt/open-agent/entrypoint.sh", "/usr/local/searxng/entrypoint.sh"]
-    env_file:
-      - path: .env-search
-        required: false
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
       - ./searxng/entrypoint.sh:/opt/open-agent/entrypoint.sh:ro
@@ -33,11 +32,28 @@ services:
     build:
       context: ../..
       dockerfile: cloud/agent/Dockerfile
-    env_file:
-      - path: .env-agent
-        required: true
     environment:
-      PI_OAUTH_CALLBACK_HOST: 0.0.0.0
+      - PI_OAUTH_CALLBACK_HOST=0.0.0.0
+      - COPILOTKIT_TELEMETRY_DISABLED=true
+      - SUPABASE_URL
+      - SUPABASE_PUBLISHABLE_KEY
+      - SUPABASE_SECRET_KEY
+      - AGENT_SERVICE_SECRET
+      - CREDENTIAL_KEYS
+      - ACCESS_REQUEST_PEPPER
+      - APP_ORIGIN
+      - RUN_TIME_LIMIT_SECONDS
+      - LOG_LEVEL
+      - JEV_MODEL
+      - JEV_CONCURRENCY
+      - AGENT_MODEL_CAPS
+      - AGENT_MODELS
+      - LLM_API_KEY
+      - LLM_BASE_URL
+      - RENDERER_URL
+      - COPILOT_CONNECTS_PER_USER
+      - COPILOT_CONNECT_MAX_MS
+      - RENDERER_SECRET
     read_only: true
     tmpfs:
       - /tmp:size=512m,mode=1777
@@ -64,9 +80,8 @@ services:
       context: ../..
       dockerfile: packages/core/Dockerfile
     command: ["node", "dist/renderer/main.js"]
-    env_file:
-      - path: .env-renderer
-        required: true
+    environment:
+      RENDERER_SECRET: ${RENDERER_SECRET:?set RENDERER_SECRET in cloud/deploy-config/env-files/backend/.env and pass that file with --env-file}
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777
@@ -86,9 +101,9 @@ services:
   caddy:
     # Caddy 2.10, pinned by digest
     image: caddy:2.10@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
-    env_file:
-      - path: .env-caddy
-        required: false
+    environment:
+      - AGENT_HOST
+      - ACME_EMAIL
     ports:
       - "${CADDY_BIND:-127.0.0.1}:80:80"
       - "${CADDY_BIND:-127.0.0.1}:443:443"
@@ -116,7 +131,7 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
     env_file:
-      - path: .env-nextjs
+      - path: ../deploy-config/env-files/frontend/.env
         required: true
     environment:
       AGENT_URL: http://agent:8000

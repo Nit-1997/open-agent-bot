@@ -9,10 +9,17 @@ export const ENV_FILE_NAMES = Object.freeze([
   "env-files/.env-e2e",
 ]);
 
+export const ENV_TARGETS = Object.freeze(["backend", "frontend", "ops"].map((g) => `cloud/deploy-config/env-files/${g}/.env`));
+
+export const ENV_EXAMPLES = Object.freeze(ENV_TARGETS.map((t) => `${t}.example`));
+
 export const SECRET_PATHS = Object.freeze([
   ".env",
   ...ENV_FILE_NAMES.map((name) => `deploy-config/${name}`),
   ...ENV_FILE_NAMES.map((name) => `cloud/deploy/${name}`),
+  ...ENV_TARGETS,
+  "cloud/deploy-config/env-files/backend/notes.txt",
+  "cloud/deploy-config/env-files/notes.txt",
   "deploy-config/env-files/anything",
   "e2e/.auth/x.json",
   "e2e/test-results/trace.zip",
@@ -38,7 +45,7 @@ export const SECRET_PATHS = Object.freeze([
 
 export const NEW_RULES = Object.freeze([
   "**/.env-*",
-  "**/env-files/",
+  "**/env-files/**",
   "**/.auth/",
   "cloud/e2e/test-results/",
   "cloud/e2e/playwright-report/",

@@ -19,7 +19,8 @@ export function rowProblems(rows) {
     const at = `row ${i}`;
     const out = [];
     for (const k of ["old", "new"]) if (typeof r?.[k] !== "string" || !r[k]) out.push(`${at}: ${k} must be a non-empty string`);
-    if (typeof r?.pr !== "string" || !/^6\.\d$/.test(r.pr)) out.push(`${at}: pr must look like 6.<n>`);
+    if (typeof r?.pr !== "string" || !/^(6\.\d|[a-z]+(-[a-z]+)+)$/.test(r.pr))
+      out.push(`${at}: pr must look like 6.<n> or name the change (words joined by -)`);
     if (r?.token !== undefined && r.token !== "path") out.push(`${at}: token must be "path" when set`);
     if (!Array.isArray(r?.allow)) out.push(`${at}: allow must be an array`);
     else
