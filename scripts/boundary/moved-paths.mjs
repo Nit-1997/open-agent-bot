@@ -20,6 +20,7 @@ export function rowProblems(rows) {
     const out = [];
     for (const k of ["old", "new"]) if (typeof r?.[k] !== "string" || !r[k]) out.push(`${at}: ${k} must be a non-empty string`);
     if (typeof r?.pr !== "string" || !/^6\.\d$/.test(r.pr)) out.push(`${at}: pr must look like 6.<n>`);
+    if (r?.token !== undefined && r.token !== "path") out.push(`${at}: token must be "path" when set`);
     if (!Array.isArray(r?.allow)) out.push(`${at}: allow must be an array`);
     else
       r.allow.forEach((a, j) => {
@@ -30,7 +31,10 @@ export function rowProblems(rows) {
   });
 }
 
-export const tokenPattern = (old) => new RegExp(`(?<![\\w@./-])${escapeRe(old)}(?=/|$|["'\`\\s)])`, "m");
+export const tokenPattern = (old, token) =>
+  token === "path"
+    ? new RegExp(`(?<![\\w@./-])${escapeRe(old)}/|(["'\`])${escapeRe(old)}\\1`, "m")
+    : new RegExp(`(?<![\\w@./-])${escapeRe(old)}(?=/|$|["'\`\\s)])`, "m");
 
 const allowed = (row, file) =>
   file.startsWith("docs/superpowers/") ||
@@ -43,7 +47,7 @@ export function staleHits(root, rows = loadRows(root)) {
   for (const row of rows) {
     for (const f of git(["ls-files", "-z", "--", row.old]).split("\0").filter(Boolean))
       hits.push({ kind: "TRACKED", file: f, line: 0, old: row.old });
-    const re = tokenPattern(row.old);
+    const re = tokenPattern(row.old, row.token);
     for (const file of files) {
       if (allowed(row, file)) continue;
       let buf;

@@ -1,5 +1,10 @@
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ALLOWLIST, ID_ROOTS, REPO, scanIds } from "../../../scripts/ids-static.mjs";
+
+const { ALLOWLIST, ID_ROOTS, REPO, scanIds } = await import(
+  pathToFileURL(join(import.meta.dirname, "../../../scripts/ids-static.mjs")).href
+);
 
 const CLOUD_ROOTS = ["cloud/web/app", "cloud/web/components"];
 const COMBINED_BASE_COUNT = 1005;

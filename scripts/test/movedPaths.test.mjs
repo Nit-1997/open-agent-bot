@@ -69,6 +69,38 @@ describe("the stale-path guard", () => {
       assert.ok(!re.test(no), no);
   });
 
+  it('token "path" (a bare folder name that is also a word): only <old>/ or the quoted folder name', () => {
+    const re = tokenPattern("web", "path");
+    for (const yes of [
+      "web/Dockerfile",
+      "COPY web/package.json web/",
+      'join(ROOT, "web")',
+      "'web'",
+      "`web`",
+      "(web/app)",
+      ":!web/test/x.ts",
+      "web/",
+    ])
+      assert.ok(re.test(yes), yes);
+    for (const no of [
+      "the web app",
+      "searches the web, reads",
+      "web search",
+      "cloud/web/app",
+      "./web/app",
+      "packages/local-web/src",
+      "webview/x",
+      '"web app"',
+      "@oab/cloud-web",
+    ])
+      assert.ok(!re.test(no), no);
+  });
+
+  it('validates token: only "path" when set', () => {
+    assert.deepEqual(rowProblems([{ ...ROW, token: "path" }]), []);
+    assert.deepEqual(rowProblems([{ ...ROW, token: "word" }]), ['row 0: token must be "path" when set']);
+  });
+
   it("reports stale tokens with file and line, skips docs/superpowers and allow-listed files", () => {
     const root = repo({
       "README.md": "intro\nput keys in deploy-config/.env-agent\n",
