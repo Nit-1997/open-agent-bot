@@ -84,6 +84,15 @@ The request limits (`LIMIT_*`) count runs in the database, so the agent refuses 
 
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" above). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session. The checks for the cloud workspaces are in CONTRIBUTING's checks table; the cloud boundary (nothing outside `cloud/` imports or builds from it) is in CONTRIBUTING's "Cloud boundary".
 
+## Run M7 locally
+
+`make run web-local` (or `make web-local`) runs the hosted app with the request limits, usage meter, Usage tab and signup modes on your machine, with no env files and no Supabase project. It needs Docker running, the Supabase CLI (it prints the install command if the CLI is missing) and `npm ci`. It starts a local Supabase stack `oab-m7-dev` on 127.0.0.1:18700–18704 with every migration in `cloud/supabase/migrations/`, writes a fresh 0600 env to `.web-local/env` (git-ignored: the local stack's keys, new secrets, Cloudflare's always-pass Turnstile test keys and the `LIMIT_*` defaults from `cloud/deploy-config/env-files/backend/.env.example`), creates the admin `owner@local.test` and the member `member@local.test`, builds `cloud/agent` and `cloud/web`, and runs the agent on 18720, the web app at http://localhost:18721 and the demos' stub model on 18722 in the background (pid files and logs in `.web-local/`). It prints a one-click sign-in link for each user and the Mailpit inbox (http://127.0.0.1:18704) for email-link sign-in.
+
+- Limits: set any `LIMIT_*` on the command, e.g. `LIMIT_REQUESTS_PER_MONTH=5 make run web-local`.
+- Model: as the admin, pick Custom server in onboarding or Settings → Models with URL `http://127.0.0.1:18722/v1`, key `oab-e2e-stub-key` and model `stub-1`. Private-network servers are admin-only, so the member needs a real provider key (Settings → Models; it stays in the local stack). `WEB_LOCAL_STUB=0` skips the stub.
+- Signup mode: `bash scripts/make/web-local.sh mode open` (or `invite`, `waitlist`; the agent and web cache it 60 s). `configure-auth.mjs` is for production only. New sign-in links: `bash scripts/make/web-local.sh links`.
+- Stop: `make stop` stops the processes, removes `oab-m7-dev` with its volumes, and deletes `.web-local/`. Web search and report cards are off (no SearXNG or renderer).
+
 ## End-to-end demo
 
 `cloud/e2e/` drives a preview stack with Playwright on desktop, tablet and phone sizes. It creates `oab-e2e+shell@example.test` and `oab-e2e+other@example.test`, seeds chats, reports and saved cards, and removes them afterwards with `cloud/supabase/scripts/cleanup-e2e.mjs`. It reads `cloud/deploy-config/env-files/ops/.env`, which needs `SUPABASE_URL`, `SUPABASE_ADMIN_SECRET_KEY` and `E2E_OPENROUTER_KEY` (saved through the app's API, never typed or logged; the run uses DeepSeek V4 Flash).

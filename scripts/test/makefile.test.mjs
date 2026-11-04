@@ -33,7 +33,12 @@ function fakeBin({ dockerInfo = 0, dockerPs = "" } = {}) {
 const make = (args, { bin, env = {} } = {}) => {
   const r = spawnSync("make", ["--no-print-directory", ...args], {
     cwd: ROOT,
-    env: { PATH: bin ? `${bin}:${process.env.PATH}` : process.env.PATH, HOME: process.env.HOME, ...env },
+    env: {
+      PATH: bin ? `${bin}:${process.env.PATH}` : process.env.PATH,
+      HOME: process.env.HOME,
+      WEB_LOCAL_DIR: join(WORK, "web-local-never-started"),
+      ...env,
+    },
     encoding: "utf8",
   });
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
@@ -65,12 +70,13 @@ const FULL_FRONTEND = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISH
   .join("");
 
 describe("Makefile", () => {
-  it("has help, run, app, web, stop and test-e2e, and help is the default", () => {
+  it("has help, run, app, web, web-local, stop and test-e2e, and help is the default", () => {
     const text = readFileSync(join(ROOT, "Makefile"), "utf8");
-    for (const t of ["help", "run", "app", "web", "stop", "test-e2e"]) assert.match(text, new RegExp(`^${t}:`, "m"), t);
+    for (const t of ["help", "run", "app", "web", "web-local", "stop", "test-e2e"]) assert.match(text, new RegExp(`^${t}:`, "m"), t);
     const r = make([]);
     assert.equal(r.status, 0, r.out);
-    for (const s of ["make run app", "make run web", "make stop", "make test-e2e", "make help"]) assert.ok(r.out.includes(s), s);
+    for (const s of ["make run app", "make run web ", "make run web-local", "make stop", "make test-e2e", "make help"])
+      assert.ok(r.out.includes(s), s);
     assert.deepEqual(
       text.split("\n").filter((l) => l.trim().startsWith("#")),
       [],
@@ -83,6 +89,8 @@ describe("Makefile", () => {
     assert.deepEqual(make(["-n", "run", "web"]).out.trim().split("\n"), [":", "bash scripts/make/web.sh"]);
     assert.deepEqual(make(["-n", "app"]).out.trim().split("\n"), ["bash scripts/make/app.sh"]);
     assert.deepEqual(make(["-n", "web"]).out.trim().split("\n"), ["bash scripts/make/web.sh"]);
+    assert.deepEqual(make(["-n", "run", "web-local"]).out.trim().split("\n"), [":", "bash scripts/make/web-local.sh"]);
+    assert.deepEqual(make(["-n", "web-local"]).out.trim().split("\n"), ["bash scripts/make/web-local.sh"]);
     assert.deepEqual(make(["-n", "stop"]).out.trim().split("\n"), ["bash scripts/make/stop.sh"]);
     assert.deepEqual(make(["-n", "test-e2e"]).out.trim().split("\n"), ["bash scripts/make/test-e2e.sh"]);
     assert.ok(make(["run"]).out.includes("make run app"));

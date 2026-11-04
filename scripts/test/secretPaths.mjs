@@ -42,6 +42,9 @@ export const SECRET_PATHS = Object.freeze([
   "cloud/deploy-config/caddy/site.crt",
   "x.p12",
   "certs/client.p12",
+  ".web-local/env",
+  ".web-local/stack.env",
+  ".web-local/logs/agent.log",
 ]);
 
 export const NEW_RULES = Object.freeze([
@@ -50,4 +53,5 @@ export const NEW_RULES = Object.freeze([
   "**/.auth/",
   "cloud/e2e/test-results/",
   "cloud/e2e/playwright-report/",
+  ".web-local/",
 ]);

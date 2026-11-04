@@ -45,6 +45,9 @@ e2e/.local/
 # Factory evidence (videos, logs)
 .factory/
 
+# make web-local: generated env, pid files and logs
+.web-local/
+
 # Mac app build outputs
 apps/desktop/build/
 apps/desktop/release/
