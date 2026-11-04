@@ -21,5 +21,6 @@
   { "file": "packages/core/test/deploy/workspaceLayout.test.ts", "reason": "skips the cloud/* workspace glob and cloud/ Dockerfiles so the test covers non-cloud workspaces and Dockerfiles only and never reads cloud/ (D12 R2-3, D11)" },
   { "file": "scripts/test/workspaceLayout.test.mjs", "reason": "skips the cloud/* workspace glob and cloud/ Dockerfiles so the test covers non-cloud workspaces and Dockerfiles only and never reads cloud/ (D12 R2-3, D11)" },
   { "file": "scripts/demo/m6/**", "reason": "the M6 demo commands name cloud/ paths: they run the cloud checks, rehearse the switch and list the build context (D12)" },
+  { "file": "scripts/demo/m7/**", "reason": "the M7 demo runs the hosted agent, web and Supabase scripts from cloud/ against the local stack; its node helpers load cloud/agent's dependencies by path (R15)" },
   { "file": "scripts/test/demoParts.test.mjs", "reason": "fixture-only cloud names: demo command lines checked as strings by the m6 static rules, never read from disk" }
 ]

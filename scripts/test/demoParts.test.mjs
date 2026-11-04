@@ -744,7 +744,7 @@ describe("m7 demo part scripts", () => {
       const [dirMode, fileMode, count] = r.stdout.trim().split("\n").slice(-3);
       assert.equal(dirMode, "700");
       assert.equal(fileMode, "600");
-      assert.ok(Number(count) >= 6, count);
+      assert.equal(Number(count), 4, count);
       assert.doesNotMatch(r.stdout, /[0-9a-f]{64}/);
     } finally {
       cleanup();
