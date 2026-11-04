@@ -1,0 +1,107 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": ["src/**/*.ts", "evals/**/*.ts", "test/**/*.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "assist": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "off",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
+                "message": "Nothing outside cloud/ may import from cloud/."
+              }
+            ]
+          }
+        }
+      },
+      "suspicious": {
+        "noExplicitAny": "off"
+      },
+      "performance": {
+        "useDomNodeTextContent": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**", "!src/local/store/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
+                    "message": "Nothing outside cloud/ may import from cloud/."
+                  },
+                  {
+                    "group": ["**/hosted/**", "@supabase/*", "jose", "@oab/core", "@oab/core/**"],
+                    "message": "Core must not import hosted implementations."
+                  },
+                  {
+                    "group": ["node:sqlite"],
+                    "message": "node:sqlite is used only inside src/local/store."
+                  },
+                  {
+                    "group": ["**/local/**", "@oab/core/local", "@oab/core/local/**"],
+                    "message": "Only src/local may import local modules."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/local/store/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
+                    "message": "Nothing outside cloud/ may import from cloud/."
+                  },
+                  {
+                    "group": ["**/hosted/**", "@supabase/*", "jose", "@oab/core", "@oab/core/**"],
+                    "message": "Core must not import hosted implementations."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "name": "@oab/core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open Agent backend: AG-UI server, pi agent sessions, and research tools",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./*": "./dist/*",
+    "./local/*": null,
+    "./scripts/*": null
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "format:check": "biome format",
+    "typecheck": "tsc -b && tsc -p tsconfig.evals.json && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "build": "tsc -b",
+    "start": "node dist/local/main.js",
+    "eval": "tsx evals/run.ts",
+    "eval:rank": "tsx evals/rank.ts"
+  },
+  "dependencies": {
+    "@ag-ui/client": "1.0.2",
+    "@ag-ui/core": "^1.0.3",
+    "@ag-ui/encoder": "^1.0.3",
+    "@copilotkit/runtime": "1.83.0",
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-coding-agent": "^1.4.0",
+    "@hono/node-server": "^2.1.5",
+    "@mozilla/readability": "^0.6.0",
+    "@oab/bff": "1.0.0",
+    "@oab/shared": "1.0.0",
+    "hono": "^4.13.14",
+    "linkedom": "^0.18.14",
+    "playwright": "1.64.1",
+    "rxjs": "7.8.1",
+    "typebox": "^1.4.3",
+    "undici": "^8.12.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/node": "^26.6.5",
+    "tsx": "4.20.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "yaml": "2.9.0"
+  }
+}

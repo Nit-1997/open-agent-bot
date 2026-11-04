@@ -1,0 +1,11 @@
+{
+  "config": "OPEN_AGENT_PORT must be an integer in 1024-65535",
+  "db_corrupt": "the database /data/open-agent.db is damaged (file is not a database)",
+  "db_newer": "the database schema 7 is newer than this build (1)",
+  "db_migration": "migrating the database to schema 2 failed; a backup is in /data/backups",
+  "kek_missing": "the credential key /keys/kek is missing but the database holds 1 saved model key sealed with it. Restore the keys volume, or start once with OPEN_AGENT_RESET_CREDENTIALS=1 to delete them and re-enter them in Models",
+  "keyfile_invalid": "the credential key /keys/kek has mode 0644; it must be 0600",
+  "ui_missing": "UI build not found at /app/ui",
+  "identity": "the local entry needs a local identity, got hosted",
+  "listen": "cannot listen on 0.0.0.0:3000 (EADDRINUSE); free the port or set another one"
+}

@@ -1,0 +1,372 @@
+import { EventType, type TextMessageStartEvent } from "@ag-ui/core";
+import { describe, expect, it } from "vitest";
+import { createTranslator, type PiEvent } from "../../src/agui/translate.js";
+import { Evidence } from "../../src/grounding/evidence.js";
+
+const renderStub = (data: unknown) =>
+  (data as { kind?: string } | undefined)?.kind === "weather" ? ({ kind: "weather_card", location: "Pune" } as never) : null;
+
+function ids() {
+  let n = 0;
+  return { newId: () => `id${++n}`, render: renderStub };
+}
+
+const assistantStart = { type: "message_start", message: { role: "assistant" } } as unknown as PiEvent;
+const assistantEnd = { type: "message_end", message: { role: "assistant" } } as unknown as PiEvent;
+const delta = (d: string) =>
+  ({
+    type: "message_update",
+    message: { role: "assistant" },
+    assistantMessageEvent: { type: "text_delta", delta: d },
+  }) as unknown as PiEvent;
+const thinking = {
+  type: "message_update",
+  message: { role: "assistant" },
+  assistantMessageEvent: { type: "thinking_delta", delta: "hmm" },
+} as unknown as PiEvent;
+const toolStart = {
+  type: "tool_execution_start",
+  toolCallId: "call_1",
+  toolName: "weather",
+  args: { location: "Pune" },
+} as unknown as PiEvent;
+const toolEnd = {
+  type: "tool_execution_end",
+  toolCallId: "call_1",
+  toolName: "weather",
+  isError: false,
+  result: {
+    content: [
+      { type: "text", text: "Sunny" },
+      { type: "text", text: " 28C" },
+    ],
+    details: {},
+  },
+} as unknown as PiEvent;
+
+const run = (events: PiEvent[], evidence?: Evidence) => {
+  const t = createTranslator({ ...ids(), evidence });
+  return [...events.flatMap((e) => t.translate(e)), ...t.finish()];
+};
+
+describe("createTranslator", () => {
+  it("text deltas become one START, N CONTENT, one END", () => {
+    const out = run([assistantStart, delta("Hel"), delta("lo"), assistantEnd]);
+    expect(out.map((e) => e.type)).toEqual([
+      EventType.TEXT_MESSAGE_START,
+      EventType.TEXT_MESSAGE_CONTENT,
+      EventType.TEXT_MESSAGE_CONTENT,
+      EventType.TEXT_MESSAGE_END,
+    ]);
+    expect(out[0]).toMatchObject({ messageId: "id1", role: "assistant" });
+    expect(out[2]).toMatchObject({ messageId: "id1", delta: "lo" });
+  });
+
+  it("text then tool then text yields two distinct messageIds", () => {
+    const out = run([assistantStart, delta("a"), assistantEnd, toolStart, toolEnd, assistantStart, delta("b"), assistantEnd]);
+    const starts = out.filter((e): e is TextMessageStartEvent => e.type === EventType.TEXT_MESSAGE_START);
+    expect(starts).toHaveLength(2);
+    expect(starts[0].messageId).not.toBe(starts[1].messageId);
+  });
+
+  it("tool start emits START/ARGS/END with pi tool id and JSON args", () => {
+    const out = run([assistantStart, assistantEnd, toolStart]);
+    expect(out.map((e) => e.type)).toEqual([EventType.TOOL_CALL_START, EventType.TOOL_CALL_ARGS, EventType.TOOL_CALL_END]);
+    expect(out[0]).toMatchObject({ toolCallId: "call_1", toolCallName: "weather", parentMessageId: "id1" });
+    expect(JSON.parse((out[1] as unknown as { delta: string }).delta)).toEqual({ location: "Pune" });
+  });
+
+  it("tool end emits TOOL_CALL_RESULT with joined text content", () => {
+    const out = run([toolEnd]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ type: EventType.TOOL_CALL_RESULT, toolCallId: "call_1", content: "Sunny 28C", role: "tool" });
+  });
+
+  it("a data tool result is rendered by the registry into a synthetic show_widget call", () => {
+    const widget = { kind: "weather_card", location: "Pune" };
+    const end = {
+      ...toolEnd,
+      result: { content: [{ type: "text", text: "Sunny" }], details: { data: { kind: "weather" } } },
+    } as unknown as PiEvent;
+    const out = run([assistantStart, assistantEnd, toolStart, end]);
+    const tail = out.slice(3);
+    expect(tail.map((e) => e.type)).toEqual([
+      EventType.TOOL_CALL_RESULT,
+      EventType.TOOL_CALL_START,
+      EventType.TOOL_CALL_ARGS,
+      EventType.TOOL_CALL_END,
+      EventType.TOOL_CALL_RESULT,
+    ]);
+    expect(tail[1]).toMatchObject({ toolCallId: "call_1-widget", toolCallName: "show_widget", parentMessageId: "id1" });
+    expect(JSON.parse((tail[2] as unknown as { delta: string }).delta)).toEqual({ widget });
+    expect(tail[4]).toMatchObject({ toolCallId: "call_1-widget", content: "rendered weather_card" });
+  });
+
+  it("render tools that return details.widget are shown as-is", () => {
+    const widget = { kind: "weather_card", location: "Pune" };
+    const end = {
+      ...toolEnd,
+      toolName: "show_x",
+      result: { content: [{ type: "text", text: "ok" }], details: { widget } },
+    } as unknown as PiEvent;
+    const out = run([end]);
+    expect(out.map((e) => e.type)).toContain(EventType.TOOL_CALL_START);
+    expect(JSON.parse((out[2] as unknown as { delta: string }).delta)).toEqual({ widget });
+  });
+
+  it("renders at most one card per data kind in a run", () => {
+    const end = (id: string) =>
+      ({
+        ...toolEnd,
+        toolCallId: id,
+        result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } },
+      }) as unknown as PiEvent;
+    const starts = run([end("a"), end("b")]).filter((e) => e.type === EventType.TOOL_CALL_START);
+    expect(starts).toHaveLength(1);
+  });
+
+  it("data the registry can't render emits nothing extra", () => {
+    const end = {
+      ...toolEnd,
+      result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "search_results" } } },
+    } as unknown as PiEvent;
+    expect(run([end]).map((e) => e.type)).toEqual([EventType.TOOL_CALL_RESULT]);
+  });
+
+  it("errored tool results never emit a widget", () => {
+    const end = {
+      ...toolEnd,
+      isError: true,
+      result: { content: [{ type: "text", text: "x" }], details: { data: { kind: "weather" } } },
+    } as unknown as PiEvent;
+    expect(run([end]).map((e) => e.type)).toEqual([EventType.TOOL_CALL_RESULT]);
+  });
+
+  it("closes an open text message before a tool call starts", () => {
+    const out = run([assistantStart, delta("a"), toolStart]);
+    expect(out.map((e) => e.type)).toEqual([
+      EventType.TEXT_MESSAGE_START,
+      EventType.TEXT_MESSAGE_CONTENT,
+      EventType.TEXT_MESSAGE_END,
+      EventType.TOOL_CALL_START,
+      EventType.TOOL_CALL_ARGS,
+      EventType.TOOL_CALL_END,
+    ]);
+  });
+
+  it("finish closes open message", () => {
+    const out = run([assistantStart, delta("a")]);
+    expect(out.at(-1)).toMatchObject({ type: EventType.TEXT_MESSAGE_END, messageId: "id1" });
+  });
+
+  it("unknown and thinking events are ignored", () => {
+    const out = run([{ type: "turn_start" } as unknown as PiEvent, thinking, { type: "agent_settled" } as unknown as PiEvent]);
+    expect(out).toEqual([]);
+  });
+});
+
+const widgetArgs = (out: ReturnType<typeof run>) =>
+  out
+    .filter((e) => e.type === EventType.TOOL_CALL_ARGS && (e as unknown as { toolCallId: string }).toolCallId.endsWith("-widget"))
+    .map((e) => JSON.parse((e as unknown as { delta: string }).delta).widget);
+
+const searchEnd = {
+  ...toolEnd,
+  toolCallId: "s1",
+  toolName: "web_search",
+  result: { content: [{ type: "text", text: "Target Diya 12ct $6.99 In stock https://www.target.com/p/diya/-/A-1" }], details: {} },
+} as unknown as PiEvent;
+
+const uiEnd = (blocks: unknown[]) =>
+  ({
+    ...toolEnd,
+    toolCallId: "u1",
+    toolName: "show_ui",
+    result: { content: [{ type: "text", text: "shown" }], details: { widget: { kind: "ui", title: "Shopping", blocks } } },
+  }) as unknown as PiEvent;
+
+describe("grounding", () => {
+  it("marks card values no tool returned and keeps sourced ones clean", () => {
+    const out = run([
+      searchEnd,
+      uiEnd([
+        {
+          type: "list",
+          items: [
+            { title: "Diya", value: "$6.99", badge: "In stock" },
+            { title: "Lantern", value: "$5.99" },
+          ],
+        },
+      ]),
+    ]);
+    expect(widgetArgs(out)).toEqual([
+      {
+        kind: "ui",
+        title: "Shopping",
+        blocks: [
+          {
+            type: "list",
+            items: [
+              { title: "Diya", value: "$6.99", badge: "In stock" },
+              { title: "Lantern", value: "$5.99" },
+            ],
+          },
+        ],
+        unverified: ["$5.99"],
+      },
+    ]);
+  });
+
+  it("keeps card pictures the card tool looked up itself", () => {
+    const filled = {
+      ...toolEnd,
+      toolCallId: "u2",
+      toolName: "show_ui",
+      result: {
+        content: [{ type: "text", text: "shown" }],
+        details: {
+          widget: {
+            kind: "ui",
+            title: "Cart",
+            blocks: [{ type: "cards", items: [{ title: "Barilla", image: "https://tse1.mm.bing.net/barilla.jpg" }] }],
+          },
+          sourced: "image: https://tse1.mm.bing.net/barilla.jpg",
+        },
+      },
+    } as unknown as PiEvent;
+    expect(widgetArgs(run([filled]))[0].blocks[0].items[0].image).toBe("https://tse1.mm.bing.net/barilla.jpg");
+  });
+
+  it("follow-up suggestions are not evidence", () => {
+    const out = run([assistantStart, delta("Picks under $20.\n<followups>Under $20 | Vegan</followups>"), assistantEnd]);
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$20"] }]);
+  });
+
+  it("a form the agent shows is not evidence for its own claims", () => {
+    const ask = {
+      ...toolEnd,
+      toolCallId: "q1",
+      toolName: "ask_user",
+      result: { content: [{ type: "text", text: "budget $250" }], details: {} },
+    } as unknown as PiEvent;
+    const out = run([ask, assistantStart, delta("Flights from $250."), assistantEnd]);
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$250"] }]);
+  });
+
+  it("evidence persists across runs of the same session", () => {
+    const evidence = new Evidence();
+    run([searchEnd], evidence);
+    const out = run([uiEnd([{ type: "text", text: "$6.99" }])], evidence);
+    expect(widgetArgs(out)[0].unverified).toBeUndefined();
+  });
+
+  it("adds a note after a message whose text has unsourced claims", () => {
+    const out = run([searchEnd, assistantStart, delta("Diyas $6.99, rangoli kit $7."), delta("49, ✅ In Stock"), assistantEnd]);
+    const types = out.map((e) => e.type);
+    expect(types.indexOf(EventType.TEXT_MESSAGE_END)).toBeLessThan(types.lastIndexOf(EventType.TOOL_CALL_START));
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
+  });
+
+  it("adds no note when the text is fully sourced, and notes each claim once per run", () => {
+    expect(widgetArgs(run([searchEnd, assistantStart, delta("Diyas are $6.99."), assistantEnd]))).toEqual([]);
+    const twice = run([assistantStart, delta("$7.49"), assistantEnd, assistantStart, delta("still $7.49"), assistantEnd]);
+    expect(widgetArgs(twice)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
+  });
+
+  it("checks text still open when the run finishes", () => {
+    const t = createTranslator(ids());
+    const out = [...[assistantStart, delta("$7.49")].flatMap((e) => t.translate(e)), ...t.finish()];
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$7.49"] }]);
+  });
+
+  it("labels claims found only in the open report instead of counting them as sourced", () => {
+    const report = new Evidence();
+    report.add("Kirk Creek $45 a night, 4.5 stars, https://example.com/kirk");
+    const t = createTranslator({ ...ids(), reportEvidence: report });
+    const out = [
+      ...[searchEnd, assistantStart, delta("Kirk Creek is $45 and 4.5 stars; diyas $6.99; the lodge $990.")].flatMap((e) => t.translate(e)),
+      ...t.finish(),
+    ];
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: ["$990"], fromReport: ["$45", "4.5 stars"] }]);
+  });
+
+  it("notes claims that are all from the open report with no unsourced list", () => {
+    const report = new Evidence();
+    report.add("Kirk Creek $45");
+    const t = createTranslator({ ...ids(), reportEvidence: report });
+    const out = [...[assistantStart, delta("Kirk Creek is $45.")].flatMap((e) => t.translate(e)), ...t.finish()];
+    expect(widgetArgs(out)).toEqual([{ kind: "grounding_note", claims: [], fromReport: ["$45"] }]);
+  });
+
+  it("never makes a link or image from the open report clickable or sourced", () => {
+    const evidence = new Evidence();
+    const report = new Evidence();
+    report.add("https://example.com/kirk https://example.com/kirk.jpg $45");
+    const t = createTranslator({ ...ids(), evidence, reportEvidence: report });
+    const card = uiEnd([
+      { type: "cards", items: [{ title: "Kirk Creek", url: "https://example.com/kirk", image: "https://example.com/kirk.jpg" }] },
+    ]);
+    const [widget] = widgetArgs([...t.translate(card), ...t.finish()]);
+    expect(widget.blocks[0].items[0]).toEqual({ title: "Kirk Creek" });
+    expect(widget.removedLinks).toBe(1);
+    expect(evidence.hasUrl("https://example.com/kirk")).toBe(false);
+    expect(evidence.unverified("$45")).toEqual(["$45"]);
+  });
+
+  it("turns research tool updates into workflow_step events", () => {
+    const step = { workflow: "research", phase: "plan", status: "start" };
+    const update = {
+      type: "tool_execution_update",
+      toolCallId: "c",
+      toolName: "research",
+      args: {},
+      partialResult: { details: { workflowStep: step } },
+    } as unknown as PiEvent;
+    const plain = {
+      type: "tool_execution_update",
+      toolCallId: "c",
+      toolName: "browse",
+      args: {},
+      partialResult: { details: {} },
+    } as unknown as PiEvent;
+    expect(run([update, plain])).toEqual([{ type: EventType.CUSTOM, name: "workflow_step", value: step }]);
+  });
+});
+
+describe("answered", () => {
+  const start = (id: string, name: string) =>
+    ({ type: "tool_execution_start", toolCallId: id, toolName: name, args: {} }) as unknown as PiEvent;
+  const end = (id: string, name: string, details: Record<string, unknown> = {}) =>
+    ({
+      type: "tool_execution_end",
+      toolCallId: id,
+      toolName: name,
+      isError: false,
+      result: { content: [{ type: "text", text: "ok" }], details },
+    }) as unknown as PiEvent;
+  const weatherData = { data: { kind: "weather" } };
+  const answeredAfter = (events: PiEvent[]) => {
+    const t = createTranslator(ids());
+    for (const e of events) t.translate(e);
+    return t.answered();
+  };
+
+  it("counts a card from a plain tool call as an answer", () => {
+    expect(answeredAfter([start("w1", "weather"), end("w1", "weather", weatherData)])).toBe(true);
+  });
+
+  it("does not count a card from a tool called inside a codemode script", () => {
+    expect(answeredAfter([start("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData), end("c1", "codemode")])).toBe(
+      false,
+    );
+  });
+
+  it("counts cards and text again once the script has finished", () => {
+    expect(answeredAfter([start("c1", "codemode"), end("c1", "codemode"), start("w1", "weather"), end("w1", "weather", weatherData)])).toBe(
+      true,
+    );
+    expect(
+      answeredAfter([start("c1", "codemode"), end("c1", "codemode"), assistantStart, delta("Valletta is warmest."), assistantEnd]),
+    ).toBe(true);
+  });
+});

@@ -1,0 +1,38 @@
+{
+  "name": "@oab/cloud-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open Agent hosted agent: Supabase store and identity, admin, access requests, key rotation and the hosted entry",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "format:check": "biome format",
+    "typecheck": "tsc -b && tsc -p tsconfig.evals.json && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:supabase": "SUPABASE_INTEGRATION=1 vitest run test/supabase",
+    "build": "tsc -b",
+    "start": "node dist/server.js",
+    "eval": "tsx evals/run.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.4.0",
+    "@oab/core": "1.0.0",
+    "@oab/shared": "1.0.0",
+    "@supabase/supabase-js": "2.118.0",
+    "hono": "^4.13.14",
+    "jose": "6.2.14",
+    "typebox": "^1.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/node": "^26.6.5",
+    "tsx": "4.20.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

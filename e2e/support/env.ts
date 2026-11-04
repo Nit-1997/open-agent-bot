@@ -1,8 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const NEVER_FROM_FILES = new Set(["APP_ORIGIN", "E2E_ALLOW_LIVE"]);
 
 function readEnvFile(path: string): Record<string, string> {
   if (!existsSync(path)) return {};
@@ -13,27 +12,45 @@ function readEnvFile(path: string): Record<string, string> {
       .filter((line) => line && !line.startsWith("#") && line.includes("="))
       .map((line) => {
         const at = line.indexOf("=");
-        return [line.slice(0, at).trim(), line.slice(at + 1).trim().replace(/^["']|["']$/g, "")];
-      }),
+        return [
+          line.slice(0, at).trim(),
+          line
+            .slice(at + 1)
+            .trim()
+            .replace(/^["']|["']$/g, ""),
+        ];
+      })
+      .filter(([key]) => !NEVER_FROM_FILES.has(key)),
   );
 }
 
-const files = {
-  ...readEnvFile(resolve(ROOT, "deploy-config/env-files/.env-supabase-admin")),
-  ...readEnvFile(resolve(ROOT, "deploy-config/env-files/.env-e2e")),
-};
+export const readEnvFiles = (paths: readonly string[]): Record<string, string> =>
+  Object.assign({}, ...paths.map((path) => readEnvFile(path)));
 
-export const env = (name: string, optional = false): string => {
-  const v = (process.env[name] ?? files[name] ?? "").trim();
-  if (!v && !optional) throw new Error(`missing ${name} (deploy-config/env-files/.env-supabase-admin)`);
-  return v;
-};
+export type EnvReader = (name: string, optional?: boolean) => string;
 
-export const scriptEnv = () => ({
-  ...process.env,
-  SUPABASE_URL: env("SUPABASE_URL"),
-  SUPABASE_ADMIN_SECRET_KEY: env("SUPABASE_ADMIN_SECRET_KEY"),
-  APP_ORIGIN: env("APP_ORIGIN"),
-});
+export function envReader(source: NodeJS.ProcessEnv, loadFiles: () => Record<string, string>, hint: string): EnvReader {
+  let files: Record<string, string> | undefined;
+  return (name, optional = false) => {
+    files ??= loadFiles();
+    const v = (source[name] ?? files[name] ?? "").trim();
+    if (!v && !optional) throw new Error(`missing ${name} (${hint})`);
+    return v;
+  };
+}
 
-export const AUTH_DIR = resolve(ROOT, "e2e/.auth");
+export function envFrom(source: NodeJS.ProcessEnv): EnvReader {
+  const named = source.E2E_ENV_FILE?.trim();
+  return envReader(
+    source,
+    () => {
+      if (!named) return {};
+      const path = resolve(named);
+      if (!existsSync(path)) throw new Error(`E2E_ENV_FILE names a missing file: ${path}`);
+      return readEnvFile(path);
+    },
+    "set it in the environment or in the file named by E2E_ENV_FILE",
+  );
+}
+
+export const env = envFrom(process.env);

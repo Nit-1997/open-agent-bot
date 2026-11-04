@@ -1,0 +1,31 @@
+{
+  "name": "@oab/bff",
+  "version": "1.0.0",
+  "description": "Framework-free handler for the Open Agent /api routes and the /api/copilotkit streaming proxy, shared by the hosted web app and the local app",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "format:check": "biome format",
+    "build": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@oab/shared": "1.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

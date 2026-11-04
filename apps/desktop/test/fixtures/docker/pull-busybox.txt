@@ -1,0 +1,8 @@
+1.37: Pulling from library/busybox
+af820adcc158: Pulling fs layer
+af820adcc158: Verifying Checksum
+af820adcc158: Download complete
+af820adcc158: Pull complete
+Digest: sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
+Status: Downloaded newer image for busybox:1.37
+docker.io/library/busybox:1.37

@@ -1,0 +1,9 @@
+{
+  "long": "Answer right here in the chat as plain paragraphs. Do not create a report, artifact or page, and do not use any tools. Write a 500-word essay about lamplighter traditions at lighthouses.",
+  "followUp": "Reply with one short sentence about the sea.",
+  "report": "Call the create_artifact tool now with the title \"Lamplighter field guide\" and a short self-contained HTML page (under 200 words, no images) about historic lighthouse keepers. Do not search the web and do not use the research tool. After the tool returns, reply with one sentence.",
+  "reportNudge": "The report has not been created yet. Call create_artifact now with the title \"Lamplighter field guide\" and a short HTML page about historic lighthouse keepers, then reply with one sentence.",
+  "reportTitle": "Lamplighter field guide",
+  "afterRestart": "Reply with one short sentence about tides.",
+  "search": "lamplighter"
+}

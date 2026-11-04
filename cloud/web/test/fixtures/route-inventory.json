@@ -1,0 +1,75 @@
+[
+  {
+    "file": "(app)/[...missing]/page.tsx",
+    "url": "/nope/deeper",
+    "signedOut": "login",
+    "user": "not_found_page",
+    "admin": "not_found_page"
+  },
+  {
+    "file": "(app)/chats/[id]/page.tsx",
+    "url": "/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "signedOut": "login",
+    "user": "pass",
+    "admin": "pass"
+  },
+  { "file": "(app)/chats/page.tsx", "url": "/chats", "signedOut": "login", "user": "pass", "admin": "pass" },
+  { "file": "(app)/page.tsx", "url": "/", "signedOut": "landing", "user": "pass", "admin": "pass" },
+  { "file": "(app)/reports/[id]/page.tsx", "url": "/reports/AbCdEf_-1234", "signedOut": "login", "user": "pass", "admin": "pass" },
+  { "file": "(app)/reports/page.tsx", "url": "/reports", "signedOut": "login", "user": "pass", "admin": "pass" },
+  { "file": "(app)/search/page.tsx", "url": "/search", "signedOut": "login", "user": "pass", "admin": "pass" },
+  { "file": "admin/page.tsx", "url": "/admin", "signedOut": "login", "user": "not_found_page", "admin": "pass" },
+  { "file": "api/artifacts/[id]/route.ts", "url": "/api/artifacts/AbCdEf_-1234", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  {
+    "file": "api/chats/[id]/messages/route.ts",
+    "url": "/api/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/messages",
+    "signedOut": "json 401",
+    "user": "pass",
+    "admin": "pass"
+  },
+  {
+    "file": "api/chats/[id]/route.ts",
+    "url": "/api/chats/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "signedOut": "json 401",
+    "user": "pass",
+    "admin": "pass"
+  },
+  { "file": "api/chats/route.ts", "url": "/api/chats", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/copilotkit/[[...slug]]/route.ts", "url": "/api/copilotkit", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  {
+    "file": "api/copilotkit/[[...slug]]/route.ts",
+    "url": "/api/copilotkit/agent/openagent/run",
+    "signedOut": "json 401",
+    "user": "pass",
+    "admin": "pass"
+  },
+  { "file": "api/models/route.ts", "url": "/api/models", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/onboarding/options/route.ts", "url": "/api/onboarding/options", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/places/route.ts", "url": "/api/places", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/profile/route.ts", "url": "/api/profile", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/providers/[[...path]]/route.ts", "url": "/api/providers", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  {
+    "file": "api/providers/[[...path]]/route.ts",
+    "url": "/api/providers/openai/key",
+    "signedOut": "json 401",
+    "user": "pass",
+    "admin": "pass"
+  },
+  { "file": "api/reports/[id]/route.ts", "url": "/api/reports/AbCdEf_-1234", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/reports/route.ts", "url": "/api/reports", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/search/route.ts", "url": "/api/search", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  { "file": "api/settings/[[...path]]/route.ts", "url": "/api/settings", "signedOut": "json 401", "user": "pass", "admin": "pass" },
+  {
+    "file": "api/settings/[[...path]]/route.ts",
+    "url": "/api/settings/brave-search/key",
+    "signedOut": "json 401",
+    "user": "pass",
+    "admin": "pass"
+  },
+  { "file": "auth/callback/route.ts", "url": "/auth/callback", "signedOut": "pass", "user": "pass", "admin": "pass" },
+  { "file": "auth/confirm/page.tsx", "url": "/auth/confirm", "signedOut": "pass", "user": "pass", "admin": "pass" },
+  { "file": "auth/signout/route.ts", "url": "/auth/signout", "signedOut": "pass", "user": "pass", "admin": "pass" },
+  { "file": "landing/page.tsx", "url": "/landing", "signedOut": "pass", "user": "pass", "admin": "pass" },
+  { "file": "login/page.tsx", "url": "/login", "signedOut": "pass", "user": "pass", "admin": "pass" },
+  { "file": "request-access/page.tsx", "url": "/request-access", "signedOut": "pass", "user": "pass", "admin": "pass" }
+]

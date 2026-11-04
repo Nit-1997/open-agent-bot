@@ -1,0 +1,335 @@
+import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const DIR = join(ROOT, ".github/workflows");
+const FILES = readdirSync(DIR)
+  .filter((f) => /\.ya?ml$/.test(f))
+  .sort();
+const read = (file) => readFileSync(join(DIR, file), "utf8");
+const doc = (file) => parse(read(file));
+const WRITE_SCOPES = ["contents", "packages", "id-token", "attestations"];
+const RELEASE_WRITES = {
+  push: ["packages", "id-token", "attestations"],
+  merge: ["packages", "id-token", "attestations"],
+  attest: ["id-token", "attestations"],
+  release: ["contents"],
+};
+
+const usesOf = (text) => [...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)].map((m) => ({ ref: m[1], comment: m[2].trim() }));
+const triggers = (wf) => (typeof wf.on === "string" ? [wf.on] : Array.isArray(wf.on) ? wf.on : Object.keys(wf.on ?? {}));
+const writes = (perms) => (perms && typeof perms === "object" ? WRITE_SCOPES.filter((s) => perms[s] === "write") : []);
+const stepsText = (job) => JSON.stringify(job.steps ?? []);
+const PRIVATE_TMPDIR = 'mkdir -p "$TMPDIR" && chmod 700 "$TMPDIR" && test -O "$TMPDIR" && test "$(stat -c %a "$TMPDIR")" = 700';
+
+describe("workflow action pins", () => {
+  it("finds the workflows", () => {
+    for (const f of ["ci.yml", "release.yml", "evals-local.yml"]) assert.ok(FILES.includes(f), f);
+  });
+
+  for (const file of FILES) {
+    it(`${file}: every uses: is owner/repo@<40-hex> with a version comment`, () => {
+      const uses = usesOf(read(file));
+      assert.ok(uses.length > 0);
+      for (const { ref, comment } of uses) {
+        if (ref.startsWith("./")) continue;
+        assert.match(ref, /^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/, `${file}: ${ref}`);
+        assert.match(comment, /^#\s*v\d/, `${file}: ${ref} needs a # vN comment`);
+      }
+    });
+
+    it(`${file}: never uses pull_request_target`, () => {
+      assert.equal(read(file).includes("pull_request_target"), false);
+      assert.equal(triggers(doc(file)).includes("pull_request_target"), false);
+    });
+
+    it(`${file}: defaults to contents: read`, () => assert.deepEqual(doc(file).permissions, { contents: "read" }));
+  }
+});
+
+describe("write scopes", () => {
+  for (const file of FILES) {
+    it(`${file}: contents/packages/id-token/attestations write only on the release.yml write jobs`, () => {
+      const wf = doc(file);
+      assert.deepEqual(writes(wf.permissions), []);
+      for (const [name, job] of Object.entries(wf.jobs ?? {})) {
+        const want = file === "release.yml" ? (RELEASE_WRITES[name] ?? []) : [];
+        assert.deepEqual(writes(job.permissions), want, `${file} job ${name}`);
+      }
+    });
+  }
+});
+
+describe("ci.yml local-stack job", () => {
+  const wf = doc("ci.yml");
+  const job = wf.jobs["local-stack"];
+
+  it("runs only on pull requests, with contents: read and no secrets", () => {
+    assert.ok(job);
+    assert.equal(job.if, "github.event_name == 'pull_request'");
+    assert.deepEqual(job.permissions, { contents: "read" });
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
+  });
+
+  it("pins the stub port to 18341 and reaches it through host.docker.internal", () => {
+    assert.equal(String(job.env.STUB_PORT), "18341");
+    assert.equal(job.env.STUB_HOST, "host.docker.internal");
+    assert.equal(job.env.STUB_BIND, "0.0.0.0");
+  });
+
+  it("builds, waits up to 300 s, runs the subset, probes, restarts, re-checks and tears down with -v in always()", () => {
+    const text = stepsText(job);
+    for (const piece of [
+      "build",
+      "--wait-timeout 300",
+      "npm run local -w e2e",
+      "local-probes.mts",
+      "npm run local:after-restart -w e2e",
+      "down -v",
+    ]) {
+      assert.ok(text.includes(piece), piece);
+    }
+    const teardown = job.steps.at(-1);
+    assert.equal(teardown.if, "always()");
+    assert.match(teardown.run, /down -v/);
+  });
+
+  it("has a Node 24 SQLite job", () => {
+    const node24 = wf.jobs["sqlite-node24"];
+    assert.ok(node24);
+    assert.match(stepsText(node24), /test\/local test\/store/);
+    assert.match(stepsText(node24), /--user pwuser/);
+    assert.match(stepsText(node24), /mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-noble@sha256:[0-9a-f]{64} /);
+    assert.doesNotMatch(stepsText(node24), /playwright:v[\d.]+-noble(?!@sha256:)/);
+    assert.match(
+      node24.steps.map((s) => s.run ?? "").join("\n"),
+      /case "\$\(node -p process\.versions\.node\)" in 24\.\*\) ;; \*\) echo "[^"]*" >&2; exit 1 ;; esac/,
+    );
+  });
+});
+
+describe("ci.yml desktop jobs", () => {
+  const wf = doc("ci.yml");
+  const jobs = wf.jobs;
+  const DESKTOP_JOBS = ["desktop"];
+  const runs = (job) => job.steps.map((s) => s.run ?? "").join("\n");
+  const usesStep = (job, prefix) => job.steps.find((s) => String(s.uses ?? "").startsWith(prefix));
+
+  it("triggers only on pull_request and push to main", () => {
+    assert.deepEqual(Object.keys(wf.on).sort(), ["pull_request", "push"]);
+    assert.deepEqual(wf.on.push, { branches: ["main"] });
+  });
+
+  it("runs only the quick jobs; the Electron e2e and the DMG build run locally (make test-e2e) and in release.yml", () => {
+    assert.deepEqual(Object.keys(jobs).sort(), ["cloud", "compose", "core", "desktop", "local-stack", "sqlite-node24", "standalone"]);
+    assert.equal(JSON.stringify(jobs).includes("macos-"), false);
+  });
+
+  for (const name of DESKTOP_JOBS) {
+    it(`${name}: contents: read, no secrets, a timeout and a checkout without persisted credentials`, () => {
+      const job = jobs[name];
+      assert.ok(job, name);
+      assert.deepEqual(job.permissions, { contents: "read" });
+      assert.equal(JSON.stringify(job).includes("secrets."), false);
+      assert.ok(Number(job["timeout-minutes"]) > 0 && Number(job["timeout-minutes"]) <= 60);
+      assert.equal(usesStep(job, "actions/checkout@").with["persist-credentials"], false);
+      assert.match(runs(job), /npm run electron:install -w @oab\/desktop/);
+      assert.equal(JSON.stringify(job.env ?? {}).includes("ELECTRON_SKIP_BINARY_DOWNLOAD"), false);
+    });
+  }
+
+  it("the jobs that never run Electron skip its binary download", () => {
+    for (const name of ["core", "cloud", "local-stack"]) assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
+  });
+
+  it("desktop: Ubuntu, checks, unit tests and the build for @oab/desktop, no Electron e2e", () => {
+    const job = jobs.desktop;
+    assert.equal(job["runs-on"], "ubuntu-24.04");
+    const text = runs(job);
+    for (const piece of [
+      "npm ci",
+      "npm run lint -w @oab/desktop",
+      "npm run format:check -w @oab/desktop",
+      "npm run typecheck -w @oab/desktop",
+      "npm test -w @oab/desktop",
+      "npm run build -w @oab/desktop",
+      "npm run stage -w @oab/desktop",
+    ])
+      assert.ok(text.includes(piece), piece);
+    assert.doesNotMatch(text, /DESKTOP_REAL_DOCKER|xvfb|playwright test/);
+    assert.equal(usesStep(job, "actions/upload-artifact@"), undefined);
+  });
+});
+
+describe("ci.yml standalone job (M6 D13)", () => {
+  const wf = doc("ci.yml");
+  const job = wf.jobs.standalone;
+  const runs = () => job.steps.map((s) => s.run ?? "").join("\n");
+  const usesStep = (prefix) => job.steps.find((s) => String(s.uses ?? "").startsWith(prefix));
+
+  it("runs on pull requests and main: no if, Ubuntu 24.04, 45 minutes, contents: read, no environment, no secrets", () => {
+    assert.ok(job);
+    assert.equal(job.if, undefined);
+    assert.equal(job["runs-on"], "ubuntu-24.04");
+    assert.equal(Number(job["timeout-minutes"]), 45);
+    assert.deepEqual(job.permissions, { contents: "read" });
+    assert.equal(job.environment, undefined);
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
+  });
+
+  it("checks out full history without persisted credentials and sets up Node from .nvmrc with the npm cache", () => {
+    const checkout = usesStep("actions/checkout@");
+    assert.equal(Number(checkout.with["fetch-depth"]), 0);
+    assert.equal(checkout.with["persist-credentials"], false);
+    const node = usesStep("actions/setup-node@");
+    assert.equal(node.with["node-version-file"], ".nvmrc");
+    assert.equal(node.with.cache, "npm");
+  });
+
+  it("uses a private 0700 TMPDIR and the oab-ci-oss project, port, volumes, images and APP_ORIGIN", () => {
+    assert.deepEqual(job.env, {
+      TMPDIR: "/home/runner/oab-tmp",
+      OAB_STANDALONE_ALLOW_DELETE: "1",
+      OAB_STANDALONE_PROJECT: "oab-ci-oss",
+      OPEN_AGENT_PORT: "18331",
+      APP_ORIGIN: "http://127.0.0.1:18331",
+      OPEN_AGENT_DATA_VOLUME: "oab-ci-oss-data",
+      OPEN_AGENT_KEYS_VOLUME: "oab-ci-oss-keys",
+      OPEN_AGENT_IMAGE: "oab-ci-oss-agent:dev",
+      OPEN_AGENT_SEARCH_IMAGE: "oab-ci-oss-search:dev",
+    });
+    assert.equal(job.steps[0].run.trim(), PRIVATE_TMPDIR);
+  });
+
+  it("leaves npm ci and the Playwright install to the script (lockfile-pinned browser) and runs it with --docker --hosted-free (6.4)", () => {
+    const text = runs();
+    assert.doesNotMatch(text, /npm ci|playwright install|npm install|npm prune/);
+    assert.equal(job.steps.at(-1).run.trim(), "bash scripts/ci/standalone.sh --docker --hosted-free");
+  });
+});
+
+describe("ci.yml cloud job (M6 D14)", () => {
+  const job = doc("ci.yml").jobs.cloud;
+  const runs = () => job.steps.map((s) => s.run ?? "").filter(Boolean);
+
+  it("runs on pull requests and main with contents: read, no environment and no secrets", () => {
+    assert.ok(job);
+    assert.equal(job.if, undefined);
+    assert.deepEqual(job.permissions, { contents: "read" });
+    assert.equal(job.environment, undefined);
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
+    const checkout = job.steps.find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+    assert.equal(checkout.with["persist-credentials"], false);
+  });
+
+  it("lints, format-checks, type-checks, unit-tests and builds the cloud workspaces only", () => {
+    assert.deepEqual(runs(), [
+      "npm ci",
+      "npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
+      "npm run lint:boundary && npm run lint:scripts && npm run format:check:scripts",
+      "npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
+      "npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e",
+      "bash scripts/ci/compose-plugin.sh",
+      "npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
+      "npm run build -w @oab/cloud-agent -w @oab/cloud-web",
+    ]);
+    assert.doesNotMatch(runs().join("\n"), /test:supabase|playwright|smoke/);
+    assert.equal(runs().join("\n").replaceAll("@oab/cloud-e2e", "").includes("e2e"), false);
+  });
+
+  it("checks out full history for the hosted compose baseline and the migrations pin (6.6)", () => {
+    const checkout = job.steps.find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+    assert.equal(checkout.with["fetch-depth"], 0);
+  });
+
+  it("replaces the web job (6.5)", () => {
+    assert.equal(doc("ci.yml").jobs.web, undefined);
+    assert.match(JSON.stringify(job.steps.at(-1)), /COPILOTKIT_TELEMETRY_DISABLED/);
+  });
+});
+
+describe("ci.yml private temp dirs", () => {
+  it("every job that sets TMPDIR makes it a 0700 folder it owns before any action runs", () => {
+    const jobs = Object.entries(doc("ci.yml").jobs).filter(([, job]) => job.env?.TMPDIR);
+    assert.deepEqual(jobs.map(([name]) => name).sort(), ["desktop", "standalone"]);
+    for (const [name, job] of jobs) assert.equal(job.steps[0].run?.trim(), PRIVATE_TMPDIR, name);
+  });
+});
+
+describe("ci.yml checkouts", () => {
+  it("every checkout in ci.yml leaves no credentials behind", () => {
+    for (const [name, job] of Object.entries(doc("ci.yml").jobs)) {
+      const checkout = (job.steps ?? []).find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+      if (checkout) assert.equal(checkout.with?.["persist-credentials"], false, name);
+    }
+  });
+});
+
+describe("ci.yml compose job (M6 D14)", () => {
+  const job = doc("ci.yml").jobs.compose;
+  const runs = () => job.steps.map((s) => s.run ?? "").filter(Boolean);
+
+  it("runs the local compose tests and the hosted deploy tests from full history (6.6)", () => {
+    const checkout = job.steps.find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+    assert.equal(checkout.with["fetch-depth"], 0);
+    assert.ok(runs().includes("node --test scripts/test/composeLayout.test.mjs scripts/test/preflight.test.mjs"));
+    assert.ok(runs().includes("npm test -w @oab/cloud-deploy"));
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
+  });
+});
+
+describe("release.yml", () => {
+  const text = read("release.yml");
+  const wf = doc("release.yml");
+
+  it("runs on v* tags only", () => assert.deepEqual(wf.on, { push: { tags: ["v*"] } }));
+
+  it("sets provenance mode=max, an SBOM and attests what it pushes", () => {
+    assert.match(text, /provenance: mode=max/);
+    assert.match(text, /sbom: true/);
+    assert.match(text, /actions\/attest-build-provenance@[0-9a-f]{40}/);
+    assert.match(text, /push-to-registry: true/);
+  });
+
+  it("builds both images, the agent content check on /app", () => {
+    const include = wf.jobs.push.strategy.matrix.include;
+    assert.deepEqual([...new Set(include.filter((l) => l.image === "open-agent").map((l) => l.content))], ["/app"]);
+    assert.deepEqual([...new Set(include.filter((l) => l.image === "open-agent-search").map((l) => l.content))], ["/opt/open-agent"]);
+    assert.match(text, /packages\/core\/Dockerfile/);
+    assert.match(text, /local\/searxng/);
+  });
+});
+
+describe("evals-local.yml", () => {
+  const wf = doc("evals-local.yml");
+
+  it("runs in the evals environment with contents: read", () => {
+    const jobs = Object.values(wf.jobs);
+    assert.ok(jobs.length > 0);
+    for (const job of jobs) assert.equal(job.environment, "evals");
+  });
+
+  it("skips with a notice when OPENROUTER_API_KEY is absent", () => {
+    const text = read("evals-local.yml");
+    assert.match(text, /::notice::/);
+    assert.match(text, /OPENROUTER_API_KEY/);
+    assert.match(text, /--target local/);
+  });
+});
+
+describe("OCI labels", () => {
+  for (const file of ["packages/core/Dockerfile", "local/searxng/Dockerfile"]) {
+    it(`${file} labels the version and revision from build args`, () => {
+      const text = readFileSync(join(ROOT, file), "utf8");
+      assert.match(text, /^ARG OPEN_AGENT_VERSION=dev$/m);
+      assert.match(text, /^ARG OPEN_AGENT_REVISION=unknown$/m);
+      assert.match(text, /org\.opencontainers\.image\.version="\$\{OPEN_AGENT_VERSION\}"/);
+      assert.match(text, /org\.opencontainers\.image\.revision="\$\{OPEN_AGENT_REVISION\}"/);
+      assert.match(text, /org\.opencontainers\.image\.licenses="MIT"/);
+    });
+  }
+});

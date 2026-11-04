@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.evals.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "paths": {
+      "@oab/core/*": ["./src/*"],
+      "typebox": ["../../node_modules/typebox/build/index.d.mts"],
+      "typebox/value": ["../../node_modules/typebox/build/value/index.d.mts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

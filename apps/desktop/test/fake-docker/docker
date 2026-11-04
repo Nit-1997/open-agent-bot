@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+import { main } from "./docker.mjs";
+
+const home = process.env.FAKE_DOCKER_HOME;
+if (!home) {
+  process.stderr.write("fake docker: FAKE_DOCKER_HOME is not set\n");
+  process.exit(64);
+}
+await main(home, process.argv.slice(2));

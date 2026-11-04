@@ -4,6 +4,11 @@
 deploy-config/.env*
 *.pem
 *.key
+*.crt
+*.p12
+.vercel/
+cloud/supabase/.temp/
+cloud/supabase/.branches/
 node_modules/
 .next/
 dist/
@@ -11,17 +16,41 @@ artifacts-data/
 .DS_Store
 .superpowers/
 
-# Local eval runs (baselines live in agent/evals/baseline/)
-agent/evals/results/
+# Local eval runs (baselines live in packages/core/evals/baseline/)
+packages/core/evals/results/
 
 # secrets in nested env folders
 deploy-config/**/.env*
+
+# secrets and e2e state anywhere (cloud/ layout included)
+**/.env-*
+**/env-files/**
+!cloud/deploy-config/env-files/*/
+!cloud/deploy-config/env-files/*/.env.example
+**/.auth/
+cloud/deploy-config/.env*
+cloud/e2e/test-results/
+cloud/e2e/playwright-report/
 
 # End-to-end runs
 e2e/test-results/
 e2e/playwright-report/
 e2e/.auth/
+e2e/.local/
 *.webm
 *.mp4
 
 .mcp.json
+
+# Factory evidence (videos, logs)
+.factory/
+
+# Mac app build outputs
+apps/desktop/build/
+apps/desktop/release/
+
+# Planning specs stay out of the public repo
+docs/superpowers/
+
+# Local Claude Code settings and memory
+**/.claude/

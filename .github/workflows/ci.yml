@@ -5,58 +5,251 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  agent:
+  core:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: agent
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: agent/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - run: npm run lint -w @oab/core -w @oab/shared
+      - run: npm run format:check -w @oab/core -w @oab/shared
+      - run: npm run typecheck -w @oab/core
+      - run: npm test -w @oab/core
+      - run: npm run build -w @oab/core
 
-  web:
+  cloud:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
+    permissions:
+      contents: read
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - run: npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
+      - run: npm run lint:boundary && npm run lint:scripts && npm run format:check:scripts
+      - run: npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
+      - run: npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e
+      - name: Pinned Docker Compose 5 for the hosted config checks (the runner's Compose 2 drops env_file under --no-env-resolution)
+        run: bash scripts/ci/compose-plugin.sh
+      - run: npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
+      - run: npm run build -w @oab/cloud-agent -w @oab/cloud-web
         env:
           COPILOTKIT_TELEMETRY_DISABLED: "true"
 
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Compose starts from a fresh clone with no env files
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Both stacks resolve from a fresh clone; the local one needs no env files
         run: |
-          ls deploy-config/.env-* 2>/dev/null && exit 1
-          touch deploy-config/.env-agent deploy-config/.env-renderer deploy-config/.env-nextjs
-          docker compose config --quiet
-          docker compose --profile litellm --profile ollama config --quiet
-          sh deploy-config/searxng/entrypoint.sh true
+          ls cloud/deploy-config/.env-* cloud/deploy-config/env-files/*/.env 2>/dev/null && exit 1
+          docker compose --env-file /dev/null config --quiet
+          docker compose -f cloud/deploy-config/compose.hosted.yml config --quiet 2>/dev/null && exit 1
+          mkdir -p cloud/deploy-config/env-files/backend cloud/deploy-config/env-files/frontend
+          printf 'RENDERER_SECRET=ci-placeholder\n' > cloud/deploy-config/env-files/backend/.env
+          touch cloud/deploy-config/env-files/frontend/.env
+          docker compose -f cloud/deploy-config/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env config --quiet
+          docker compose -f cloud/deploy-config/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env --profile litellm --profile ollama config --quiet
+          sh cloud/deploy-config/searxng/entrypoint.sh true
         env:
           SEARXNG_SECRET_FILE: /tmp/searxng-secret/secret
+      - name: Project names are pinned; the preview override is named and bound to 127.0.0.1
+        run: |
+          test "$(docker compose --env-file /dev/null config --format json | jq -r .name)" = open-agent
+          test "$(docker compose --env-file cloud/deploy-config/env-files/backend/.env -f cloud/deploy-config/compose.hosted.yml config --format json | jq -r .name)" = open-agent-bot
+          preview="docker compose --env-file cloud/deploy-config/env-files/backend/.env --profile local -f cloud/deploy-config/compose.hosted.yml -f cloud/deploy-config/compose.preview.yml config --format json"
+          test "$($preview | jq -r .name)" = oab-preview
+          test "$($preview | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
+          test "$($preview | jq '[.services[].ports[]? | .published | tonumber] | all(. >= 18000)')" = true
+          test "$($preview | jq -c '[.services[].ports[]? | .published] | sort')" = '["18300","18800"]'
+      - name: Local stack is loopback-only, takes no env files, keeps its volume names and has no bind mounts
+        run: |
+          local="docker compose --env-file /dev/null config --format json"
+          test "$($local | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
+          test "$(docker compose --env-file /dev/null config --format json --no-env-resolution | jq '[.services[] | select(has("env_file"))] | length')" = 0
+          test "$($local | jq -r '.volumes.data.name')" = open-agent-data
+          test "$($local | jq -r '.volumes.keys.name')" = open-agent-keys
+          test "$($local | jq '[.services[].volumes[]? | select(.type == "bind")] | length')" = 0
+      - name: Local compose layout and preflight
+        run: node --test scripts/test/composeLayout.test.mjs scripts/test/preflight.test.mjs
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - name: Pinned Docker Compose 5 for the hosted config checks (the runner's Compose 2 drops env_file under --no-env-resolution)
+        run: bash scripts/ci/compose-plugin.sh
+      - name: Hosted deploy checks (config equivalence with the pre-M6 baseline fixture, preview, preflight, twins, migrations, docs, env-files helper)
+        run: npm test -w @oab/cloud-deploy
+      - name: actionlint on every workflow (pinned image)
+        run: npm run lint:workflows
+
+  standalone:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      TMPDIR: /home/runner/oab-tmp
+      OAB_STANDALONE_ALLOW_DELETE: "1"
+      OAB_STANDALONE_PROJECT: oab-ci-oss
+      OPEN_AGENT_PORT: "18331"
+      APP_ORIGIN: http://127.0.0.1:18331
+      OPEN_AGENT_DATA_VOLUME: oab-ci-oss-data
+      OPEN_AGENT_KEYS_VOLUME: oab-ci-oss-keys
+      OPEN_AGENT_IMAGE: oab-ci-oss-agent:dev
+      OPEN_AGENT_SEARCH_IMAGE: oab-ci-oss-search:dev
+    steps:
+      - name: A private 0700 temp dir, as the desktop jobs use
+        run: mkdir -p "$TMPDIR" && chmod 700 "$TMPDIR" && test -O "$TMPDIR" && test "$(stat -c %a "$TMPDIR")" = 700
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Remove cloud/, then install, lint, type-check, test and build the rest; build and start the local stack; build the Mac app
+        run: bash scripts/ci/standalone.sh --docker --hosted-free
+
+  local-stack:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      COMPOSE_PROJECT: oab-ci-local
+      OPEN_AGENT_PORT: "18330"
+      OPEN_AGENT_DATA_VOLUME: oab-ci-local-data
+      OPEN_AGENT_KEYS_VOLUME: oab-ci-local-keys
+      APP_ORIGIN: http://127.0.0.1:18330
+      STUB_HOST: host.docker.internal
+      STUB_PORT: "18341"
+      STUB_BIND: 0.0.0.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build the local images
+        run: docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null build
+      - name: Start the local stack
+        run: docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null up -d --wait --wait-timeout 300
+      - name: Start the stub model and reach it from the agent through host.docker.internal
+        run: |
+          nohup npx tsx e2e/support/stubModel.ts > "$RUNNER_TEMP/stub.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/stub.pid"
+          for _ in $(seq 1 30); do grep -q "listening" "$RUNNER_TEMP/stub.log" && break; sleep 1; done
+          cat "$RUNNER_TEMP/stub.log"
+          docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null exec -T agent node -e "fetch('http://$STUB_HOST:$STUB_PORT/v1/models').then(r=>{console.log('stub via host-gateway:',r.status);process.exit(r.ok?0:1)},e=>{console.log('stub unreachable:',e.cause?.code??e.message);process.exit(1)})"
+      - name: Local e2e subset on the stub model
+        run: npm run local -w e2e
+      - name: Refusal probes (Host, Origin, fetch metadata, no CORS)
+        run: npx tsx e2e/scripts/local-probes.mts
+      - name: Restart the stack; data and keys survive down and up
+        run: |
+          docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null down
+          docker volume inspect "$OPEN_AGENT_DATA_VOLUME" "$OPEN_AGENT_KEYS_VOLUME" --format '{{.Name}} kept'
+          docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null up -d --wait --wait-timeout 300
+      - name: After-restart spec
+        run: npm run local:after-restart -w e2e
+      - name: Stack status and agent request log
+        if: failure()
+        run: |
+          docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null ps -a
+          docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null logs --no-color --tail 200 agent renderer search
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: local-stack-e2e
+          path: e2e/test-results
+          retention-days: 7
+      - name: Tear down the stack, its volumes and the stub
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/stub.pid" ]; then kill "$(cat "$RUNNER_TEMP/stub.pid")" 2>/dev/null || true; fi
+          docker compose -p "$COMPOSE_PROJECT" --env-file /dev/null down -v
+          docker volume rm "$OPEN_AGENT_DATA_VOLUME" "$OPEN_AGENT_KEYS_VOLUME" 2>/dev/null || true
+
+  sqlite-node24:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: SQLite store and local entry tests on Node 24, as pwuser, with npm ci inside the container
+        run: |
+          docker run --rm --user pwuser -v "$PWD":/src:ro \
+            -e ELECTRON_SKIP_BINARY_DOWNLOAD=1 -e COPILOTKIT_TELEMETRY_DISABLED=true \
+            mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea sh -ec '
+              mkdir -p /tmp/repo && cd /src && tar --exclude=./node_modules --exclude="./*/node_modules" --exclude="./*/*/node_modules" --exclude=./.git --exclude=./.factory -cf - . | tar -C /tmp/repo -xf -
+              cd /tmp/repo && node --version && case "$(node -p process.versions.node)" in 24.*) ;; *) echo "Node 24 required, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
+              npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
+              npm run build -w @oab/core
+              cd packages/core && npx vitest run test/local test/store'
+
+  desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      TMPDIR: /home/runner/oab-tmp
+    steps:
+      - name: A private temp dir (the shell refuses a docker CLI under a world-writable parent such as /tmp)
+        run: mkdir -p "$TMPDIR" && chmod 700 "$TMPDIR" && test -O "$TMPDIR" && test "$(stat -c %a "$TMPDIR")" = 700
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run electron:install -w @oab/desktop
+      - run: npm run lint -w @oab/desktop
+      - run: npm run format:check -w @oab/desktop
+      - run: npm run typecheck -w @oab/desktop
+      - run: npm test -w @oab/desktop
+      - run: npm run build -w @oab/desktop && npm run stage -w @oab/desktop

@@ -1,0 +1,55 @@
+{
+  "$schema": "../node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": [
+      "**/*.ts",
+      "**/*.mts",
+      "**/*.mjs",
+      "**/*.json",
+      "!**/node_modules",
+      "!**/.auth",
+      "!**/test-results",
+      "!**/playwright-report",
+      "!**/.local"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
+                "message": "Nothing outside cloud/ may import from cloud/."
+              }
+            ]
+          }
+        }
+      },
+      "performance": {
+        "useDomNodeTextContent": "off"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true
+  }
+}

@@ -1,0 +1,133 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, describe, it } from "node:test";
+import { readEnvFiles } from "./env.ts";
+import { ALLOW_LIVE_ENV, allowLive, appOrigin, liveOriginProblem, previewOriginProblem } from "./origin.ts";
+
+const LIVE = "https://app.localhost";
+const PREVIEW = "http://localhost:18300";
+
+describe("previewOriginProblem", () => {
+  for (const ok of ["http://localhost:18000", "http://localhost:18300", "http://127.0.0.1:19999", "http://127.0.0.1:18443"]) {
+    it(`accepts ${ok}`, () => assert.equal(previewOriginProblem(ok), undefined));
+  }
+  for (const bad of [
+    undefined,
+    "",
+    LIVE,
+    "https://app.localhost:18300",
+    "https://localhost:18300",
+    "http://localhost",
+    "http://localhost:80",
+    "http://localhost:8000",
+    "http://localhost:17999",
+    "http://localhost:20000",
+    "http://127.0.0.2:18300",
+    "http://app.localhost:18300",
+    "http://localhost.example.com:18300",
+    "http://user@localhost:18300",
+    "http://localhost:18300/",
+    "http://localhost:18300/app",
+    "http://localhost:18300?x=1",
+    "http://[::1]:18300",
+    "not a url",
+  ]) {
+    it(`refuses ${JSON.stringify(bad)}`, () => assert.match(previewOriginProblem(bad) ?? "", /APP_ORIGIN/));
+  }
+  for (const ok of ["http://localhost:18300", "http://127.0.0.1:18800"]) {
+    it(`accepts the preview pair member ${ok}`, () => assert.equal(previewOriginProblem(ok), undefined));
+  }
+  for (const bad of [
+    "http://localhost:18300.evil.com",
+    "http://user:pw@localhost:18300",
+    "http://localhost:18300@evil.com",
+    "https://app.localhost",
+    "http://127.0.0.1:8000",
+    "http://localhost:18300/x",
+  ]) {
+    it(`refuses the look-alike ${bad}`, () => assert.match(previewOriginProblem(bad) ?? "", /APP_ORIGIN/));
+  }
+  it("never echoes userinfo in a refusal", () => {
+    for (const bad of ["http://user:pw@localhost:18300", "http://user:pw@127.0.0.1:8000/x", "https://user:pw@app.localhost"]) {
+      for (const message of [
+        previewOriginProblem(bad),
+        previewOriginProblem(bad, "AGENT_ORIGIN"),
+        liveOriginProblem(`${bad}/`),
+        (() => {
+          try {
+            appOrigin({ explicit: bad, allowLive: false });
+          } catch (e) {
+            return (e as Error).message;
+          }
+        })(),
+      ]) {
+        assert.ok(message, bad);
+        assert.doesNotMatch(message, /pw|user/, message);
+        assert.match(message, /\*\*\*@/, message);
+      }
+    }
+  });
+  it("names the variable it checks", () => {
+    assert.match(previewOriginProblem("http://localhost:18300.evil.com", "AGENT_ORIGIN") ?? "", /^AGENT_ORIGIN must be/);
+    assert.match(previewOriginProblem(undefined, "AGENT_ORIGIN") ?? "", /^AGENT_ORIGIN is not set/);
+    assert.equal(previewOriginProblem("http://127.0.0.1:18800", "AGENT_ORIGIN"), undefined);
+  });
+});
+
+describe("liveOriginProblem", () => {
+  for (const ok of [LIVE, "https://app.example.com", PREVIEW]) {
+    it(`accepts ${ok}`, () => assert.equal(liveOriginProblem(ok), undefined));
+  }
+  for (const bad of [
+    undefined,
+    "",
+    "app.localhost",
+    "ftp://app.localhost",
+    "https://app.localhost/",
+    "https://app.localhost/x",
+    "not a url",
+  ]) {
+    it(`refuses ${JSON.stringify(bad)}`, () => assert.match(liveOriginProblem(bad) ?? "", /APP_ORIGIN/));
+  }
+});
+
+describe("allowLive", () => {
+  it("is on only for E2E_ALLOW_LIVE=1", () => {
+    assert.equal(allowLive({ [ALLOW_LIVE_ENV]: "1" }), true);
+    for (const value of [undefined, "", "0", "true", "yes", " 1", "1 "])
+      assert.equal(allowLive({ [ALLOW_LIVE_ENV]: value }), false, String(value));
+  });
+});
+
+describe("appOrigin", () => {
+  it("accepts an explicit preview origin", () => {
+    assert.equal(appOrigin({ explicit: PREVIEW, allowLive: false }), PREVIEW);
+    assert.equal(appOrigin({ explicit: ` ${PREVIEW} `, allowLive: false }), PREVIEW);
+  });
+  it("requires an explicit origin, even with the live opt-in", () => {
+    for (const explicit of [undefined, "", " "]) {
+      assert.throws(() => appOrigin({ explicit, allowLive: false }), /APP_ORIGIN is not set/);
+      assert.throws(() => appOrigin({ explicit, allowLive: true }), /APP_ORIGIN is not set/);
+    }
+  });
+  it("refuses the live origin without the opt-in and names the opt-in", () => {
+    assert.throws(() => appOrigin({ explicit: LIVE, allowLive: false }), /must be http:\/\/localhost.*E2E_ALLOW_LIVE=1/s);
+  });
+  it("accepts a live origin with the opt-in, still checking its shape", () => {
+    assert.equal(appOrigin({ explicit: LIVE, allowLive: true }), LIVE);
+    assert.throws(() => appOrigin({ explicit: `${LIVE}/`, allowLive: true }), /APP_ORIGIN/);
+  });
+});
+
+describe("env files", () => {
+  const dir = mkdtempSync(join(tmpdir(), "oab-e2e-env-"));
+  after(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("never supply APP_ORIGIN or the live opt-in", () => {
+    const file = join(dir, ".env-e2e");
+    writeFileSync(file, `APP_ORIGIN=${LIVE}\nE2E_ALLOW_LIVE=1\nE2E_OPENROUTER_KEY="k"\n`);
+    assert.deepEqual(readEnvFiles([file, join(dir, "missing")]), { E2E_OPENROUTER_KEY: "k" });
+  });
+});
