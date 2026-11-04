@@ -56,6 +56,39 @@ jobs:
         env:
           COPILOTKIT_TELEMETRY_DISABLED: "true"
 
+  cloud-supabase:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      COPILOTKIT_TELEMETRY_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
+        with:
+          version: 2.111.0
+      - run: npm ci
+      - name: Start the oab-m7-ci local Supabase stack (127.0.0.1:18740-18744)
+        run: node cloud/supabase/scripts/local-stack.mjs start --name oab-m7-ci --ports 18740
+      - name: Local integration tests
+        run: |
+          stack_env=$(node cloud/supabase/scripts/local-stack.mjs env --name oab-m7-ci)
+          eval "$stack_env"
+          : "${OAB_SB_API_URL:?the local stack env is missing}"
+          npm run test:local -w @oab/cloud-agent
+      - name: Stop the stack and remove its volumes
+        if: always()
+        run: node cloud/supabase/scripts/local-stack.mjs stop --name oab-m7-ci --ports 18740
+
   compose:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 const resolve = createRequire(import.meta.url).resolve;
 
@@ -15,6 +15,7 @@ export default defineConfig({
   },
   test: {
     include: ["test/**/*.test.ts"],
+    exclude: [...configDefaults.exclude, "**/*.local.test.ts"],
     setupFiles: [fileURLToPath(new URL("../../packages/core/test/setup.ts", import.meta.url))],
     testTimeout: 30000,
     execArgv: ["--disable-warning=ExperimentalWarning"],
