@@ -1,12 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import pg from "pg";
+import {
+  FORBIDDEN_ENV,
+  forbiddenEnvSet,
+  inPortRange,
+  localDbUrlProblem,
+  PORT_MAX,
+  PORT_MIN,
+  REFUSAL_CODE,
+} from "../../../supabase/scripts/localGuard.mjs";
 
-export const REFUSAL = "local_stack_only";
-export const LIVE_ENV = ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_URL", "LIVE_DB_URL"] as const;
+export const REFUSAL = REFUSAL_CODE;
+export const LIVE_ENV = FORBIDDEN_ENV;
 export const STACK_ENV = ["OAB_SB_API_URL", "OAB_SB_DB_URL", "OAB_SB_PUBLISHABLE_KEY", "OAB_SB_SECRET_KEY", "OAB_SB_MAIL_URL"] as const;
-export const PORT_MIN = 18700;
-export const PORT_MAX = 18749;
+export { PORT_MAX, PORT_MIN };
 
 export class HarnessRefusal extends Error {
   readonly code = REFUSAL;
@@ -18,30 +26,22 @@ export class HarnessRefusal extends Error {
 
 export type LocalStackEnv = { apiUrl: string; dbUrl: string; publishableKey: string; secretKey: string; mailUrl: string };
 
-const inRange = (port: string) => /^\d+$/.test(port) && Number(port) >= PORT_MIN && Number(port) <= PORT_MAX;
 const LOOPBACK_HTTP = /^http:\/\/127\.0\.0\.1:(\d+)$/;
 
 function loopbackHttp(name: string, raw: string): string {
   const m = LOOPBACK_HTTP.exec(raw);
-  if (!m || !inRange(m[1])) throw new HarnessRefusal(`${name} must be http://127.0.0.1:<${PORT_MIN}-${PORT_MAX}> (no path)`);
+  if (!m || !inPortRange(m[1])) throw new HarnessRefusal(`${name} must be http://127.0.0.1:<${PORT_MIN}-${PORT_MAX}> (no path)`);
   return raw;
 }
 
 function loopbackDb(raw: string): string {
-  let u: URL;
-  try {
-    u = new URL(raw);
-  } catch {
-    throw new HarnessRefusal("OAB_SB_DB_URL is not a URL");
-  }
-  if (!/^postgres(ql)?:$/.test(u.protocol)) throw new HarnessRefusal("OAB_SB_DB_URL must be a postgresql:// URL");
-  if (u.hostname !== "127.0.0.1") throw new HarnessRefusal(`OAB_SB_DB_URL host must be 127.0.0.1 (got ${u.hostname || "none"})`);
-  if (!inRange(u.port)) throw new HarnessRefusal(`OAB_SB_DB_URL port must be ${PORT_MIN}-${PORT_MAX} (got ${u.port || "default"})`);
+  const problem = localDbUrlProblem(raw, "OAB_SB_DB_URL");
+  if (problem) throw new HarnessRefusal(problem);
   return raw;
 }
 
 export function guardLocalEnv(env: NodeJS.ProcessEnv): LocalStackEnv | undefined {
-  const live = LIVE_ENV.filter((k) => env[k] !== undefined && env[k] !== "");
+  const live = forbiddenEnvSet(env);
   if (live.length) throw new HarnessRefusal(`refusing to run with ${live.join(", ")} set: the local suite never talks to a live project`);
   const present = STACK_ENV.filter((k) => env[k]);
   if (present.length === 0) return undefined;

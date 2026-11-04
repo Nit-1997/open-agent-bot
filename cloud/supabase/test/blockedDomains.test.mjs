@@ -53,6 +53,8 @@ describe("blocked-domains.mjs", () => {
       "postgresql://postgres:postgres@127.0.0.1:5432/postgres",
       "https://127.0.0.1:18742",
       "not a url",
+      "postgresql://postgres:postgres@127.0.0.1:18742/postgres?host=db.example.com",
+      "postgresql://postgres:postgres@127.0.0.1:18742/postgres?hostaddr=10.0.0.1",
     ])
       assert.throws(
         () => localDbUrl({ OAB_SB_DB_URL: url }),
@@ -60,7 +62,11 @@ describe("blocked-domains.mjs", () => {
         url,
       );
     assert.throws(() => localDbUrl({}), /needs OAB_SB_DB_URL/);
-    for (const k of ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_URL", "LIVE_DB_URL"])
+    assert.throws(
+      () => localDbUrl({ OAB_SB_DB_URL: "postgresql://postgres:postgres@127.0.0.1:18742/postgres?hostaddr=10.0.0.1" }),
+      /no query parameter but sslmode=disable \(got hostaddr\)/,
+    );
+    for (const k of ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_PASSWORD", "SUPABASE_DB_URL", "LIVE_DB_URL"])
       assert.throws(
         () => localDbUrl({ OAB_SB_DB_URL: "postgresql://postgres:postgres@127.0.0.1:18742/postgres", [k]: "x" }),
         new RegExp(k),

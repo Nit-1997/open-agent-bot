@@ -10,6 +10,7 @@ import {
   MIGRATIONS_DIR,
   PRE_M7_CHECKS,
   parsePlan,
+  PRE_M7_MIGRATIONS,
   preM7Migrations,
   preM7Query,
   preM7Versions,
@@ -32,18 +33,28 @@ const dryRun = (migrations, opts) =>
 const run = (input, args = []) => spawnSync(process.execPath, [SCRIPT, ...args], { input, encoding: "utf8" });
 
 describe("check-push-plan.mjs (Gate 8 dry-run helper, D21 step 3)", () => {
-  it("names the two M7 migrations, which are the newest files in cloud/supabase/migrations", () => {
+  it("names the two M7 migrations right after a frozen list of the 12 pre-M7 files in cloud/supabase/migrations", () => {
     const files = readdirSync(MIGRATIONS_DIR)
       .filter((f) => f.endsWith(".sql"))
       .sort();
     assert.deepEqual(M7_MIGRATIONS, ["20261104092535_request_usage.sql", "20261104113650_signup_modes.sql"]);
-    assert.deepEqual(files.slice(-2), M7_MIGRATIONS);
-    assert.deepEqual(preM7Migrations(), files.slice(0, -2));
-    assert.equal(preM7Migrations().length, 12);
+    assert.equal(PRE_M7_MIGRATIONS.length, 12);
+    assert.ok(Object.isFrozen(PRE_M7_MIGRATIONS));
+    assert.deepEqual(files.slice(0, 14), [...PRE_M7_MIGRATIONS, ...M7_MIGRATIONS]);
+    assert.deepEqual(preM7Migrations(), [...PRE_M7_MIGRATIONS]);
     assert.deepEqual(
       preM7Versions(),
-      files.slice(0, -2).map((f) => f.slice(0, 14)),
+      PRE_M7_MIGRATIONS.map((f) => f.slice(0, 14)),
     );
+  });
+
+  it("keeps the pre-M7 list when a later migration is added (an M8 file never joins the history-repair list)", () => {
+    const m8 = "20261201000000_later.sql";
+    const r = run(dryRun([...preM7Migrations(), ...M7_MIGRATIONS, m8]));
+    assert.equal(r.status, 3);
+    assert.match(r.stderr, new RegExp(`${preM7Versions().join(" ")}(?!\\s*20261201000000)`));
+    assert.doesNotMatch(preM7Versions().join(" "), /20261201000000/);
+    assert.equal(run(dryRun([...M7_MIGRATIONS, m8])).status, 1);
   });
 
   it("parses the CLI's JSON line and its bullet list, ignoring colour codes", () => {

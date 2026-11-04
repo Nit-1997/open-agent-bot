@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { after, describe, it } from "node:test";
 import {
   assertAllowedCli,
@@ -57,12 +57,15 @@ const STATUS = [
   'SERVICE_ROLE_KEY="eyJhbGciOi.x.y"',
 ].join("\n");
 
-function fakeCli(calls, { status = STATUS, fail } = {}) {
+function fakeCli(calls, { status = STATUS, fail, running = new Set() } = {}) {
   return (args, o = {}) => {
     assertAllowedCli(args);
     calls.push(args);
     const sub = args.slice(2).join(" ");
     if (fail && sub.startsWith(fail)) return { status: 1, stdout: "", stderr: "boom" };
+    const stack = basename(args[1]).replace(/^oab-sb-/, "");
+    if (sub === "start") running.add(stack);
+    if (sub.startsWith("stop")) running.delete(stack);
     if (sub.startsWith("gen signing-key")) {
       writeFileSync(join(args[1], "supabase", "signing_keys.json"), `[${KEY}]\n`);
       return { status: 0, stdout: "", stderr: "" };
@@ -74,6 +77,7 @@ function fakeCli(calls, { status = STATUS, fail } = {}) {
 
 const deps = (calls, extra = {}) => {
   const lines = [];
+  const running = new Set();
   return {
     lines,
     deps: {
@@ -81,9 +85,9 @@ const deps = (calls, extra = {}) => {
       tmp: scratch,
       out: (s) => lines.push(s),
       err: (s) => lines.push(s),
-      cli: fakeCli(calls, extra),
+      cli: fakeCli(calls, { ...extra, running }),
       portFree: async () => true,
-      docker: () => [],
+      docker: (args) => (args[0] === "ps" ? [...running].map((n) => `supabase_db_${n}`) : []),
       ...extra.deps,
     },
   };
@@ -183,8 +187,17 @@ describe("local-stack.mjs refusals", () => {
       ["postgresql://postgres:postgres@127.0.0.1/postgres", /port must be/],
       ["http://127.0.0.1:18742", /postgresql:\/\//],
       ["not a url", /not a URL/],
+      [
+        "postgresql://postgres:postgres@127.0.0.1:18742/postgres?host=db.example.com",
+        /no query parameter but sslmode=disable \(got host\)/,
+      ],
+      ["postgresql://postgres:postgres@127.0.0.1:18742/postgres?hostaddr=10.0.0.1", /got hostaddr/],
+      ["postgresql://postgres:postgres@127.0.0.1:18742/postgres?port=5432&sslmode=disable", /got port/],
+      ["postgresql://postgres:postgres@127.0.0.1:18742/postgres?sslmode=require", /sslmode must be disable/],
+      ["postgresql://postgres:postgres@127.0.0.1:18742/postgres?sslmode=disable&sslmode=require", /sslmode must be disable/],
     ])
       refuses(() => checkDbUrl(bad), re);
+    assert.ok(checkDbUrl("postgresql://postgres:postgres@127.0.0.1:18742/postgres?sslmode=disable"));
   });
 
   it("accepts --migrations-until only for a version in cloud/supabase/migrations", () => {
@@ -422,6 +435,42 @@ describe("local-stack.mjs main", () => {
     });
     assert.equal(await main(["stop", "--name", "oab-m7-gone", "--ports", "18740"], left.deps), 1);
     assert.match(left.lines.at(-1), /left behind: volume supabase_db_oab-m7-gone$/);
+  });
+
+  it("stop with nothing running removes a leftover workdir without running the CLI", async () => {
+    const calls = [];
+    const { deps: d, lines } = deps(calls);
+    const work = workdirFor("oab-m7-idle", scratch);
+    mkdirSync(join(work, "supabase"), { recursive: true });
+    writeFileSync(join(work, "supabase", "config.toml"), 'signing_keys_path = "./signing_keys.json"\n');
+    assert.equal(await main(["stop", "--name", "oab-m7-idle", "--ports", "18740"], d), 0);
+    assert.deepEqual(calls, []);
+    assert.equal(existsSync(work), false);
+    assert.match(lines.at(-1), /oab-m7-idle is not running; no containers, volumes or networks remain/);
+  });
+
+  it("stop with containers but no workdir writes an empty signing_keys.json before supabase stop", async () => {
+    const calls = [];
+    const keysAtStop = [];
+    let up = true;
+    const work = workdirFor("oab-m7-orphan", scratch);
+    rmSync(work, { recursive: true, force: true });
+    const { deps: d, lines } = deps(calls, {
+      deps: {
+        docker: (args) => (args[0] === "ps" && up ? ["supabase_db_oab-m7-orphan"] : []),
+        cli: (args) => {
+          calls.push(assertAllowedCli(args));
+          keysAtStop.push(readFileSync(join(work, "supabase", "signing_keys.json"), "utf8"));
+          up = false;
+          return { status: 0, stdout: "", stderr: "" };
+        },
+      },
+    });
+    assert.equal(await main(["stop", "--name", "oab-m7-orphan", "--ports", "18740"], d), 0);
+    assert.deepEqual(calls, [["--workdir", work, "stop", "--no-backup"]]);
+    assert.deepEqual(keysAtStop, ["[]\n"]);
+    assert.equal(existsSync(work), false);
+    assert.match(lines.at(-1), /oab-m7-orphan stopped/);
   });
 
   it("never relays key lines from the CLI output", () => {

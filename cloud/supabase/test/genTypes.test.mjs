@@ -26,6 +26,8 @@ describe("gen-types.mjs --local", () => {
     refuses(() => localTypesArgs({ OAB_SB_DB_URL: "postgresql://postgres:pw@localhost:18742/postgres" }), /host must be 127\.0\.0\.1/);
     refuses(() => localTypesArgs({ OAB_SB_DB_URL: "postgresql://postgres:pw@127.0.0.1:5432/postgres" }), /port must be 18700-18749/);
     refuses(() => localTypesArgs({ OAB_SB_DB_URL: "https://127.0.0.1:18742" }), /postgresql:\/\//);
+    refuses(() => localTypesArgs({ OAB_SB_DB_URL: `${LOCAL}?host=db.example.com` }), /got host\)/);
+    refuses(() => localTypesArgs({ OAB_SB_DB_URL: `${LOCAL}?hostaddr=10.0.0.1` }), /got hostaddr\)/);
   });
 
   it("refuses to run with live Supabase credentials in the environment", () => {

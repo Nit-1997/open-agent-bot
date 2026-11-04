@@ -10,11 +10,15 @@ const SELF = "cloud/supabase/test/staticSafety.test.mjs";
 const FORBIDDEN = {
   "remote-cli": /\bsupabase\s+(link|config\s+push|functions\s+deploy|secrets\s+set)\b/g,
   "db-push-not-local": /\bdb\s+push\b(?![^\n]*--db-url\s+["']?postgres(?:ql)?:\/\/[^@\s]*@127\.0\.0\.1:)/g,
+  "repair-not-local": /\bmigration\s+repair\b(?![^\n]*--db-url\s+["']?postgres(?:ql)?:\/\/[^@\s]*@127\.0\.0\.1:)/g,
+  "reset-not-local": /\bdb\s+reset\b(?![^\n]*--db-url\s+["']?postgres(?:ql)?:\/\/[^@\s]*@127\.0\.0\.1:)/g,
+  "project-ref": /--project-ref\b(?![^\n]*--db-url\s+["']?postgres(?:ql)?:\/\/[^@\s]*@127\.0\.0\.1:)/g,
   linked: /--linked\b/g,
   "supabase-co": /\.supabase\.co\b/g,
 };
 
 const SCANNED_FILES = [
+  "cloud/supabase/scripts/localGuard.mjs",
   "cloud/supabase/scripts/local-stack.mjs",
   "cloud/supabase/scripts/blocked-domains.mjs",
   "cloud/supabase/scripts/managementApi.mjs",
@@ -25,10 +29,13 @@ const SCANNED_FILES = [
 const SCANNED_DIRS = ["cloud/agent/test/local", "cloud/supabase/test", "scripts/demo/m7"];
 
 const FIXTURES = {
-  "cloud/supabase/scripts/local-stack.mjs": { counts: { linked: 1 }, reason: "assertAllowedCli refuses --linked; it never passes it" },
+  "cloud/supabase/scripts/local-stack.mjs": {
+    counts: { linked: 1, "project-ref": 2 },
+    reason: "assertAllowedCli refuses --linked and --project-ref; it never passes them",
+  },
   "cloud/supabase/test/localStack.test.mjs": {
-    counts: { linked: 3, "supabase-co": 3 },
-    reason: "refusal fixtures: linked flags and live database hosts the script must refuse",
+    counts: { linked: 3, "supabase-co": 3, "project-ref": 3 },
+    reason: "refusal fixtures: linked flags, --project-ref and live database hosts the script must refuse",
   },
   "cloud/supabase/test/genTypes.test.mjs": {
     counts: { linked: 2 },
@@ -86,7 +93,13 @@ describe("static safety of the M7 executable files (D19, R14)", () => {
         "db push --db-url postgresql://postgres:pw@aws-0.pooler.example.com:5432/postgres",
         'db push --db-url "$LIVE_DB_URL"',
       ],
-      linked: ["supabase db push --linked", "db reset --linked"],
+      "repair-not-local": [
+        "supabase migration repair --status applied 20261101060613",
+        'supabase --workdir cloud migration repair --status applied 1 --db-url "$LIVE_DB_URL"',
+      ],
+      "reset-not-local": ["supabase db reset", "npx supabase db reset --db-url postgresql://postgres:pw@db.example.com:5432/postgres"],
+      "project-ref": ["supabase link --project-ref abc", "--project-ref=abc"],
+      linked: ["supabase db push --linked", "supabase db pull --linked"],
       "supabase-co": ["https://abcdefghijklmnopqrst.supabase.co", "db.abcdefghijklmnopqrst.supabase.co:5432"],
     };
     for (const [id, lines] of Object.entries(samples)) for (const line of lines) assert.equal(hits(line)[id], 1, `${id}: ${line}`);
@@ -95,6 +108,13 @@ describe("static safety of the M7 executable files (D19, R14)", () => {
       {},
     );
     assert.deepEqual(hits("supabase start --workdir /tmp/oab-sb-oab-m7-b"), {});
+    assert.deepEqual(
+      hits(
+        "supabase --workdir cloud migration repair --status applied 1 --db-url postgresql://postgres:postgres@127.0.0.1:18712/postgres?sslmode=disable",
+      ),
+      {},
+    );
+    assert.deepEqual(hits("supabase db reset --db-url postgresql://postgres:postgres@127.0.0.1:18712/postgres"), {});
   });
 
   it("scans the M7 files, and the fixture list names only scanned files", () => {
@@ -129,22 +149,30 @@ describe("static safety of the M7 executable files (D19, R14)", () => {
     const harness = text("cloud/agent/test/local/harness.ts");
     const config = text("cloud/agent/vitest.local.config.ts");
     const script = text("cloud/supabase/scripts/local-stack.mjs");
+    const guard = text("cloud/supabase/scripts/localGuard.mjs");
     for (const [f, t] of [
-      ["harness.ts", harness],
       ["vitest.local.config.ts", config],
-      ["local-stack.mjs", script],
+      ["localGuard.mjs", guard],
     ])
       assert.match(t, /local_stack_only/, f);
-    for (const name of ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_URL", "LIVE_DB_URL"])
-      assert.match(harness, new RegExp(`"${name}"`), name);
-    assert.match(harness, /u\.hostname !== "127\.0\.0\.1"/);
+    for (const name of ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_PASSWORD", "SUPABASE_DB_URL", "LIVE_DB_URL"])
+      assert.match(guard, new RegExp(`"${name}"`), name);
+    assert.match(guard, /u\.hostname !== "127\.0\.0\.1"/);
+    assert.match(guard, /filter\(\(k\) => k !== "sslmode"\)/);
+    assert.match(guard, /ssl\[0\] !== "disable"/);
+    for (const [f, t] of [
+      ["harness.ts", harness],
+      ["local-stack.mjs", script],
+      ["blocked-domains.mjs", text("cloud/supabase/scripts/blocked-domains.mjs")],
+    ]) {
+      assert.match(t, /from "(?:\.\/|\.\.\/\.\.\/\.\.\/supabase\/scripts\/)localGuard\.mjs"/, f);
+      assert.match(t, /forbiddenEnvSet\(env\)/, f);
+      assert.match(t, /localDbUrlProblem\(raw, /, f);
+    }
     assert.match(harness, /\^http:\\\/\\\/127\\\.0\\\.0\\\.1:/);
     assert.match(config, /guardLocalEnv\(process\.env\)/);
     assert.match(config, /process\.exit\(2\)/);
     assert.match(config, /setupFiles:[^\n]*test\/local\/setup\.ts/);
-    for (const name of ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_PASSWORD", "SUPABASE_DB_URL"])
-      assert.match(script, new RegExp(`"${name}"`), name);
-    assert.match(script, /u\.hostname !== "127\.0\.0\.1"/);
     assert.match(script, /a === "--linked" \|\| a === "--project-ref"/);
     const pkg = JSON.parse(text("cloud/agent/package.json"));
     assert.equal(pkg.scripts["test:local"], "vitest run -c vitest.local.config.ts");
