@@ -186,6 +186,25 @@
         #text "All chats · 7"
       </a>
     </div>
+    <div id="sidebar-usage">
+      <div class="rounded-2xl border border-surface-accent bg-surface p-3" data-level="normal" id="sidebar-usage-meter">
+        <div class="flex items-baseline justify-between gap-2 text-[13px]" id="sidebar-usage-meter-head">
+          <span class="font-semibold text-text-primary" id="sidebar-usage-meter-label">
+            #text "This month"
+          </span>
+          <span class="text-text-muted" id="sidebar-usage-meter-reset" title="00:00 UTC">
+            #text "resets 1 Dec"
+          </span>
+        </div>
+        <div aria-label="Requests used this month" aria-valuemax="50" aria-valuemin="0" aria-valuenow="12" class="my-1.5 h-2 overflow-hidden rounded-full bg-surface-accent" id="sidebar-usage-meter-bar" role="progressbar">
+          <span class="block h-full rounded-full bg-mist-500" id="sidebar-usage-meter-bar-fill" style="width: 24%;">
+          </span>
+        </div>
+        <p class="text-[13px] text-text-secondary" id="sidebar-usage-meter-count">
+          #text "12 of 50 requests used"
+        </p>
+      </div>
+    </div>
     <button class="mt-auto flex w-full items-center gap-2.5 rounded-2xl border border-surface-accent bg-surface p-3 text-left transition hover:border-border" id="agent-card" type="button">
       <span aria-hidden="true" class="agent-dp items-center justify-center font-semibold leading-none inline-flex shrink-0 h-9 w-9 text-[13px]  " data-look="mist" id="agent-card-orb">
         #text "J"

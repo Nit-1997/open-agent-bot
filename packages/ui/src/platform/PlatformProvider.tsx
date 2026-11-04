@@ -23,6 +23,12 @@ export function usePlatform(): Platform {
   return platform;
 }
 
+const NO_SLOTS: PlatformSlots = Object.freeze({});
+
+export function usePlatformSlots(): PlatformSlots {
+  return useContext(PlatformContext)?.slots ?? NO_SLOTS;
+}
+
 export function usePathname(): string {
   return usePlatform().router.usePathname();
 }

@@ -157,6 +157,13 @@ function respond(url: string): Response {
   if (path === "/api/providers") return Response.json({ providers });
   if (path === "/api/settings") return Response.json({ braveSearch: false });
   if (path === "/api/onboarding/options") return Response.json(options);
+  if (path === "/api/usage")
+    return Response.json({
+      month: { used: 12, limit: 50, resetsAt: "2026-12-01T00:00:00.000Z" },
+      hour: { used: 1, limit: 10, resetsAt: "2026-11-02T12:40:00.000Z" },
+      running: { mine: 0, limit: 1 },
+      humanCheck: "off",
+    });
   return Response.json({ error: "not_found" }, { status: 404 });
 }
 
