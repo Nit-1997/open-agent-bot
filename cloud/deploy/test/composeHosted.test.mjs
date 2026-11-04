@@ -2,37 +2,27 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { after, describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import { cleanEnv, composeConfig, requireComposeKeepingEnvFiles, ROOT, standIn } from "./support/composeConfig.mjs";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const HOSTED = "cloud/deploy/compose.hosted.yml";
 const PREVIEW = "cloud/deploy/compose.preview.yml";
 const BASELINE = "the pre-M6 baseline";
 const HOSTED_PROFILES = ["--profile", "local", "--profile", "litellm", "--profile", "ollama"];
-const PASS_ENV = ["PATH", "HOME", "DOCKER_HOST", "DOCKER_CONFIG", "DOCKER_CONTEXT", "DOCKER_CERT_PATH", "DOCKER_TLS_VERIFY"];
+requireComposeKeepingEnvFiles();
 const WORK = mkdtempSync(join(tmpdir(), "compose-hosted-"));
-after(() => rmSync(WORK, { recursive: true, force: true }));
+const STAND_IN = standIn();
+after(() => {
+  rmSync(WORK, { recursive: true, force: true });
+  STAND_IN.remove();
+});
 const PLACEHOLDER = "placeholder-not-a-secret";
 const BACKEND_FIXTURE = join(WORK, "backend.env");
 writeFileSync(BACKEND_FIXTURE, `RENDERER_SECRET=${PLACEHOLDER}\n`);
 
-const cleanEnv = (extra = {}) => ({
-  ...Object.fromEntries(PASS_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]])),
-  ...extra,
-});
-
-function config(args, { cwd = ROOT, env = {}, envFile = ["--env-file", BACKEND_FIXTURE] } = {}) {
-  const res = spawnSync("docker", ["compose", ...envFile, ...args, "config", "--format", "json", "--no-env-resolution"], {
-    cwd,
-    env: cleanEnv(env),
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (res.status !== 0) throw new Error(`docker compose ${args.join(" ")} config exited ${res.status} (output not shown)`);
-  return JSON.parse(res.stdout);
-}
+const config = (args, { projectDir = "cloud/deploy", ...opts } = {}) =>
+  composeConfig(args, { envFile: ["--env-file", BACKEND_FIXTURE], standInDir: STAND_IN.dir, projectDir, ...opts });
 
 function diffPaths(a, b, path = "") {
   if (a === b) return [];
@@ -139,7 +129,7 @@ describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
     const base = join(WORK, "baseline.yml");
     writeFileSync(base, baselineText());
     const hosted = config(["-f", HOSTED, ...HOSTED_PROFILES]);
-    const before = config(["-p", "open-agent-bot", "--project-directory", ROOT, "-f", base, ...HOSTED_PROFILES]);
+    const before = config(["-p", "open-agent-bot", "-f", base, ...HOSTED_PROFILES], { projectDir: "" });
     assert.deepEqual(
       diffPaths(hosted, before),
       [...Object.keys(ALLOWED), ...Object.keys(REWIRED)].sort(),
@@ -247,7 +237,7 @@ describe("Compose .env lookup (D9 guard)", () => {
     rmSync(join(probe, ".env"), { force: true });
     rmSync(join(probe, "sub/.env"), { force: true });
     for (const [file, project] of Object.entries(files)) writeFileSync(join(probe, file), `COMPOSE_PROJECT_NAME=${project}\n`);
-    return config([...args, "-f", "sub/compose.yml"], { cwd: probe, envFile: [] }).name;
+    return composeConfig([...args, "-f", "sub/compose.yml"], { cwd: probe }).name;
   };
 
   it("reads .env from the compose file's folder, not the working directory, so the guard must sit in cloud/deploy/", () => {

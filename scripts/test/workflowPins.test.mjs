@@ -24,6 +24,7 @@ const usesOf = (text) => [...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)]
 const triggers = (wf) => (typeof wf.on === "string" ? [wf.on] : Array.isArray(wf.on) ? wf.on : Object.keys(wf.on ?? {}));
 const writes = (perms) => (perms && typeof perms === "object" ? WRITE_SCOPES.filter((s) => perms[s] === "write") : []);
 const stepsText = (job) => JSON.stringify(job.steps ?? []);
+const PRIVATE_TMPDIR = 'mkdir -p "$TMPDIR" && chmod 700 "$TMPDIR" && test -O "$TMPDIR" && test "$(stat -c %a "$TMPDIR")" = 700';
 
 describe("workflow action pins", () => {
   it("finds the workflows", () => {
@@ -251,7 +252,7 @@ describe("ci.yml standalone job (M6 D13)", () => {
       OPEN_AGENT_IMAGE: "oab-ci-oss-agent:dev",
       OPEN_AGENT_SEARCH_IMAGE: "oab-ci-oss-search:dev",
     });
-    assert.match(runs(), /^mkdir -m 700 "\$TMPDIR"$/m);
+    assert.equal(job.steps[0].run.trim(), PRIVATE_TMPDIR);
   });
 
   it("leaves npm ci and the Playwright install to the script (lockfile-pinned browser) and runs it with --docker --hosted-free (6.4)", () => {
@@ -282,6 +283,7 @@ describe("ci.yml cloud job (M6 D14)", () => {
       "npm run lint:boundary && npm run lint:scripts && npm run format:check:scripts",
       "npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
       "npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e",
+      "bash scripts/ci/compose-plugin.sh",
       "npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
       "npm run build -w @oab/cloud-agent -w @oab/cloud-web",
     ]);
@@ -297,6 +299,14 @@ describe("ci.yml cloud job (M6 D14)", () => {
   it("replaces the web job (6.5)", () => {
     assert.equal(doc("ci.yml").jobs.web, undefined);
     assert.match(JSON.stringify(job.steps.at(-1)), /COPILOTKIT_TELEMETRY_DISABLED/);
+  });
+});
+
+describe("ci.yml private temp dirs", () => {
+  it("every job that sets TMPDIR makes it a 0700 folder it owns before any action runs", () => {
+    const jobs = Object.entries(doc("ci.yml").jobs).filter(([, job]) => job.env?.TMPDIR);
+    assert.deepEqual(jobs.map(([name]) => name).sort(), ["desktop", "desktop-real", "standalone"]);
+    for (const [name, job] of jobs) assert.equal(job.steps[0].run?.trim(), PRIVATE_TMPDIR, name);
   });
 });
 

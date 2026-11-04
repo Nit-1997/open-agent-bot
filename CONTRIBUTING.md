@@ -26,7 +26,7 @@ CI runs these on every pull request. Run them from the repo root before you push
 | `@oab/cloud-agent` | `npm run lint -w @oab/cloud-agent && npm run format:check -w @oab/cloud-agent && npm run typecheck -w @oab/cloud-agent && npm test -w @oab/cloud-agent && npm run build -w @oab/cloud-agent` (the hosted agent; unit tests only) |
 | `@oab/cloud-web` | `npm run lint -w @oab/cloud-web && npm run format:check -w @oab/cloud-web && npm run typecheck -w @oab/cloud-web && npm test -w @oab/cloud-web && npm run build -w @oab/cloud-web` (the hosted Next.js app; Vercel builds it from Root Directory `cloud/web`) |
 | `@oab/cloud-e2e` | `npm run lint -w @oab/cloud-e2e && npm run format:check -w @oab/cloud-e2e && npm run typecheck -w @oab/cloud-e2e && npm test -w @oab/cloud-e2e` (the hosted Playwright specs; `test` runs only the unit tests, never a browser) |
-| `@oab/cloud-deploy` | `npm run lint -w @oab/cloud-deploy && npm run format:check -w @oab/cloud-deploy && npm test -w @oab/cloud-deploy` (hosted deploy checks: cloud workspaces and Dockerfiles, the hosted compose file against its pre-M6 baseline fixture, preflight, the `local/` twins, migrations pinned by a SHA-256 fixture, the hosted docs, `scripts/env-files.mjs` and `scripts/env-check.mjs`) |
+| `@oab/cloud-deploy` | `npm run lint -w @oab/cloud-deploy && npm run format:check -w @oab/cloud-deploy && npm test -w @oab/cloud-deploy` (hosted deploy checks: cloud workspaces and Dockerfiles, the hosted compose file against its pre-M6 baseline fixture, preflight, the `local/` twins, migrations pinned by a SHA-256 fixture, the hosted docs, `scripts/env-files.mjs` and `scripts/env-check.mjs`; the hosted compose checks need Docker Compose 5 or later, which CI installs with `scripts/ci/compose-plugin.sh`) |
 | root | `npm run lint:scripts && npm run format:check:scripts` (Biome over `scripts/**/*.mjs`, also run by the root `lint` and `format:check`) and `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, the root `Makefile`, and the unique-id scan over `packages/ui/src`, `packages/local-web/src` and `apps/desktop/src/screens`; `node scripts/ids-static.mjs` prints `ids: N/N`; `cloud/web/test/idsStatic.test.ts` scans those plus `cloud/web/app` and `cloud/web/components`) |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `cloud/agent/test/supabase/` run against the real Supabase project with `npm run test:supabase -w @oab/cloud-agent`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
@@ -38,10 +38,11 @@ docker run --rm --user pwuser -v "$PWD":/src:ro -e ELECTRON_SKIP_BINARY_DOWNLOAD
   mkdir -p /tmp/repo && cd /src && tar --exclude=./node_modules --exclude="./*/node_modules" --exclude="./*/*/node_modules" --exclude=./.git --exclude=./.factory -cf - . | tar -C /tmp/repo -xf -
   cd /tmp/repo && node --version && case "$(node -p process.versions.node)" in 24.*) ;; *) echo "Node 24 required, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
   npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
+  npm run build -w @oab/core
   cd packages/core && npx vitest run test/local test/store'
 ```
 
-It copies the source without `node_modules` and runs `npm ci` inside the container, because the host's macOS `node_modules` don't run on Linux. It runs as `pwuser`, not root, because root can read the mode-0000 key files the tests expect to be refused.
+It copies the source without `node_modules` and runs `npm ci` inside the container, because the host's macOS `node_modules` don't run on Linux. The build compiles `@oab/shared` and `@oab/bff` (which the local entry imports from `dist/`) and `packages/core/dist/local/main.js`, which the entry tests start. It runs as `pwuser`, not root, because root can read the mode-0000 key files the tests expect to be refused.
 
 ## Releases
 

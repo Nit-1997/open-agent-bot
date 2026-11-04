@@ -51,6 +51,8 @@ jobs:
       - run: npm run lint:boundary && npm run lint:scripts && npm run format:check:scripts
       - run: npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
       - run: npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e
+      - name: Pinned Docker Compose 5 for the hosted config checks (the runner's Compose 2 drops env_file under --no-env-resolution)
+        run: bash scripts/ci/compose-plugin.sh
       - run: npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
       - run: npm run build -w @oab/cloud-agent -w @oab/cloud-web
         env:
@@ -66,6 +68,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Both stacks resolve from a fresh clone; the local one needs no env files
         run: |
           ls cloud/deploy/.env-* cloud/deploy-config/env-files/*/.env 2>/dev/null && exit 1
@@ -98,6 +102,11 @@ jobs:
           test "$($local | jq '[.services[].volumes[]? | select(.type == "bind")] | length')" = 0
       - name: Local compose layout and preflight
         run: node --test scripts/test/composeLayout.test.mjs scripts/test/preflight.test.mjs
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - name: Pinned Docker Compose 5 for the hosted config checks (the runner's Compose 2 drops env_file under --no-env-resolution)
+        run: bash scripts/ci/compose-plugin.sh
       - name: Hosted deploy checks (config equivalence with the pre-M6 baseline fixture, preview, preflight, twins, migrations, docs, env-files helper)
         run: npm test -w @oab/cloud-deploy
       - name: actionlint on every workflow (pinned image)
@@ -119,6 +128,8 @@ jobs:
       OPEN_AGENT_IMAGE: oab-ci-oss-agent:dev
       OPEN_AGENT_SEARCH_IMAGE: oab-ci-oss-search:dev
     steps:
+      - name: A private 0700 temp dir, as the desktop jobs use
+        run: mkdir -p "$TMPDIR" && chmod 700 "$TMPDIR" && test -O "$TMPDIR" && test "$(stat -c %a "$TMPDIR")" = 700
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
@@ -128,8 +139,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: A private 0700 temp dir, as the desktop jobs use
-        run: mkdir -m 700 "$TMPDIR"
       - name: Remove cloud/, then install, lint, type-check, test and build the rest; build and start the local stack; build the Mac app
         run: bash scripts/ci/standalone.sh --docker --hosted-free
 
@@ -216,6 +225,7 @@ jobs:
               mkdir -p /tmp/repo && cd /src && tar --exclude=./node_modules --exclude="./*/node_modules" --exclude="./*/*/node_modules" --exclude=./.git --exclude=./.factory -cf - . | tar -C /tmp/repo -xf -
               cd /tmp/repo && node --version && case "$(node -p process.versions.node)" in 24.*) ;; *) echo "Node 24 required, got $(node -p process.versions.node)" >&2; exit 1 ;; esac
               npm ci -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
+              npm run build -w @oab/core
               cd packages/core && npx vitest run test/local test/store'
 
   desktop:
@@ -226,6 +236,8 @@ jobs:
     env:
       TMPDIR: /home/runner/oab-tmp
     steps:
+      - name: A private temp dir (the shell refuses a docker CLI under a world-writable parent such as /tmp)
+        run: mkdir -p "$TMPDIR" && chmod 700 "$TMPDIR" && test -O "$TMPDIR" && test "$(stat -c %a "$TMPDIR")" = 700
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -234,8 +246,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: A private temp dir (the shell refuses a docker CLI under a world-writable parent such as /tmp)
-        run: mkdir -m 700 "$TMPDIR"
       - run: npm ci
       - name: Electron's system libraries, xvfb, and unprivileged user namespaces for Chromium's sandbox
         run: |
@@ -277,6 +287,8 @@ jobs:
       STUB_PORT: "18341"
       STUB_BIND: 0.0.0.0
     steps:
+      - name: A private temp dir (the shell refuses a docker CLI under a world-writable parent such as /tmp)
+        run: mkdir -p "$TMPDIR" && chmod 700 "$TMPDIR" && test -O "$TMPDIR" && test "$(stat -c %a "$TMPDIR")" = 700
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -285,8 +297,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: A private temp dir (the shell refuses a docker CLI under a world-writable parent such as /tmp)
-        run: mkdir -m 700 "$TMPDIR"
       - run: npm ci
       - name: Electron's system libraries, xvfb, and unprivileged user namespaces for Chromium's sandbox
         run: |
