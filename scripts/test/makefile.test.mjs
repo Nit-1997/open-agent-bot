@@ -65,12 +65,12 @@ const FULL_FRONTEND = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISH
   .join("");
 
 describe("Makefile", () => {
-  it("has help, run, app, web and stop, and help is the default", () => {
+  it("has help, run, app, web, stop and test-e2e, and help is the default", () => {
     const text = readFileSync(join(ROOT, "Makefile"), "utf8");
-    for (const t of ["help", "run", "app", "web", "stop"]) assert.match(text, new RegExp(`^${t}:`, "m"), t);
+    for (const t of ["help", "run", "app", "web", "stop", "test-e2e"]) assert.match(text, new RegExp(`^${t}:`, "m"), t);
     const r = make([]);
     assert.equal(r.status, 0, r.out);
-    for (const s of ["make run app", "make run web", "make stop", "make help"]) assert.ok(r.out.includes(s), s);
+    for (const s of ["make run app", "make run web", "make stop", "make test-e2e", "make help"]) assert.ok(r.out.includes(s), s);
     assert.deepEqual(
       text.split("\n").filter((l) => l.trim().startsWith("#")),
       [],
@@ -84,7 +84,27 @@ describe("Makefile", () => {
     assert.deepEqual(make(["-n", "app"]).out.trim().split("\n"), ["bash scripts/make/app.sh"]);
     assert.deepEqual(make(["-n", "web"]).out.trim().split("\n"), ["bash scripts/make/web.sh"]);
     assert.deepEqual(make(["-n", "stop"]).out.trim().split("\n"), ["bash scripts/make/stop.sh"]);
+    assert.deepEqual(make(["-n", "test-e2e"]).out.trim().split("\n"), ["bash scripts/make/test-e2e.sh"]);
     assert.ok(make(["run"]).out.includes("make run app"));
+  });
+
+  it("test-e2e refuses a world-writable temp parent before it runs npm or docker", () => {
+    const f = fakeBin();
+    const open = join(WORK, `open-${n++}`);
+    mkdirSync(open);
+    chmodSync(open, 0o777);
+    const r = make(["test-e2e"], { bin: f.bin, env: { OAB_E2E_TMP_PARENT: open } });
+    assert.notEqual(r.status, 0, r.out);
+    assert.match(r.out, /make test-e2e: .* is writable by others/);
+    assert.equal(f.calls(), "");
+  });
+
+  it("test-e2e stops before npm with a clear error when Docker is not running", () => {
+    const f = fakeBin({ dockerInfo: 1 });
+    const r = make(["test-e2e"], { bin: f.bin });
+    assert.notEqual(r.status, 0, r.out);
+    assert.match(r.out, /make test-e2e: Docker is not running/);
+    assert.equal(f.calls().includes("npm"), false, f.calls());
   });
 
   it("app stops before npm with a clear error when Docker is not running", () => {
