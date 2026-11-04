@@ -187,6 +187,22 @@
       {
         "file": "scripts/test/workflowPins.test.mjs",
         "reason": "pins the supabase/setup-cli GitHub Action of the cloud-supabase job, not the old supabase/ folder (M7 7.0)"
+      },
+      {
+        "file": "cloud/supabase/scripts/local-stack.mjs",
+        "reason": "\"supabase\" is the Supabase CLI binary and the CLI's own workdir folder (<workdir>/supabase/config.toml) of the local stack, not the old root folder (M7 7.0)"
+      },
+      {
+        "file": "cloud/supabase/test/localStack.test.mjs",
+        "reason": "asserts the CLI workdir layout (<workdir>/supabase/...) and the supabase binary local-stack.mjs runs, not the old root folder (M7 7.0)"
+      },
+      {
+        "file": "cloud/supabase/local/platform.sql",
+        "reason": "names the CLI workdir file supabase/roles.sql it is copied to, not the old root folder (M7 7.0)"
+      },
+      {
+        "file": "cloud/supabase/scripts/gen-types.mjs",
+        "reason": "\"supabase\" is the Supabase CLI binary gen-types --local runs, not the old root folder (M7 7.1)"
       }
     ]
   },
