@@ -2,6 +2,8 @@ import { ConfigError, type CoreConfig, coreConfigFrom, type ModelOption, require
 import type { CredentialKeys } from "@oab/core/secrets/keyWrapper.js";
 import { decode32, parseCredentialKeys } from "@oab/core/secrets/keys.js";
 import { log } from "@oab/core/lib/log.js";
+import type { Limits } from "@oab/shared/usage";
+import { limitsFrom } from "./limits/config.js";
 
 export type HostedEnvConfig = {
   supabaseUrl: string;
@@ -14,6 +16,7 @@ export type HostedEnvConfig = {
   llmBaseUrl: string;
   llmApiKey?: string;
   models: ModelOption[];
+  limits: Limits;
   localStack?: true;
 };
 
@@ -80,6 +83,7 @@ export function loadHostedConfig(env: NodeJS.ProcessEnv): HostedConfig {
   );
   const accessRequestPepper = need("ACCESS_REQUEST_PEPPER", decode32, "must be base64 of exactly 32 bytes");
   const core = coreConfigFrom(env, problems);
+  const limits = limitsFrom(env, problems);
   if (core.rendererSecret && core.rendererSecret === serviceSecret) problems.push("RENDERER_SECRET must differ from AGENT_SERVICE_SECRET");
 
   if (problems.length) throw new ConfigError(problems);
@@ -97,6 +101,7 @@ export function loadHostedConfig(env: NodeJS.ProcessEnv): HostedConfig {
     credentialKeys,
     appOrigin,
     accessRequestPepper,
+    limits,
     ...(local && { localStack: true as const }),
   };
 }

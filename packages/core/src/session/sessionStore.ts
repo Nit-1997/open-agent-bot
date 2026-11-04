@@ -6,6 +6,7 @@ import { log } from "../lib/log.js";
 import type { PiSession } from "../pi/createPiSession.js";
 import type { AgentPersona } from "@oab/shared/profile";
 import type { UserContext } from "../prompt/userContext.js";
+import { capabilityKey } from "../providers/hubs.js";
 import type { ActiveCart } from "../shop/cart.js";
 import type { EarlierCards } from "../workspace/earlier.js";
 import type { WorkspaceStore } from "../workspace/store.js";
@@ -20,6 +21,7 @@ export type SessionEntry = {
   session: PiSession;
   busy: boolean;
   retired?: boolean;
+  capabilityKey?: string;
   lastRunId?: string;
   lastUsed: number;
   dispose: () => Promise<void>;
@@ -70,7 +72,7 @@ export class SessionStore {
 
   get(owner: SessionOwner): SessionEntry | undefined {
     const e = this.entries.get(sessionKey(owner));
-    return e?.retired ? undefined : e;
+    return !e || e.retired || e.capabilityKey !== capabilityKey(owner.user) ? undefined : e;
   }
 
   private keysOf(userId: string): string[] {
@@ -94,11 +96,15 @@ export class SessionStore {
 
   getOrCreate(owner: SessionOwner, ctx: UserContext | null, persona: AgentPersona, seed?: SessionSeed): Promise<SessionEntry> {
     const key = sessionKey(owner);
+    const caps = capabilityKey(owner.user);
     const existing = this.entries.get(key);
-    if (existing && !(existing.retired && !existing.busy)) {
+    const changed = !!existing && existing.capabilityKey !== caps;
+    if (existing && changed && existing.busy) existing.retired = true;
+    if (existing && (existing.busy || (!existing.retired && !changed))) {
       existing.lastUsed = this.now();
       return Promise.resolve(existing);
     }
+    if (changed) log.info(`[session] capabilities changed user=${owner.user.id} chat=${owner.chatId}, rebuilt`);
     const stale = existing ? this.drop(key) : undefined;
     const waiting = this.pending.get(key);
     if (waiting) return waiting;
@@ -113,6 +119,7 @@ export class SessionStore {
       await freed;
       const e = await this.create(owner, ctx, persona, seed);
       e.lastUsed = this.now();
+      e.capabilityKey = caps;
       this.entries.set(key, e);
       return e;
     })();
