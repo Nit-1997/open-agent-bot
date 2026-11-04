@@ -6,6 +6,7 @@ import { type LinkProps, nativeHistory, type Platform, PlatformProvider, type Pl
 import NextLink from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useMemo } from "react";
+import { DeleteAccount } from "@/components/account/DeleteAccountDialog";
 import { AccessDisabled } from "@/components/session/AccessDisabled";
 import { AdminItem, SignOutItem } from "@/components/session/AccountSlots";
 import { SignedOutBanner } from "@/components/session/SignedOutBanner";
@@ -37,6 +38,7 @@ const MEMBER_SLOTS: PlatformSlots = Object.freeze({
   accessDisabledNotice: AccessDisabled,
   usageMeter: UsageMeter,
   runRefusal: Object.freeze({ codes: RUN_REFUSAL_CODES, Notice: RefusalNotice }),
+  profileDanger: DeleteAccount,
 });
 
 const ADMIN_SLOTS: PlatformSlots = Object.freeze({ ...MEMBER_SLOTS, accountMenuExtra: AdminItem });

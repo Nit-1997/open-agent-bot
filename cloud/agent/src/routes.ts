@@ -2,6 +2,7 @@ import type { AuthEnv, RouteMount } from "@oab/core/identity/types.js";
 import type { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AccessService } from "./access/service.js";
+import { type AccountRouteDeps, accountRoutes } from "./account/routes.js";
 import type { AdminService } from "./admin/service.js";
 import { accessRoutes } from "./http/access.js";
 import { adminRoutes } from "./http/admin.js";
@@ -17,6 +18,7 @@ export type HostedRouteDeps = {
   usage: UsageRouteDeps;
   adminUsage: AdminUsageDeps;
   signup: SignupRouteDeps;
+  account: AccountRouteDeps;
 };
 
 export function hostedRoutes(deps: HostedRouteDeps): RouteMount[] {
@@ -33,5 +35,6 @@ export function hostedRoutes(deps: HostedRouteDeps): RouteMount[] {
     { stage: "protected", basePath: "/admin", routes: admin },
     { stage: "protected", basePath: "/usage", routes: usageRoutes(deps.usage) },
     { stage: "protected", basePath: "/human-check", routes: humanCheckRoutes(deps.signup) },
+    { stage: "protected", basePath: "/account", routes: accountRoutes(deps.account) },
   ];
 }

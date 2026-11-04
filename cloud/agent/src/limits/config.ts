@@ -20,6 +20,7 @@ export const PRUNE_MS = 60 * 60_000;
 export const ADMIT_ATTEMPTS: Limit = { max: 60, windowMs: 10 * 60_000 };
 export const USAGE_ROUTE: Limit = { max: 120, windowMs: 10 * 60_000 };
 export const HUMAN_CHECK_ROUTE: Limit = { max: 10, windowMs: 10 * 60_000 };
+export const SELF_DELETE: Limit = { max: 3, windowMs: 60 * 60_000 };
 
 export function limitsFrom(env: NodeJS.ProcessEnv, problems: string[]): Limits {
   const limits = {} as Limits;

@@ -4,6 +4,7 @@ import type { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { Admission, RunPolicy, RunRequest } from "@oab/core/policy/types.js";
 import type { RunRefusalCode, RunRefusalWindow } from "@oab/shared/runRefusals";
 import type { Limits } from "@oab/shared/usage";
+import { accountDeleting, type DeletingUsers } from "../account/deleting.js";
 import { ADMIT_ATTEMPTS, BUSY_RETRY_S, RUNNING_RETRY_S, UNAVAILABLE_RETRY_S } from "./config.js";
 import type { HumanCheckGate } from "../signup/humanCheck.js";
 import type { RunSlots } from "./slots.js";
@@ -68,6 +69,7 @@ export type HostedRunPolicyDeps = {
   slots: RunSlots;
   humanCheck: HumanCheckGate;
   limiter: RateLimiter;
+  deleting?: Pick<DeletingUsers, "has">;
   now?: () => number;
 };
 
@@ -83,6 +85,7 @@ export class HostedRunPolicy implements RunPolicy {
 
   async admit(run: RunRequest): Promise<Admission> {
     const userId = run.principal.id;
+    if (this.deps.deleting?.has(userId)) return { ok: false, error: accountDeleting() };
     const attempt = this.deps.limiter.take(`admit:${userId}`, ADMIT_ATTEMPTS);
     if (!attempt.ok) {
       return this.refuse("limit_attempts", slowDownMessage(attempt.retryAfter), {

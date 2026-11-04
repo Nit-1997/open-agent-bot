@@ -43,9 +43,13 @@ export function parseConfirmInput(type: unknown, tokenHash: unknown, email: unkn
   return { type, tokenHash, email: address };
 }
 
-export function clientIp(headers: Headers): string | null {
-  const first = headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+const firstHop = (value: string | null): string | null => {
+  const first = value?.split(",")[0]?.trim() ?? "";
   return IP_RE.test(first) ? first : null;
+};
+
+export function clientIp(headers: Headers): string | null {
+  return firstHop(headers.get("x-vercel-forwarded-for")) ?? firstHop(headers.get("x-forwarded-for"));
 }
 
 export function firstParam(value: string | string[] | undefined): string | undefined {

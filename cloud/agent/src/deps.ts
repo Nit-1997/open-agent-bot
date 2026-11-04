@@ -5,6 +5,8 @@ import { log } from "@oab/core/lib/log.js";
 import type { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { AgentDeps, CoreHandles } from "@oab/core/startAgent.js";
 import { createAccessService } from "./access/service.js";
+import { DeletingUsers } from "./account/deleting.js";
+import { createSelfDelete } from "./account/selfDelete.js";
 import { createTurnstileVerifier, type HumanVerifier, isTestSecret } from "./captcha/turnstile.js";
 import { createAuthAdmin } from "./admin/authAdmin.js";
 import { type AccountHooks, createAdminService } from "./admin/service.js";
@@ -61,7 +63,7 @@ export function humanVerifierFor(cfg: Pick<HostedConfig, "turnstile" | "appOrigi
   });
 }
 
-export type HostedAgent = { deps: AgentDeps; status: UserStatusCache; usage: UsageRepo };
+export type HostedAgent = { deps: AgentDeps; status: UserStatusCache; usage: UsageRepo; deleting: DeletingUsers };
 
 export function startLimitTimers(policy: Pick<HostedRunPolicy, "sweep">, usage: Pick<UsageRepo, "prune">): () => void {
   const timers = [
@@ -101,10 +103,11 @@ export function hostedAgentDeps(
   const verifier = "verifier" in seams ? seams.verifier : humanVerifierFor(cfg);
   const humanCheck = new LiveHumanCheckGate({ mode: () => signup.mode(), checks: usage.humanCheck, verifierConfigured: !!verifier });
   const slots = new RunSlots({ staleAfterMs: (cfg.runTimeLimitSeconds + STALE_GRACE_S) * 1000 });
+  const deleting = new DeletingUsers();
   let policy: HostedRunPolicy | undefined;
   const policyFor = (limiter: RateLimiter) => {
     if (!policy) {
-      policy = new HostedRunPolicy({ limits: cfg.limits, usage, slots, humanCheck, limiter });
+      policy = new HostedRunPolicy({ limits: cfg.limits, usage, slots, humanCheck, limiter, deleting });
       startLimitTimers(policy, usage);
     }
     return policy;
@@ -133,7 +136,7 @@ export function hostedAgentDeps(
           },
           captcha: { required: async () => gateApplies(await signup.mode()), verifier },
         }),
-        admin: createAdminService({ repo: adminRepo, auth: authAdmin, hooks }),
+        admin: createAdminService({ repo: adminRepo, auth: authAdmin, hooks, usage, deleting }),
         adminGuard: createAdminGuard({ isLiveAdmin: (user) => liveRole.isAdmin(user.id), roleUnverified: hostedIdentity.roleUnverified }),
         limiter: core.limiter,
         usage: { usage, policy: policyFor(core.limiter), limits: cfg.limits, humanCheck, limiter: core.limiter },
@@ -146,8 +149,18 @@ export function hostedAgentDeps(
           signupStats: () => signup.stats(),
         },
         signup: { mode: () => signup.mode(), gate: humanCheck, verifier, limiter: core.limiter },
+        account: {
+          selfDelete: createSelfDelete({
+            profiles: adminRepo.users,
+            removal: { repo: adminRepo, auth: authAdmin, usage },
+            deleting,
+            forget: hooks.onDisabled,
+            invalidate: (id) => status.invalidate(id),
+          }),
+          limiter: core.limiter,
+        },
       });
     },
   };
-  return { deps, status, usage };
+  return { deps, status, usage, deleting };
 }
