@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join, resolve } from "node:path";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { LATEST_PATH } from "../../apps/desktop/test/support/mockReleases.ts";
 import { lastReplyLength, send, status, stubBaseUrl } from "../support/localStack";
 import { LONG_MARKER } from "../support/stubModel";
@@ -62,6 +62,11 @@ const presentDigests = () =>
     .filter((l) => l.includes("oab-m5-"));
 const api = <T>(page: Page, path: string) => page.evaluate((p) => fetch(p).then((r) => r.json()), path) as Promise<T>;
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
+const inView = (loc: Locator) =>
+  expect(async () => {
+    await loc.scrollIntoViewIfNeeded({ timeout: 5_000 });
+    await expect(loc).toBeInViewport({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
 
 test.describe("M5 app", () => {
   test.describe.configure({ mode: "serial" });
@@ -231,8 +236,7 @@ test.describe("M5 app", () => {
     const again = await openServices(s, page);
     for (const k of SERVICES) await expect(again.locator(`#screen-services-services-${k}-version`)).toHaveText(NEXT);
     say(`4: services: ${oneLine(await again.locator("#screen-services-services").innerText())}`);
-    await again.locator("#screen-services-services").scrollIntoViewIfNeeded();
-    await expect(again.locator("#screen-services-services")).toBeInViewport();
+    await inView(again.locator("#screen-services-services"));
     await again.waitForTimeout(2_000);
     const updates = s
       .log()
