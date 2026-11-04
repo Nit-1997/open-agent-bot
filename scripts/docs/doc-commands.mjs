@@ -305,6 +305,7 @@ const ALWAYS_OWNER = new Map([
 ]);
 const DOCKER_OBJECTS = new Set(["image", "volume", "container", "network", "builder", "buildx", "context"]);
 const DOCKER_REMOVE = new Set(["rm", "remove", "prune", "rmi"]);
+export const PREFLIGHT_ARGS = Object.freeze(["compose", "config", "--format", "json"]);
 const COMPOSE_SUBS = new Set(["up", "down", "pull", "ps", "logs", "config"]);
 const COMPOSE_BANNED = ["-p", "--project-name", "-f", "--file", "--project-directory", "--env-file"];
 const CURL_FLAGS = new Set(["-f", "-s", "-S", "-fsS", "-fs", "-sS", "-sSf", "-i", "-I", "--fail", "--silent", "--show-error", "--head"]);
@@ -384,7 +385,7 @@ function allowed(cmd, ctx, cwd) {
   if (a0 === "docker" && a1 === "compose") {
     if (!COMPOSE_SUBS.has(argv[2])) return notAllowed;
     if (!inside(cwd, ctx.clone)) return { ok: false, reason: "docker compose outside the clone" };
-    return { ok: true, cwd, docker: { cwd, preflight: [...argv.slice(1, 2), "config", "--format", "json"] } };
+    return { ok: true, cwd, docker: { cwd, preflight: PREFLIGHT_ARGS } };
   }
   if (a0 === "docker" && ((a1 === "image" && argv[2] === "ls") || a1 === "ps")) return { ok: true, cwd, docker: { cwd } };
   if (a0 === "curl") {

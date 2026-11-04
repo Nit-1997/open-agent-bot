@@ -22,6 +22,7 @@ const GATE = { version: VERSION, prerelease: "true", tag: TAG };
 const work = mkdtempSync(join(tmpdir(), "oab-m5-wfrun-"));
 after(() => rmSync(work, { recursive: true, force: true }));
 const store = join(work, "artifacts");
+let attestAssets;
 
 const resolve = (value, ctx) =>
   String(value).replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, expr) => {
@@ -222,5 +223,20 @@ describe("release.yml script steps run in order against fixtures (push record â†
     assert.equal(sums, want);
     assert.equal(spawnSync("shasum", ["-a", "256", "-c", "SHA256SUMS"], { cwd: join(ctx.temp, "assets") }).status, 0);
     assert.deepEqual(readdirSync(join(store, "release-sums")), ["SHA256SUMS"]);
+    attestAssets = join(ctx.temp, "assets");
+  });
+
+  it("shasum -c over attest's SHA256SUMS fails when one byte of a DMG is flipped", () => {
+    assert.ok(attestAssets, "the attest step ran");
+    const copy = mkdtempSync(join(work, "flipped-"));
+    cpSync(attestAssets, copy, { recursive: true });
+    const dmg = join(copy, `Open-Agent-${VERSION}-x64.dmg`);
+    const bytes = readFileSync(dmg);
+    bytes[0] ^= 0x01;
+    writeFileSync(dmg, bytes);
+    const r = spawnSync("shasum", ["-a", "256", "-c", "SHA256SUMS"], { cwd: copy, encoding: "utf8" });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, new RegExp(`Open-Agent-${VERSION.replace(/\./g, "\\.")}-x64\\.dmg: FAILED`));
+    assert.match(r.stdout, new RegExp(`Open-Agent-${VERSION.replace(/\./g, "\\.")}-arm64\\.dmg: OK`));
   });
 });

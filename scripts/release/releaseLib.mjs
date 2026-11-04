@@ -267,13 +267,24 @@ export function attestationVerifyLine(subject, version) {
   return `gh attestation verify ${subject} --repo ${REPO_SLUG} --signer-workflow ${SIGNER_WORKFLOW} --source-ref refs/tags/v${version} --deny-self-hosted-runners`;
 }
 
-const UNSAFE_IN_NOTES = new Set([..."[]()<>@`"]);
-export const safeChange = (line) =>
-  [...String(line)]
+const MORE_CHANGES = /^… and \d+ more$/;
+
+function inlineCode(text) {
+  const fence = "`".repeat(Math.max(0, ...[...text.matchAll(/`+/g)].map((m) => m[0].length)) + 1);
+  const pad = text.startsWith("`") || text.endsWith("`") ? " " : "";
+  return `${fence}${pad}${text}${pad}${fence}`;
+}
+
+export function safeChange(line) {
+  const text = [...String(line)]
     .map((c) => (c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 ? " " : c))
-    .filter((c) => !UNSAFE_IN_NOTES.has(c))
     .join("")
     .trim();
+  if (MORE_CHANGES.test(text)) return text;
+  const m = /^([0-9a-f]+) +(.+)$/.exec(text);
+  if (m) return `${m[1]} ${inlineCode(m[2])}`;
+  return text ? inlineCode(text) : "";
+}
 
 export function notes({ version, prerelease, digests, bases, changes, previousTag }) {
   const tag = `v${version}`;
