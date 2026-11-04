@@ -172,7 +172,7 @@ export function ChatSession(props: ChatSessionProps) {
         if (isUserStop(stopRequested.current, event)) return;
         if (takeRefusal(event.message ?? "")) return;
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
-        noteRunFailure(event.code);
+        noteRunFailure(event.code ?? errorCodeIn(event.message ?? ""));
         setError({ kind: classifyRunError({ error: new Error(message) }), message: event.message });
       },
     });
