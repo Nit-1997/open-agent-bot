@@ -10,8 +10,6 @@ import { describeInviteFailure } from "./inviteCopy.js";
 
 export type AccountHooks = { onDisabled(userId: string): Promise<void>; onEnabled(userId: string): void };
 
-const ADMIN_TTL_MS = 30_000;
-
 const missingUser = () => new UserError("That user doesn't exist.", "not_found");
 const selfAction = () => new UserError("You can't do that to your own account.", "conflict", { code: "self_action" });
 const inviteFailed = (code: string) => new UserError(describeInviteFailure(code), "upstream", { code: "invite_failed" });
@@ -19,18 +17,6 @@ const inviteOutcome = (result: EmailResult) =>
   result.ok
     ? { inviteStatus: "sent" as const, inviteError: null }
     : { inviteStatus: "failed" as const, inviteError: describeInviteFailure(result.code) };
-
-export function createLiveAdminCheck(auth: Pick<AuthAdmin, "getUser">, now: () => number = Date.now) {
-  const cache = new Map<string, { ok: boolean; at: number }>();
-  return async (user: Principal): Promise<boolean> => {
-    const hit = cache.get(user.id);
-    if (hit && now() - hit.at < ADMIN_TTL_MS) return hit.ok;
-    const account = await auth.getUser(user.id);
-    const ok = !!account?.isAdmin && (!account.bannedUntil || Date.parse(account.bannedUntil) <= now());
-    cache.set(user.id, { ok, at: now() });
-    return ok;
-  };
-}
 
 export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hooks: AccountHooks }) {
   const { repo, auth, hooks } = deps;
