@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   attestationProblems,
@@ -708,8 +708,17 @@ describe("workspaces", () => {
 
 describe("owner-only docs manifests", () => {
   const tmp = realpathSync(tmpdir());
+  const made = [];
+  const temp = (prefix) => {
+    const d = mkdtempSync(join(tmp, prefix));
+    made.push(d);
+    return d;
+  };
+  after(() => {
+    for (const d of made) rmSync(d, { recursive: true, force: true });
+  });
   const fixture = (doc, manifest) => {
-    const d = mkdtempSync(join(tmp, "oab-m6-owner-docs-"));
+    const d = temp("oab-m6-owner-docs-");
     mkdirSync(join(d, "docs"));
     writeFileSync(join(d, "docs/x.md"), doc);
     writeFileSync(join(d, "owner.json"), JSON.stringify(manifest));
@@ -747,7 +756,7 @@ describe("owner-only docs manifests", () => {
     assert.match(problems({ commands: [] }), /names its files/);
   });
   it("the runner takes --owner-docs manifests and refuses one that doesn't exist", () => {
-    const d = mkdtempSync(join(tmp, "oab-m6-docs-"));
+    const d = temp("oab-m6-docs-");
     mkdirSync(join(d, "rel/lock"), { recursive: true });
     mkdirSync(join(d, "rel/release"));
     writeFileSync(join(d, "rel/lock/services.lock.json"), "{}");
