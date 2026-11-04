@@ -19,6 +19,8 @@ const SCANNED_FILES = [
   "cloud/supabase/scripts/blocked-domains.mjs",
   "cloud/supabase/scripts/managementApi.mjs",
   "cloud/supabase/scripts/gen-types.mjs",
+  "cloud/supabase/scripts/check-push-plan.mjs",
+  "cloud/supabase/scripts/check-old-bodies.mjs",
 ];
 const SCANNED_DIRS = ["cloud/agent/test/local", "cloud/supabase/test", "scripts/demo/m7"];
 
@@ -35,6 +37,10 @@ const FIXTURES = {
   "cloud/supabase/test/blockedDomains.test.mjs": {
     counts: { "supabase-co": 1 },
     reason: "refusal fixture: a live database host that blocked-domains.mjs --local must refuse",
+  },
+  "cloud/supabase/test/checkPushPlan.test.mjs": {
+    counts: { "db-push-not-local": 1 },
+    reason: "dry-run output fixture: the CLI's own closing message, fed to check-push-plan.mjs on stdin; nothing runs it",
   },
   "cloud/agent/test/local/harnessGuard.test.ts": {
     counts: { "supabase-co": 3 },
@@ -96,6 +102,8 @@ describe("static safety of the M7 executable files (D19, R14)", () => {
     assert.ok(files.includes("cloud/supabase/scripts/local-stack.mjs"));
     assert.ok(files.includes("cloud/agent/test/local/harness.ts"));
     assert.ok(files.includes("cloud/supabase/test/localStack.test.mjs"));
+    for (const f of ["cloud/supabase/scripts/check-push-plan.mjs", "cloud/supabase/scripts/check-old-bodies.mjs", "scripts/demo/m7/lib.sh"])
+      assert.ok(files.includes(f), f);
     for (const f of Object.keys(FIXTURES)) assert.ok(files.includes(f), f);
     for (const f of Object.keys(OUT_OF_SCOPE)) {
       assert.ok(existsSync(join(ROOT, f)), f);
