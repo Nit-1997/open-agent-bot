@@ -35,9 +35,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           Continue with Google
         </button>
       </form>
-      <EmailLinkForm startOpen={!!error} open={open} siteKey={siteKey} />
       {open && (
-        <p id="login-legal" className="text-center text-[12px] text-text-muted">
+        <p id="login-legal" className="text-center text-[12.5px] text-text-secondary">
           {"By continuing you agree to the "}
           <Link id="login-legal-terms" href="/terms" className="underline underline-offset-2">
             Terms
@@ -49,6 +48,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           .
         </p>
       )}
+      <EmailLinkForm startOpen={!!error} open={open} siteKey={siteKey} />
       {mode === "waitlist" && (
         <div id="login-request" className="space-y-2 border-t border-border pt-5">
           <p id="login-request-text" className="text-center text-[13px] text-text-secondary">
