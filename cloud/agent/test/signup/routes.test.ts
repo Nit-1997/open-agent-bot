@@ -119,17 +119,17 @@ describe("POST /human-check", () => {
 });
 
 describe("GET /signup", () => {
-  it("answers the mode, and waitlist when the mode is unknown", async () => {
-    for (const [mode, shown] of [
-      ["open", "open"],
-      ["invite", "invite"],
-      ["waitlist", "waitlist"],
-      ["unknown", "waitlist"],
+  it("answers the mode and whether email links need the captcha: waitlist with the captcha when the mode is unknown", async () => {
+    for (const [mode, shown, captcha] of [
+      ["open", "open", true],
+      ["invite", "invite", false],
+      ["waitlist", "waitlist", false],
+      ["unknown", "waitlist", true],
     ] as const) {
       const res = await (await app(mode)).call(null, "/signup");
       expect(res.status).toBe(200);
       expect(res.headers.get("cache-control")).toBe("no-store");
-      expect(await res.json()).toEqual({ mode: shown });
+      expect(await res.json()).toEqual({ mode: shown, captcha });
     }
   });
 

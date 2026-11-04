@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { checkUsageFunctions, GATE8_REFUSAL } from "../../src/limits/startup.js";
+import { checkSignupFunctions, checkUsageFunctions, GATE8_REFUSAL } from "../../src/limits/startup.js";
+import { SignupLookupError } from "../../src/signup/settings.js";
 import { UsageRepoError } from "../../src/limits/usageRepo.js";
 
 const repo = (summary: () => Promise<{ monthTotal: number; activeUsers: number }>) => ({ summary });
@@ -28,5 +29,57 @@ describe("usage functions startup check", () => {
     expect(GATE8_REFUSAL).toBe(
       "refusing to start: the M7 usage functions are missing or not executable (apply the migrations first: Gate 8)",
     );
+  });
+});
+
+describe("signup functions startup check", () => {
+  const signup = (probe: () => Promise<"open" | "waitlist" | "invite">) => ({ probe });
+
+  it("passes when signup_settings_get answers, without the Turnstile warning outside open mode", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(
+      await checkSignupFunctions(
+        signup(async () => "waitlist"),
+        false,
+      ),
+    ).toBe("ok");
+    expect(
+      await checkSignupFunctions(
+        signup(async () => "open"),
+        true,
+      ),
+    ).toBe("ok");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("warns once at start when the mode is open and no Turnstile secret is set", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(
+      await checkSignupFunctions(
+        signup(async () => "open"),
+        false,
+      ),
+    ).toBe("ok");
+    expect(warn.mock.calls.flat().join(" ")).toContain("[signup] open mode needs TURNSTILE_SECRET_KEY");
+  });
+
+  it.each(["PGRST202", "42501"])("refuses to start when PostgREST answers %s", async (code) => {
+    expect(
+      await checkSignupFunctions(
+        signup(() => Promise.reject(new SignupLookupError("settings", code))),
+        true,
+      ),
+    ).toBe("missing");
+  });
+
+  it.each(["timeout", "unreachable", "invalid_row"])("only logs any other error (%s)", async (code) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(
+      await checkSignupFunctions(
+        signup(() => Promise.reject(new SignupLookupError("settings", code))),
+        true,
+      ),
+    ).toBe("unknown");
+    expect(warn.mock.calls.flat().join(" ")).toContain(`[signup] signup settings startup check failed (${code})`);
   });
 });
