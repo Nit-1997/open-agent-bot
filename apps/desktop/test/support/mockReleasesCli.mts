@@ -1,5 +1,7 @@
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
-import { serveTree, startMockReleases } from "./mockReleases.ts";
+
+const { serveTree, startMockReleases } = createRequire(import.meta.url)("./mockReleases.ts") as typeof import("./mockReleases.ts");
 
 async function cli(argv: readonly string[]): Promise<void> {
   const arg = (name: string) => {
