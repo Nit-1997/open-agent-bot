@@ -46,3 +46,6 @@ e2e/.local/
 # Mac app build outputs
 apps/desktop/build/
 apps/desktop/release/
+
+# Planning specs stay out of the public repo
+docs/superpowers/
