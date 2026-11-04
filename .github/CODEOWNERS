@@ -2,3 +2,7 @@
 /.github/workflows/ @Nit-1997
 /scripts/release/ @Nit-1997
 /apps/desktop/release-policy.json @Nit-1997
+/scripts/docs/ @Nit-1997
+/scripts/demo/ @Nit-1997
+/docs/INSTALL.md @Nit-1997
+/README.md @Nit-1997

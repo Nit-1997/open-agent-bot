@@ -364,12 +364,8 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: ../../node_modules/.bin/electron-builder --mac --arm64 --x64 --publish never --config.extraMetadata.version="$VERSION"
-      - name: Packaged smoke with the bundled release lock
-        run: |
-          node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg" | tee "$RUNNER_TEMP/smoke.log"
-      - name: Both apps bundle kind=release at this version
-        run: |
-          test "$(grep -c -F "services.lock.json kind=release version=$VERSION images=" "$RUNNER_TEMP/smoke.log")" = 2
+      - name: Packaged smoke with the bundled release lock (asserts kind=release, this version, byte-equal to the lock job's)
+        run: node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-dmgs

@@ -1,36 +1,17 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import {
-  copyFileSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { isMain, main, REPO } from "./cli.mjs";
 import { mergeDigest } from "./image-checks.mjs";
-import { DRY_RUN_VERSION, MANIFEST_NAME, releaseAssets, SUMS_NAME, sha256Hex, stableJson } from "./releaseLib.mjs";
+import { DRY_RUN_VERSION, MANIFEST_NAME, RELEASE_IMAGES, releaseAssets, SUMS_NAME, sha256Hex, stableJson } from "./releaseLib.mjs";
+import { detachLeftovers, loadWorkflow, planJob, runPlanned } from "./workflowJobs.mjs";
 
-export const IMAGES = Object.freeze([
-  { key: "agent", name: "oab-m5-open-agent", context: ".", file: "packages/core/Dockerfile", content: "/app" },
-  {
-    key: "search",
-    name: "oab-m5-open-agent-search",
-    context: "local/searxng",
-    file: "local/searxng/Dockerfile",
-    content: "/opt/open-agent",
-  },
-]);
+export const IMAGES = Object.freeze(
+  RELEASE_IMAGES.map((i) => Object.freeze({ key: i.key, name: i.dryRunName, context: i.context, file: i.dockerfile, content: i.content })),
+);
 const PLATFORMS = new Set(["linux/arm64", "linux/amd64"]);
 const REGISTRY = /^127\.0\.0\.1:18\d{3}$/;
 const OAB = /^oab-[a-z0-9-]+$/;
@@ -92,44 +73,6 @@ export function dryRunProblems(o, env, ctx) {
   if (ctx.dirty && !o.allowDirty) out.push("tracked files have uncommitted changes (commit them or pass --allow-dirty)");
   for (const i of IMAGES) if (!i.name.startsWith("oab-")) out.push(`image name ${i.name} does not start with oab-`);
   return out;
-}
-
-export function checkMountedApp(mount, { lockSha256, version }) {
-  const out = [];
-  const apps = readdirSync(mount).filter((n) => n.endsWith(".app"));
-  if (apps.length !== 1 || apps[0] !== "Open Agent.app")
-    return [`the DMG must hold exactly one Open Agent.app, found [${apps.join(", ")}]`];
-  const app = join(mount, "Open Agent.app");
-  const lock = join(app, "Contents/Resources/stack/services.lock.json");
-  let st;
-  try {
-    st = lstatSync(lock);
-  } catch {
-    return ["Contents/Resources/stack/services.lock.json is missing"];
-  }
-  if (st.isSymbolicLink() || !st.isFile()) return ["Contents/Resources/stack/services.lock.json is not a regular file"];
-  const shasum = spawnSync("shasum", ["-a", "256", lock], { encoding: "utf8" });
-  const got = shasum.stdout.split(/\s/)[0];
-  if (shasum.status !== 0) out.push(`shasum exited ${shasum.status}`);
-  else if (got !== lockSha256) out.push(`the bundled lock sha256 ${got} differs from the lock step's ${lockSha256}`);
-  const plist = spawnSync("plutil", ["-extract", "CFBundleShortVersionString", "raw", join(app, "Contents/Info.plist")], {
-    encoding: "utf8",
-  });
-  if (plist.status !== 0) out.push(`plutil exited ${plist.status}: ${plist.stderr.trim()}`);
-  else if (plist.stdout.trim() !== version) out.push(`CFBundleShortVersionString is ${plist.stdout.trim()}, expected ${version}`);
-  return out;
-}
-
-export function verifyDmg(dmg, expect, scratch) {
-  const mount = mkdtempSync(join(scratch, "m-"));
-  const attach = spawnSync("hdiutil", ["attach", "-nobrowse", "-readonly", "-mountpoint", mount, dmg], { encoding: "utf8" });
-  if (attach.status !== 0) return [`hdiutil attach exited ${attach.status}: ${attach.stderr.trim()}`];
-  try {
-    return checkMountedApp(mount, expect);
-  } finally {
-    spawnSync("hdiutil", ["detach", mount], { encoding: "utf8" });
-    rmSync(mount, { recursive: true, force: true });
-  }
 }
 
 export function mockRelease(version, manifestBytes) {
@@ -199,8 +142,11 @@ export async function dryRun(o) {
   if (inspect.status !== 0 || !/^Driver:\s+docker-container$/m.test(inspect.stdout))
     throw new StepFailed(`builder ${o.builder} must exist and use the docker-container driver`);
 
-  node("gate/version", script("version.mjs"), [tag, "--dry-run"]);
-  node("gate/checks", script("gate.mjs"), ["--tag", tag, "--dry-run"]);
+  const gated = node("gate/checks", script("gate.mjs"), ["--tag", tag, "--dry-run"], { capture: true });
+  process.stdout.write(gated.stdout);
+  const reported = /^gate: tag=(\S+) version=(\S+) prerelease=(\S+)$/m.exec(gated.stdout);
+  if (reported?.[1] !== tag || reported[2] !== o.version || reported[3] !== "false")
+    throw new StepFailed(`gate reported ${reported?.[0] ?? "no version line"}, expected tag=${tag} version=${o.version} prerelease=false`);
   const revision = step("gate/revision", "git", ["rev-parse", "HEAD"], { capture: true }).stdout.trim();
 
   const refs = {};
@@ -350,7 +296,6 @@ export async function dryRun(o) {
       return { refs, log };
     }
 
-    const lockSha256 = sha256Hex(readFileSync(lockFile));
     const dmgDir = join(o.out, "dmgs");
     mkdirSync(dmgDir, { recursive: true });
     const names = { arm64: `Open-Agent-${o.version}-arm64.dmg`, x64: `Open-Agent-${o.version}-x64.dmg` };
@@ -389,31 +334,35 @@ export async function dryRun(o) {
       node("desktop/restage", join(APP, "scripts/stage-stack.mjs"), [], { allowFail: true });
     }
 
-    const scratch = mkdtempSync(join(tmpdir(), "oab-m5-verify-"));
-    try {
-      for (const arch of ["arm64", "x64"]) {
-        say(`[dry-run verify-dmgs/${arch}] hdiutil attach -nobrowse -readonly ${rel(join(dmgDir, names[arch]))}`);
-        const bad = verifyDmg(join(dmgDir, names[arch]), { lockSha256, version: o.version }, scratch);
-        for (const b of bad) say(`[dry-run verify-dmgs/${arch}] ${b}`);
-        say(`[dry-run verify-dmgs/${arch}] exit ${bad.length ? 1 : 0}`);
-        if (bad.length) throw new StepFailed(`verify-dmgs ${arch} failed`);
+    const wf = loadWorkflow();
+    const artifacts = { "release-lock": lockDir, "release-dmgs": dmgDir };
+    const workflowJob = (job, skip = []) => {
+      const ctx = { temp: join(o.out, "runner", job), version: o.version, artifacts, skip };
+      const plan = planJob(wf, job, ctx);
+      say(
+        `[dry-run ${job}] release.yml step "${plan.run.name}" run verbatim: ${plan.run.run.trim().split("\n").length} lines, sha256 ${sha256Hex(plan.run.run)}`,
+      );
+      for (const d of plan.downloads) say(`[dry-run ${job}] download-artifact ${d.name} -> ${rel(d.to)}`);
+      for (const k of Object.keys(plan.run.env)) say(`[dry-run ${job}] env ${k}=${plan.run.env[k]}`);
+      let r;
+      try {
+        r = runPlanned(plan, ctx, step);
+      } finally {
+        for (const m of detachLeftovers(ctx.temp)) say(`[dry-run ${job}] detached a mount the block left behind: ${rel(m)}`);
       }
-    } finally {
-      rmSync(scratch, { recursive: true, force: true });
-    }
-
-    const attestDir = join(o.out, "attest");
-    mkdirSync(attestDir, { recursive: true });
-    symlinkSync(manifestFile, join(attestDir, MANIFEST_NAME));
-    for (const arch of ["arm64", "x64"]) symlinkSync(join(dmgDir, names[arch]), join(attestDir, names[arch]));
-    node("attest/sums", script("sums.mjs"), [attestDir, "--version", o.version]);
-    say("[dry-run attest/attest-build-provenance] SKIPPED (dry run: no GitHub OIDC)");
+      for (const u of plan.skipped) say(`[dry-run ${job}] ${u} SKIPPED (dry run: no GitHub OIDC or artifact store)`);
+      if (r.status !== 0) throw new StepFailed(`${job} exited ${r.status}`);
+      return ctx;
+    };
+    workflowJob("verify-dmgs");
+    const attest = workflowJob("attest", ["actions/attest-build-provenance@", "actions/upload-artifact@"]);
+    const sumsFile = join(attest.temp, "assets", SUMS_NAME);
 
     const releaseDir = join(o.out, "release");
     mkdirSync(releaseDir, { recursive: true });
     copyFileSync(manifestFile, join(releaseDir, MANIFEST_NAME));
     for (const arch of ["arm64", "x64"]) copyFileSync(join(dmgDir, names[arch]), join(releaseDir, names[arch]));
-    copyFileSync(join(attestDir, SUMS_NAME), join(releaseDir, SUMS_NAME));
+    copyFileSync(sumsFile, join(releaseDir, SUMS_NAME));
     const assets = readdirSync(releaseDir).sort();
     if (JSON.stringify(assets) !== JSON.stringify(releaseAssets(o.version)))
       throw new StepFailed(`release/ holds [${assets.join(", ")}], expected [${releaseAssets(o.version).join(", ")}]`);

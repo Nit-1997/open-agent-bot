@@ -10,6 +10,31 @@ export const PRODUCTION_REFS = Object.freeze({
 export const LOCAL_REGISTRY_REF = /^127\.0\.0\.1:18\d{3}\/oab-[a-z0-9-]+@sha256:[0-9a-f]{64}$/;
 export const DRY_RUN_VERSION = /^0\.0\.0-dryrun\.(0|[1-9]\d*)$/;
 export const MANIFEST_NAME = "open-agent-services.json";
+export const RELEASE_IMAGES = Object.freeze([
+  Object.freeze({
+    key: "agent",
+    image: "open-agent",
+    name: "ghcr.io/nit-1997/open-agent",
+    dryRunName: "oab-m5-open-agent",
+    context: ".",
+    dockerfile: "packages/core/Dockerfile",
+    content: "/app",
+  }),
+  Object.freeze({
+    key: "search",
+    image: "open-agent-search",
+    name: "ghcr.io/nit-1997/open-agent-search",
+    dryRunName: "oab-m5-open-agent-search",
+    context: "local/searxng",
+    dockerfile: "local/searxng/Dockerfile",
+    content: "/opt/open-agent",
+  }),
+]);
+export const releaseImage = (key) => {
+  const i = RELEASE_IMAGES.find((x) => x.key === key);
+  if (!i) throw new Error(`unknown release image ${key}`);
+  return i;
+};
 export const SUMS_NAME = "SHA256SUMS";
 
 const RELEASE_TAG = /^v((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-rc\.(0|[1-9]\d*))?)$/;
@@ -224,24 +249,6 @@ export function releaseAssets(version) {
   return [`Open-Agent-${version}-arm64.dmg`, `Open-Agent-${version}-x64.dmg`, MANIFEST_NAME, SUMS_NAME].sort();
 }
 
-export const summedFiles = (version) => releaseAssets(version).filter((n) => n !== SUMS_NAME);
-
-export function sha256sums(files) {
-  const sorted = [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  return sorted.map((f) => `${f.sha256}  ${f.name}\n`).join("");
-}
-
-export function parseSums(text) {
-  const out = [];
-  for (const line of text.split("\n")) {
-    if (line === "") continue;
-    const m = /^([0-9a-f]{64}) {2}([^/\s][^/]*)$/.exec(line);
-    if (!m) throw new Error(`bad SHA256SUMS line ${JSON.stringify(line)}`);
-    out.push({ sha256: m[1], name: m[2] });
-  }
-  return out;
-}
-
 export function previousFinalTag(tags, tag) {
   const own = FINAL_TAG.exec(tag) ?? RELEASE_TAG.exec(tag) ?? DRY_RUN_TAG.exec(tag);
   if (!own) return undefined;
@@ -259,6 +266,14 @@ export function previousFinalTag(tags, tag) {
 export function attestationVerifyLine(subject, version) {
   return `gh attestation verify ${subject} --repo ${REPO_SLUG} --signer-workflow ${SIGNER_WORKFLOW} --source-ref refs/tags/v${version} --deny-self-hosted-runners`;
 }
+
+const UNSAFE_IN_NOTES = new Set([..."[]()<>@`"]);
+export const safeChange = (line) =>
+  [...String(line)]
+    .map((c) => (c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 ? " " : c))
+    .filter((c) => !UNSAFE_IN_NOTES.has(c))
+    .join("")
+    .trim();
 
 export function notes({ version, prerelease, digests, bases, changes, previousTag }) {
   const tag = `v${version}`;
@@ -329,7 +344,7 @@ export function notes({ version, prerelease, digests, bases, changes, previousTa
     "",
     `## Changes${previousTag ? ` since ${previousTag}` : ""}`,
     "",
-    ...(changes.length ? changes.map((c) => `- ${c}`) : ["- (no commits)"]),
+    ...(changes.length ? changes.map((c) => `- ${safeChange(c)}`) : ["- (no commits)"]),
     "",
   );
   return lines.join("\n");

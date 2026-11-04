@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { isMain, main, REPO, spawnRunner } from "./cli.mjs";
-import { baseImages, notes, parseTag, previousFinalTag } from "./releaseLib.mjs";
+import { baseImages, notes, parseTag, previousFinalTag, releaseImage } from "./releaseLib.mjs";
 
 export function gitChanges(git, ref, previous, max) {
   const range = previous ? `${previous}..${ref}` : ref;
@@ -13,7 +13,7 @@ export function gitChanges(git, ref, previous, max) {
   return max && all.length > max ? [...all.slice(0, max), `… and ${all.length - max} more`] : all;
 }
 
-export function notesCommand(argv, git = spawnRunner("git", { cwd: REPO })) {
+export function notesCommand(argv, git = spawnRunner("git", { cwd: REPO }), env = process.env) {
   const { values } = parseArgs({
     args: argv,
     options: {
@@ -26,12 +26,12 @@ export function notesCommand(argv, git = spawnRunner("git", { cwd: REPO })) {
   });
   for (const k of ["version", "lock", "out"]) if (!values[k]) throw new Error(`pass --${k}`);
   const tag = `v${values.version}`;
-  const parsed = parseTag(tag, { dryRun: true });
+  const parsed = parseTag(tag, { dryRun: env.OPEN_AGENT_SHELL_TEST === "1" });
   if (!parsed.ok) throw new Error(parsed.reason);
   const lock = JSON.parse(readFileSync(values.lock, "utf8"));
   const bases = baseImages(
-    readFileSync(join(REPO, "packages/core/Dockerfile"), "utf8"),
-    readFileSync(join(REPO, "local/searxng/Dockerfile"), "utf8"),
+    readFileSync(join(REPO, releaseImage("agent").dockerfile), "utf8"),
+    readFileSync(join(REPO, releaseImage("search").dockerfile), "utf8"),
   );
   const tags = git(["tag", "--list", "v*"]);
   if (tags.status !== 0) throw new Error(`git tag --list exited ${tags.status}: ${tags.stderr.trim()}`);

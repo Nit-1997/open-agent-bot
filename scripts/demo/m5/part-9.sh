@@ -8,7 +8,7 @@ expect down-demo "1=the demo project was already down" "down_demo"
 expect down-pkg "1=the packaged-launch project was already down" "down_pkg"
 expect registry-rm "1=the registry container was already gone" "docker rm -f -v oab-factory-m5-registry"
 expect builder-rm "1=the builder was already gone" "docker buildx rm oab-factory-m5-builder"
-expect images-rm "1=no oab-m5 image left to remove" "docker image rm \$(docker image ls -a --digests --format '{{.Repository}}@{{.Digest}}' | grep -E '(^|/)oab-m5-' | grep -v '@<none>$')"
+expect images-rm "1=no oab-m5 image left to remove" "docker image rm \$(m5_images)"
 expect tags-rm "1=no oab-m5 tag left to remove" "docker image rm \$(docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E '(^|/)oab-m5-|oab-factory-m5')"
 for k in install scratch; do
   if [ -f "$DEMO_DIR/$k.path" ]; then

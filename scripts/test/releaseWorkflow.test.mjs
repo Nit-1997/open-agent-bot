@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
+import { RELEASE_IMAGES } from "../release/releaseLib.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (f) => readFileSync(join(ROOT, f), "utf8");
@@ -76,14 +77,13 @@ const RELEASE_VIEW_RUN = `gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --j
 cat "$RUNNER_TEMP/draft-check.txt"
 grep -qx true "$RUNNER_TEMP/draft-check.txt"
 `;
-const SMOKE_RUN = `node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg" | tee "$RUNNER_TEMP/smoke.log"\n`;
-const SMOKE_GREP_RUN = `test "$(grep -c -F "services.lock.json kind=release version=$VERSION images=" "$RUNNER_TEMP/smoke.log")" = 2\n`;
+const SMOKE_RUN = `node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg"`;
 const ROSETTA_RUN = "/usr/bin/pgrep -q oahd || sudo softwareupdate --install-rosetta --agree-to-license\n";
 const PINNED = {
   "verify-dmgs": [VERIFY_DMGS_RUN],
   attest: [SUMS_RUN],
   release: [RELEASE_EXISTING_RUN, RELEASE_VIEW_RUN],
-  desktop: [SMOKE_RUN, SMOKE_GREP_RUN, ROSETTA_RUN],
+  desktop: [ROSETTA_RUN],
 };
 
 const DESKTOP_NPM = [
@@ -97,6 +97,7 @@ const DESKTOP_NODE = [
   /^node apps\/desktop\/scripts\/build\.mjs$/,
   /^\.\.\/\.\.\/node_modules\/\.bin\/electron-builder --mac --arm64 --x64 --publish never --config\.extraMetadata\.version="\$VERSION"$/,
 ];
+const DESKTOP_EXACT = [SMOKE_RUN];
 const SIMPLE = [/^node scripts\/release\/[a-z-]+\.mjs(?: |$)/, /^gh (?!release (?:edit|delete|upload))/, /^docker /];
 const GATE_FETCH = 'git fetch --force origin "+refs/tags/$TAG:refs/tags/$TAG"';
 
@@ -118,7 +119,7 @@ function runProblems(jobName, run) {
   if (line.includes("\n")) return [`${jobName}: a run step must be one command, got ${JSON.stringify(run)}`];
   if (/[|;&`]|\$\(/.test(line.replace(/'[^']*'/g, "''"))) return [`${jobName}: inline shell logic in ${JSON.stringify(line)}`];
   if (jobName === "gate" && line === GATE_FETCH) return [];
-  if (jobName === "desktop" && [...DESKTOP_NPM, ...DESKTOP_NODE].some((re) => re.test(line))) return [];
+  if (jobName === "desktop" && ([...DESKTOP_NPM, ...DESKTOP_NODE].some((re) => re.test(line)) || DESKTOP_EXACT.includes(line))) return [];
   if (SIMPLE.some((re) => re.test(line))) return [];
   return [`${jobName}: ${JSON.stringify(line)} is not a scripts/release call, a gh/docker invocation or an allowed desktop npm command`];
 }
@@ -317,6 +318,32 @@ describe("push: build, check, push the same build, check again, attest (AC 4, 31
     assert.equal(pushed.with.provenance, "mode=max");
     assert.equal(pushed.with.sbom, true);
     for (const l of job("push").strategy.matrix.include) assert.equal(l.name, `ghcr.io/nit-1997/${l.image}`, `${l.image} ${l.arch}`);
+  });
+
+  it("the push and merge matrices are releaseLib's RELEASE_IMAGES table (one table for build inputs)", () => {
+    const want = RELEASE_IMAGES.flatMap((i) =>
+      ["amd64", "arm64"].map((arch) => ({
+        image: i.image,
+        name: i.name,
+        arch,
+        context: i.context,
+        dockerfile: i.dockerfile,
+        content: i.content,
+      })),
+    );
+    const got = job("push").strategy.matrix.include.map(({ image, name, arch, context, dockerfile, content }) => ({
+      image,
+      name,
+      arch,
+      context,
+      dockerfile,
+      content,
+    }));
+    assert.deepEqual(got, want);
+    assert.deepEqual(
+      job("merge").strategy.matrix.include,
+      RELEASE_IMAGES.map((i) => ({ image: i.image, name: i.name })),
+    );
   });
 
   it("content and labels before the push; pull, content again, attest, record after", () => {
@@ -527,7 +554,7 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     for (const x of l.filter((x) => x.startsWith("npm rebuild"))) assert.match(x, /^npm rebuild [@a-z0-9/._-]+$/);
   });
 
-  it("stages the release-lock lock, builds, runs electron-builder with the version, smokes with --release and --expect-lock, and greps kind=release", () => {
+  it("stages the release-lock lock, builds, runs electron-builder with the version and smokes with --release and --expect-lock", () => {
     const download = usesOf("desktop", "actions/download-artifact@");
     assert.deepEqual(
       download.map((d) => [d.with.name, d.with.path]),
@@ -537,9 +564,8 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     const build = runAt("desktop", /^node apps\/desktop\/scripts\/build\.mjs$/);
     const eb = runAt("desktop", /electron-builder --mac --arm64 --x64 --publish never --config\.extraMetadata\.version="\$VERSION"/);
     const smoke = at("desktop", (s) => s.run === SMOKE_RUN);
-    const grep = at("desktop", (s) => s.run === SMOKE_GREP_RUN);
     const upload = at("desktop", (s) => String(s.uses ?? "").startsWith("actions/upload-artifact@"));
-    const order = [stage, build, eb, smoke, grep, upload];
+    const order = [stage, build, eb, smoke, upload];
     assert.ok(
       order.every((k) => k >= 0),
       order.join(),
@@ -551,6 +577,13 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     );
     assert.equal(String(steps("desktop")[eb].env.CSC_IDENTITY_AUTO_DISCOVERY), "false");
     assert.equal(steps("desktop")[eb]["working-directory"], "apps/desktop");
+  });
+
+  it("leaves the kind/version check to packagedSmoke (no second grep over its log)", () => {
+    for (const s of runsOf("desktop")) {
+      assert.doesNotMatch(s.run, /smoke\.log|\bgrep -c\b|\btee\b/, s.run);
+    }
+    assert.match(read("apps/desktop/scripts/packagedSmokeLib.mjs"), /not byte-equal to --expect-lock/);
   });
 
   it("uploads release-dmgs: the two DMGs only", () => {
@@ -686,12 +719,21 @@ describe("release: a draft with exactly four assets (AC 13, 28)", () => {
 });
 
 describe("CODEOWNERS (D16 3b)", () => {
-  it("names the owner for workflows, release scripts and the release policy", () => {
+  it("names the owner for workflows, release, docs and demo scripts, the release policy, INSTALL and README", () => {
     const lines = read(".github/CODEOWNERS")
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith("#"));
-    for (const path of ["/.github/workflows/", "/scripts/release/", "/apps/desktop/release-policy.json", "/.github/CODEOWNERS"])
+    for (const path of [
+      "/.github/workflows/",
+      "/scripts/release/",
+      "/scripts/docs/",
+      "/scripts/demo/",
+      "/apps/desktop/release-policy.json",
+      "/docs/INSTALL.md",
+      "/README.md",
+      "/.github/CODEOWNERS",
+    ])
       assert.ok(lines.includes(`${path} @Nit-1997`), path);
   });
 });

@@ -63,7 +63,7 @@ function removalProblem(line) {
   for (const m of line.matchAll(REMOVAL)) {
     if (/system\s+prune|builder\s+prune|buildx\s+prune|(?:image|volume|container|network)\s+prune/.test(m[0]))
       return `prune is never allowed: ${m[0].trim()}`;
-    if (!/oab-/.test(m[0])) return `removal must name an oab- resource: ${m[0].trim()}`;
+    if (!/oab-|\$\(m5_images\)/.test(m[0])) return `removal must name an oab- resource: ${m[0].trim()}`;
   }
   return undefined;
 }

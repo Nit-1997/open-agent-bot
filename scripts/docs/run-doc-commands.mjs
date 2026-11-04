@@ -50,6 +50,7 @@ const TRUSTED_PLUGINS = ["docker-compose", "docker-buildx"];
 const LOCAL_TAGS = ["open-agent:local", "open-agent-search:local"];
 const TSV_HEADER = ["source", "command (as documented)", "mode", "command as run", "exit", "note"];
 const RUN_TIMEOUT_MS = 60 * 60 * 1000;
+export const RUN_SHELL = Object.freeze(["--noprofile", "--norc", "-f", "+B", "-c"]);
 
 export function scratchEnv({ dir, realHome = homedir(), exists = existsSync }) {
   const sock = join(realHome, ".docker/run/docker.sock");
@@ -83,9 +84,11 @@ export function writeDockerConfig({ dir, desktopPlugins = DESKTOP_PLUGINS, plugi
   return { config: join(cfgDir, "config.json"), links };
 }
 
-export function preflight(cwd, env, exec, project, port) {
-  const cfg = exec("docker", ["compose", "config", "--format", "json"], { cwd, env });
-  if (cfg.status !== 0) return { ok: false, reason: `docker compose config exited ${cfg.status}: ${cfg.stderr.trim()}` };
+export const PREFLIGHT_ARGS = Object.freeze(["compose", "config", "--format", "json"]);
+
+export function preflight(cwd, env, exec, project, port, args = PREFLIGHT_ARGS) {
+  const cfg = exec("docker", [...args], { cwd, env });
+  if (cfg.status !== 0) return { ok: false, reason: `docker ${args.join(" ")} exited ${cfg.status}: ${cfg.stderr.trim()}` };
   const jq = exec("jq", ["-r", ".name"], { cwd, env, input: cfg.stdout });
   const name = jq.stdout.trim();
   if (jq.status !== 0 || name !== project) return { ok: false, reason: `project is '${name}', expected '${project}'` };
@@ -197,13 +200,13 @@ export function createRunner({
         return row("owner", "", "", `${c.reason} (declared ${e.mode})`, true);
       }
       for (const d of c.docker) {
-        const at = hasCompose(d) ? d : preflightDir;
-        const pf = preflight(at, env, exec, ctx.project, ctx.port);
+        const at = (d.preflight ?? hasCompose(d.cwd)) ? d.cwd : preflightDir;
+        const pf = preflight(at, env, exec, ctx.project, ctx.port, d.preflight);
         log(`preflight (${at}): ${pf.ok ? `ok ${pf.name}` : pf.reason}\n`);
         if (!pf.ok) return row(e.mode, c.asRun, "refused", `preflight: ${pf.reason}`, false);
       }
       log(`documented: ${occ.command}\nas run:     ${c.asRun}\ncwd:        ${cwd}\nenv:        scratch base (no changes)\n`);
-      const r = exec("/bin/bash", ["--noprofile", "--norc", "-c", c.asRun], { cwd, env, timeout: RUN_TIMEOUT_MS });
+      const r = exec("/bin/bash", [...RUN_SHELL, c.asRun], { cwd, env, timeout: RUN_TIMEOUT_MS });
       log(`--- stdout\n${r.stdout}--- stderr\n${r.stderr}exit: ${r.status}\n`);
       const want = e.expectExit ?? 0;
       const ok = r.status === want;
