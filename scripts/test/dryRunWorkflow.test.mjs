@@ -109,6 +109,86 @@ describe("the dry run plans release.yml's own verify-dmgs and attest steps", () 
     assert.throws(() => resolveExpr("${{ github.token }}", { temp: "/t", version: V }), /github\.token/);
   });
 
+  it("refuses step and job keys it does not execute, and expressions inside the run text", () => {
+    const edit = (f) => {
+      const wf = structuredClone(WF);
+      f(wf);
+      return wf;
+    };
+    const runStep = (w, job) => w.jobs[job].steps.find((s) => s.run);
+    for (const key of ["if", "continue-on-error", "timeout-minutes", "shell", "uses"])
+      for (const job of ["verify-dmgs", "attest"])
+        assert.throws(
+          () =>
+            planJob(
+              edit((w) => {
+                runStep(w, job)[key] = key === "uses" ? "actions/x@1" : "true";
+              }),
+              job,
+              ctxFor("x", ATTEST_SKIP),
+            ),
+          new RegExp(`${job} .*${key}`),
+        );
+    for (const key of ["if", "continue-on-error", "timeout-minutes"])
+      assert.throws(
+        () =>
+          planJob(
+            edit((w) => {
+              w.jobs.attest.steps[0][key] = "true";
+            }),
+            "attest",
+            ctxFor("x", ATTEST_SKIP),
+          ),
+        new RegExp(`attest .*${key}`),
+      );
+    assert.throws(
+      () =>
+        planJob(
+          edit((w) => {
+            w.jobs.attest.steps[0].with.pattern = "release-*";
+          }),
+          "attest",
+          ctxFor("x", ATTEST_SKIP),
+        ),
+      /attest .*pattern/,
+    );
+    for (const key of ["env", "defaults", "if", "container", "strategy", "continue-on-error"])
+      assert.throws(
+        () =>
+          planJob(
+            edit((w) => {
+              w.jobs["verify-dmgs"][key] = key === "env" ? { X: "1" } : "true";
+            }),
+            "verify-dmgs",
+            ctxFor("x"),
+          ),
+        new RegExp(`verify-dmgs .*job-level ${key}`),
+      );
+    assert.throws(
+      () =>
+        planJob(
+          edit((w) => {
+            runStep(w, "verify-dmgs").run += `echo "\${{ github.ref }}"\n`;
+          }),
+          "verify-dmgs",
+          ctxFor("x"),
+        ),
+      /verify-dmgs .*\$\{\{ in its run text/,
+    );
+  });
+
+  it("release.yml's verify-dmgs and attest use only keys the dry run executes", () => {
+    for (const job of ["verify-dmgs", "attest"]) {
+      assert.deepEqual(
+        Object.keys(WF.jobs[job]).filter(
+          (k) => !["needs", "runs-on", "timeout-minutes", "permissions", "environment", "steps"].includes(k),
+        ),
+        [],
+      );
+      assert.equal(runOf(job).run.includes("${{"), false);
+    }
+  });
+
   it("runs the block the way GitHub's shell: bash does", () => {
     assert.deepEqual(GITHUB_BASH, ["--noprofile", "--norc", "-eo", "pipefail", "-c"]);
     const calls = [];

@@ -485,7 +485,7 @@ describe("notes.mjs", () => {
       PROD.search,
       bases.agent,
       bases.search,
-      "abc1234 fix: a thing",
+      "- abc1234 `fix: a thing`",
       "## Changes since v0.9.0",
       "Open-Agent-1.0.0-arm64.dmg",
       "Open-Agent-1.0.0-x64.dmg",
@@ -525,16 +525,28 @@ describe("notes.mjs", () => {
     assert.equal(r.previousTag, "v0.9.0");
     assert.ok(calls.includes("log --oneline --no-decorate v0.9.0..v1.0.0"));
     const text = readFileSync(join(dir, "notes.md"), "utf8");
-    assert.match(text, /- c49 change 49\n- … and 10 more/);
+    assert.match(text, /- c49 `change 49`\n- … and 10 more/);
   });
-  it("renders commit subjects without links, images, HTML, mentions or code spans", () => {
-    const evil = "abc1234 feat: [click](https://evil.example) ![x](y) <img src=x onerror=alert(1)> @Nit-1997 `rm -rf` ok";
-    assert.equal(safeChange(evil), "abc1234 feat: clickhttps://evil.example !xy img src=x onerror=alert1 Nit-1997 rm -rf ok");
-    assert.equal(safeChange("abc1234 tab\there\u0007"), "abc1234 tab here");
+  it("renders each commit subject as one inline code span, so it can't add links, images, HTML, mentions or #refs", () => {
+    const evil = "abc1234 feat: [click](https://evil.example) ![x](y) <img src=x onerror=alert(1)> @Nit-1997 #12 `rm -rf` ok";
+    assert.equal(
+      safeChange(evil),
+      "abc1234 ``feat: [click](https://evil.example) ![x](y) <img src=x onerror=alert(1)> @Nit-1997 #12 `rm -rf` ok``",
+    );
+    assert.equal(safeChange("abc1234 docs(m5): INSTALL warnings"), "abc1234 `docs(m5): INSTALL warnings`");
+    assert.equal(safeChange("abc1234 tab\there\u0007"), "abc1234 `tab here`");
+    assert.equal(safeChange("abc1234 `a` ``b``"), "abc1234 ``` `a` ``b`` ```");
+    assert.equal(safeChange("abc1234 https://evil.example"), "abc1234 `https://evil.example`");
+    assert.equal(safeChange("no sha <b>here</b>"), "`no sha <b>here</b>`");
+    assert.equal(safeChange("… and 10 more"), "… and 10 more");
     const text = notes({ version: "1.0.0", prerelease: false, digests: PROD, bases, changes: [evil], previousTag: "v0.9.0" });
     const changes = text.slice(text.indexOf("## Changes"));
-    assert.doesNotMatch(changes, /[[\]()<>@`]/);
     assert.ok(changes.includes(`- ${safeChange(evil)}`));
+    for (const line of changes.split("\n").filter((l) => l.startsWith("- "))) {
+      const m = /^- [0-9a-f]+ (`+)( ?)(.*)\2\1$/.exec(line);
+      assert.ok(m, line);
+      assert.equal(m[3].includes(m[1]), false, line);
+    }
   });
   it("the CLI takes a dry-run version only in test mode", () => {
     const dir = scratch();

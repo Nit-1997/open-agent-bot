@@ -231,6 +231,9 @@ test.describe("M5 app", () => {
     const again = await openServices(s, page);
     for (const k of SERVICES) await expect(again.locator(`#screen-services-services-${k}-version`)).toHaveText(NEXT);
     say(`4: services: ${oneLine(await again.locator("#screen-services-services").innerText())}`);
+    await again.locator("#screen-services-services").scrollIntoViewIfNeeded();
+    await expect(again.locator("#screen-services-services")).toBeInViewport();
+    await again.waitForTimeout(2_000);
     const updates = s
       .log()
       .split("\n")

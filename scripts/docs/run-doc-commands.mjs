@@ -25,6 +25,7 @@ import {
   guideVersion,
   loadManifest,
   manifestProblems,
+  PREFLIGHT_ARGS,
   REPO,
   substitute,
   substitutionRules,
@@ -83,8 +84,6 @@ export function writeDockerConfig({ dir, desktopPlugins = DESKTOP_PLUGINS, plugi
   }
   return { config: join(cfgDir, "config.json"), links };
 }
-
-export const PREFLIGHT_ARGS = Object.freeze(["compose", "config", "--format", "json"]);
 
 export function preflight(cwd, env, exec, project, port, args = PREFLIGHT_ARGS) {
   const cfg = exec("docker", [...args], { cwd, env });

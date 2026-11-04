@@ -16,6 +16,7 @@ import {
   imageTagProblems,
   loadManifest,
   manifestProblems,
+  PREFLIGHT_ARGS,
   substitute,
   substitutionRules,
   tokenize,
@@ -280,6 +281,13 @@ describe("allowlist", () => {
     assert.ok(r.runnable, r.reason);
     assert.equal(r.cwdAfter, CTX.clone);
     assert.deepEqual(r.docker, [{ cwd: CTX.clone, preflight: ["compose", "config", "--format", "json"] }]);
+  });
+  it("preflights every compose line with the fixed PREFLIGHT_ARGS", () => {
+    for (const sub of ["up -d", "ps", "down", "logs agent"]) {
+      const r = classify(`docker compose ${sub}`, CTX, CTX.clone);
+      assert.ok(r.runnable, r.reason);
+      assert.equal(r.docker[0].preflight, PREFLIGHT_ARGS);
+    }
   });
   for (const [line, want, cwd] of [
     ["rm -rf x", /rm/],
