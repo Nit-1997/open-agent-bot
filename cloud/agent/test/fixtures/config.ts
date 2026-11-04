@@ -1,5 +1,5 @@
-import { type HostedConfig, loadHostedConfig } from "../../../src/hosted/config.js";
-import { CORE_TEST_ENV, TEST_KEY_B64, TEST_SECRET } from "../../fixtures/config.js";
+import { type HostedConfig, loadHostedConfig } from "../../src/config.js";
+import { CORE_TEST_ENV, TEST_KEY_B64, TEST_SECRET } from "../../../../packages/core/test/fixtures/config.js";
 
 export { TEST_KEY_B64, TEST_SECRET };
 

@@ -1,12 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ArtifactStore } from "../../../src/artifacts/store.js";
-import { createVerifier } from "../../../src/hosted/identity/verify.js";
-import { parseCredentialKeys } from "../../../src/secrets/keys.js";
-import { LocalKeyWrapper } from "../../../src/secrets/keyWrapper.js";
-import { forUser } from "../../../src/hosted/store/users.js";
-import { RepoProfileStore } from "../../../src/profile/store.js";
-import { EnvelopeCredentialStore } from "../../../src/secrets/credentialStore.js";
+import { ArtifactStore } from "@oab/core/artifacts/store.js";
+import { createVerifier } from "../../src/identity/verify.js";
+import { parseCredentialKeys } from "@oab/core/secrets/keys.js";
+import { LocalKeyWrapper } from "@oab/core/secrets/keyWrapper.js";
+import { forUser } from "../../src/store/users.js";
+import { RepoProfileStore } from "@oab/core/profile/store.js";
+import { EnvelopeCredentialStore } from "@oab/core/secrets/credentialStore.js";
 import {
   adminRepo,
   cleanedEmails,

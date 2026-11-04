@@ -102,7 +102,7 @@ describe("evals target selection", () => {
 
   it("refuses an unknown target", async () => {
     await expect(transportFor({ target: "cloud", url: "", repoRoot: CORE, env: {} }, CLI_TARGETS)).rejects.toThrow(
-      /--target must be hosted or local/,
+      "--target must be local; got 'cloud'",
     );
   });
 });

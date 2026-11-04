@@ -1,0 +1,68 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": ["src/**/*.ts", "!src/store/database.types.ts", "evals/**/*.ts", "test/**/*.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "assist": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off"
+      },
+      "performance": {
+        "useDomNodeTextContent": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@oab/core/scripts", "@oab/core/scripts/**"],
+                    "message": "Scripts are entry points; hosted code must not import them."
+                  },
+                  {
+                    "group": ["@oab/core/identity/local*", "@oab/core/identity/local*/**"],
+                    "message": "Hosted code must not use a local identity."
+                  },
+                  {
+                    "group": ["@oab/core/local", "@oab/core/local/**", "node:sqlite"],
+                    "message": "Hosted code must not use the local store."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

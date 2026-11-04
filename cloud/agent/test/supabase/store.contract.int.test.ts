@@ -1,6 +1,6 @@
 import { describe, expect } from "vitest";
-import { createSupabaseStore } from "../../../src/hosted/store/supabaseStore.js";
-import { describeStoreContract } from "../../contract/store.js";
+import { createSupabaseStore } from "../../src/store/supabaseStore.js";
+import { describeStoreContract } from "../../../../packages/core/test/contract/store.js";
 import { authAdmin, createBareUser, deleteCreatedUsers, enabled, remainingRows, service } from "./helpers.js";
 
 describe.skipIf(!enabled)("live Supabase", () => {

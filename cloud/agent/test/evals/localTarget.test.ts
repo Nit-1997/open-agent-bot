@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadsSupabase } from "../../evals/moduleGraph.js";
+import { loadsSupabase } from "../../../../packages/core/test/evals/moduleGraph.js";
 
 describe("evals module graph", () => {
   it("the probe sees Supabase load for --target hosted (control)", () => {

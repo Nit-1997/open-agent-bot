@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError } from "../../src/config.js";
-import { loadHostedConfig } from "../../src/hosted/config.js";
+import { ConfigError } from "@oab/core/config.js";
+import { loadHostedConfig } from "../src/config.js";
 import { TEST_ENV } from "./fixtures/config.js";
 
 const ALL_VARS = [

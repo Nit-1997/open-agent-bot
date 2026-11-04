@@ -151,7 +151,7 @@ describe("admin users", () => {
   it("reports the step a delete failed at", async () => {
     const h = await makeHostedApp();
     const repo = h.accounts.repo();
-    const { createAdminService } = await import("../../../src/hosted/admin/service.js");
+    const { createAdminService } = await import("../../src/admin/service.js");
     const admin = createAdminService({
       repo: { ...repo, storage: { removeUserFiles: async () => Promise.reject(new Error("storage down")) } },
       auth: h.accounts.auth(),

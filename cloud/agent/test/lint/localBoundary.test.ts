@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { biomeFixtures } from "../../lint/biomeFixture.js";
-import { readSourceTree } from "../../lint/boundary.js";
-import { localViolations, withAppended } from "../../lint/localRules.js";
+import { biomeFixtures } from "../../../../packages/core/test/lint/biomeFixture.js";
+import { readSourceTree } from "../../../../packages/core/test/lint/boundary.js";
+import { localViolations, withAppended } from "../../../../packages/core/test/lint/localRules.js";
 
-const SRC = join(import.meta.dirname, "../../../src");
+const SRC = join(import.meta.dirname, "../../src");
 const LOCAL_MESSAGE = "Hosted code must not use the local store.";
 
 describe("local store boundary on src/", () => {

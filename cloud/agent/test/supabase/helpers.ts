@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { readEnvFile } from "../../../evals/auth/hosted.js";
-import { createAuthAdmin } from "../../../src/hosted/admin/authAdmin.js";
-import { deleteAccount } from "../../../src/hosted/admin/deleteAccount.js";
-import { createAdminRepo } from "../../../src/hosted/store/admin.js";
-import { createAnonClient, createServiceClient } from "../../../src/hosted/store/client.js";
+import { readEnvFile } from "../../evals/auth/hosted.js";
+import { createAuthAdmin } from "../../src/admin/authAdmin.js";
+import { deleteAccount } from "../../src/admin/deleteAccount.js";
+import { createAdminRepo } from "../../src/store/admin.js";
+import { createAnonClient, createServiceClient } from "../../src/store/client.js";
 
-const ROOT = resolve(new URL(".", import.meta.url).pathname, "../../../../..");
+const ROOT = resolve(new URL(".", import.meta.url).pathname, "../../../..");
 
 export const env: Record<string, string> = {
   ...readEnvFile(resolve(ROOT, "deploy-config/.env-agent")),

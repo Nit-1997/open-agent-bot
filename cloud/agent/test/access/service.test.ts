@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { type AccessDeps, createAccessService, hashIp, normalizeEmail, readRequest } from "../../../src/hosted/access/service.js";
-import { BackgroundQueue } from "../../../src/lib/backgroundQueue.js";
-import { RateLimiter } from "../../../src/lib/rateLimit.js";
+import { type AccessDeps, createAccessService, hashIp, normalizeEmail, readRequest } from "../../src/access/service.js";
+import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
+import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 
 const pepper = Buffer.alloc(32, 3);
 const form = (n = 0) => ({ name: "A", email: "a@example.test", note: "", formToken: `token-${n}` });

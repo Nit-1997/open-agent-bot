@@ -1,7 +1,7 @@
 import { createHmac, createPublicKey } from "node:crypto";
 import { exportJWK, generateKeyPair, type JWK, SignJWT } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
-import { AuthError, createVerifier } from "../../../src/hosted/identity/verify.js";
+import { AuthError, createVerifier } from "../../src/identity/verify.js";
 
 const URL_BASE = "https://abcdefghijklmnopqrst.supabase.co";
 const ISS = `${URL_BASE}/auth/v1`;

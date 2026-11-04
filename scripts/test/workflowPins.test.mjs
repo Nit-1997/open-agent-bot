@@ -137,7 +137,8 @@ describe("ci.yml desktop jobs", () => {
   }
 
   it("the jobs that never run Electron skip its binary download", () => {
-    for (const name of ["core", "web", "local-stack"]) assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
+    for (const name of ["core", "web", "cloud", "local-stack"])
+      assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
   });
 
   it("desktop: Ubuntu, checks and unit tests for @oab/desktop, then the fake-docker e2e under xvfb", () => {
@@ -254,11 +255,37 @@ describe("ci.yml standalone job (M6 D13)", () => {
     assert.match(runs(), /^mkdir -m 700 "\$TMPDIR"$/m);
   });
 
-  it("leaves npm ci and the Playwright install to the script (lockfile-pinned browser) and runs it with --docker only (6.2)", () => {
+  it("leaves npm ci and the Playwright install to the script (lockfile-pinned browser) and runs it with --docker --hosted-free (6.4)", () => {
     const text = runs();
     assert.doesNotMatch(text, /npm ci|playwright install|npm install|npm prune/);
-    assert.equal(job.steps.at(-1).run.trim(), "bash scripts/ci/standalone.sh --docker");
-    assert.doesNotMatch(text, /--hosted-free/);
+    assert.equal(job.steps.at(-1).run.trim(), "bash scripts/ci/standalone.sh --docker --hosted-free");
+  });
+});
+
+describe("ci.yml cloud job (M6 D14)", () => {
+  const job = doc("ci.yml").jobs.cloud;
+  const runs = () => job.steps.map((s) => s.run ?? "").filter(Boolean);
+
+  it("runs on pull requests and main with contents: read, no environment and no secrets", () => {
+    assert.ok(job);
+    assert.equal(job.if, undefined);
+    assert.deepEqual(job.permissions, { contents: "read" });
+    assert.equal(job.environment, undefined);
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
+    const checkout = job.steps.find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+    assert.equal(checkout.with["persist-credentials"], false);
+  });
+
+  it("lints, format-checks, type-checks, unit-tests and builds the cloud workspaces only", () => {
+    assert.deepEqual(runs(), [
+      "npm ci",
+      "npm run lint -w @oab/cloud-agent",
+      "npm run format:check -w @oab/cloud-agent",
+      "npm run typecheck -w @oab/cloud-agent",
+      "npm test -w @oab/cloud-agent",
+      "npm run build -w @oab/cloud-agent",
+    ]);
+    assert.doesNotMatch(runs().join("\n"), /test:supabase|playwright|smoke|e2e/);
   });
 });
 

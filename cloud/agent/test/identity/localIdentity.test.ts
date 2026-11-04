@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { hostedAgentDeps } from "../../../src/hosted/deps.js";
-import type { Db } from "../../../src/hosted/store/client.js";
-import { createLocalIdentity } from "../../../src/identity/localIdentity.js";
+import { hostedAgentDeps } from "../../src/deps.js";
+import type { Db } from "../../src/store/client.js";
+import { createLocalIdentity } from "@oab/core/identity/localIdentity.js";
 import { testConfig } from "../fixtures/config.js";
 
 const SECRET = "0123456789abcdef".repeat(4);

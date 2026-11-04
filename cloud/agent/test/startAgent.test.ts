@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAccessService } from "../../src/hosted/access/service.js";
-import { createAdminService } from "../../src/hosted/admin/service.js";
-import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
-import { hostedRoutes } from "../../src/hosted/routes.js";
-import type { RouteMount } from "../../src/identity/types.js";
-import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
-import { RateLimiter } from "../../src/lib/rateLimit.js";
-import { type AgentDeps, type RunningAgent, startAgent } from "../../src/startAgent.js";
-import { coreDeps } from "../fixtures/agent.js";
+import { createAccessService } from "../src/access/service.js";
+import { createAdminService } from "../src/admin/service.js";
+import { createAdminGuard } from "../src/identity/adminGuard.js";
+import { hostedRoutes } from "../src/routes.js";
+import type { RouteMount } from "@oab/core/identity/types.js";
+import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
+import { RateLimiter } from "@oab/core/lib/rateLimit.js";
+import { type AgentDeps, type RunningAgent, startAgent } from "@oab/core/startAgent.js";
+import { coreDeps } from "../../../packages/core/test/fixtures/agent.js";
 import { FakeAccounts } from "./fixtures/hostedApp.js";
 
 const running: RunningAgent[] = [];

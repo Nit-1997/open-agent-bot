@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CONNECT, type CopilotHarness, copilotHarness, fakeRun, RUN, runBody, STOP, T1 } from "../../copilot/harness.js";
+import { CONNECT, type CopilotHarness, copilotHarness, fakeRun, RUN, runBody, STOP, T1 } from "../../../../packages/core/test/copilot/harness.js";
 import { CALLERS, type Caller, EXTRA_ACCOUNTS, matrixSeams } from "../fixtures/callers.js";
 import { type HostedHarness, makeHostedApp } from "../fixtures/hostedApp.js";
 

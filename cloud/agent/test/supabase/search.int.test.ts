@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { forUser } from "../../../src/hosted/store/users.js";
-import type { SearchResult, SearchRow } from "../../../src/store/types.js";
+import { forUser } from "../../src/store/users.js";
+import type { SearchResult, SearchRow } from "@oab/core/store/types.js";
 import { cleanedEmails, createBareUser, deleteCreatedUsers, enabled, managementQuery, remainingRows, service } from "./helpers.js";
 
 describe.skipIf(!enabled)("search_user_content (live project)", () => {

@@ -1,7 +1,7 @@
-import type { VerifiedUser } from "../../../src/hosted/identity/verify.js";
-import type { Principal } from "../../../src/identity/types.js";
+import type { VerifiedUser } from "../../src/identity/verify.js";
+import type { Principal } from "@oab/core/identity/types.js";
 
-export * from "../../fixtures/users.js";
+export * from "../../../../packages/core/test/fixtures/users.js";
 
 export const verified = (u: Principal): VerifiedUser => ({
   id: u.id,

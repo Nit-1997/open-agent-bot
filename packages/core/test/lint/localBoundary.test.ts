@@ -7,7 +7,6 @@ import { type LocalRule, localViolations, withAppended } from "./localRules.js";
 
 const SRC = join(import.meta.dirname, "../../src");
 const SQLITE_MESSAGE = "node:sqlite is used only inside src/local/store.";
-const LOCAL_MESSAGE = "Hosted code must not use the local store.";
 const LOCAL_ONLY_MESSAGE = "Only src/local may import local modules.";
 
 describe("local store boundary rules on fixture trees", () => {
@@ -62,8 +61,8 @@ describe("Biome enforces B7, B8 and B9", () => {
   it.each([
     ["src/http/chats.ts", 'import "node:sqlite";\n', SQLITE_MESSAGE],
     ["src/local/main.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n', SQLITE_MESSAGE],
-    ["src/hosted/deps.ts", 'import "@oab/core/local/store/sqliteStore.js";\n', LOCAL_MESSAGE],
-    ["src/hosted/x.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n', LOCAL_MESSAGE],
+    ["src/hosted/deps.ts", 'import "@oab/core/local/store/sqliteStore.js";\n', LOCAL_ONLY_MESSAGE],
+    ["src/hosted/x.ts", 'import { DatabaseSync } from "node:sqlite";\nexport default DatabaseSync;\n', SQLITE_MESSAGE],
     ["src/renderer/server.ts", 'import { refuse } from "../local/refusal.js";\nexport default refuse;\n', LOCAL_ONLY_MESSAGE],
     ["src/server.ts", 'import { startLocal } from "./local/start.js";\nexport default startLocal;\n', LOCAL_ONLY_MESSAGE],
   ])("blocks %s: %s", (file, code, message) => {

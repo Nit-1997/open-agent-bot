@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, hasCap } from "../../src/config.js";
-import { loadHostedConfig } from "../../src/hosted/config.js";
+import { ConfigError, hasCap } from "@oab/core/config.js";
+import { loadHostedConfig } from "../src/config.js";
 import { TEST_ENV, testConfig } from "./fixtures/config.js";
 
 const b64 = (n: number, fill = 1) => Buffer.alloc(n, fill).toString("base64");

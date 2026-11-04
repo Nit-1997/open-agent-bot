@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import type { TransportInput } from "../run.js";
-import type { AuthHeaders, Transport } from "../types.js";
+import type { TransportInput } from "../../../../packages/core/evals/run.js";
+import type { AuthHeaders, Transport } from "../../../../packages/core/evals/types.js";
 
 export function readEnvFile(path: string): Record<string, string> {
   let text: string;

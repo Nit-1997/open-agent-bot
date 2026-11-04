@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain JS owner script without type declarations
-import { createAdmin } from "../../../../../supabase/scripts/admin.mjs";
+import { createAdmin } from "../../../../supabase/scripts/admin.mjs";
 
 const admin = () => createAdmin({ url: "https://stub.supabase.test", key: "sb_secret_test" });
 

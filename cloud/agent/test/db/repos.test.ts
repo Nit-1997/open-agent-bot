@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAdminRepo } from "../../../src/hosted/store/admin.js";
-import { createServiceClient } from "../../../src/hosted/store/client.js";
-import { forUser } from "../../../src/hosted/store/users.js";
-import { earlierCards } from "../../../src/workspace/earlier.js";
+import { createAdminRepo } from "../../src/store/admin.js";
+import { createServiceClient } from "../../src/store/client.js";
+import { forUser } from "../../src/store/users.js";
+import { earlierCards } from "@oab/core/workspace/earlier.js";
 import { ALICE, CHAT_1 } from "../fixtures/users.js";
 
 type Reply = { status?: number; body?: unknown; headers?: Record<string, string> } | Error;

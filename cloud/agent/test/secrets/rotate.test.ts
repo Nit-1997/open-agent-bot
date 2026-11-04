@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { parseCredentialKeys } from "../../../src/secrets/keys.js";
-import { open, type Sealed, seal } from "../../../src/secrets/envelope.js";
-import { LocalKeyWrapper } from "../../../src/secrets/keyWrapper.js";
-import { type RotationRepo, rotateStale } from "../../../src/hosted/secrets/rotate.js";
-import { ROTATION_BATCH, type RotationCursor, type StaleCredential } from "../../../src/hosted/store/rotation.js";
+import { parseCredentialKeys } from "@oab/core/secrets/keys.js";
+import { open, type Sealed, seal } from "@oab/core/secrets/envelope.js";
+import { LocalKeyWrapper } from "@oab/core/secrets/keyWrapper.js";
+import { type RotationRepo, rotateStale } from "../../src/secrets/rotate.js";
+import { ROTATION_BATCH, type RotationCursor, type StaleCredential } from "../../src/store/rotation.js";
 
 const k1 = randomBytes(32).toString("base64");
 const k2 = randomBytes(32).toString("base64");

@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readEnvFile } from "../../../evals/auth/hosted.js";
+import { readEnvFile } from "../../evals/auth/hosted.js";
 
 describe("helpers", () => {
   it("reads KEY=value env files, ignoring comments and blank lines, and tolerates a missing file", () => {

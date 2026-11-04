@@ -304,9 +304,7 @@ async function localTarget(input: TransportInput): Promise<Transport> {
 
 export const BUILT_IN_TARGETS: Targets = Object.freeze({ local: localTarget });
 
-export const CLI_TARGETS: Targets = Object.freeze({
-  hosted: async (input: TransportInput) => (await import("./auth/hosted.js")).hostedTarget(input),
-});
+export const CLI_TARGETS: Targets = Object.freeze({});
 
 function registry(targets: Targets): Targets {
   for (const name of Object.keys(targets)) {

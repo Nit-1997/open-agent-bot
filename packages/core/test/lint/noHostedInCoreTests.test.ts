@@ -5,7 +5,7 @@ import { importSpecifiers, stringLiterals } from "./boundary.js";
 
 const CORE = join(import.meta.dirname, "../..");
 const ROOTS = ["test", "evals"];
-const SKIP = new Set(["test/hosted", "evals/results", "node_modules"]);
+const SKIP = new Set(["evals/results", "node_modules"]);
 const CODE = /\.(?:[cm]?ts|[cm]?js)$/;
 
 type Via = "import" | "string";
@@ -36,12 +36,6 @@ const EXEMPT: Exemption[] = [
     allow: ["string:deploy-config"],
     reason: "compares local/ twins with deploy-config/; moves to cloud/deploy/test in 6.6 (D3)",
   },
-  {
-    file: "evals/auth/hosted.ts",
-    allow: ["import", "string"],
-    reason: "the hosted evals login; moves to cloud/agent/evals/auth in 6.4 (D3)",
-  },
-  { file: "evals/run.ts", allow: ["import:evals-login"], reason: "the CLI wrapper registers the hosted target until 6.4 (D7)" },
 ];
 
 const resolveFrom = (file: string, specifier: string) => posix.normalize(posix.join(posix.dirname(file), specifier));
@@ -83,7 +77,7 @@ function hostedRefs(file: string, code: string): Finding[] {
 const exempted = (f: Finding) =>
   EXEMPT.some((e) => e.file === f.file && (e.allow.includes(f.via) || e.allow.includes(`${f.via}:${f.what}`)));
 
-function coreTestFiles(): string[] {
+function coreFiles(roots = ROOTS): string[] {
   const walk = (dir: string): string[] =>
     readdirSync(join(CORE, dir)).flatMap((name) => {
       const rel = posix.join(dir, name);
@@ -91,7 +85,7 @@ function coreTestFiles(): string[] {
       if (statSync(join(CORE, rel)).isDirectory()) return walk(rel);
       return CODE.test(name) ? [rel] : [];
     });
-  return ROOTS.filter((r) => existsSync(join(CORE, r))).flatMap(walk);
+  return roots.filter((r) => existsSync(join(CORE, r))).flatMap(walk);
 }
 
 const scan = (files: string[]) => files.flatMap((f) => hostedRefs(f, readFileSync(join(CORE, f), "utf8")));
@@ -157,7 +151,7 @@ describe("hosted reference scanner", () => {
 });
 
 describe("core tests and evals without hosted code", () => {
-  const files = coreTestFiles();
+  const files = coreFiles();
   const findings = scan(files);
 
   it("scans the core test and evals trees", () => {
@@ -181,9 +175,31 @@ describe("core tests and evals without hosted code", () => {
     }
   });
 
-  it("groups the hosted tests under test/hosted", () => {
-    const hosted = readdirSync(join(CORE, "test/hosted"), { recursive: true }).map(String);
-    expect(hosted).toContain(join("fixtures", "hostedApp.ts"));
-    expect(hosted.filter((f) => f.endsWith(".test.ts")).length).toBeGreaterThan(20);
+  it("keeps no hosted test group and no hosted evals login: both live in cloud/agent", () => {
+    expect(existsSync(join(CORE, "test/hosted"))).toBe(false);
+    expect(existsSync(join(CORE, "evals/auth/hosted.ts"))).toBe(false);
+    expect(existsSync(join(CORE, "evals/auth/local.ts"))).toBe(true);
+  });
+});
+
+describe("core source and manifest without hosted code", () => {
+  it("finds no hosted import, @supabase/*, jose, supabase/ or deploy-config/ in src", () => {
+    const files = coreFiles(["src"]);
+    expect(files).toContain("src/local/main.ts");
+    expect(scan(files).map(label)).toEqual([]);
+  });
+
+  it("has no hosted folder, server entry or rotation script in src", () => {
+    for (const path of ["src/hosted", "src/server.ts", "src/scripts/rotateCredentials.ts"])
+      expect(existsSync(join(CORE, path)), path).toBe(false);
+  });
+
+  it("depends on no @supabase/* or jose, has no test:supabase and starts the local entry", () => {
+    const pkg = JSON.parse(readFileSync(join(CORE, "package.json"), "utf8"));
+    const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies, ...pkg.peerDependencies, ...pkg.optionalDependencies });
+    expect(deps.filter((d) => /^@supabase\//.test(d) || d === "jose")).toEqual([]);
+    expect(Object.keys(pkg.exports).filter((k) => /hosted/i.test(k))).toEqual([]);
+    expect(pkg.scripts["test:supabase"]).toBeUndefined();
+    expect(pkg.scripts.start).toBe("node dist/local/main.js");
   });
 });

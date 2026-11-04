@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { AuthError } from "../../src/hosted/identity/verify.js";
-import { NO_CAPABILITIES, type Principal } from "../../src/identity/types.js";
+import { AuthError } from "../src/identity/verify.js";
+import { NO_CAPABILITIES, type Principal } from "@oab/core/identity/types.js";
 import { makeHostedApp, tokenFor } from "./fixtures/hostedApp.js";
 import { TEST_SECRET } from "./fixtures/config.js";
 import { ADMIN, ALICE, ALL_CAPABILITIES, BOB, CHAT_1, verified } from "./fixtures/users.js";

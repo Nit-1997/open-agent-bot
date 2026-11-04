@@ -55,9 +55,9 @@ describe("evals target registry", () => {
     expect(defaultTarget({ hosted: stub([]) })).toBe("hosted");
   });
 
-  it("has the CLI wrapper register hosted, which stays the CLI default", () => {
-    expect(Object.keys(CLI_TARGETS)).toEqual(["hosted"]);
-    expect(defaultTarget(CLI_TARGETS)).toBe("hosted");
+  it("has the core CLI register nothing, so local is its default", () => {
+    expect(Object.keys(CLI_TARGETS)).toEqual([]);
+    expect(defaultTarget(CLI_TARGETS)).toBe("local");
   });
 });
 

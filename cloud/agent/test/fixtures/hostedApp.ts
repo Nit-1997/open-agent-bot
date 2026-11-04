@@ -1,23 +1,23 @@
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
 import { PAGE_SIZE } from "@oab/shared/pages";
-import type { Principal } from "../../../src/identity/types.js";
-import { BackgroundQueue } from "../../../src/lib/backgroundQueue.js";
-import { UserError } from "../../../src/lib/errors.js";
-import { RateLimiter } from "../../../src/lib/rateLimit.js";
-import { type AccessService, createAccessService } from "../../../src/hosted/access/service.js";
-import type { AuthAccount, AuthAdmin, EmailResult } from "../../../src/hosted/admin/authAdmin.js";
-import { createAdminService } from "../../../src/hosted/admin/service.js";
-import { createAdminGuard } from "../../../src/hosted/identity/adminGuard.js";
-import { UserStatusCache } from "../../../src/hosted/identity/status.js";
-import { createSupabaseIdentity } from "../../../src/hosted/identity/supabaseIdentity.js";
-import { AuthError, type Verifier } from "../../../src/hosted/identity/verify.js";
-import { hostedRoutes } from "../../../src/hosted/routes.js";
-import type { AdminRepo } from "../../../src/hosted/store/admin.js";
-import { type AppOverrides, makeApp, tokenFor } from "../../fixtures/app.js";
+import type { Principal } from "@oab/core/identity/types.js";
+import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
+import { UserError } from "@oab/core/lib/errors.js";
+import { RateLimiter } from "@oab/core/lib/rateLimit.js";
+import { type AccessService, createAccessService } from "../../src/access/service.js";
+import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/admin/authAdmin.js";
+import { createAdminService } from "../../src/admin/service.js";
+import { createAdminGuard } from "../../src/identity/adminGuard.js";
+import { UserStatusCache } from "../../src/identity/status.js";
+import { createSupabaseIdentity } from "../../src/identity/supabaseIdentity.js";
+import { AuthError, type Verifier } from "../../src/identity/verify.js";
+import { hostedRoutes } from "../../src/routes.js";
+import type { AdminRepo } from "../../src/store/admin.js";
+import { type AppOverrides, makeApp, tokenFor } from "../../../../packages/core/test/fixtures/app.js";
 import { TEST_SECRET } from "./config.js";
 import { ADMIN, ALICE, BOB, verified } from "./users.js";
 
-export { tokenFor, wrapper } from "../../fixtures/app.js";
+export { tokenFor, wrapper } from "../../../../packages/core/test/fixtures/app.js";
 
 export class FakeAccounts {
   users = new Map<string, { email: string; status: UserStatus; createdAt: string; account: AuthAccount }>();

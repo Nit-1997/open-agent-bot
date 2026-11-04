@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createAccessService } from "../../../src/hosted/access/service.js";
-import { BackgroundQueue } from "../../../src/lib/backgroundQueue.js";
-import { RateLimiter } from "../../../src/lib/rateLimit.js";
+import { createAccessService } from "../../src/access/service.js";
+import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
+import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { makeHostedApp } from "../fixtures/hostedApp.js";
 import { ALICE } from "../fixtures/users.js";
 

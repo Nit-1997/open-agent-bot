@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { forUser } from "../../../src/hosted/store/users.js";
+import { forUser } from "../../src/store/users.js";
 import {
   anon,
   cleanedEmails,

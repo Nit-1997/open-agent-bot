@@ -11,13 +11,15 @@ const CHECKED_PACKAGES = ["packages/ui", "packages/bff"];
 const BUNDLED_APPS = ["packages/local-web", "apps/desktop"];
 
 function workspaces() {
-  return json("package.json").workspaces.flatMap((pattern) => {
-    if (!pattern.endsWith("/*")) return [pattern];
-    const base = pattern.slice(0, -2);
-    return readdirSync(join(ROOT, base), { withFileTypes: true })
-      .filter((e) => e.isDirectory() && existsSync(join(ROOT, base, e.name, "package.json")))
-      .map((e) => `${base}/${e.name}`);
-  });
+  return json("package.json")
+    .workspaces.filter((pattern) => !pattern.startsWith("cloud/"))
+    .flatMap((pattern) => {
+      if (!pattern.endsWith("/*")) return [pattern];
+      const base = pattern.slice(0, -2);
+      return readdirSync(join(ROOT, base), { withFileTypes: true })
+        .filter((e) => e.isDirectory() && existsSync(join(ROOT, base, e.name, "package.json")))
+        .map((e) => `${base}/${e.name}`);
+    });
 }
 
 function installStage(dockerfile) {

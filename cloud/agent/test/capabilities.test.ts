@@ -1,10 +1,10 @@
 import { exportJWK, generateKeyPair, type JWK, SignJWT } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
-import { hostedCapabilities } from "../../src/hosted/identity/capabilities.js";
-import { UserStatusCache } from "../../src/hosted/identity/status.js";
-import { createSupabaseIdentity } from "../../src/hosted/identity/supabaseIdentity.js";
-import { createVerifier } from "../../src/hosted/identity/verify.js";
-import { NO_CAPABILITIES } from "../../src/identity/types.js";
+import { hostedCapabilities } from "../src/identity/capabilities.js";
+import { UserStatusCache } from "../src/identity/status.js";
+import { createSupabaseIdentity } from "../src/identity/supabaseIdentity.js";
+import { createVerifier } from "../src/identity/verify.js";
+import { NO_CAPABILITIES } from "@oab/core/identity/types.js";
 import { TEST_SECRET } from "./fixtures/config.js";
 
 const URL_BASE = "https://abcdefghijklmnopqrst.supabase.co";

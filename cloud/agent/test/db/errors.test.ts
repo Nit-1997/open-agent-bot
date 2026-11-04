@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dbError, must, read } from "../../../src/hosted/store/errors.js";
+import { dbError, must, read } from "../../src/store/errors.js";
 
 const ok = <T>(data: T) => ({ data, error: null, status: 200, count: null });
 const fail = (code: string | null, status: number) => ({ data: null, error: { code, message: "boom" }, status, count: null });

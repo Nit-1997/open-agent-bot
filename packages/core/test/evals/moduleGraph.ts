@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const CORE = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const ORIGIN = "http://127.0.0.1:18340";
 
-export function loadsSupabase(target: "local" | "hosted"): { supabase: boolean; out: string } {
+export function loadsSupabase(target: "local" | "hosted", runFile = join(CORE, "evals/run.ts")): { supabase: boolean; out: string } {
   const dir = mkdtempSync(join(tmpdir(), "oab-evals-graph-"));
   const hook = join(dir, "hook.mjs");
   const probe = join(dir, "probe.mts");
@@ -25,7 +25,8 @@ registerHooks({
   );
   writeFileSync(
     probe,
-    `const { CLI_TARGETS, transportFor } = await import(${JSON.stringify(join(CORE, "evals/run.ts"))});
+    `const { transportFor } = await import(${JSON.stringify(join(CORE, "evals/run.ts"))});
+const { CLI_TARGETS } = await import(${JSON.stringify(runFile)});
 const fetch = async () => new Response("{}", { status: 200 });
 try {
   await transportFor({ target: ${JSON.stringify(target)}, url: "http://127.0.0.1:18800/agui", origin: "${ORIGIN}", repoRoot: ${JSON.stringify(dir)}, env: {}, fetch }, CLI_TARGETS);

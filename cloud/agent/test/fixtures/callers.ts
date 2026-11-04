@@ -1,5 +1,5 @@
-import { AuthError } from "../../../src/hosted/identity/verify.js";
-import { NO_CAPABILITIES, type Principal } from "../../../src/identity/types.js";
+import { AuthError } from "../../src/identity/verify.js";
+import { NO_CAPABILITIES, type Principal } from "@oab/core/identity/types.js";
 import type { IdentitySeams } from "./hostedApp.js";
 import { tokenFor } from "./hostedApp.js";
 import { TEST_SECRET } from "./config.js";

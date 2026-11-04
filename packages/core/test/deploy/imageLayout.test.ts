@@ -67,11 +67,11 @@ describe("agent image layout", () => {
     expect(labels).toContain(`org.opencontainers.image.revision="$\{OPEN_AGENT_REVISION}"`);
   });
 
-  it("turns CopilotKit telemetry off and keeps the hosted command", () => {
+  it("turns CopilotKit telemetry off and runs the local entry", () => {
     const s = final();
     expect(s.lines).toContain("ENV COPILOTKIT_TELEMETRY_DISABLED=true");
-    expect(s.lines.filter((l) => l.startsWith("CMD "))).toEqual(['CMD ["node", "dist/server.js"]']);
-    expect(s.lines.at(-1)).toBe('CMD ["node", "dist/server.js"]');
+    expect(s.lines.filter((l) => l.startsWith("CMD "))).toEqual(['CMD ["node", "dist/local/main.js"]']);
+    expect(s.lines.at(-1)).toBe('CMD ["node", "dist/local/main.js"]');
   });
 
   it("takes no secret build args", () => {

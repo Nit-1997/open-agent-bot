@@ -35,6 +35,14 @@ function diffPaths(a, b, path = "") {
   return [...keys].sort().flatMap((k) => diffPaths(a[k], b[k], `${path}.${k}`));
 }
 
+const valueAt = (obj, path) =>
+  path
+    .split(".")
+    .slice(1)
+    .reduce((o, k) => o?.[k], obj);
+const HOSTED_MOVES = { ".services.agent.build.dockerfile": ["packages/core/Dockerfile", "cloud/agent/Dockerfile"] };
+const AGENT_DOCKERFILE = /^( {2}agent:\n {4}build:\n {6}context: \.\n {6}dockerfile: )packages\/core\/Dockerfile$/m;
+
 const localConfig = (env = {}) => config(["-f", "docker-compose.yml"], env);
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const portsOf = (svc) => (svc.ports ?? []).map((p) => `${p.host_ip ?? ""}:${p.published}:${p.target}`);
@@ -43,11 +51,12 @@ const sourcesOf = (svc) => (svc.volumes ?? []).map((v) => `${v.source}:${v.targe
 describe("hosted compose (compose.hosted.yml)", () => {
   const baseline = execFileSync("git", ["show", `${BASELINE}:docker-compose.yml`], { cwd: ROOT, encoding: "utf8" });
 
-  it("is the old root docker-compose.yml byte for byte plus one name line", () => {
-    assert.equal(read("compose.hosted.yml"), `name: open-agent-bot\n${baseline}`);
+  it("is the old root docker-compose.yml byte for byte plus one name line, with only the agent's dockerfile moved", () => {
+    assert.match(baseline, AGENT_DOCKERFILE);
+    assert.equal(read("compose.hosted.yml"), `name: open-agent-bot\n${baseline.replace(AGENT_DOCKERFILE, "$1cloud/agent/Dockerfile")}`);
   });
 
-  it(`resolves to the same config as the root file at ${BASELINE} under project open-agent-bot`, () => {
+  it(`resolves to the same config as the root file at ${BASELINE} under project open-agent-bot, apart from the moved rows`, () => {
     const tmp = join(ROOT, `.compose-baseline-${process.pid}.yml`);
     writeFileSync(tmp, baseline);
     let hosted;
@@ -58,7 +67,11 @@ describe("hosted compose (compose.hosted.yml)", () => {
     } finally {
       rmSync(tmp, { force: true });
     }
-    assert.deepEqual(diffPaths(hosted, before), [], "differing config paths (values never printed)");
+    assert.deepEqual(diffPaths(hosted, before), Object.keys(HOSTED_MOVES), "differing config paths (values never printed)");
+    for (const [path, [old, now]] of Object.entries(HOSTED_MOVES)) {
+      assert.ok(valueAt(before, path) === old, `${path} at ${BASELINE} is not the expected old value`);
+      assert.ok(valueAt(hosted, path) === now, `${path} is not the expected new value`);
+    }
     assert.equal(hosted.name, "open-agent-bot");
     assert.deepEqual(Object.fromEntries(Object.entries(hosted.volumes).map(([k, v]) => [k, v.name])), {
       "searxng-data": "open-agent-bot_searxng-data",

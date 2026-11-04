@@ -64,6 +64,8 @@ const blocked: Array<[string, SourceTree, string]> = [
   ],
   ["B6", { "hosted/x.ts": 'export const f = () => import("@oab/core/identity/localLaunch.js");\n' }, "@oab/core/identity/localLaunch.js"],
   ["B6", { "hosted/identity/x.ts": 'import "../../identity/localIdentity.js";\n' }, "../../identity/localIdentity.js"],
+  ["B1", { "server.ts": 'import "./hosted/main.js";\n' }, "./hosted/main.js"],
+  ["B1", { "scripts/rotateCredentials.ts": 'import { rotateStale } from "../hosted/secrets/rotate.js";\n' }, "../hosted/secrets/rotate.js"],
 ];
 
 const allowed: Array<[string, SourceTree]> = [
@@ -73,8 +75,6 @@ const allowed: Array<[string, SourceTree]> = [
   ],
   ["hosted importing hosted relatively", { "hosted/admin/service.ts": 'import type { AdminRepo } from "../store/admin.js";\n' }],
   ["vendor imports inside hosted", { "hosted/store/client.ts": 'import { createClient } from "@supabase/supabase-js";\nimport "jose";\n' }],
-  ["the server entry", { "server.ts": 'import "./hosted/main.js";\n' }],
-  ["the rotation entry", { "scripts/rotateCredentials.ts": 'import { rotateStale } from "../hosted/secrets/rotate.js";\n' }],
   ["names that only contain hosted", { "lib/x.ts": 'import "./hostedLimits.js";\nimport "../unhosted/x.js";\n' }],
   ["core importing core", { "http/chats.ts": 'import type { UserRepos } from "../store/types.js";\n' }],
   ["hosted reaching the identity port", { "hosted/identity/x.ts": 'import type { Identity } from "@oab/core/identity/types.js";\n' }],
@@ -95,8 +95,8 @@ describe("hosted boundary rules on fixture trees", () => {
     expect(boundaryViolations(tree)).toEqual([]);
   });
 
-  it("keeps B1 exceptions to the two entries and has no B3 exceptions", () => {
-    expect(ENTRIES).toEqual(["server.ts", "scripts/rotateCredentials.ts"]);
+  it("has no B1 or B3 exceptions: core has no hosted entries left", () => {
+    expect(ENTRIES).toEqual([]);
     expect(B1_EXCEPTIONS).toEqual(ENTRIES);
     expect(B3_EXCEPTIONS).toEqual([]);
     expect(boundaryViolations({ "app.ts": 'import { adminRoutes } from "./hosted/http/admin.js";\nimport "jose";\n' })).toEqual([
@@ -123,14 +123,14 @@ describe("Biome enforces B1, B3, B4 and B6", () => {
     ["src/auth/verify.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
     ["src/app.ts", 'import { adminRoutes } from "./hosted/http/admin.js";\nexport default adminRoutes;\n'],
     ["src/startAgent.ts", 'import { hostedRoutes } from "./hosted/routes.js";\nexport default hostedRoutes;\n'],
-  ];
-
-  const lintAllowed: Array<[string, string]> = [
     ["src/hosted/store/users.ts", 'import { UserError } from "@oab/core/lib/errors.js";\nexport default UserError;\n'],
     ["src/hosted/store/client.ts", 'import { createClient } from "@supabase/supabase-js";\nexport default createClient;\n'],
     ["src/server.ts", 'import "./hosted/main.js";\n'],
     ["src/scripts/rotateCredentials.ts", 'import { rotateStale } from "../hosted/secrets/rotate.js";\nexport default rotateStale;\n'],
     ["src/hosted/identity/verify.ts", 'import { jwtVerify } from "jose";\nexport default jwtVerify;\n'],
+  ];
+
+  const lintAllowed: Array<[string, string]> = [
     ["src/http/chats.ts", 'import type { UserRepos } from "../store/types.js";\nexport type R = UserRepos;\n'],
   ];
 
@@ -150,30 +150,6 @@ describe("Biome enforces B1, B3, B4 and B6", () => {
     const r = lint("core", "src/hosted/x.ts", 'import x from "@oab/core/hosted/store/client.js";\nexport default x;\n');
     expect(r.out).toContain("lint/style/noRestrictedImports");
     expect(r.status).not.toBe(0);
-  });
-
-  it("blocks @oab/core/scripts/* inside hosted files", () => {
-    const r = lint("core", "src/hosted/x.ts", 'import x from "@oab/core/scripts/rotateCredentials.js";\nexport default x;\n');
-    expect(r.out).toContain("Scripts are entry points; hosted code must not import them.");
-    expect(r.status).not.toBe(0);
-  });
-
-  it("allows core paths that only start like hosted or scripts inside hosted files", () => {
-    const r = lint(
-      "core",
-      "src/hosted/x.ts",
-      'import x from "@oab/core/hostedLimits.js";\nimport y from "@oab/core/scriptsTool.js";\nexport default [x, y];\n',
-    );
-    expect(r.out).not.toContain("noRestrictedImports");
-    expect(r.status).toBe(0);
-  });
-
-  it("blocks local identity modules inside hosted files", () => {
-    for (const spec of ["@oab/core/identity/localIdentity.js", "@oab/core/identity/local/identity.js"]) {
-      const r = lint("core", "src/hosted/deps.ts", `import x from "${spec}";\nexport default x;\n`);
-      expect(r.out).toContain("Hosted code must not use a local identity.");
-      expect(r.status).not.toBe(0);
-    }
   });
 
   it("still blocks cloud imports where the override applies", () => {

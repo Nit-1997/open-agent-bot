@@ -11,10 +11,10 @@ export function biomeFixtures(prefix: string) {
   const work = mkdtempSync(join(tmpdir(), prefix));
   let n = 0;
   return {
-    lint(pkg: "core" | "shared", file: string, code: string) {
+    lint(pkg: string, file: string, code: string, base = join(PACKAGES, pkg, "biome.json")) {
       const root = join(work, String(n++), "packages", pkg);
       mkdirSync(dirname(join(root, file)), { recursive: true });
-      const config = { extends: [join(PACKAGES, pkg, "biome.json")], files: { includes: ["src/**/*.ts"] } };
+      const config = { extends: [base], files: { includes: ["src/**/*.ts"] } };
       writeFileSync(join(root, "biome.json"), JSON.stringify(config));
       writeFileSync(join(root, file), code);
       const res = spawnSync(process.execPath, [BIOME, "lint", "--colors=off", file], { cwd: root, encoding: "utf8" });

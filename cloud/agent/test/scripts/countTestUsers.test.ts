@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain JS owner script without type declarations
-import { countTestUsers, formatCounts } from "../../../../../supabase/scripts/count-test-users.mjs";
+import { countTestUsers, formatCounts } from "../../../../supabase/scripts/count-test-users.mjs";
 
 const URL_BASE = "https://stub.supabase.test";
 

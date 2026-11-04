@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAccessService } from "../../src/hosted/access/service.js";
-import { createAdminService } from "../../src/hosted/admin/service.js";
-import { createAdminGuard } from "../../src/hosted/identity/adminGuard.js";
-import { hostedRoutes } from "../../src/hosted/routes.js";
-import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
-import { RateLimiter } from "../../src/lib/rateLimit.js";
-import { checkMounts } from "../../src/startAgent.js";
+import { createAccessService } from "../src/access/service.js";
+import { createAdminService } from "../src/admin/service.js";
+import { createAdminGuard } from "../src/identity/adminGuard.js";
+import { hostedRoutes } from "../src/routes.js";
+import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
+import { RateLimiter } from "@oab/core/lib/rateLimit.js";
+import { checkMounts } from "@oab/core/startAgent.js";
 import { FakeAccounts, makeHostedApp } from "./fixtures/hostedApp.js";
 import { TEST_SECRET } from "./fixtures/config.js";
 import { ADMIN, ALICE } from "./fixtures/users.js";

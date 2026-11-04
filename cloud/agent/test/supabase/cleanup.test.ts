@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UserError } from "../../../src/lib/errors.js";
+import { UserError } from "@oab/core/lib/errors.js";
 import { deleteCreatedUsers, track } from "./helpers.js";
 
 afterEach(() => vi.restoreAllMocks());

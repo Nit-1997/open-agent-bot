@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { UserStatusCache } from "../../../src/hosted/identity/status.js";
-import { AuthError } from "../../../src/hosted/identity/verify.js";
-import { createAdminGuard } from "../../../src/hosted/identity/adminGuard.js";
-import { createSupabaseIdentity, serviceSecretMatches } from "../../../src/hosted/identity/supabaseIdentity.js";
-import { createGuards } from "../../../src/identity/guards.js";
-import type { AuthEnv } from "../../../src/identity/types.js";
+import { UserStatusCache } from "../../src/identity/status.js";
+import { AuthError } from "../../src/identity/verify.js";
+import { createAdminGuard } from "../../src/identity/adminGuard.js";
+import { createSupabaseIdentity, serviceSecretMatches } from "../../src/identity/supabaseIdentity.js";
+import { createGuards } from "@oab/core/identity/guards.js";
+import type { AuthEnv } from "@oab/core/identity/types.js";
 import { TEST_SECRET } from "../fixtures/config.js";
 import { ADMIN, ALICE, verified } from "../fixtures/users.js";
 

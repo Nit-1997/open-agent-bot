@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { adminHooks, hostedAgentDeps } from "../../src/hosted/deps.js";
-import { hostedGateway } from "../../src/hosted/gateway.js";
-import type { Db } from "../../src/hosted/store/client.js";
-import type { Identity } from "../../src/identity/types.js";
-import { RateLimiter } from "../../src/lib/rateLimit.js";
+import { adminHooks, hostedAgentDeps } from "../src/deps.js";
+import { hostedGateway } from "../src/gateway.js";
+import type { Db } from "../src/store/client.js";
+import type { Identity } from "@oab/core/identity/types.js";
+import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { testConfig } from "./fixtures/config.js";
 import { ALICE } from "./fixtures/users.js";
 

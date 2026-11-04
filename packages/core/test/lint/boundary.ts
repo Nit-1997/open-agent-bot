@@ -5,7 +5,7 @@ export type Rule = "B1" | "B2" | "B3" | "B4" | "B6";
 export type Violation = { rule: Rule; file: string; specifier: string };
 export type SourceTree = Record<string, string>;
 
-export const ENTRIES = ["server.ts", "scripts/rotateCredentials.ts"];
+export const ENTRIES: string[] = [];
 export const B1_EXCEPTIONS = [...ENTRIES];
 export const B3_EXCEPTIONS: string[] = [];
 

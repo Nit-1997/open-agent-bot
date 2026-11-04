@@ -1,8 +1,8 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { boundaryViolations, ENTRIES, readSourceTree } from "../../lint/boundary.js";
+import { boundaryViolations, ENTRIES, readSourceTree } from "../../../../packages/core/test/lint/boundary.js";
 
-const SRC = join(import.meta.dirname, "../../../src");
+const SRC = join(import.meta.dirname, "../../src");
 
 describe("hosted boundary on src/", () => {
   const tree = readSourceTree(SRC);
