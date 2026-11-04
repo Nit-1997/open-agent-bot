@@ -172,10 +172,13 @@ describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
     const imageEnv = [...read("cloud/agent/Dockerfile").matchAll(/^ENV ([A-Z_]+)=/gm)].map((m) => m[1]);
     for (const k of imageEnv)
       assert.ok(!AGENT_ENV.includes(k), `${k} is set by the agent image; a bare name would unset it when the env file lacks it`);
+    const text = read(HOSTED);
+    const envFiles = [...text.matchAll(/^ {4}env_file:\n {6}- path: (.+)\n {8}required: (\w+)$/gm)];
     assert.deepEqual(
-      hosted.services.web.env_file.map((f) => [f.path, f.required ?? true]),
-      [[at("cloud/deploy-config/env-files/frontend/.env"), true]],
+      envFiles.map((m) => [m[1], m[2]]),
+      [["../deploy-config/env-files/frontend/.env", "true"]],
     );
+    assert.ok(envFiles[0].index > text.indexOf("\n  web:\n"), "the only env_file belongs to web");
     const example = (g) =>
       read(`cloud/deploy-config/env-files/${g}/.env.example`)
         .split("\n")
