@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const WEB = join(import.meta.dirname, "..");
-const UI = join(WEB, "../packages/ui");
+const UI = join(WEB, "../../packages/ui");
 const read = (path: string) => readFileSync(join(WEB, path), "utf8");
 const readUi = (path: string) => readFileSync(join(UI, path), "utf8");
 
@@ -21,8 +21,8 @@ const imports = (css: string) => [...css.matchAll(/@import\s+["']([^"']+)["']/g)
 
 describe("self-hosted fonts", () => {
   it("leaves no next/font import in the code", () => {
-    const grep = spawnSync("git", ["grep", "-n", "next/font", "--", "web", "packages", "e2e", ":!web/test/fonts.test.ts"], {
-      cwd: join(WEB, ".."),
+    const grep = spawnSync("git", ["grep", "-n", "next/font", "--", "cloud/web", "packages", "e2e", ":!cloud/web/test/fonts.test.ts"], {
+      cwd: join(WEB, "../.."),
       encoding: "utf8",
     });
     expect(grep.stdout).toBe("");

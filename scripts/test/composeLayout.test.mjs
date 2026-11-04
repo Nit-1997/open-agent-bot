@@ -40,8 +40,15 @@ const valueAt = (obj, path) =>
     .split(".")
     .slice(1)
     .reduce((o, k) => o?.[k], obj);
-const HOSTED_MOVES = { ".services.agent.build.dockerfile": ["packages/core/Dockerfile", "cloud/agent/Dockerfile"] };
+const WEB_CACHE = ":size=256m,uid=1000,gid=1000,mode=0700";
+const HOSTED_MOVES = {
+  ".services.agent.build.dockerfile": ["packages/core/Dockerfile", "cloud/agent/Dockerfile"],
+  ".services.web.build.dockerfile": ["web/Dockerfile", "cloud/web/Dockerfile"],
+  ".services.web.tmpfs.1": [`/app/web/.next/cache${WEB_CACHE}`, `/app/cloud/web/.next/cache${WEB_CACHE}`],
+};
 const AGENT_DOCKERFILE = /^( {2}agent:\n {4}build:\n {6}context: \.\n {6}dockerfile: )packages\/core\/Dockerfile$/m;
+const WEB_DOCKERFILE = /^( {2}web:\n {4}profiles: \["local"\]\n {4}build:\n {6}context: \.\n {6}dockerfile: )web\/Dockerfile$/m;
+const WEB_TMPFS = /^( {6}- )\/app\/web\/\.next\/cache(:size=256m,uid=1000,gid=1000,mode=0700)$/m;
 
 const localConfig = (env = {}) => config(["-f", "docker-compose.yml"], env);
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
@@ -51,9 +58,13 @@ const sourcesOf = (svc) => (svc.volumes ?? []).map((v) => `${v.source}:${v.targe
 describe("hosted compose (compose.hosted.yml)", () => {
   const baseline = execFileSync("git", ["show", `${BASELINE}:docker-compose.yml`], { cwd: ROOT, encoding: "utf8" });
 
-  it("is the old root docker-compose.yml byte for byte plus one name line, with only the agent's dockerfile moved", () => {
-    assert.match(baseline, AGENT_DOCKERFILE);
-    assert.equal(read("compose.hosted.yml"), `name: open-agent-bot\n${baseline.replace(AGENT_DOCKERFILE, "$1cloud/agent/Dockerfile")}`);
+  it("is the old root docker-compose.yml byte for byte plus one name line, with only the agent's and web's build paths moved", () => {
+    for (const re of [AGENT_DOCKERFILE, WEB_DOCKERFILE, WEB_TMPFS]) assert.match(baseline, re);
+    const moved = baseline
+      .replace(AGENT_DOCKERFILE, "$1cloud/agent/Dockerfile")
+      .replace(WEB_DOCKERFILE, "$1cloud/web/Dockerfile")
+      .replace(WEB_TMPFS, "$1/app/cloud/web/.next/cache$2");
+    assert.equal(read("compose.hosted.yml"), `name: open-agent-bot\n${moved}`);
   });
 
   it(`resolves to the same config as the root file at ${BASELINE} under project open-agent-bot, apart from the moved rows`, () => {
@@ -80,6 +91,7 @@ describe("hosted compose (compose.hosted.yml)", () => {
       "ollama-data": "open-agent-bot_ollama-data",
     });
     assert.equal(hosted.services.agent.build.context, ROOT);
+    assert.equal(hosted.services.web.build.context, ROOT);
   });
 });
 

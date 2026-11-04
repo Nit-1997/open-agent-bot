@@ -19,13 +19,13 @@ function workspaceDirs(): string[] {
     });
 }
 
-const DOCKERFILES = ["packages/core/Dockerfile", "web/Dockerfile"];
+const DOCKERFILES = ["packages/core/Dockerfile"];
 
 describe("workspace layout", () => {
   const dirs = workspaceDirs();
 
   it("finds every workspace package", () => {
-    expect(dirs).toEqual(expect.arrayContaining(["packages/core", "packages/shared", "web", "e2e"]));
+    expect(dirs).toEqual(expect.arrayContaining(["packages/core", "packages/shared", "e2e"]));
   });
 
   it.each(DOCKERFILES)("%s copies every workspace package.json before npm ci", (dockerfile) => {
@@ -39,10 +39,11 @@ describe("workspace layout", () => {
     }
   });
 
-  it.each([
-    ["web/tsconfig.json", "web"],
-    ["packages/core/tsconfig.json", "packages/core"],
-  ])("%s points typebox paths at files that exist", (tsconfig, base) => {
+  it.each(DOCKERFILES)("%s names no cloud/ path", (dockerfile) => {
+    expect(read(dockerfile)).not.toMatch(/(^|[\s./])cloud\//m);
+  });
+
+  it.each([["packages/core/tsconfig.json", "packages/core"]])("%s points typebox paths at files that exist", (tsconfig, base) => {
     const { compilerOptions } = json<{ compilerOptions: { paths: Record<string, string[]> } }>(tsconfig);
     const targets = Object.entries(compilerOptions.paths)
       .filter(([key]) => key.startsWith("typebox"))

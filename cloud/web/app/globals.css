@@ -4,4 +4,4 @@
 @source "../app";
 @source "../components";
 @source "../lib";
-@source "../../packages/ui/src";
+@source "../../../packages/ui/src";

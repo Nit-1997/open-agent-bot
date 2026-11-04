@@ -77,5 +77,57 @@
         "reason": "the move verifier names the moved paths to classify the move commits"
       }
     ]
+  },
+  {
+    "old": "web",
+    "new": "cloud/web",
+    "pr": "6.5",
+    "token": "path",
+    "allow": [
+      {
+        "file": "scripts/boundary/**",
+        "reason": "the boundary and stale-path checkers hold the moved-path rows themselves"
+      },
+      {
+        "file": "scripts/move/**",
+        "reason": "the move verifier names the moved paths to classify the move commits"
+      },
+      {
+        "file": "scripts/test/dockerignore.test.mjs",
+        "reason": "keeps the legacy web/.env.local ignore case on purpose (an ignored file left in an old checkout must stay ignored)"
+      },
+      {
+        "file": "scripts/test/secretPaths.mjs",
+        "reason": "keeps the legacy web/.env.local secret path on purpose, next to cloud/web/.env.local"
+      },
+      {
+        "file": "scripts/test/cloudBoundary.test.mjs",
+        "reason": "fixture-only strings (\"web\" as a path segment argument) written into temp repos"
+      },
+      {
+        "file": "scripts/test/movedPaths.test.mjs",
+        "reason": "fixture-only strings that test the path token mode"
+      },
+      {
+        "file": "scripts/test/verifyMove.test.mjs",
+        "reason": "fixture-only web/ paths written into a temp repo to test the move verifier"
+      },
+      {
+        "file": "packages/core/src/tools/index.ts",
+        "reason": "\"web\" is the SearXNG search category, not a path"
+      },
+      {
+        "file": "packages/core/src/tools/research.ts",
+        "reason": "\"web\" is the SearXNG search category, not a path"
+      },
+      {
+        "file": "packages/core/src/tools/webSearch.ts",
+        "reason": "\"web\" is the SearXNG search category, not a path"
+      },
+      {
+        "file": "scripts/test/composeLayout.test.mjs",
+        "reason": "checks the 6986a4c baseline's old web build path against the moved one (moves to cloud/deploy/test in 6.6)"
+      }
+    ]
   }
 ]

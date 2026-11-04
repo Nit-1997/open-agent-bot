@@ -37,6 +37,7 @@ describe("B11 import boundary", () => {
       'import "react";',
       'import "../../../../packages/core/src/x.ts";',
       'import "../../../../web/lib/x.ts";',
+      'import "../../../../cloud/web/lib/x.ts";',
       'import "../../test/fake-docker/fake-agent.mjs";',
       'import "electron";',
       'import "node:path";',
@@ -49,6 +50,7 @@ describe("B11 import boundary", () => {
       "react",
       "../../../../packages/core/src/x.ts",
       "../../../../web/lib/x.ts",
+      "../../../../cloud/web/lib/x.ts",
       "../../test/fake-docker/fake-agent.mjs",
     ]);
   });
@@ -61,17 +63,14 @@ describe("B11 import boundary", () => {
     expect(bad).toEqual([]);
   });
 
-  it("nothing in packages/ or web/ imports the desktop app", () => {
-    const roots = [join(REPO, "packages"), join(REPO, "web")];
-    const hits = roots
-      .flatMap((r) => files(r, /\.(ts|tsx|mts|js|mjs)$/))
-      .filter((f) =>
-        importSpecifiers(readFileSync(f, "utf8")).some((s) => s.startsWith("@oab/desktop") || /(^|\/)apps\/desktop(\/|$)/.test(s)),
-      );
+  it("nothing in packages/ imports the desktop app", () => {
+    const hits = files(join(REPO, "packages"), /\.(ts|tsx|mts|js|mjs)$/).filter((f) =>
+      importSpecifiers(readFileSync(f, "utf8")).some((s) => s.startsWith("@oab/desktop") || /(^|\/)apps\/desktop(\/|$)/.test(s)),
+    );
     expect(hits.map((f) => relative(REPO, f))).toEqual([]);
   });
 
-  it("the folder walk skips a missing root (web/ leaves in M6)", () => {
+  it("the folder walk skips a missing root", () => {
     expect(files(join(REPO, "no-such-root"), /\.ts$/)).toEqual([]);
   });
 

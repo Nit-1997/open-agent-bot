@@ -28,26 +28,6 @@ jobs:
       - run: npm test -w @oab/core
       - run: npm run build -w @oab/core
 
-  web:
-    runs-on: ubuntu-latest
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - run: npm ci
-      - run: npm run lint -w web
-      - run: npm run format:check -w web
-      - run: npm run typecheck -w web
-      - run: npm test -w web
-      - run: npm run build -w web
-        env:
-          COPILOTKIT_TELEMETRY_DISABLED: "true"
-
   cloud:
     runs-on: ubuntu-latest
     permissions:
@@ -64,11 +44,13 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run lint -w @oab/cloud-agent
-      - run: npm run format:check -w @oab/cloud-agent
-      - run: npm run typecheck -w @oab/cloud-agent
-      - run: npm test -w @oab/cloud-agent
-      - run: npm run build -w @oab/cloud-agent
+      - run: npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy
+      - run: npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy
+      - run: npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web
+      - run: npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy
+      - run: npm run build -w @oab/cloud-agent -w @oab/cloud-web
+        env:
+          COPILOTKIT_TELEMETRY_DISABLED: "true"
 
   compose:
     runs-on: ubuntu-latest

@@ -78,6 +78,9 @@ const FAILING = [
     { "packages/x/package.json": '{\n  "name": "x",\n  "dependencies": { "@oab/cloud-web": "*" }\n}\n' },
     "packages/x/package.json:3 B",
   ],
+  ["bare @oab/cloud", { "packages/x/src/a.ts": 'import x from "@oab/cloud";\nexport default x;\n' }, "packages/x/src/a.ts:1 A"],
+  ["bare @oab/cloud/agent", { "packages/x/src/a.ts": 'import x from "@oab/cloud/agent";\nexport default x;\n' }, "packages/x/src/a.ts:1 A"],
+  ["export * from a parent cloud/ folder", { "packages/x/a.ts": 'export * from "../../cloud/x";\n' }, "packages/x/a.ts:1 A"],
   [
     "bare @oab/cloud-agent/x",
     { "packages/x/src/a.ts": 'import x from "@oab/cloud-agent/x";\nexport default x;\n' },
@@ -178,6 +181,18 @@ describe("cloud boundary: passing cases", () => {
       { "packages/x/eslint.config.mjs": 'export default [{ patterns: ["**/cloud/**", "**/cloud"] }];\n' },
     ],
     ["a glob **/cloud/** in a biome config", { "e2e/biome.json": '{ "group": ["**/cloud", "**/cloud/**"] }\n' }],
+    [
+      "dynamic import() of @google-cloud/storage",
+      { "packages/x/src/a.ts": 'export const load = () => import("@google-cloud/storage");\n' },
+    ],
+    [
+      "./cloudinary.ts and ../clouds/x",
+      {
+        "packages/x/src/a.ts": 'import c from "./cloudinary.ts";\nimport d from "../clouds/x";\nexport default [c, d];\n',
+        "packages/x/src/cloudinary.ts": "export default 1;\n",
+        "packages/x/clouds/x.ts": "export default 2;\n",
+      },
+    ],
     ["package-lock.json keys", { "package-lock.json": '{ "packages": { "cloud/agent": { "name": "@oab/cloud-agent" } } }\n' }],
     ["a comment", { "packages/x/src/a.ts": '// import "../../../cloud/agent/src/a.ts"\n/* cloud/web/app */\nexport const a = 1;\n' }],
     ["a shell comment", { "scripts/x.sh": "#!/bin/sh\n# rm -rf cloud/deploy\necho ok\n" }],
