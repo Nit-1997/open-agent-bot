@@ -99,6 +99,13 @@ export function hostedAgentDeps(
         adminGuard: createAdminGuard({ isLiveAdmin: createLiveAdminCheck(authAdmin) }),
         limiter: core.limiter,
         usage: { usage, policy: policyFor(core.limiter), limits: cfg.limits, humanCheck, limiter: core.limiter },
+        adminUsage: {
+          usage,
+          policy: policyFor(core.limiter),
+          limits: cfg.limits,
+          profiles: adminRepo.users,
+          signupMode: async () => "waitlist",
+        },
       }),
   };
   return { deps, status, usage };

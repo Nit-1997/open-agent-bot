@@ -17,10 +17,18 @@ type Pending = { user: AdminUser; kind: "deactivate" | "delete" };
 
 const ID = "admin-users";
 
-export function UsersList({ initial, selfId }: { initial: ActionResult<PageResponse<AdminUser>>; selfId: string }) {
-  const list = usePagedAdminList<AdminUser, string>({ initial, initialQuery: "", fetchPage: (q, page) => listUsers(page, q) });
+export function UsersList({
+  initial,
+  initialQuery = "",
+  selfId,
+}: {
+  initial: ActionResult<PageResponse<AdminUser>>;
+  initialQuery?: string;
+  selfId: string;
+}) {
+  const list = usePagedAdminList<AdminUser, string>({ initial, initialQuery, fetchPage: (q, page) => listUsers(page, q) });
   const { query, page, result, loading, busyRow, rowErrors, hiddenErrors, notice, load } = list;
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(initialQuery);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
 

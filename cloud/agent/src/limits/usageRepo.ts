@@ -22,6 +22,7 @@ export interface UsageRepo {
   get(userId: string): Promise<UsageNow>;
   summary(): Promise<UsageSummary>;
   page(q: UsagePageQuery): Promise<{ total: number; items: UsageRowDb[] }>;
+  lastRequest(userId: string): Promise<string | null>;
   prune(): Promise<void>;
   tombstone(userId: string): Promise<void>;
   humanCheck: { get(userId: string): Promise<boolean>; set(userId: string): Promise<void> };
@@ -69,6 +70,8 @@ const PageResult = Type.Object({
     }),
   ),
 });
+
+const LastRows = Type.Array(Type.Object({ last_at: Type.String() }), { maxItems: 1 });
 
 const OneRow = <T extends TSchema>(row: T) => Type.Array(row, { minItems: 1, maxItems: 1 });
 
@@ -141,6 +144,19 @@ export function createUsageRepo(db: Db, opts: UsageRepoOptions): UsageRepo {
           lastAt: i.last_at && date(i.last_at).toISOString(),
         })),
       };
+    },
+    async lastRequest(userId) {
+      const rows = await call("lastRequest", LastRows, (s) =>
+        db
+          .from("request_usage")
+          .select("last_at")
+          .eq("user_id", userId)
+          .not("last_at", "is", null)
+          .order("last_at", { ascending: false })
+          .limit(1)
+          .abortSignal(s),
+      );
+      return rows[0] ? date(rows[0].last_at).toISOString() : null;
     },
     async prune() {
       await call("prune", Type.Null(), (s) => db.rpc("request_log_prune", at()).abortSignal(s));
