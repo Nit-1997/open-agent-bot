@@ -47,7 +47,9 @@ describe("local Supabase stack smoke", () => {
     const user = await createUser();
     const { accessToken } = await signIn(user);
     expect(decodeProtectedHeader(accessToken)).toMatchObject({ alg: "ES256", typ: "JWT" });
-    expect(decodeJwt(accessToken)).toMatchObject({ iss: `${localEnv().apiUrl}/auth/v1`, aud: "authenticated", sub: user.id });
+    const claims = decodeJwt(accessToken);
+    expect(claims).toMatchObject({ iss: `${localEnv().apiUrl}/auth/v1`, sub: user.id });
+    expect([claims.aud].flat()).toEqual(["authenticated"]);
     const verified = await createVerifier({ supabaseUrl: localEnv().apiUrl })(accessToken);
     expect(verified).toMatchObject({ id: user.id, email: user.email, isAdmin: false });
   });
