@@ -259,6 +259,11 @@ describe("allowlist", () => {
     [`xattr -dr com.apple.quarantine "${CTX.installApp}"`, CTX.dir],
     [`xattr -l "${CTX.installApp}"`, CTX.dir],
     ["git fetch --tags", CTX.clone],
+    ["git checkout v1.0.1", CTX.clone],
+    ["git checkout v1.0.0-rc.2", CTX.clone],
+    [`git clone file://${REPO} open-agent-bot`, CTX.dir],
+    [`git clone file://${REPO}`, CTX.dir],
+    ["docker image ls -a --digests 'ghcr.io/nit-1997/{a,b}*'", CTX.dir],
   ])
     it(`runs: ${line}`, () => {
       const r = classify(line, CTX, cwd);
@@ -274,7 +279,7 @@ describe("allowlist", () => {
     const r = classify(`git clone file://${REPO} open-agent-bot && cd open-agent-bot && docker compose up -d`, CTX, CTX.dir);
     assert.ok(r.runnable, r.reason);
     assert.equal(r.cwdAfter, CTX.clone);
-    assert.deepEqual(r.docker, [CTX.clone]);
+    assert.deepEqual(r.docker, [{ cwd: CTX.clone, preflight: ["compose", "config", "--format", "json"] }]);
   });
   for (const [line, want, cwd] of [
     ["rm -rf x", /rm/],
@@ -343,6 +348,26 @@ describe("allowlist", () => {
     ["shasum -a 256 -c SHA256SUMS", /not allowlisted: shasum/, CTX.clone],
     [`git clone https://github.com/Nit-1997/open-agent-bot x`, /not allowlisted: git clone/, CTX.dir],
     ["git fetch --tags", /not allowlisted: git fetch/, CTX.dir],
+    ["docker compose down {-popen-agent,}", /unquoted glob or brace/],
+    ["docker compose down -v{,}", /unquoted glob or brace/],
+    ["cd $'\\x2e\\x2e'", /\$' or \$"/, CTX.dir],
+    ['cd $"open-agent-bot"', /\$' or \$"/, CTX.dir],
+    ["cd .[.]", /unquoted glob or brace/, CTX.dir],
+    ["cd .?", /unquoted glob or brace/, CTX.dir],
+    ["cd *", /unquoted glob or brace/, CTX.dir],
+    ["git fetch --upload-pack=touch /tmp/x", /outside the scratch dir|not allowlisted: git fetch/],
+    ["git fetch --upload-pack=x", /not allowlisted: git fetch/],
+    ["git fetch origin", /not allowlisted: git fetch/],
+    ["git fetch --tags --upload-pack=x", /not allowlisted: git fetch/],
+    ["git checkout -b x", /not allowlisted: git checkout/],
+    ["git checkout main", /not allowlisted: git checkout/],
+    ["git checkout v1.0.1 -- .", /not allowlisted: git checkout/],
+    ["git -c core.sshCommand=x fetch --tags", /not allowlisted: git -c/],
+    [`git clone --upload-pack=x file://${REPO} open-agent-bot`, /not allowlisted: git clone/, CTX.dir],
+    [`git clone --branch main --depth 1 file://${REPO} open-agent-bot`, /not allowlisted: git clone/, CTX.dir],
+    [`git clone --depth 2 file://${REPO} open-agent-bot`, /not allowlisted: git clone/, CTX.dir],
+    [`git clone -b revamp/integration file://${REPO} open-agent-bot`, /not allowlisted: git clone/, CTX.dir],
+    [`git clone file://${REPO} open-agent-bot extra`, /not allowlisted: git clone/, CTX.dir],
   ])
     it(`owner: ${line}`, () => {
       const r = owner(line, cwd);
@@ -505,6 +530,51 @@ describe("runner", () => {
     const { runner, calls } = harness([{ command: "docker ps", mode: "run" }]);
     runner.run(occ("docker ps"));
     assert.deepEqual(calls[0], ["preflight", `${DIR}/.preflight`]);
+  });
+  it("runs each line under bash with no profile, no globbing and no brace expansion", () => {
+    const seen = [];
+    const runner = createRunner({
+      ctx: CTX,
+      env: {},
+      manifest: manifestFor([{ command: "curl -fsS http://127.0.0.1:18520/health", mode: "run" }]),
+      exec: (cmd, args) => {
+        seen.push([cmd, ...args]);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      log: () => {},
+      preflightDir: `${DIR}/.preflight`,
+    });
+    runner.cwd = CTX.clone;
+    runner.run(occ("curl -fsS http://127.0.0.1:18520/health"));
+    assert.deepEqual(seen, [["/bin/bash", "--noprofile", "--norc", "-f", "+B", "-c", "curl -fsS http://127.0.0.1:18520/health"]]);
+  });
+  it("preflights a compose line with that line's own compose argv in that line's cwd, never the preflight copy", () => {
+    const seen = [];
+    const exec = (cmd, args, o = {}) => {
+      if (cmd === "docker") {
+        seen.push([o.cwd, ...args]);
+        return { status: 0, stdout: JSON.stringify({ name: CTX.project, services: {}, volumes: {} }), stderr: "" };
+      }
+      if (cmd === "jq") return { status: 0, stdout: `${JSON.parse(o.input).name}\n`, stderr: "" };
+      return { status: 0, stdout: "", stderr: "" };
+    };
+    const cwd = `${DIR}/elsewhere`;
+    const ctx = { ...CTX, clone: cwd };
+    const runner = createRunner({
+      ctx,
+      env: {},
+      manifest: manifestFor([{ command: "docker compose up -d --build", mode: "run" }]),
+      exec,
+      log: () => {},
+      hasCompose: () => false,
+      preflightDir: `${DIR}/.preflight`,
+    });
+    runner.cwd = cwd;
+    runner.run(occ("docker compose up -d --build"));
+    assert.deepEqual(seen, [[cwd, "compose", "config", "--format", "json"]]);
+    assert.deepEqual(classify("docker compose up -d --build", CTX, CTX.clone).docker, [
+      { cwd: CTX.clone, preflight: ["compose", "config", "--format", "json"] },
+    ]);
   });
   it("records owner rows with their reason and never runs them", () => {
     const { runner, calls } = harness([
@@ -686,6 +756,10 @@ describe("guide checks", () => {
     assert.deepEqual(attestationProblems(generated, "1.0.0"), []);
     assert.match(attestationProblems(generated, "1.0.1").join("\n"), /--source-ref refs\/tags\/v1.0.1/);
   });
+  it("lets `gh attestation verify --help` through, but not a real verify next to it", () => {
+    assert.deepEqual(attestationProblems("confirm with `gh attestation verify --help` first", "1.0.0"), []);
+    assert.equal(attestationProblems("`gh attestation verify --help` then `gh attestation verify x.dmg --repo r`", "1.0.0").length, 1);
+  });
   it("pins a runbook line through the tag variable only when asked to", () => {
     const line =
       'gh attestation verify "$f" --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref "refs/tags/$TAG" --deny-self-hosted-runners';
@@ -700,6 +774,17 @@ describe("guide checks", () => {
       assert.deepEqual(htmlProblems(read(f)), [], f);
     assert.deepEqual(htmlProblems(fixture("html-in-code.md")), []);
     assert.deepEqual(htmlProblems(fixture("html.md")), ['line 3: <div id="x">', "line 3: </div>"]);
+  });
+});
+
+describe("INSTALL review wording", () => {
+  it("says Trash, names Homebrew for gh with install or upgrade, and warns before down -v that the Mac app's data goes too", () => {
+    assert.doesNotMatch(INSTALL, /\bBin\b/);
+    assert.match(INSTALL, /Drag "Open Agent" from Applications to the Trash\./);
+    assert.match(INSTALL, /install it with \[Homebrew\]\(https:\/\/brew\.sh\/\), so you need Homebrew first\. Install or upgrade `gh`/);
+    const warn = INSTALL.indexOf("this also deletes the Mac app's chats, reports and saved keys on this computer");
+    const down = INSTALL.indexOf("docker compose down -v");
+    assert.ok(warn > 0 && warn < down, `warning ${warn}, down -v ${down}`);
   });
 });
 
@@ -1113,8 +1198,15 @@ describe("RELEASING", () => {
       "gh auth refresh -s read:packages,delete:packages",
       "gh api -X DELETE /user/packages/container/open-agent/versions/<id>",
       "Never delete untagged versions",
+      "**The tag rule.**",
+      "the next rc number (`v1.0.0-rc.1` → `v1.0.0-rc.2`)",
+      "once any draft existed for it, the fix ships as the next patch, `v1.0.1`",
     ])
       assert.ok(r.includes(s), `Rollback lacks ${s}`);
+    assert.ok(!r.includes("tag again as above"));
+    assert.ok(R.includes("Homebrew tap: not built (deferred, spec A13)."));
+    assert.ok(section("## Prerequisites", "## Repository settings").includes("`gh attestation verify --help`"));
+    assert.ok(section("## Gate 5a", "## Gate 5b").includes("`gh attestation verify --help`"));
   });
 });
 

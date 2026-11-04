@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -115,8 +115,10 @@ describe("demo part scripts", () => {
       "docker rm -f -v oab-factory-m5-registry",
       "docker buildx rm oab-factory-m5-builder",
       "docker image rm $(docker image ls -a --digests --format '{{.Repository}}@{{.Digest}}' | grep oab-m5-)",
+      "docker image rm $(m5_images)",
     ])
       assert.deepEqual(partProblems(good(ok), "x.sh"), [], ok);
+    assert.match(partProblems(good("docker image rm $(m5_imagez)"), "x.sh").join("\n"), /oab-/);
   });
 
   it("never touches the live open-agent-bot containers", () => {
@@ -126,6 +128,60 @@ describe("demo part scripts", () => {
       partProblems(good(`docker ps --format '{{.Names}} {{.Status}}' | grep -E '^open-agent-bot' > "$DEMO_DIR/live-before.txt" || true`), "x.sh"),
       [],
     );
+  });
+
+  it("parts 6 and 9 remove M5 images only through lib.sh's anchored m5_images helper", () => {
+    assert.match(
+      read(LIB),
+      /^m5_images\(\) \{ docker image ls -a --digests --format '\{\{\.Repository\}\}@\{\{\.Digest\}\}' \| grep -E '\(\^\|\/\)oab-m5-' \| grep -v '@<none>\$'; \}$/m,
+    );
+    for (const p of ["part-6.sh", "part-9.sh"]) {
+      const text = read(join(PARTS_DIR, p));
+      assert.match(text, /docker image rm \\\$\(m5_images\)/, p);
+      assert.doesNotMatch(text, /grep oab-m5-/, p);
+    }
+  });
+
+  it("starts the registry from lib.sh's digest-pinned REGISTRY_IMAGE", () => {
+    assert.match(read(LIB), /^REGISTRY_IMAGE="registry:2@sha256:[0-9a-f]{64}"$/m);
+    const p2 = read(join(PARTS_DIR, "part-2.sh"));
+    assert.match(p2, /-p 127\.0\.0\.1:18501:5000 \$REGISTRY_IMAGE"/);
+    assert.doesNotMatch(p2, /registry:2/);
+  });
+
+  it("recall only returns an existing folder under $TMPDIR or the demo dir, never one with ..", () => {
+    const demo = `.factory/m5/test-recall-${process.pid}`;
+    const repo = join(PARTS_DIR, "../../..");
+    const tmp = mkdtempSync(join(tmpdir(), "tmp."));
+    const outside = mkdtempSync(join(repo, ".factory/m5/outside-"));
+    const recall = (path) =>
+      spawnSync("bash", ["-c", `. scripts/demo/m5/lib.sh; printf '%s\\n' "$1" > "$DEMO_DIR/x.path"; recall x`, "part-test", path], {
+        cwd: repo,
+        encoding: "utf8",
+        env: { ...process.env, DEMO_DIR: demo, TMPDIR: tmpdir() },
+      });
+    try {
+      const ok = recall(tmp);
+      assert.equal(ok.status, 0, ok.stderr);
+      assert.equal(ok.stdout, realpathSync(tmp));
+      for (const [path, why] of [
+        [`${tmp}/../${tmp.split("/").pop()}`, /contains \.\./],
+        [join(tmp, "missing"), /not a directory/],
+        [outside, /outside/],
+        ["/", /outside/],
+        [realpathSync(tmpdir()), /outside/],
+      ]) {
+        const r = recall(path);
+        assert.equal(r.status, 1, path);
+        assert.match(r.stderr, why, path);
+      }
+      symlinkSync(outside, join(tmp, "link"));
+      assert.match(recall(join(tmp, "link")).stderr, /outside/);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+      rmSync(join(repo, demo), { recursive: true, force: true });
+    }
   });
 
   it("ignores comments", () => {

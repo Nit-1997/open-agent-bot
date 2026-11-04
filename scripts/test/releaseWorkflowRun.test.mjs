@@ -206,19 +206,21 @@ describe("release.yml script steps run in order against fixtures (push record â†
     );
   });
 
-  it("attest's sha256sum line over release-lock + release-dmgs equals sums.mjs on the same files", () => {
+  it("attest's sha256sum line lists exactly the two DMGs and the lock job's manifest, sorted, in sha256sum format", () => {
     mkdirSync(join(store, "release-dmgs"), { recursive: true });
     for (const arch of ["arm64", "x64"])
       writeFileSync(join(store, "release-dmgs", `Open-Agent-${VERSION}-${arch}.dmg`), `fake ${arch} dmg\n`);
     const { ctx } = runJob("attest");
     const sums = readFileSync(join(ctx.temp, "assets/SHA256SUMS"), "utf8");
-    const check = mkdtempSync(join(work, "sums-"));
-    for (const f of [`Open-Agent-${VERSION}-arm64.dmg`, `Open-Agent-${VERSION}-x64.dmg`])
-      cpSync(join(store, "release-dmgs", f), join(check, f));
-    cpSync(join(store, "release-lock/open-agent-services.json"), join(check, "open-agent-services.json"));
-    const r = spawnSync(process.execPath, [join(ROOT, "scripts/release/sums.mjs"), check, "--version", VERSION], { encoding: "utf8" });
-    assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(join(check, "SHA256SUMS"), "utf8"), sums);
+    const want = [
+      join(store, "release-dmgs", `Open-Agent-${VERSION}-arm64.dmg`),
+      join(store, "release-dmgs", `Open-Agent-${VERSION}-x64.dmg`),
+      join(store, "release-lock/open-agent-services.json"),
+    ]
+      .map((f) => `${sha256Hex(readFileSync(f))}  ${basename(f)}\n`)
+      .join("");
+    assert.equal(sums, want);
+    assert.equal(spawnSync("shasum", ["-a", "256", "-c", "SHA256SUMS"], { cwd: join(ctx.temp, "assets") }).status, 0);
     assert.deepEqual(readdirSync(join(store, "release-sums")), ["SHA256SUMS"]);
   });
 });

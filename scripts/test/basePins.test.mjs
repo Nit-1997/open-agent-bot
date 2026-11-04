@@ -62,6 +62,14 @@ describe("base image pins (D11)", () => {
       for (const m of read(f).matchAll(/[\w./-]+:latest(@sha256:[0-9a-f]{64})?/g)) assert.ok(m[1], `${f}: ${m[0]} has no digest`);
   });
 
+  it("every registry:2 reference is the one digest pinned in scripts/demo/m5/lib.sh", () => {
+    const pin = /^REGISTRY_IMAGE="(registry:2@sha256:[0-9a-f]{64})"$/m.exec(read("scripts/demo/m5/lib.sh"))?.[1];
+    assert.ok(pin, "scripts/demo/m5/lib.sh has no REGISTRY_IMAGE pin");
+    const refs = tracked.filter(inScope).flatMap((f) => [...read(f).matchAll(/registry:2\S*/g)].map((m) => ({ file: f, ref: m[0] })));
+    assert.ok(refs.some((r) => r.file === "CONTRIBUTING.md"));
+    for (const r of refs) assert.equal(r.ref.replace(/["'`]+$/, ""), pin, `${r.file}: ${r.ref}`);
+  });
+
   const release = ".github/workflows/release.yml";
   it("release.yml pins the buildx version and a digest-pinned BuildKit image", () => {
     const wf = parse(read(release));

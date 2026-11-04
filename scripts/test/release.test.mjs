@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { assertLock } from "../release/assert-lock.mjs";
-import { checkMountedApp, draftRelease, dryRunProblems, mockRelease, parseDryRunArgs } from "../release/dry-run.mjs";
+import { draftRelease, dryRunProblems, IMAGES, mockRelease, parseDryRunArgs } from "../release/dry-run.mjs";
 import { gate, releaseState } from "../release/gate.mjs";
 import { contentCheck, imageChecks, labelsCheck, mergeDigest, nodeCheck } from "../release/image-checks.mjs";
 import { notesCommand } from "../release/notes.mjs";
@@ -20,13 +20,12 @@ import {
   notes,
   parseTag,
   previousFinalTag,
+  RELEASE_IMAGES,
   releaseAssets,
-  sha256sums,
+  safeChange,
   versionOf,
 } from "../release/releaseLib.mjs";
-import { verifySums, writeSums } from "../release/sums.mjs";
 import { verifyIndex } from "../release/verify-index.mjs";
-import { versionCommand } from "../release/version.mjs";
 import { writeLock } from "../release/write-lock.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -74,22 +73,11 @@ describe("parseTag / versionOf", () => {
     });
     assert.equal(parseTag("v1.0.0-dryrun.1", { dryRun: true }).ok, false);
   });
-  it("version.mjs prints the version and refuses --dry-run outside test mode", () => {
-    assert.deepEqual(versionCommand(["v1.2.3-rc.4"], {}), { version: "1.2.3-rc.4", prerelease: "true", tag: "v1.2.3-rc.4" });
-    assert.throws(() => versionCommand(["v0.0.0-dryrun.1", "--dry-run"], {}), /OPEN_AGENT_SHELL_TEST/);
-    assert.equal(versionCommand(["v0.0.0-dryrun.1", "--dry-run"], TEST_ENV).version, "0.0.0-dryrun.1");
-  });
-  it("version.mjs writes version/prerelease to $GITHUB_OUTPUT", () => {
-    const dir = scratch();
-    const out = join(dir, "out");
-    const r = spawnSync(process.execPath, [join(ROOT, "scripts/release/version.mjs"), "v1.0.0-rc.2"], {
-      encoding: "utf8",
-      env: { PATH: process.env.PATH, GITHUB_OUTPUT: out },
-    });
-    assert.equal(r.status, 0, r.stderr);
-    assert.equal(r.stdout, "1.0.0-rc.2\n");
-    assert.equal(readFileSync(out, "utf8"), "version=1.0.0-rc.2\nprerelease=true\n");
-    rmSync(dir, { recursive: true });
+  it("the dry run reads the version from gate --dry-run; version.mjs, sums.mjs and --expect-sha256 are gone", () => {
+    for (const f of ["scripts/release/version.mjs", "scripts/release/sums.mjs"]) assert.equal(existsSync(join(ROOT, f)), false, f);
+    const src = readFileSync(join(ROOT, "scripts/release/dry-run.mjs"), "utf8");
+    assert.match(src, /gate\.mjs"\), \["--tag", tag, "--dry-run"\]/);
+    assert.doesNotMatch(readFileSync(join(ROOT, "scripts/release/assert-lock.mjs"), "utf8"), /expect-sha256/);
   });
 });
 
@@ -450,12 +438,6 @@ describe("assert-lock.mjs", () => {
     ["the committed no-pins lock", readFileSync(join(ROOT, "apps/desktop/services.lock.json"), "utf8"), /version is "dev"/],
   ])
     it(`${name} fails`, () => assert.match(check(value).join("\n"), reason));
-  it("--expect-sha256 mismatch fails, match passes", () => {
-    const text = `${JSON.stringify(lock(), null, 2)}\n`;
-    const sha = createHash("sha256").update(text).digest("hex");
-    assert.deepEqual(check(text, ["--attested", att, "--expect-sha256", sha]), []);
-    assert.match(check(text, ["--attested", att, "--expect-sha256", D("0")]).join(), /expect-sha256/);
-  });
   it("the dry-run path needs test mode, local refs and a dryrun version", () => {
     const dry = lock({ version: "0.0.0-dryrun.1", images: { ...LOCAL } });
     const f = join(dir, "dry.json");
@@ -476,61 +458,6 @@ describe("assert-lock.mjs", () => {
       /kind/,
     );
   });
-});
-
-describe("sums.mjs", () => {
-  const v = "0.0.0-dryrun.1";
-  const make = () => {
-    const dir = scratch();
-    for (const n of releaseAssets(v).filter((n) => n !== "SHA256SUMS")) writeFileSync(join(dir, n), `bytes of ${n}\n`);
-    return dir;
-  };
-  it("lists exactly the two DMGs and the manifest, sorted, two spaces; verifies back", () => {
-    const dir = make();
-    const text = writeSums(dir, v);
-    const names = text
-      .trim()
-      .split("\n")
-      .map((l) => l.split("  ")[1]);
-    assert.deepEqual(names, [`Open-Agent-${v}-arm64.dmg`, `Open-Agent-${v}-x64.dmg`, "open-agent-services.json"]);
-    for (const l of text.trim().split("\n")) assert.match(l, /^[0-9a-f]{64} {2}\S/);
-    assert.deepEqual(verifySums(dir, v), []);
-  });
-  it("matches shasum/sha256sum output on the same files", () => {
-    const dir = make();
-    const text = writeSums(dir, v);
-    const tool = spawnSync("sha256sum", ["--version"]).status === 0 ? ["sha256sum", []] : ["shasum", ["-a", "256"]];
-    const r = spawnSync(tool[0], [...tool[1], `Open-Agent-${v}-arm64.dmg`, `Open-Agent-${v}-x64.dmg`, "open-agent-services.json"], {
-      cwd: dir,
-      encoding: "utf8",
-    });
-    assert.equal(r.status, 0);
-    assert.equal(r.stdout, text);
-    assert.equal(spawnSync("shasum", ["-a", "256", "-c", "SHA256SUMS"], { cwd: dir }).status, 0);
-  });
-  it("a changed byte fails", () => {
-    const dir = make();
-    writeSums(dir, v);
-    writeFileSync(join(dir, "open-agent-services.json"), "bytes of open-agent-services.jsoN\n");
-    assert.match(verifySums(dir, v).join(), /differs from SHA256SUMS/);
-    assert.notEqual(spawnSync("shasum", ["-a", "256", "-c", "SHA256SUMS"], { cwd: dir }).status, 0);
-  });
-  it("refuses extra or missing files", () => {
-    const dir = make();
-    writeFileSync(join(dir, "notes.md"), "x");
-    assert.throws(() => writeSums(dir, v), /unexpected notes\.md/);
-    rmSync(join(dir, "notes.md"));
-    rmSync(join(dir, `Open-Agent-${v}-x64.dmg`));
-    assert.throws(() => writeSums(dir, v), /missing Open-Agent-0\.0\.0-dryrun\.1-x64\.dmg/);
-  });
-  it("sha256sums sorts by name", () =>
-    assert.equal(
-      sha256sums([
-        { name: "b", sha256: D("1") },
-        { name: "a", sha256: D("2") },
-      ]),
-      `${D("2")}  a\n${D("1")}  b\n`,
-    ));
 });
 
 describe("notes.mjs", () => {
@@ -600,6 +527,57 @@ describe("notes.mjs", () => {
     const text = readFileSync(join(dir, "notes.md"), "utf8");
     assert.match(text, /- c49 change 49\n- … and 10 more/);
   });
+  it("renders commit subjects without links, images, HTML, mentions or code spans", () => {
+    const evil = "abc1234 feat: [click](https://evil.example) ![x](y) <img src=x onerror=alert(1)> @Nit-1997 `rm -rf` ok";
+    assert.equal(safeChange(evil), "abc1234 feat: clickhttps://evil.example !xy img src=x onerror=alert1 Nit-1997 rm -rf ok");
+    assert.equal(safeChange("abc1234 tab\there\u0007"), "abc1234 tab here");
+    const text = notes({ version: "1.0.0", prerelease: false, digests: PROD, bases, changes: [evil], previousTag: "v0.9.0" });
+    const changes = text.slice(text.indexOf("## Changes"));
+    assert.doesNotMatch(changes, /[[\]()<>@`]/);
+    assert.ok(changes.includes(`- ${safeChange(evil)}`));
+  });
+  it("the CLI takes a dry-run version only in test mode", () => {
+    const dir = scratch();
+    const lockFile = join(dir, "lock.json");
+    writeFileSync(lockFile, JSON.stringify({ images: LOCAL }));
+    const git = (args) => ok(args[0] === "tag" ? "" : "c1 one\n");
+    const argv = ["--version", "0.0.0-dryrun.1", "--lock", lockFile, "--out", join(dir, "notes.md"), "--ref", "HEAD"];
+    assert.throws(() => notesCommand(argv, git, {}), /v0\.0\.0-dryrun/);
+    assert.equal(notesCommand(argv, git, TEST_ENV).changes, 1);
+    assert.throws(() => notesCommand(["--version", "1.0.0-beta.1", "--lock", lockFile, "--out", join(dir, "n.md")], git, TEST_ENV));
+  });
+});
+
+describe("RELEASE_IMAGES (one table for the image build inputs)", () => {
+  it("names the two images, their Dockerfiles, contexts and content folders", () => {
+    assert.deepEqual(
+      RELEASE_IMAGES.map((i) => [i.key, i.image, i.name, i.dryRunName, i.context, i.dockerfile, i.content]),
+      [
+        ["agent", "open-agent", "ghcr.io/nit-1997/open-agent", "oab-m5-open-agent", ".", "packages/core/Dockerfile", "/app"],
+        [
+          "search",
+          "open-agent-search",
+          "ghcr.io/nit-1997/open-agent-search",
+          "oab-m5-open-agent-search",
+          "local/searxng",
+          "local/searxng/Dockerfile",
+          "/opt/open-agent",
+        ],
+      ],
+    );
+    for (const i of RELEASE_IMAGES) assert.ok(existsSync(join(ROOT, i.dockerfile)), i.dockerfile);
+    assert.ok(Object.isFrozen(RELEASE_IMAGES) && RELEASE_IMAGES.every(Object.isFrozen));
+  });
+  it("the dry run and notes.mjs read it instead of their own copies", () => {
+    assert.deepEqual(
+      IMAGES.map((i) => [i.key, i.name, i.context, i.file, i.content]),
+      RELEASE_IMAGES.map((i) => [i.key, i.dryRunName, i.context, i.dockerfile, i.content]),
+    );
+    for (const f of ["scripts/release/dry-run.mjs", "scripts/release/notes.mjs"]) {
+      const src = readFileSync(join(ROOT, f), "utf8");
+      assert.doesNotMatch(src, /packages\/core\/Dockerfile|local\/searxng/, f);
+    }
+  });
 });
 
 describe("dry-run.mjs guards", () => {
@@ -665,39 +643,5 @@ describe("dry-run.mjs guards", () => {
     assert.equal(m.draft, false);
     assert.equal(m.prerelease, false);
     assert.equal(m.assets[0].browser_download_url, "{{ORIGIN}}/assets/open-agent-services.json");
-  });
-});
-
-describe("dry-run verify-dmgs step", { skip: process.platform !== "darwin" && "plutil and shasum are macOS tools" }, () => {
-  const lockText = `${JSON.stringify({ schema: 1, kind: "release", version: "0.0.0-dryrun.1" }, null, 2)}\n`;
-  const lockSha256 = createHash("sha256").update(lockText).digest("hex");
-  const mounted = (o = {}) => {
-    const dir = scratch();
-    const app = join(dir, o.appName ?? "Open Agent.app");
-    mkdirSync(join(app, "Contents/Resources/stack"), { recursive: true });
-    writeFileSync(
-      join(app, "Contents/Info.plist"),
-      `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>${o.version ?? "0.0.0-dryrun.1"}</string></dict></plist>\n`,
-    );
-    const lock = join(app, "Contents/Resources/stack/services.lock.json");
-    if (o.symlink) {
-      writeFileSync(join(dir, "real.json"), lockText);
-      symlinkSync(join(dir, "real.json"), lock);
-    } else writeFileSync(lock, o.lock ?? lockText);
-    if (o.second) mkdirSync(join(dir, "Other.app"));
-    return dir;
-  };
-  const expect = { lockSha256, version: "0.0.0-dryrun.1" };
-  it("passes when the bundled lock is the lock step's", () => assert.deepEqual(checkMountedApp(mounted(), expect), []));
-  it("fails on a DMG built from a different lock", () =>
-    assert.match(
-      checkMountedApp(mounted({ lock: lockText.replace("dryrun.1", "dryrun.9") }), expect).join(),
-      /differs from the lock step's/,
-    ));
-  it("fails on a symlinked lock, a second app, a renamed app or a wrong version", () => {
-    assert.match(checkMountedApp(mounted({ symlink: true }), expect).join(), /not a regular file/);
-    assert.match(checkMountedApp(mounted({ second: true }), expect).join(), /exactly one Open Agent\.app/);
-    assert.match(checkMountedApp(mounted({ appName: "Evil.app" }), expect).join(), /exactly one Open Agent\.app/);
-    assert.match(checkMountedApp(mounted({ version: "0.0.0-dev" }), expect).join(), /CFBundleShortVersionString is 0\.0\.0-dev/);
   });
 });
