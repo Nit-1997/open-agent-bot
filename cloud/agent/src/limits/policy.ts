@@ -8,7 +8,7 @@ import { accountDeleting, type DeletingUsers } from "../account/deleting.js";
 import { ADMIT_ATTEMPTS, BUSY_RETRY_S, RUNNING_RETRY_S, UNAVAILABLE_RETRY_S } from "./config.js";
 import type { HumanCheckGate } from "../signup/humanCheck.js";
 import type { RunSlots } from "./slots.js";
-import { type AdmitResult, USAGE_TIMEOUT_MS, type UsageRepo } from "./usageRepo.js";
+import type { AdmitResult, UsageRepo } from "./usageRepo.js";
 
 type RefusalParts = { retryAfter?: number; retryAt?: number; limit?: number; used?: number; window?: RunRefusalWindow };
 
@@ -54,14 +54,6 @@ export const usageUnavailable = (now: number) =>
   });
 
 type Cached = { code: "limit_monthly" | "limit_hourly"; retryAt: number; limit: number; used: number };
-
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("usage check timed out")), ms);
-  });
-  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
-}
 
 export type HostedRunPolicyDeps = {
   limits: Limits;
@@ -136,7 +128,7 @@ export class HostedRunPolicy implements RunPolicy {
 
     let result: AdmitResult;
     try {
-      result = await withTimeout(this.deps.usage.admit(userId), USAGE_TIMEOUT_MS);
+      result = await this.deps.usage.admit(userId);
     } catch (err) {
       slots.release(ticketId);
       log.warn(`[limits] usage check failed user=${userId} run=${run.runId}`, err instanceof Error ? err.message : err);
@@ -153,6 +145,11 @@ export class HostedRunPolicy implements RunPolicy {
     }
 
     const { logId } = result;
+    if (this.deps.deleting?.has(userId)) {
+      slots.release(ticketId);
+      this.refundLater(userId, logId, run.runId);
+      return { ok: false, error: accountDeleting() };
+    }
     let ended = false;
     let refunded = false;
     return {
@@ -166,15 +163,18 @@ export class HostedRunPolicy implements RunPolicy {
         refund: () => {
           if (refunded) return;
           refunded = true;
-          this.refused.delete(userId);
-          void this.deps.usage
-            .refund(userId, logId)
-            .catch((err: unknown) =>
-              log.warn(`[limits] refund failed user=${userId} run=${run.runId}`, err instanceof Error ? err.message : err),
-            );
+          this.refundLater(userId, logId, run.runId);
         },
       },
     };
+  }
+
+  private refundLater(userId: string, logId: number, runId: string): void {
+    this.refused.delete(userId);
+    void this.deps.usage.refund(userId, logId).then(
+      () => this.refused.delete(userId),
+      (err: unknown) => log.warn(`[limits] refund failed user=${userId} run=${runId}`, err instanceof Error ? err.message : err),
+    );
   }
 
   sweep(): void {
