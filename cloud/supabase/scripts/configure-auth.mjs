@@ -17,8 +17,10 @@ const OPEN_PROVIDERS = new Set(["email", "google"]);
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);
-const mode = args.has("--apply") ? "apply" : args.has("--check") ? "check" : undefined;
-if (!mode) fail("usage: configure-auth.mjs --check | --apply [--rotate-secrets] [--disable-legacy-keys] [--i-confirm-open-signups]");
+const modes = ["--check", "--apply", "--close"].filter((m) => args.has(m));
+const mode = modes.length === 1 ? modes[0].slice(2) : undefined;
+if (!mode)
+  fail("usage: configure-auth.mjs --check | --apply [--rotate-secrets] [--disable-legacy-keys] [--i-confirm-open-signups] | --close");
 
 function fail(message) {
   console.error(message);
@@ -45,6 +47,7 @@ const legalDir = (() => {
 })();
 const signupMode = env("SIGNUP_MODE", { optional: true }) || "waitlist";
 if (!SIGNUP_MODES.includes(signupMode)) fail(`SIGNUP_MODE must be one of ${SIGNUP_MODES.join(", ")}`);
+if (mode === "close" && signupMode === "open") fail("--close closes signups: SIGNUP_MODE must be invite or waitlist (default waitlist)");
 const { api, read, write } = managementApi({ base: target.base, ref: env("SUPABASE_PROJECT_REF"), token: env("SUPABASE_ACCESS_TOKEN") });
 const template = (name) => readFileSync(join(HERE, "..", "templates", name), "utf8");
 
@@ -129,12 +132,11 @@ async function missingHookFunctions() {
 }
 
 async function modeRow() {
-  try {
-    const rows = await read("select mode from public.signup_settings where id");
-    return rows?.length === 1 ? rows[0].mode : null;
-  } catch {
-    return null;
-  }
+  const table = await read("select to_regclass('public.signup_settings') is not null as ok");
+  if (table?.[0]?.ok !== true) return null;
+  const rows = await read("select mode from public.signup_settings where id");
+  if (rows?.length !== 1) throw new Error(`public.signup_settings holds ${rows?.length ?? "no"} rows, expected exactly one`);
+  return rows[0].mode;
 }
 
 function providerProblems(config) {
@@ -183,11 +185,25 @@ async function openPreconditions() {
   return failed;
 }
 
-async function writeMode() {
-  await write(`update public.signup_settings set mode = '${signupMode}', updated_at = now() where id`);
+async function writeMode(to = signupMode) {
+  if (!SIGNUP_MODES.includes(to)) throw new Error(`refusing to write signup mode ${JSON.stringify(to)}`);
+  await write(`update public.signup_settings set mode = '${to}', updated_at = now() where id`);
   const now = await modeRow();
-  if (now !== signupMode) fail(`signup mode is still ${now ?? "unknown"} after the update`);
-  console.log(`signup mode: ${signupMode}`);
+  if (now !== to) fail(`signup mode is still ${now ?? "unknown"} after the update`);
+  console.log(`signup mode: ${to}`);
+}
+
+async function closeSignups(current) {
+  if (current.disable_signup !== true) {
+    await api("PATCH", "/config/auth", { disable_signup: true });
+    const after = await api("GET", "/config/auth");
+    if (after?.disable_signup !== true) fail("disable_signup is still not true after the close");
+    console.log("disable_signup: false → true (signups closed)");
+  } else console.log("disable_signup: true (signups already closed)");
+  const row = await modeRow();
+  if (row === null) console.log("signup mode: public.signup_settings missing (pre-M7 database: the hook is invite-only)");
+  else if (row !== signupMode) await writeMode();
+  else console.log(`signup mode: ${row}, no drift`);
 }
 
 async function keyDrift() {
@@ -234,8 +250,13 @@ async function disableLegacyKeys(keys) {
 }
 
 async function main() {
+  let current = await api("GET", "/config/auth");
+  if (mode === "close") return closeSignups(current);
   const want = desired();
-  const current = await api("GET", "/config/auth");
+  if (mode === "apply" && signupMode !== "open" && current.disable_signup !== true) {
+    await closeSignups(current);
+    current = await api("GET", "/config/auth");
+  }
   const changes = diff(current, want, args.has("--rotate-secrets"));
   const fields = Object.keys(changes);
   for (const f of fields) console.log(`${f}: ${show(f, current[f])} → ${show(f, changes[f])}`);
@@ -270,13 +291,28 @@ async function main() {
     if (missing.length) fail(`refusing to enable hooks: ${missing.join(", ")} missing (apply the migrations first)`);
   }
   const opening = signupMode === "open";
-  if (opening && rowDrift) await writeMode();
+  const wroteOpen = opening && rowDrift && row !== null;
+  if (wroteOpen) await writeMode();
   if (fields.length) {
-    const skipped = await patch(changes);
+    let problem;
+    let skipped = [];
+    try {
+      skipped = await patch(changes);
+      const after = await api("GET", "/config/auth");
+      const left = Object.keys(diff(after, want, false)).filter((f) => !skipped.includes(f));
+      if (left.length) problem = `still drifting after apply: ${left.join(", ")}`;
+    } catch (err) {
+      problem = err instanceof Error ? err.message : String(err);
+    }
+    if (problem && wroteOpen) {
+      const now = await api("GET", "/config/auth").catch(() => undefined);
+      if (now?.disable_signup !== false) {
+        await writeMode(row);
+        console.log(`signup mode restored to ${row}: signups were not opened`);
+      }
+    }
+    if (problem) fail(problem);
     for (const f of skipped) console.log(`${f}: skipped, requires a paid plan`);
-    const after = await api("GET", "/config/auth");
-    const left = Object.keys(diff(after, want, false)).filter((f) => !skipped.includes(f));
-    if (left.length) fail(`still drifting after apply: ${left.join(", ")}`);
     console.log("auth config: applied");
   }
   if (!opening && row !== null && rowDrift) await writeMode();

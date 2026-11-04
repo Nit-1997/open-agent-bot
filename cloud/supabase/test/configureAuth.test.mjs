@@ -23,16 +23,20 @@ afterEach(async () => {
   api = undefined;
 });
 
-function run(args, { mode, legalDir = legal } = {}) {
+const ADMIN_ENV = {
+  SITE_URL: "https://app.example",
+  GOOGLE_CLIENT_ID: "fake-client.apps.googleusercontent.com",
+  GOOGLE_CLIENT_SECRET: "fake-google-secret",
+  RESEND_API_KEY: "re_fake",
+  SMTP_SENDER_EMAIL: "noreply@example.test",
+};
+
+function run(args, { mode, legalDir = legal, minimalEnv = false } = {}) {
   const env = {
     PATH: process.env.PATH,
     SUPABASE_PROJECT_REF: REF,
     SUPABASE_ACCESS_TOKEN: "sbp_fake_token",
-    SITE_URL: "https://app.example",
-    GOOGLE_CLIENT_ID: "fake-client.apps.googleusercontent.com",
-    GOOGLE_CLIENT_SECRET: "fake-google-secret",
-    RESEND_API_KEY: "re_fake",
-    SMTP_SENDER_EMAIL: "noreply@example.test",
+    ...(!minimalEnv && ADMIN_ENV),
     ...(mode && { SIGNUP_MODE: mode }),
   };
   const child = spawn(process.execPath, [SCRIPT, ...args, "--api-base", api.base, "--legal-dir", legalDir], { env });
@@ -55,6 +59,7 @@ async function inSync(mode, dbOver = {}, authOver = {}) {
   api.state.db.mode = mode;
   api.state.auth.disable_signup = mode !== "open";
   api.state.log.length = 0;
+  api.state.paths.length = 0;
 }
 
 describe("configure-auth.mjs against a fake Management API", () => {
@@ -186,6 +191,90 @@ describe("configure-auth.mjs against a fake Management API", () => {
     const r = await run(["--apply"], { mode: "invite" });
     assert.equal(r.code, 0, r.out);
     assert.deepEqual(api.state.log, ["SQL update mode=invite"]);
+  });
+
+  it("--close needs only the project ref and token, and PATCHes disable_signup alone before writing the mode row", async () => {
+    await inSync("open");
+    const r = await run(["--close"], { minimalEnv: true });
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(api.state.log, ["PATCH auth disable_signup disable_signup=true", "SQL update mode=waitlist"]);
+    assert.match(r.out, /disable_signup: false → true \(signups closed\)/);
+    assert.equal(api.state.auth.disable_signup, true);
+    assert.equal(api.state.db.mode, "waitlist");
+    assert.equal(
+      api.state.paths.some((p) => /signing-keys|api-keys/.test(p)),
+      false,
+    );
+  });
+
+  it("--close is a no-op on a closed project, honours SIGNUP_MODE=invite and refuses SIGNUP_MODE=open", async () => {
+    await inSync("waitlist");
+    let r = await run(["--close"], { minimalEnv: true });
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(api.state.log, []);
+    assert.match(r.out, /signups already closed/);
+    r = await run(["--close"], { minimalEnv: true, mode: "invite" });
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(api.state.log, ["SQL update mode=invite"]);
+    api.state.log.length = 0;
+    r = await run(["--close"], { minimalEnv: true, mode: "open" });
+    assert.equal(r.code, 1);
+    assert.match(r.out, /--close closes signups/);
+    assert.deepEqual(api.state.log, []);
+    assert.equal((await run(["--close", "--apply"], { minimalEnv: true })).code, 1);
+  });
+
+  it("closing still succeeds when the full PATCH is refused with 400: disable_signup goes alone first and the row follows it", async () => {
+    await inSync("open");
+    api.state.failFullPatch = true;
+    api.state.auth.smtp_sender_name = "Old name";
+    let r = await run(["--apply"], { mode: "waitlist" });
+    assert.equal(r.code, 1);
+    assert.match(r.out, /PATCH \/config\/auth → 400/);
+    assert.deepEqual(api.state.log, [
+      "PATCH auth disable_signup disable_signup=true",
+      "SQL update mode=waitlist",
+      "PATCH auth full refused 400",
+    ]);
+    assert.equal(api.state.auth.disable_signup, true);
+    assert.equal(api.state.db.mode, "waitlist");
+    api.state.auth.disable_signup = false;
+    api.state.db.mode = "open";
+    api.state.log.length = 0;
+    r = await run(["--close"], { minimalEnv: true });
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(api.state.log, ["PATCH auth disable_signup disable_signup=true", "SQL update mode=waitlist"]);
+  });
+
+  it("opening restores the mode row when the PATCH fails, so the row and GoTrue agree", async () => {
+    await inSync("waitlist");
+    api.state.failFullPatch = true;
+    api.state.auth.smtp_sender_name = "Old name";
+    const r = await run(["--apply", "--i-confirm-open-signups"], { mode: "open" });
+    assert.equal(r.code, 1);
+    assert.match(r.out, /signup mode restored to waitlist: signups were not opened/);
+    assert.deepEqual(api.state.log, ["SQL update mode=open", "PATCH auth full refused 400", "SQL update mode=waitlist"]);
+    assert.equal(api.state.auth.disable_signup, true);
+    assert.equal(api.state.db.mode, "waitlist");
+  });
+
+  it("treats only a missing signup_settings table as pre-M7, and fails on any other read error", async () => {
+    await inSync("waitlist");
+    api.state.db.modeReadFails = true;
+    let r = await run(["--check"]);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /statement timeout/);
+    assert.doesNotMatch(r.out, /pre-M7 database/);
+    api.state.db.modeReadFails = false;
+    api.state.db.regclassFails = true;
+    r = await run(["--check"]);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /connection reset/);
+    api.state.db.regclassFails = false;
+    api.state.db.settingsRows = 2;
+    r = await run(["--check"]);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /holds 2 rows, expected exactly one/);
   });
 
   it("sends every request to the fake API only", async () => {
