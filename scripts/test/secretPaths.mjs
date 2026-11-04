@@ -1,0 +1,37 @@
+export const ENV_FILE_NAMES = Object.freeze([
+  ".env-agent",
+  ".env-renderer",
+  ".env-nextjs",
+  ".env-caddy",
+  ".env-llm",
+  ".env-search",
+  "env-files/.env-supabase-admin",
+  "env-files/.env-e2e",
+]);
+
+export const SECRET_PATHS = Object.freeze([
+  ".env",
+  ...ENV_FILE_NAMES.map((name) => `deploy-config/${name}`),
+  ...ENV_FILE_NAMES.map((name) => `cloud/deploy/${name}`),
+  "deploy-config/env-files/anything",
+  "e2e/.auth/x.json",
+  "e2e/test-results/trace.zip",
+  "e2e/playwright-report/index.html",
+  "cloud/e2e/.auth/x.json",
+  "cloud/e2e/test-results/trace.zip",
+  "cloud/e2e/playwright-report/index.html",
+  "cloud/deploy/.env",
+  "cloud/deploy/env-files/notes.txt",
+  "cloud/web/.env.local",
+  "cloud/agent/.env",
+  "web/.env.local",
+  "packages/core/.env",
+]);
+
+export const NEW_RULES = Object.freeze([
+  "**/.env-*",
+  "**/env-files/",
+  "**/.auth/",
+  "cloud/e2e/test-results/",
+  "cloud/e2e/playwright-report/",
+]);

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { NEW_RULES, SECRET_PATHS } from "./secretPaths.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const RULES = readFileSync(join(ROOT, ".dockerignore"), "utf8")
@@ -35,15 +37,34 @@ function ignored(path) {
 }
 
 describe(".dockerignore", () => {
-  for (const name of [".env", ".env-agent", "deploy-config/.env-agent", "deploy-config/.env-renderer", "packages/core/.env", "web/.env.local"]) {
+  for (const name of [
+    ".env",
+    ".env-agent",
+    "deploy-config/.env-agent",
+    "deploy-config/.env-renderer",
+    "packages/core/.env",
+    "web/.env.local",
+  ]) {
     it(`excludes ${name}`, () => assert.equal(ignored(name), true));
   }
 
-  for (const name of ["deploy-config/env-files/.env-e2e", "deploy-config/env-files/.env-supabase-admin", "deploy-config/env-files/anything"]) {
+  for (const name of [
+    "deploy-config/env-files/.env-e2e",
+    "deploy-config/env-files/.env-supabase-admin",
+    "deploy-config/env-files/anything",
+  ]) {
     it(`excludes ${name}`, () => assert.equal(ignored(name), true));
   }
 
-  for (const name of ["server.pem", "deploy-config/certs/tls.pem", "tls.key", ".factory", ".factory/m3/logs/x.txt", ".git", "node_modules"]) {
+  for (const name of [
+    "server.pem",
+    "deploy-config/certs/tls.pem",
+    "tls.key",
+    ".factory",
+    ".factory/m3/logs/x.txt",
+    ".git",
+    "node_modules",
+  ]) {
     it(`excludes ${name}`, () => assert.equal(ignored(name), true));
   }
 
@@ -51,11 +72,38 @@ describe(".dockerignore", () => {
     it(`lists ${rule}`, () => assert.ok(RULES.includes(rule) || RULES.includes(`${rule}/`), rule));
   }
 
-  for (const name of ["apps/desktop/release/Open-Agent-0.0.0-dev-arm64.dmg", "apps/desktop/release/mac-arm64/Open Agent.app/Contents/Info.plist", "apps/desktop/build/stack/docker-compose.yml"]) {
+  for (const name of SECRET_PATHS) {
+    it(`excludes secret path ${name}`, () => assert.equal(ignored(name), true));
+  }
+
+  for (const rule of NEW_RULES) {
+    it(`lists ${rule}`, () => assert.ok(RULES.includes(rule), rule));
+  }
+
+  it("is the only ignore file for builds", () => {
+    const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard"], { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 })
+      .split("\n")
+      .filter((f) => basename(f).endsWith(".dockerignore"));
+    assert.deepEqual(files, [".dockerignore"]);
+  });
+
+  for (const name of [
+    "apps/desktop/release/Open-Agent-0.0.0-dev-arm64.dmg",
+    "apps/desktop/release/mac-arm64/Open Agent.app/Contents/Info.plist",
+    "apps/desktop/build/stack/docker-compose.yml",
+  ]) {
     it(`excludes ${name}`, () => assert.equal(ignored(name), true));
   }
 
-  for (const name of ["apps/desktop/package.json", "packages/core/src/local/main.ts", "packages/local-web/index.html", "deploy-config/env.examples/agent.env.example", "package-lock.json"]) {
+  for (const name of [
+    "apps/desktop/package.json",
+    "packages/core/src/local/main.ts",
+    "packages/local-web/index.html",
+    "deploy-config/env.examples/agent.env.example",
+    "cloud/deploy/env.examples/agent.env.example",
+    "cloud/deploy/compose.hosted.yml",
+    "package-lock.json",
+  ]) {
     it(`keeps ${name}`, () => assert.equal(ignored(name), false));
   }
 });
