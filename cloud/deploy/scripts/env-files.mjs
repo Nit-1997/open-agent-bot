@@ -29,6 +29,8 @@ export const KNOWN = [
   "env-files/.env-e2e",
 ];
 
+export const MAX_BYTES = 64 * 1024;
+
 const USAGE = "usage: env-files.mjs --from <…/deploy-config|…/cloud/deploy> --to <…/cloud/deploy> (--copy | --move) [--dry-run]";
 const octal = (mode) => `0${(mode & 0o777).toString(8).padStart(3, "0")}`;
 const endsWith = (path, ...segments) => path.split(sep).slice(-segments.length).join("/") === segments.join("/");
@@ -63,7 +65,7 @@ function checkDir(label, path, uid, target) {
 function readSource(path, name) {
   let fd;
   try {
-    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   } catch (e) {
     if (e.code === "ENOENT") return null;
     if (e.code === "ELOOP") throw new Refusal(`${name} is a symlink`);
@@ -73,6 +75,7 @@ function readSource(path, name) {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Refusal(`${name} is not a regular file`);
     if (st.nlink !== 1) throw new Refusal(`${name} has ${st.nlink} links`);
+    if (st.size > MAX_BYTES) throw new Refusal(`${name} is larger than ${MAX_BYTES} bytes`);
     return { mode: st.mode & 0o777, bytes: readFileSync(fd) };
   } finally {
     closeSync(fd);
@@ -131,7 +134,7 @@ function preflight({ from, to }, uid) {
 
 export function run(
   { from: fromArg, to: toArg, action, dryRun },
-  { log = console.log, write = writeFileSync, uid = process.getuid() } = {},
+  { log = console.log, write = writeFileSync, mkdir = mkdirSync, uid = process.getuid() } = {},
 ) {
   const from = resolve(fromArg);
   const to = resolve(toArg);
@@ -164,7 +167,11 @@ export function run(
       continue;
     }
     if (name.startsWith("env-files/") && !envFilesReady) {
-      mkdirSync(join(to, "env-files"), { mode: 0o700 });
+      try {
+        mkdir(join(to, "env-files"), { mode: 0o700 });
+      } catch (e) {
+        if (e.code !== "EEXIST") throw e;
+      }
       const problem = dirProblem("--to env-files", lstatSync(join(to, "env-files")), uid, true);
       if (problem) {
         log(`env-files: refused: ${problem}`);
@@ -176,9 +183,13 @@ export function run(
     try {
       write(fd, src.bytes);
       fsyncSync(fd);
-    } finally {
+    } catch (e) {
       closeSync(fd);
+      unlinkSync(dst);
+      log(`env-files: refused: ${name} could not be written (${e.code ?? e.name}); nothing left behind`);
+      return 1;
     }
+    closeSync(fd);
     if (action === "move") {
       if (!sameFileBytes(dst, src.bytes) || !sameFileBytes(join(from, name), src.bytes)) {
         log(`env-files: refused: ${name} differs from its source after writing; source kept`);
