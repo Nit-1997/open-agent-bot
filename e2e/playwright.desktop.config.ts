@@ -10,8 +10,8 @@ export default defineConfig({
   reporter: [["list"]],
   outputDir: "./test-results/desktop",
   projects: [
-    { name: "desktop-fake", testMatch: /.*\.spec\.ts/, testIgnore: /(real|demo|localBuild)\.spec\.ts/ },
+    { name: "desktop-fake", testMatch: /.*\.spec\.ts/, testIgnore: /(real|demo|demo-m5|localBuild)\.spec\.ts/ },
     { name: "desktop-real", testMatch: /(real|localBuild)\.spec\.ts/ },
-    { name: "desktop-demo", testMatch: /demo\.spec\.ts/ },
+    { name: "desktop-demo", testMatch: /demo(-m5)?\.spec\.ts/ },
   ],
 });
