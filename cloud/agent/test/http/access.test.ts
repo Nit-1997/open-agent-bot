@@ -22,6 +22,31 @@ describe("public service routes", () => {
     expect([...h.accounts.requests.values()].map((r) => r.email)).toEqual(["dummy@example.test"]);
   });
 
+  it("ignores x-client-ip from a caller without the service secret: refused before the access service sees it", async () => {
+    const seen: string[] = [];
+    const access = createAccessService({
+      pepper: Buffer.alloc(32, 1),
+      limiter: new RateLimiter(),
+      queue: new BackgroundQueue({ name: "test", max: 10, concurrency: 1 }),
+      submit: async (input) => {
+        seen.push(input.ipHash.toString("hex"));
+        return "inserted";
+      },
+      sendMagicLink: async () => ({}),
+    });
+    const h = await makeHostedApp({ access });
+    for (const secret of [null, "wrong-secret"]) {
+      const res = await h.call(null, "/access-requests", {
+        method: "POST",
+        secret,
+        body: JSON.stringify({ name: "Dummy", email: "dummy@example.test", note: "", formToken: "f1" }),
+        headers: { "x-client-ip": "198.51.100.1" },
+      });
+      expect(res.status).toBe(401);
+    }
+    expect(seen).toEqual([]);
+  });
+
   it("answers 400 only for a malformed body", async () => {
     const h = await makeHostedApp();
     expect((await post(h, "/access-requests", { name: "", email: "x", formToken: "f" })).status).toBe(400);

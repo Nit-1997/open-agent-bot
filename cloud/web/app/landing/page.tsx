@@ -167,9 +167,17 @@ export default function LandingPage() {
 
       <footer id="landing-footer" className="mx-auto flex max-w-[960px] justify-between px-6 pt-4 pb-10 text-[13px] text-[#888]">
         <span id="landing-footer-copy">© 2026 Open Agent</span>
-        <Link id="landing-footer-signin" href="/login" className="hover:text-[#111]">
-          Sign in
-        </Link>
+        <nav id="landing-footer-links" aria-label="Footer" className="flex gap-5">
+          <Link id="landing-footer-terms" href="/terms" className="hover:text-[#111]">
+            Terms
+          </Link>
+          <Link id="landing-footer-privacy" href="/privacy" className="hover:text-[#111]">
+            Privacy
+          </Link>
+          <Link id="landing-footer-signin" href="/login" className="hover:text-[#111]">
+            Sign in
+          </Link>
+        </nav>
       </footer>
     </div>
   );

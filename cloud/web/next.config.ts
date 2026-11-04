@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["@oab/ui", "@oab/bff"],
   outputFileTracingRoot: path.join(__dirname, "../.."),
+  outputFileTracingIncludes: { "/terms": ["./content/terms.md"], "/privacy": ["./content/privacy.md"] },
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },

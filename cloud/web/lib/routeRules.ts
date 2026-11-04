@@ -8,7 +8,17 @@ export type RouteDecision =
   | { kind: "not_found_page" }
   | { kind: "landing" };
 
-const PUBLIC_PATHS = new Set(["/login", "/request-access", "/auth/callback", "/auth/confirm", "/auth/signout", "/landing", "/favicon.ico"]);
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/request-access",
+  "/auth/callback",
+  "/auth/confirm",
+  "/auth/signout",
+  "/landing",
+  "/terms",
+  "/privacy",
+  "/favicon.ico",
+]);
 
 export const isPublicPath = (pathname: string) => PUBLIC_PATHS.has(pathname) || pathname.startsWith("/_next/");
 

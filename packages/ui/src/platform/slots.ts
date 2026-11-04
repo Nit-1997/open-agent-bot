@@ -15,4 +15,5 @@ export type PlatformSlots = Readonly<{
   accessDisabledNotice?: ComponentType;
   usageMeter?: ComponentType<{ id: string; variant: "sidebar" | "sheet" }>;
   runRefusal?: RunRefusalSlot;
+  profileDanger?: ComponentType<{ id: string }>;
 }>;

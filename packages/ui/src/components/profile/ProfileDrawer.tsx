@@ -42,7 +42,7 @@ export function ProfileDrawer(props: {
   const [error, setError] = useState<string | null>(null);
   const [agentValid, setAgentValid] = useState(true);
   const options = useOnboardingOptions(draft.home);
-  const SignOutEverywhere = usePlatform().slots.signOutEverywhere;
+  const { signOutEverywhere: SignOutEverywhere, profileDanger: ProfileDanger } = usePlatform().slots;
   const { onClose, focus } = props;
 
   useEffect(() => {
@@ -191,6 +191,7 @@ export function ProfileDrawer(props: {
               Clear profile
             </button>
           )}
+          {ProfileDanger && <ProfileDanger id="profile-delete-account" />}
         </div>
       </div>
       <footer id="profile-drawer-footer" className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">

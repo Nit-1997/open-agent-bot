@@ -128,8 +128,10 @@ describe("admin users", () => {
     }
   });
 
-  it("deletes a user only with the typed email, removing files, requests and the account", async () => {
+  it("deletes a user only with the typed email, writing the usage tombstone and removing files, requests and the account", async () => {
     const h = await makeHostedApp();
+    h.usage.store.newUser(BOB.email, BOB.id);
+    await h.usage.usage.admit(BOB.id);
     await h.accounts.repo().accessRequests.submit({ name: "Bob", email: BOB.email, note: "", ipHash: Buffer.alloc(32) });
     const wrong = await h.call(ADMIN, `/admin/users/${BOB.id}`, {
       method: "DELETE",
@@ -143,6 +145,8 @@ describe("admin users", () => {
     });
     expect(await ok.json()).toEqual({ ok: true });
     expect(h.accounts.removedArtifacts).toEqual([BOB.id]);
+    expect(h.usage.store.tombstoneCount()).toBe(1);
+    expect(h.deleting.has(BOB.id)).toBe(true);
     expect(h.accounts.users.has(BOB.id)).toBe(false);
     expect([...h.accounts.requests.values()].some((r) => r.email === BOB.email)).toBe(false);
     expect((await h.call(ADMIN, `/admin/users/${BOB.id}/deactivate`, { method: "POST" })).status).toBe(404);
@@ -156,6 +160,8 @@ describe("admin users", () => {
       repo: { ...repo, storage: { removeUserFiles: async () => Promise.reject(new Error("storage down")) } },
       auth: h.accounts.auth(),
       hooks: { onDisabled: async () => {}, onEnabled: () => {} },
+      usage: h.usage.usage,
+      deleting: h.deleting,
     });
     const quiet = (await import("vitest")).vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(admin.remove(ADMIN, BOB.id, BOB.email)).rejects.toMatchObject({

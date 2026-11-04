@@ -83,6 +83,7 @@ const ROUTES: Probe[] = [
   { route: "/artifacts/:file", method: "GET", path: `/artifacts/${ID}.pdf` },
   { route: "/usage", method: "GET", path: "/usage" },
   { route: "/human-check", method: "POST", path: "/human-check", body: { token: "t" } },
+  { route: "/account/delete", method: "POST", path: "/account/delete", body: { confirmEmail: "nobody@example.test" } },
   { route: "/admin/access-requests", method: "GET", path: "/admin/access-requests" },
   { route: "/admin/access-requests/:id/approve", method: "POST", path: `/admin/access-requests/${ID}/approve`, body: {} },
   { route: "/admin/access-requests/:id/reject", method: "POST", path: `/admin/access-requests/${ID}/reject`, body: {} },
@@ -130,6 +131,7 @@ const USER_PATHS = [
   "/search",
   "/usage",
   "/human-check",
+  "/account/delete",
 ];
 
 const key = (p: Probe) => `${p.method} ${p.path}`;

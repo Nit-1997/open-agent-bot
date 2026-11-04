@@ -73,5 +73,7 @@
   { "file": "auth/signout/route.ts", "url": "/auth/signout", "signedOut": "pass", "user": "pass", "admin": "pass" },
   { "file": "landing/page.tsx", "url": "/landing", "signedOut": "pass", "user": "pass", "admin": "pass" },
   { "file": "login/page.tsx", "url": "/login", "signedOut": "pass", "user": "pass", "admin": "pass" },
-  { "file": "request-access/page.tsx", "url": "/request-access", "signedOut": "pass", "user": "pass", "admin": "pass" }
+  { "file": "privacy/page.tsx", "url": "/privacy", "signedOut": "pass", "user": "pass", "admin": "pass" },
+  { "file": "request-access/page.tsx", "url": "/request-access", "signedOut": "pass", "user": "pass", "admin": "pass" },
+  { "file": "terms/page.tsx", "url": "/terms", "signedOut": "pass", "user": "pass", "admin": "pass" }
 ]

@@ -39,11 +39,12 @@ describe("desktopSlots", () => {
     expect(Object.keys(desktopSlots({ openServices: () => {} }))).toEqual(["accountMenuExtra"]);
   });
 
-  it("never sets the hosted usage meter or the run refusal notice", () => {
+  it("never sets the hosted usage meter, the run refusal notice or the account delete", () => {
     for (const bridge of [undefined, null, {}, { openServices: () => {} }]) {
       const slots = desktopSlots(bridge);
       expect(slots.usageMeter).toBeUndefined();
       expect(slots.runRefusal).toBeUndefined();
+      expect(slots.profileDanger).toBeUndefined();
     }
   });
 });

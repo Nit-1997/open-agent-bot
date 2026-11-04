@@ -29,6 +29,7 @@ describe("hostedAgentDeps", () => {
       ["protected", "/admin"],
       ["protected", "/usage"],
       ["protected", "/human-check"],
+      ["protected", "/account"],
     ]);
   });
 

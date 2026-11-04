@@ -3,6 +3,8 @@ import { UserError } from "@oab/core/lib/errors.js";
 import { log } from "@oab/core/lib/log.js";
 import type { AccessRequestView, AdminUser, ProfileView, RequestFilter } from "@oab/shared/admin";
 import type { Page } from "@oab/shared/pages";
+import type { DeletingUsers } from "../account/deleting.js";
+import type { UsageRepo } from "../limits/usageRepo.js";
 import type { AdminRepo } from "../store/admin.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "./authAdmin.js";
 import { deleteAccount } from "./deleteAccount.js";
@@ -18,8 +20,16 @@ const inviteOutcome = (result: EmailResult) =>
     ? { inviteStatus: "sent" as const, inviteError: null }
     : { inviteStatus: "failed" as const, inviteError: describeInviteFailure(result.code) };
 
-export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hooks: AccountHooks }) {
-  const { repo, auth, hooks } = deps;
+export type AdminServiceDeps = {
+  repo: AdminRepo;
+  auth: AuthAdmin;
+  hooks: AccountHooks;
+  usage: Pick<UsageRepo, "tombstone">;
+  deleting: DeletingUsers;
+};
+
+export function createAdminService(deps: AdminServiceDeps) {
+  const { repo, auth, hooks, usage, deleting } = deps;
 
   const request = async (id: string) => {
     const r = await repo.accessRequests.get(id);
@@ -127,8 +137,14 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
           });
         }
       };
-      await step("deactivate", () => disable(id));
-      await deleteAccount({ repo, auth }, profile, step);
+      deleting.add(id);
+      try {
+        await step("deactivate", () => disable(id));
+        await deleteAccount({ repo, auth, usage }, profile, step);
+      } catch (err) {
+        deleting.delete(id);
+        throw err;
+      }
       log.info(`[admin] deleted user=${id} by=${admin.id}`);
     },
   };
