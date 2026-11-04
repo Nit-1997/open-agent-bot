@@ -281,7 +281,7 @@ Work from a checkout of the M7 commit you will deploy, with Supabase CLI 2.111.0
 
    On any stop below, run `unset LIVE_DB_URL` before you leave the shell.
 
-   While a `psql` or `supabase` command below runs, its URL argument, password included, shows in the process list (`ps`) to every user of the machine, so run Gates 8 and 9 on a machine only you use. For the `psql` steps you can keep the password out of the arguments: write it to `~/.pgpass` (mode `0600`, one line `<pooler host>:5432:postgres:<user>:<password>`), paste the URL without the password, and delete the file when you finish. The Supabase CLI's `--db-url` still carries it. Never export the URL or the password, and never leave either in a file after the gate.
+   While a `psql` or Supabase CLI command below runs, its URL argument, password included, shows in the process list (`ps`) to every user of the machine, so run Gates 8 and 9 on a machine only you use. For the `psql` steps you can keep the password out of the arguments: write it to `~/.pgpass` (mode `0600`, one line `<pooler host>:5432:postgres:<user>:<password>`), paste the URL without the password, and delete the file when you finish. The Supabase CLI's `--db-url` still carries it. Never export the URL or the password, and never leave either in a file after the gate.
 
 2. Save the old function bodies, then check that live still runs the ones `cloud/supabase/rollback/m7.sql` restores. `check-old-bodies.mjs` compares each body (`prosrc`) and its `security definer`, volatility and `set` settings with the rollback file and prints only function names; exit 0 means both match, exit 1 means one differs (stop: live was changed by hand, and the rollback file would not restore it).
 
