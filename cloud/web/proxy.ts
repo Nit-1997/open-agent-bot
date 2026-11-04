@@ -30,6 +30,7 @@ async function respond(
     case "landing":
       return NextResponse.rewrite(new URL(LANDING_PATH, request.url), { request: { headers: forwardHeaders } });
     case "not_found_page":
+      if (request.nextUrl.pathname === NOT_FOUND_PATH) return NextResponse.next({ status: 404, request: { headers: forwardHeaders } });
       return NextResponse.rewrite(new URL(NOT_FOUND_PATH, request.url), { status: 404, request: { headers: forwardHeaders } });
     case "login": {
       const origin = appOrigin();
