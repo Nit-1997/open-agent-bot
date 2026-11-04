@@ -21,6 +21,7 @@ const [preM6, m7] = FIXTURES.map(pinnedIn);
 const pinned = [...preM6, ...m7];
 
 const HANDLE_NEW_USER = /create (?:or replace )?function private\.handle_new_user\(\)[\s\S]*?\$\$;/;
+const BEFORE_USER_CREATED = /create (?:or replace )?function private\.before_user_created\(event jsonb\)[\s\S]*?\$\$;/;
 
 describe(`Supabase migrations (cloud/supabase/migrations, pinned by ${FIXTURES.join(" and ")})`, () => {
   const now = readdirSync(MIGRATIONS).sort();
@@ -29,7 +30,7 @@ describe(`Supabase migrations (cloud/supabase/migrations, pinned by ${FIXTURES.j
     assert.ok(preM6.length >= 12, `only ${preM6.length} pre-M6 migrations pinned`);
     assert.deepEqual(
       m7.map((p) => p.name),
-      ["20261104092535_request_usage.sql"],
+      ["20261104092535_request_usage.sql", "20261104113650_signup_modes.sql"],
     );
     assert.deepEqual(
       now,
@@ -55,6 +56,15 @@ describe("rollback/m7.sql (Gate 8 rollback)", () => {
     const created = HANDLE_NEW_USER.exec(original)?.[0];
     assert.ok(restored && created);
     assert.equal(restored, created.replace("create function", "create or replace function"));
+  });
+
+  it("restores before_user_created verbatim from the access migration and clears the M7 version comment", () => {
+    const access = readFileSync(join(MIGRATIONS, "20261101060633_access.sql"), "utf8");
+    const restored = BEFORE_USER_CREATED.exec(rollback)?.[0];
+    const created = BEFORE_USER_CREATED.exec(access)?.[0];
+    assert.ok(restored && created);
+    assert.equal(restored, created.replace("create function", "create or replace function"));
+    assert.match(rollback, /^comment on function private\.before_user_created\(jsonb\) is null;$/m);
   });
 
   it("only replaces function bodies", () => {

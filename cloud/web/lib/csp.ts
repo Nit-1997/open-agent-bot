@@ -2,10 +2,16 @@ export function newNonce(): string {
   return Buffer.from(crypto.randomUUID()).toString("base64");
 }
 
-export function contentSecurityPolicy(nonce: string, supabaseUrl: string, dev: boolean, frameOrigins: string[] = []): string {
+export function contentSecurityPolicy(
+  nonce: string,
+  supabaseUrl: string,
+  dev: boolean,
+  frameOrigins: string[] = [],
+  scriptOrigins: string[] = [],
+): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
+    [`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`, ...scriptOrigins].join(" "),
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     "font-src 'self'",

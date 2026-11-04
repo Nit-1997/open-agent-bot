@@ -62,6 +62,7 @@ const ALLOWED = {
   ".services.agent.build.dockerfile": ["packages/core/Dockerfile", "cloud/agent/Dockerfile"],
   ".services.web.build.dockerfile": ["web/Dockerfile", "cloud/web/Dockerfile"],
   ".services.web.tmpfs.1": [`/app/web/.next/cache${WEB_CACHE}`, `/app/cloud/web/.next/cache${WEB_CACHE}`],
+  ".services.web.build.args.NEXT_PUBLIC_TURNSTILE_SITE_KEY": [undefined, ""],
 };
 const LINE_MOVES = [
   [/^( {6}- path: )deploy-config\/(\.env-\w+)$/gm, "$1$2"],
@@ -71,13 +72,17 @@ const LINE_MOVES = [
   [/^( {2}agent:\n {4}build:\n {6}context: \.\.\/\.\.\n {6}dockerfile: )packages\/core\/Dockerfile$/m, "$1cloud/agent/Dockerfile"],
   [/^( {6}dockerfile: )web\/Dockerfile$/m, "$1cloud/web/Dockerfile"],
   [/^( {6}- )\/app\/web\/\.next\/cache(:size=256m,uid=1000,gid=1000,mode=0700)$/m, "$1/app/cloud/web/.next/cache$2"],
+  [
+    /^( {8}NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: \$\{NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-\}\n)/m,
+    "$1        NEXT_PUBLIC_TURNSTILE_SITE_KEY: $${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}\n",
+  ],
 ];
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const FIXTURE = join(ROOT, "cloud/deploy/test/fixtures/compose-hosted-baseline.yml");
 const baselineText = () => readFileSync(FIXTURE, "utf8");
 
 describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
-  it(`is the ${BASELINE} root docker-compose.yml (fixtures/compose-hosted-baseline.yml) plus one name line, with only its paths moved to cloud/deploy`, () => {
+  it(`is the ${BASELINE} root docker-compose.yml (fixtures/compose-hosted-baseline.yml) plus one name line and the M7 Turnstile build arg, with only its paths moved to cloud/deploy`, () => {
     let moved = baselineText();
     for (const [re, to] of LINE_MOVES) {
       assert.match(moved, new RegExp(re.source, re.flags.replace("g", "")), String(re));
@@ -86,7 +91,7 @@ describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
     assert.equal(read(HOSTED), `name: open-agent-bot\n${moved}`);
   });
 
-  it(`resolves to the same config as the root file at ${BASELINE} under project open-agent-bot, apart from exactly the moved paths`, () => {
+  it(`resolves to the same config as the root file at ${BASELINE} under project open-agent-bot, apart from exactly the moved paths and the Turnstile build arg`, () => {
     const base = join(WORK, "baseline.yml");
     writeFileSync(base, baselineText());
     const hosted = config(["-f", HOSTED, ...HOSTED_PROFILES]);

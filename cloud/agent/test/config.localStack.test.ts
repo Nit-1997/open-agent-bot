@@ -80,6 +80,30 @@ describe("loadHostedConfig local-stack mode", () => {
     expect(loadHostedConfig({ ...TEST_ENV, SUPABASE_LOCAL_STACK: "" })).not.toHaveProperty("localStack");
   });
 
+  it("accepts TURNSTILE_VERIFY_URL only on 127.0.0.1 factory ports, with a secret", () => {
+    vi.spyOn(log, "warn").mockImplementation(() => {});
+    const secret = "1x0000000000000000000000000000000AA";
+    expect(
+      loadHostedConfig({ ...LOCAL, TURNSTILE_SECRET_KEY: secret, TURNSTILE_VERIFY_URL: "http://127.0.0.1:18723/siteverify" }).turnstile,
+    ).toEqual({
+      secret,
+      verifyUrl: "http://127.0.0.1:18723/siteverify",
+    });
+    for (const url of ["http://127.0.0.1:9999", "https://127.0.0.1:18723", "http://localhost:18723", "http://127.0.0.1:18723?x=1"])
+      expect(problems({ ...LOCAL, TURNSTILE_SECRET_KEY: secret, TURNSTILE_VERIFY_URL: url }), url).toEqual([
+        "TURNSTILE_VERIFY_URL must be http://127.0.0.1:<18700-18749>[/path]",
+      ]);
+    expect(problems({ ...LOCAL, TURNSTILE_VERIFY_URL: "http://127.0.0.1:18723" })).toEqual([
+      "TURNSTILE_VERIFY_URL needs TURNSTILE_SECRET_KEY",
+    ]);
+  });
+
+  it("accepts the Cloudflare test secrets in local-stack mode", () => {
+    vi.spyOn(log, "warn").mockImplementation(() => {});
+    for (const secret of ["1x0000000000000000000000000000000AA", "2x0000000000000000000000000000000AA"])
+      expect(loadHostedConfig({ ...LOCAL, TURNSTILE_SECRET_KEY: secret }).turnstile).toEqual({ secret });
+  });
+
   it("is never set by the hosted Dockerfile, the compose files or the env examples", () => {
     const files = [
       "cloud/agent/Dockerfile",
@@ -91,6 +115,6 @@ describe("loadHostedConfig local-stack mode", () => {
       ...readdirSync(join(ROOT, "cloud/deploy/env.examples")).map((f) => `cloud/deploy/env.examples/${f}`),
     ];
     expect(files.length).toBeGreaterThanOrEqual(9);
-    for (const f of files) expect(readFileSync(join(ROOT, f), "utf8"), f).not.toMatch(/SUPABASE_LOCAL_STACK/);
+    for (const f of files) expect(readFileSync(join(ROOT, f), "utf8"), f).not.toMatch(/SUPABASE_LOCAL_STACK|TURNSTILE_VERIFY_URL/);
   });
 });

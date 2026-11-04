@@ -1,5 +1,5 @@
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
-import type { SignupMode } from "@oab/shared/usage";
+import type { SignupMode, SignupStats } from "@oab/shared/usage";
 import { PAGE_SIZE } from "@oab/shared/pages";
 import type { Principal } from "@oab/core/identity/types.js";
 import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
@@ -12,7 +12,9 @@ import { createAdminGuard } from "../../src/identity/adminGuard.js";
 import { UserStatusCache } from "../../src/identity/status.js";
 import { createSupabaseIdentity } from "../../src/identity/supabaseIdentity.js";
 import { AuthError, type Verifier } from "../../src/identity/verify.js";
+import type { HumanVerifier } from "../../src/captcha/turnstile.js";
 import { hostedRoutes } from "../../src/routes.js";
+import { gateApplies, LiveHumanCheckGate } from "../../src/signup/humanCheck.js";
 import type { AdminRepo } from "../../src/store/admin.js";
 import { type AppOverrides, makeApp, tokenFor } from "../../../../packages/core/test/fixtures/app.js";
 import { TEST_SECRET } from "./config.js";
@@ -178,12 +180,14 @@ export type HostedOverrides = Omit<AppOverrides, "identity" | "routes"> & {
   access?: AccessService;
   usage?: (limiter: RateLimiter) => FakeUsageDeps;
   signupMode?: () => Promise<SignupMode | "unknown">;
+  signupStats?: () => Promise<SignupStats>;
+  verifier?: HumanVerifier;
 };
 
 export type HostedHarness = Awaited<ReturnType<typeof makeHostedApp>>;
 
 export async function makeHostedApp(over: HostedOverrides = {}) {
-  const { seams, access: accessOver, usage: usageOver, signupMode, ...appOver } = over;
+  const { seams, access: accessOver, usage: usageOver, signupMode, signupStats, verifier, ...appOver } = over;
   const accounts = new FakeAccounts();
   for (const u of [ALICE, BOB, ADMIN]) accounts.add(u);
   const users = new Map([ALICE, BOB, ADMIN].map((u) => [tokenFor(u), u]));
@@ -210,6 +214,7 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
     hooks: { onDisabled: async (id) => status.invalidate(id), onEnabled: (id) => status.invalidate(id) },
   });
   const queue = new BackgroundQueue({ name: "access", max: 50, concurrency: 2 });
+  const mode = signupMode ?? (async () => "waitlist" as const);
   const access = createAccessService({
     pepper: Buffer.alloc(32, 9),
     limiter,
@@ -219,16 +224,19 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
       accounts.sent.push({ kind: "magic", email });
       return {};
     },
+    captcha: { required: async () => gateApplies(await mode()), verifier },
   });
   const usage = (usageOver ?? fakeUsageDeps)(limiter);
+  const gate = new LiveHumanCheckGate({ mode, checks: usage.usage.humanCheck, verifierConfigured: !!verifier });
   const routes = hostedRoutes({
     access: accessOver ?? access,
     admin,
     adminGuard: createAdminGuard({ isLiveAdmin: (u) => liveAdmin(u.id), roleUnverified: identity.roleUnverified }),
     limiter,
-    usage,
-    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users, signupMode),
+    usage: { ...usage, humanCheck: gate },
+    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users, mode, signupStats),
+    signup: { mode, gate, verifier, limiter },
   });
   const h = await makeApp({ ...appOver, limiter, identity, routes });
-  return { ...h, accounts, status, queue, usage, demoted };
+  return { ...h, accounts, status, queue, usage, demoted, gate };
 }

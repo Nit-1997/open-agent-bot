@@ -1,8 +1,7 @@
 import { body, safe } from "@oab/core/http/handlers.js";
 import { Hono } from "hono";
 import { type AccessService, normalizeEmail, readRequest } from "../access/service.js";
-
-const clientIp = (raw: string | undefined) => (raw ?? "").split(",")[0].trim().slice(0, 64) || "unknown";
+import { clientIp } from "./clientIp.js";
 
 export function accessRoutes(deps: { access: AccessService }) {
   const app = new Hono();
@@ -18,8 +17,8 @@ export function accessRoutes(deps: { access: AccessService }) {
   app.post(
     "/auth/email-link",
     safe(async (c) => {
-      const email = normalizeEmail((await body(c)).email);
-      deps.access.emailLink(email, clientIp(c.req.header("x-client-ip")));
+      const b = await body(c);
+      await deps.access.emailLink(normalizeEmail(b.email), clientIp(c.req.header("x-client-ip")), b.captchaToken);
       return c.json({ ok: true }, 202);
     }),
   );

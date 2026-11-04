@@ -2,7 +2,11 @@ import type { UserStatus } from "./admin.ts";
 
 export type Limits = { runningPerUser: number; perHour: number; perMonth: number; runningServer: number };
 
-export type SignupMode = "invite" | "waitlist" | "open";
+export const SIGNUP_MODES = ["invite", "waitlist", "open"] as const;
+export type SignupMode = (typeof SIGNUP_MODES)[number];
+export const isSignupMode = (v: unknown): v is SignupMode => typeof v === "string" && (SIGNUP_MODES as readonly string[]).includes(v);
+
+export type SignupStats = { lastHour: number; lastDay: number; capHour: number; capDay: number };
 
 export type HumanCheckState = "off" | "required" | "done" | "unavailable";
 
@@ -18,7 +22,7 @@ export type AdminUsageSummary = {
   running: { now: number; limit: number; staleReleased: number };
   limits: Limits;
   signupMode: SignupMode | "unknown";
-  signups: { lastHour: number; lastDay: number; capHour: number; capDay: number } | null;
+  signups: SignupStats | null;
 };
 
 export const USAGE_FILTERS = ["all", "at_limit"] as const;

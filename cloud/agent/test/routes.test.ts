@@ -8,6 +8,7 @@ import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { checkMounts } from "@oab/core/startAgent.js";
 import { FakeAccounts, makeHostedApp } from "./fixtures/hostedApp.js";
 import { TEST_SECRET } from "./fixtures/config.js";
+import { waitlistSignup } from "./fixtures/humanCheck.js";
 import { fakeAdminUsageDeps, fakeUsageDeps } from "./fixtures/usage.js";
 import { ADMIN, ALICE } from "./fixtures/users.js";
 
@@ -29,17 +30,19 @@ function mounts() {
     limiter,
     usage,
     adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users),
+    signup: waitlistSignup(limiter),
   });
   return { list, adminGuard };
 }
 
 describe("hostedRoutes", () => {
-  it("mounts access as public at /, admin and usage as protected, and passes the mount checks", () => {
+  it("mounts access and the signup mode as public at /, admin, usage and the human check as protected, and passes the mount checks", () => {
     const { list } = mounts();
     expect(list.map((m) => [m.stage, m.basePath])).toEqual([
       ["public", "/"],
       ["protected", "/admin"],
       ["protected", "/usage"],
+      ["protected", "/human-check"],
     ]);
     expect(() => checkMounts(list)).not.toThrow();
   });
@@ -54,7 +57,11 @@ describe("hostedRoutes", () => {
     ]);
     const firstRoute = routes.findIndex((r) => r.method !== "ALL");
     expect(routes.findLastIndex((r) => r.handler === adminGuard)).toBeLessThan(firstRoute);
-    expect(list[0]!.routes.routes.map((r) => `${r.method} ${r.path}`)).toEqual(["POST /access-requests", "POST /auth/email-link"]);
+    expect(list[0]!.routes.routes.map((r) => `${r.method} ${r.path}`)).toEqual([
+      "POST /access-requests",
+      "POST /auth/email-link",
+      "GET /signup",
+    ]);
   });
 
   it("hides admin routes from a non-admin and lets the admin list users and requests", async () => {

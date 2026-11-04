@@ -8,6 +8,7 @@ import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { type AgentDeps, type RunningAgent, startAgent } from "@oab/core/startAgent.js";
 import { coreDeps } from "../../../packages/core/test/fixtures/agent.js";
+import { waitlistSignup } from "./fixtures/humanCheck.js";
 import { fakeAdminUsageDeps, fakeUsageDeps } from "./fixtures/usage.js";
 import { FakeAccounts } from "./fixtures/hostedApp.js";
 
@@ -43,6 +44,7 @@ function hostedMounts(limiter = new RateLimiter()): RouteMount[] {
     limiter,
     usage,
     adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users),
+    signup: waitlistSignup(limiter),
   });
 }
 

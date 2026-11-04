@@ -4,7 +4,8 @@ import { NO_CAPABILITIES, type Principal } from "@oab/core/identity/types.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { Admission, RunTicket } from "@oab/core/policy/types.js";
 import type { HumanCheckState, Limits } from "@oab/shared/usage";
-import { type HumanCheckGate, humanCheckOff } from "../../src/limits/humanCheckStub.js";
+import type { HumanCheckGate } from "../../src/signup/humanCheck.js";
+import { humanCheckOff } from "../fixtures/humanCheck.js";
 import { HostedRunPolicy } from "../../src/limits/policy.js";
 import { RunSlots } from "../../src/limits/slots.js";
 import { type UsageRepo, UsageRepoError } from "../../src/limits/usageRepo.js";
@@ -321,10 +322,6 @@ describe("HostedRunPolicy human check gate", () => {
       retryAfter: 60,
     });
     expect(s.repo.calls).toBe(0);
-  });
-
-  it("ships the 7.2 stub as off", async () => {
-    expect(await humanCheckOff.state("anyone")).toBe("off");
   });
 });
 

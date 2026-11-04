@@ -9,3 +9,5 @@ export type EmailRows = {
   deleteEmail(table: string, email: string): Promise<void>;
 };
 export declare function emailRows(env: { url: string; key: string }): EmailRows;
+export declare function markHumanChecked(env: { url: string; key: string }, userIds: string[]): Promise<number>;
+export declare function humanCheckTestUsers(admin: unknown, env: { url: string; key: string }): Promise<number>;

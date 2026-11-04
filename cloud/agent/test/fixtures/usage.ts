@@ -1,8 +1,8 @@
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { ProfileView } from "@oab/shared/admin";
-import type { Limits, SignupMode } from "@oab/shared/usage";
+import type { Limits, SignupMode, SignupStats } from "@oab/shared/usage";
 import type { AdminUsageDeps } from "../../src/limits/adminRoutes.js";
-import { humanCheckOff } from "../../src/limits/humanCheckStub.js";
+import { humanCheckOff } from "./humanCheck.js";
 import { HostedRunPolicy } from "../../src/limits/policy.js";
 import type { UsageRouteDeps } from "../../src/limits/routes.js";
 import { RunSlots } from "../../src/limits/slots.js";
@@ -23,6 +23,7 @@ export function fakeAdminUsageDeps(
   u: FakeUsageDeps,
   profiles: { get(id: string): Promise<ProfileView | undefined> },
   signupMode: () => Promise<SignupMode | "unknown"> = async () => "waitlist",
+  signupStats: () => Promise<SignupStats> = async () => ({ lastHour: 0, lastDay: 0, capHour: 20, capDay: 100 }),
 ): AdminUsageDeps {
-  return { usage: u.usage, policy: u.policy, limits: u.limits, profiles, signupMode };
+  return { usage: u.usage, policy: u.policy, limits: u.limits, profiles, signupMode, signupStats };
 }

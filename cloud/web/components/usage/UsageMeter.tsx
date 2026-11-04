@@ -1,6 +1,9 @@
 "use client";
 
 import type { UsageView } from "@oab/shared/usage";
+import { useState } from "react";
+import { HumanCheckDialog } from "@/components/auth/HumanCheckDialog";
+import { HUMAN_CHECK_COPY } from "@/lib/humanCheckCopy";
 import { DESKTOP_URL, METER_COPY, meterLevel } from "@/lib/usageCopy";
 import { useUsage } from "./useUsage";
 
@@ -29,7 +32,33 @@ function MacLine({ id }: { id: string }) {
   );
 }
 
-function Counts({ id, view }: { id: string; view: UsageView }) {
+function HumanCheckLine({ id, onDone }: { id: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div id={`${id}-check`} className="mt-2 space-y-1.5 text-[12.5px] text-text-secondary">
+      <p id={`${id}-check-text`}>{METER_COPY.check}</p>
+      <button
+        id={`${id}-check-open`}
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-full bg-charcoal px-3 py-1 text-[12px] font-medium text-on-charcoal focus-visible:outline-2 focus-visible:outline-mist-500"
+      >
+        {HUMAN_CHECK_COPY.meterOpen}
+      </button>
+      {open && (
+        <HumanCheckDialog
+          onCancel={() => setOpen(false)}
+          onDone={() => {
+            setOpen(false);
+            onDone();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function Counts({ id, view, onChecked }: { id: string; view: UsageView; onChecked: () => void }) {
   const { used, limit, resetsAt } = view.month;
   const level = meterLevel(used, limit);
   const shown = Math.min(used, limit);
@@ -73,11 +102,7 @@ function Counts({ id, view }: { id: string; view: UsageView }) {
           <MacLine id={id} />
         </div>
       )}
-      {view.humanCheck === "required" && (
-        <p id={`${id}-check`} className="mt-2 text-[12.5px] text-text-secondary">
-          {METER_COPY.check}
-        </p>
-      )}
+      {view.humanCheck === "required" && <HumanCheckLine id={id} onDone={onChecked} />}
     </>
   );
 }
@@ -111,7 +136,7 @@ export function UsageMeter({ id, variant }: { id: string; variant: Variant }) {
     );
   return (
     <div id={id} data-level={meterLevel(state.view.month.used, state.view.month.limit)} className={FRAME[variant]}>
-      <Counts id={id} view={state.view} />
+      <Counts id={id} view={state.view} onChecked={retry} />
     </div>
   );
 }

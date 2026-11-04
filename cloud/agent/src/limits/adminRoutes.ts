@@ -13,6 +13,7 @@ import {
   type Limits,
   nextUtcMonth,
   type SignupMode,
+  type SignupStats,
   USAGE_PAGE_MAX,
   USAGE_QUERY_MAX,
 } from "@oab/shared/usage";
@@ -26,6 +27,7 @@ export type AdminUsageDeps = {
   limits: Limits;
   profiles: { get(id: string): Promise<ProfileView | undefined> };
   signupMode: () => Promise<SignupMode | "unknown">;
+  signupStats: () => Promise<SignupStats>;
   now?: () => number;
 };
 
@@ -63,17 +65,23 @@ export function usageAdminRoutes(deps: AdminUsageDeps): Hono<AuthEnv> {
     "/admin/usage/summary",
     safe<AuthEnv>(async (c) => {
       const totals = await fromUsage("summary", () => deps.usage.summary());
-      const signupMode = await deps.signupMode().catch((err: unknown) => {
-        log.warn("[limits] signup mode lookup failed", err instanceof Error ? err.message : err);
-        return "unknown" as const;
-      });
+      const [signupMode, signups] = await Promise.all([
+        deps.signupMode().catch((err: unknown) => {
+          log.warn("[limits] signup mode lookup failed", err instanceof Error ? err.message : err);
+          return "unknown" as const;
+        }),
+        deps.signupStats().catch((err: unknown) => {
+          log.warn("[limits] signup stats lookup failed", err instanceof Error ? err.message : err);
+          return null;
+        }),
+      ]);
       const snap = deps.policy.snapshot();
       const view: AdminUsageSummary = {
         month: { total: totals.monthTotal, activeUsers: totals.activeUsers, resetsAt: nextUtcMonth(now()).toISOString() },
         running: { now: snap.running, limit: deps.limits.runningServer, staleReleased: snap.staleReleased },
         limits: deps.limits,
         signupMode,
-        signups: null,
+        signups,
       };
       return c.json(view);
     }),
