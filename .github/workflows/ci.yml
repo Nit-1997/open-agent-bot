@@ -258,6 +258,11 @@ jobs:
       - run: npm run typecheck -w @oab/desktop
       - run: npm test -w @oab/desktop
       - run: npm run build -w @oab/desktop && npm run stage -w @oab/desktop
+      - name: DIAG one test with protocol logs
+        working-directory: e2e
+        run: |
+          DEBUG=pw:protocol,pw:browser,pw:api xvfb-run -a npx playwright test -c playwright.desktop.config.ts desktop/docker.spec.ts --project desktop-fake -g "Compose 2.23.0" > "$RUNNER_TEMP/diag.log" 2>&1 || echo "diag exit $?"
+          grep -vE "Network\.|Fetch\." "$RUNNER_TEMP/diag.log" | cut -c1-400 | head -400
       - name: Electron e2e with the fake docker CLI (no Docker)
         working-directory: e2e
         run: xvfb-run -a npx playwright test -c playwright.desktop.config.ts --project desktop-fake
