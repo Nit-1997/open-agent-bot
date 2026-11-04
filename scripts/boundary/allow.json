@@ -19,5 +19,7 @@
   { "file": "apps/desktop/test/boundary.test.ts", "reason": "scanner fixture: a cloud/web import string checked in memory, never read from disk" },
   { "file": "package.json", "reason": "the root workspaces list includes \"cloud/*\" (D12); npm skips the folder when cloud/ is deleted" },
   { "file": "packages/core/test/deploy/workspaceLayout.test.ts", "reason": "skips the cloud/* workspace glob and cloud/ Dockerfiles so the test covers non-cloud workspaces and Dockerfiles only and never reads cloud/ (D12 R2-3, D11)" },
-  { "file": "scripts/test/workspaceLayout.test.mjs", "reason": "skips the cloud/* workspace glob and cloud/ Dockerfiles so the test covers non-cloud workspaces and Dockerfiles only and never reads cloud/ (D12 R2-3, D11)" }
+  { "file": "scripts/test/workspaceLayout.test.mjs", "reason": "skips the cloud/* workspace glob and cloud/ Dockerfiles so the test covers non-cloud workspaces and Dockerfiles only and never reads cloud/ (D12 R2-3, D11)" },
+  { "file": "scripts/demo/m6/**", "reason": "the M6 demo commands name cloud/ paths: they run the cloud checks, rehearse the switch and list the build context (D12)" },
+  { "file": "scripts/test/demoParts.test.mjs", "reason": "fixture-only cloud names: demo command lines checked as strings by the m6 static rules, never read from disk" }
 ]

@@ -65,6 +65,15 @@ Agent settings live in `cloud/deploy/.env-agent` (git-ignored).
 | `COPILOT_CONNECT_MAX_MS` | `1800000` (30 min) | Longest a connect stream stays open (60000–86400000 ms) |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs prompts, tool arguments and the profile |
 
+## Develop the hosted stack
+
+To work on one side of the hosted stack, run the other in Docker and point at it:
+
+- Agent: `cd cloud/agent && npm run build && set -a && . ../deploy/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table above). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval. The agent image sets it already.
+- Web: `cd cloud/web && set -a && . ../deploy/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
+
+Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" above). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session. The checks for the cloud workspaces are in CONTRIBUTING's checks table; the cloud boundary (nothing outside `cloud/` imports or builds from it) is in CONTRIBUTING's "Cloud boundary".
+
 ## End-to-end demo
 
 `cloud/e2e/` drives a preview stack with Playwright on desktop, tablet and phone sizes. It creates `oab-e2e+shell@example.test` and `oab-e2e+other@example.test`, seeds chats, reports and saved cards, and removes them afterwards with `cloud/supabase/scripts/cleanup-e2e.mjs`. It reads `cloud/deploy/env-files/.env-supabase-admin` and needs `E2E_OPENROUTER_KEY` in `cloud/deploy/env-files/.env-e2e` (saved through the app's API, never typed or logged; the run uses DeepSeek V4 Flash).
@@ -85,3 +94,129 @@ The `smoke` project (`cloud/e2e/preview-smoke.spec.ts`) runs on its own against 
 - `npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` (from `packages/core`, where `local` is the default and only target) runs the same scenarios against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. The signed-in path above runs from `cloud/agent`, whose `evals/run.ts` registers `--target hosted` (its default) on top of core's runner.
 - `npm run eval:rank` scores shop ranking on the ESCI grocery slice (Exact@1, NDCG@3); add `-- --judge` with an OpenRouter key to score the Jev re-rank.
 - `npx tsx evals/run.ts --rescore <results dir>` re-grades saved runs after assertions change.
+
+## Switch-over after M6 (owner only)
+
+M6 moved everything hosted into `cloud/`. Two owner steps put production on the new layout: Gate 6 points Vercel at `cloud/web`, and Gate 7 moves the live agent stack to `cloud/deploy`. The live stack runs commit `c1c0f4e` from `<old checkout>` (the old checkout): its root `docker-compose.yml` has no `name:` (the project is `open-agent-bot` from the folder name), the agent and renderer build from `agent/Dockerfile`, the web from `web/Dockerfile`, and its containers bind files from that checkout's `deploy-config/`.
+
+Do both gates in **one sitting**, in this order. The web app and the agent must come from compatible commits: the post-revamp web app reaches the agent's `/copilotkit`, which the `c1c0f4e` agent doesn't have, while the new agent still serves the `/agui` route the old web app uses. So the agent switches first and Vercel goes live right after it.
+
+1. **Before the first merge** (any day before): the Vercel checks in Gate 6 step 1, and turn off production auto-assignment (Gate 6 step 2), so no merge to `main` can put a new web app in front of the old agent.
+2. **Merge** the M6 branches to `main` and update the required checks (Gate 6 step 3). The live agent is not affected: it runs from the old checkout.
+3. **Prepare** Gate 7 steps 1 to 5: a fresh checkout, the settings files, the config check, a preview on spare ports, the names check and the rollback point. Nothing live changes yet.
+4. **Root Directory** `cloud/web` on Vercel (Gate 6 step 4), a setting only.
+5. **Switch the agent** (Gate 7 step 6): a few seconds of agent downtime; the old web app keeps working against the new agent.
+6. **Web live** (Gate 6 step 5): promote the latest `main` deployment.
+7. **Verify** (Gate 7 step 7). If something is wrong, roll back the web app and the agent together (Gate 7 step 8).
+8. **Burn-in**, then clean up (Gate 7 step 9).
+
+If the live agent was already redeployed from the post-revamp layout (`compose.hosted.yml` at the root of the old checkout, started with `-f compose.hosted.yml --env-file deploy-config/.env-nextjs --profile local`) before M6 merges, the gates can run apart: web and agent are compatible on both sides of the switch. Use the same steps; only the rollback command (Gate 7 step 8) differs.
+
+## Vercel (Gate 6)
+
+1. Checks, before anything merges:
+   - Settings → Git → "Git Fork Protection" is on.
+   - Settings → Environment Variables: Production holds `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN`, `AGENT_URL` and `AGENT_SERVICE_SECRET`; no server secret (`AGENT_SERVICE_SECRET`, any Supabase secret key) is scoped to Preview or Development.
+   - Settings → Build and Deployment: no custom Install or Build Command and no Ignored Build Step that the move would break; "Include files outside the root directory in the Build Step" is on.
+   - If the Supabase GitHub integration or branching is on for this repository, it doesn't run for fork pull requests, and its directory is `cloud`.
+2. Settings → Environments → Production: turn off "Auto-assign Custom Production Domains", so merges to `main` build but don't go live. If your plan doesn't offer it, do steps 2 to 6 of the sitting back to back instead.
+3. Merge to `main`. On the `main` ruleset's required status checks, add `standalone` and `cloud` and remove the old web job (it no longer exists). The production build of each merge either fails (from the 6.5 merge on, the old Root Directory is gone) or isn't assigned; the serving deployment stays as it is. The Vercel check on the 6.5 pull request is expected red and doesn't block.
+4. Settings → Build and Deployment → Root Directory: `cloud/web`. Keep "Include files outside the root directory in the Build Step" on. Change nothing else.
+5. After the agent switch (Gate 7 step 6): Deployments → the latest `main` commit → Redeploy, then Promote it to production (or turn auto-assignment back on and redeploy). Check `/login`, sign in and stream a chat. Turn "Auto-assign Custom Production Domains" back on.
+6. If the web app misbehaves: Instant Rollback to the previous production deployment. If you also roll the agent back, roll the web app back first.
+
+## Move the live stack to `cloud/deploy` (Gate 7)
+
+**Never `git pull` the old checkout before the switch.** Its containers bind-mount files from its `deploy-config/`; a pull that moves them leaves the next container restart with empty directories in their place, and SearXNG and Caddy fail. The old checkout stays untouched as the rollback.
+
+Run the steps in one terminal, from the fresh checkout:
+
+```bash
+OLD=<old checkout>
+NEW="$HOME/open-agent-hosted"
+```
+
+1. A fresh checkout of the M6 `main` commit. Never put a `.env` file in its `cloud/deploy/`: Compose reads `.env` from the compose file's folder, and a `COMPOSE_PROJECT_NAME` there would override `open-agent-bot`.
+
+   ```bash
+   git clone https://github.com/Nit-1997/open-agent-bot "$NEW"
+   cd "$NEW"
+   git checkout <main commit after M6>
+   ```
+
+2. Copy the settings files from the old checkout (names, modes and sizes only; each new file is `0600`, nothing is overwritten, the old files stay for the rollback):
+
+   ```bash
+   node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy --copy --dry-run
+   node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy --copy
+   ```
+
+   An `unknown (not moved)` line (exit 2) names a file the helper doesn't know; copy it by hand only if the hosted stack uses it.
+
+3. Config check under the new code, then a preview on spare ports. The check prints `hosted config ok`, a `ConfigError` message (names only, never values), or only an error's name and code:
+
+   ```bash
+   docker compose -p oab-gate7 -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local run --rm --no-deps --build agent node -e "import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})"
+   . scripts/preview-preflight.sh
+   P="docker compose -p oab-gate7 --env-file cloud/deploy/.env-nextjs -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local"
+   preflight $P && $P up -d --build search renderer agent web
+   ```
+
+   Sign in at http://localhost:18300 and send a chat. Then remove the preview, its volumes and its images:
+
+   ```bash
+   $P down
+   docker volume ls --filter label=com.docker.compose.project=oab-gate7 --format '{{.Name}}'
+   docker volume rm $(docker volume ls -q --filter label=com.docker.compose.project=oab-gate7)
+   docker image rm oab-gate7-agent oab-gate7-renderer oab-gate7-web
+   ```
+
+4. Names check (names only): the project must be `open-agent-bot` and the volumes `open-agent-bot_caddy-config`, `open-agent-bot_caddy-data` and `open-agent-bot_searxng-data` (and `open-agent-bot_ollama-data` with the `ollama` profile), the ones the live stack uses.
+
+   ```bash
+   docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json | jq '{name, volumes: [.volumes[].name]}'
+   ```
+
+5. Rollback point. Write down the old commit, the exact command you started the live stack with (for `c1c0f4e`, most likely `docker compose --env-file deploy-config/.env-nextjs --profile local up -d --build` run in the old checkout) and the running containers. Then retag the images of the built services (agent, renderer, web), so `up --build` can't overwrite them; SearXNG and Caddy are pulled images pinned by digest and need nothing:
+
+   ```bash
+   git -C "$OLD" rev-parse HEAD
+   docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Names}} {{.Image}} {{.CreatedAt}}'
+   SHA=$(git -C "$OLD" rev-parse --short HEAD)
+   docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Label "com.docker.compose.service"}} {{.Image}}' | while read -r svc img; do case "$svc" in agent|renderer|web) docker tag "$img" "${img%:*}:rollback-$SHA" && echo "$svc $img ${img%:*}:rollback-$SHA" ;; esac; done | tee "$HOME/open-agent-rollback.txt"
+   ```
+
+   The note must list three lines (agent, renderer, web), each `<service> <image> <image>:rollback-<sha>`. If an image shows as a bare `sha256:` id, stop: the tag was already moved by another build.
+
+6. Switch. Containers are recreated with the new bind paths and images, on the same volumes; the agent is down for a few seconds:
+
+   ```bash
+   docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local up -d --build
+   ```
+
+7. Verify: every container is new and healthy, the volumes are the same, the agent answers locally and through the tunnel, and (after Gate 6 step 5) sign-in and a streamed chat work on the Vercel app. The Cloudflare tunnel runs outside the compose project, so it needs no change.
+
+   ```bash
+   docker compose -f cloud/deploy/compose.hosted.yml ps
+   docker volume ls --filter label=com.docker.compose.project=open-agent-bot --format '{{.Name}}'
+   curl -fsS http://127.0.0.1:8000/health
+   curl -fsS https://<public agent host>/health
+   ```
+
+8. Rollback, if needed (web app first, Gate 6 step 6): put each recorded tag back on the exact image ref it came from, then start the old stack from the old checkout with its recorded command **without `--build`**, so the old images run again on the same volumes (with `--build` it rebuilds the old code from the old checkout instead). The second line below is the usual `c1c0f4e` command, written to run from any folder; use yours if you recorded a different one.
+
+   ```bash
+   while read -r svc img tag; do docker tag "$tag" "$img"; done < "$HOME/open-agent-rollback.txt"
+   docker compose --project-directory "$OLD" -f "$OLD/docker-compose.yml" --env-file "$OLD/deploy-config/.env-nextjs" --profile local up -d
+   ```
+
+   If the old checkout ran the post-revamp layout instead, its command is `docker compose -f "$OLD/compose.hosted.yml" --env-file "$OLD/deploy-config/.env-nextjs" --profile local up -d`.
+
+9. After a burn-in (a few days), delete the old checkout's settings files and the rollback tags. From then on, every hosted command runs in the new checkout with `-f cloud/deploy/compose.hosted.yml`; a docker compose command without `-f` targets the local project `open-agent` in any checkout.
+
+   ```bash
+   rm "$OLD"/deploy-config/.env-* "$OLD"/deploy-config/env-files/.env-*
+   while read -r svc img tag; do docker image rm "$tag"; done < "$HOME/open-agent-rollback.txt"
+   ```
+
+The factory rehearsed these steps on `oab-` projects beside the live stack (M6 demo part 4): from `c1c0f4e` and from the M3 layout at `4879d41`, each switched to this layout with the volumes reused and rolled back through the retagged images.
