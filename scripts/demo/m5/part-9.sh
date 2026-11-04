@@ -32,4 +32,6 @@ absent no-m5-containers "no M5 containers left (grep found none)" "docker ps -a 
 absent no-m5-builder "no M5 builder left (grep found none)" "docker buildx ls | grep oab-factory-m5"
 absent no-m5-volumes "no M5 volumes left (grep found none)" "docker volume ls --format '{{.Name}}' | grep -E '^(oab-factory-m5|buildx_buildkit_oab-factory-m5)'"
 absent no-m5-images "no M5 images left (grep found none)" "docker image ls -a --digests | grep -E 'oab-m5-|oab-factory-m5'"
+absent no-m5-networks "no M5 networks left (grep found none)" "docker network ls --format '{{.Name}}' | grep -E 'oab-(factory-)?m5'"
+no_open_agent_project
 run exit-codes "column -t -s \$'\\t' \"$EXITS\""

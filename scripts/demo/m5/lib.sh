@@ -96,6 +96,44 @@ absent() {
   exit 1
 }
 
+exits() {
+  local label="$1" want="$2" meaning="$3" cmd="$4" rc
+  printf '\033[36m$ %s\033[0m\n' "$cmd"
+  eval "$cmd"
+  rc=$?
+  if [ "$rc" -eq "$want" ]; then
+    record "$label" "$rc" "$meaning"
+    printf '\033[33m   [%s exit %s = %s]\033[0m\n' "$label" "$rc" "$meaning"
+    return 0
+  fi
+  record "$label" "$rc" "UNEXPECTED: $label exited $rc, expected $want; $PART stopped"
+  printf '\033[31m!! %s exited %s, expected %s; %s stops here\033[0m\n' "$label" "$rc" "$want" "$PART"
+  exit 1
+}
+
+need() {
+  local label="$1" refusal="$2" cmd="$3"
+  printf '\033[36m$ %s\033[0m\n' "$cmd"
+  if eval "$cmd"; then
+    record "$label" 0 ""
+    printf '   [%s exit 0]\n' "$label"
+    return 0
+  fi
+  record "$label" 1 "REFUSED: $refusal; $PART stopped"
+  printf '\033[31m!! %s refused: %s; %s stops here\033[0m\n' "$label" "$refusal" "$PART"
+  exit 1
+}
+
+no_open_agent_project() {
+  if docker compose ls -a --format json | jq -r '.[].Name' | grep -qx open-agent; then
+    record no-open-agent-project 1 "ABORT: a real open-agent compose project exists"
+    echo "ABORT: a real open-agent project exists"
+    exit 1
+  fi
+  record no-open-agent-project 0 ""
+  note "no open-agent compose project"
+}
+
 remember() { printf '%s\n' "$2" > "$DEMO_DIR/$1.path"; }
 recall() {
   local p real root
