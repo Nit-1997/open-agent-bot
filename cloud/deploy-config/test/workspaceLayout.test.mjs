@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -36,7 +37,8 @@ describe("cloud workspace layout", () => {
   });
 
   it("keeps every deployment artifact and the env files in the one folder cloud/deploy-config", () => {
-    assert.equal(existsSync(join(ROOT, "cloud/deploy")), false, "cloud/deploy must not exist");
+    const tracked = execFileSync("git", ["ls-files", "--", "cloud/deploy/"], { cwd: ROOT, encoding: "utf8" });
+    assert.equal(tracked, "", "git tracks nothing under cloud/deploy (an older checkout's ignored env files may stay there)");
     for (const entry of ["compose.hosted", "compose.preview"]) assert.ok(existsSync(join(ROOT, `cloud/deploy-config/${entry}.yml`)), entry);
     for (const entry of ["caddy", "searxng", "renderer", "litellm", "scripts", "test", "env-files"])
       assert.ok(existsSync(join(ROOT, "cloud/deploy-config", entry)), entry);
