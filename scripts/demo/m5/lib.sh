@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Sourced by every scripts/demo/m5/part-<n>.sh.
 set -u
 set -o pipefail
 
@@ -13,6 +12,7 @@ DRY="${DEMO_DRY_ROOT:-.factory/m5/release-dry-run}"
 V1="${DEMO_VERSION_A:-0.0.0-dryrun.1}"
 V2="${DEMO_VERSION_B:-0.0.0-dryrun.2}"
 DOCKER_CLI="${DEMO_DOCKER:-/usr/local/bin/docker}"
+REGISTRY_IMAGE="registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
 EXITS="$DEMO_DIR/exit-codes.txt"
 export OPEN_AGENT_SHELL_TEST=1 COPILOTKIT_TELEMETRY_DISABLED=true
 
@@ -98,12 +98,21 @@ absent() {
 
 remember() { printf '%s\n' "$2" > "$DEMO_DIR/$1.path"; }
 recall() {
-  local p
+  local p real root
   p="$(cat "$DEMO_DIR/$1.path" 2>/dev/null)" || { echo "ABORT: $1 is unknown; run its part first" >&2; exit 1; }
   case "$p" in
-    "${TMPDIR:-/tmp}"*/tmp.* | /tmp/tmp.* | /private/var/folders/*/tmp.* | /var/folders/*/tmp.*) printf '%s' "$p" ;;
-    *) echo "ABORT: $1 path '$p' is not a mktemp folder" >&2; exit 1 ;;
+    *..*) echo "ABORT: $1 path '$p' contains .." >&2; exit 1 ;;
   esac
+  [ -d "$p" ] || { echo "ABORT: $1 path '$p' is not a directory" >&2; exit 1; }
+  real="$(realpath "$p")" || { echo "ABORT: $1 path '$p' does not resolve" >&2; exit 1; }
+  for root in "${TMPDIR:-/tmp}" /tmp "$DEMO_DIR"; do
+    root="$(realpath "$root" 2>/dev/null)" || continue
+    case "$real" in
+      "${root%/}"/?*) printf '%s' "$real"; return 0 ;;
+    esac
+  done
+  echo "ABORT: $1 path '$p' resolves to '$real', outside \$TMPDIR and $DEMO_DIR" >&2
+  exit 1
 }
 
 down_pkg() {

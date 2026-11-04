@@ -11,5 +11,5 @@ run pulls "grep -hE '\\[docker\\] pull|tokenFp|\\[app\\] app view loaded' $DEMO_
 run lock-refs "jq -r '.images[]' $A/lock/services.lock.json"
 run images-after "m5_images"
 run down "down_pkg"
-expect remove-images "1=an image was already gone" "docker image rm \$(docker image ls -a --digests --format '{{.Repository}}@{{.Digest}}' | grep oab-m5- | grep -v '@<none>$')"
+expect remove-images "1=an image was already gone" "docker image rm \$(m5_images)"
 absent images-gone "no oab-m5 images left for the fresh app launch (grep found none)" "m5_images"

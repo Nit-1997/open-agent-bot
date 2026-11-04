@@ -82,6 +82,7 @@ export function coverage(extracted, manifest, files) {
   };
 }
 
+const GLOB_CHARS = "{}*?[";
 const OPERATORS = ["&&", "||", ";;", ";", "|", "&", "(", ")"];
 const REDIRECTS = [">>", ">&", "<&", ">|", "&>", "<<", ">", "<"];
 
@@ -92,7 +93,7 @@ export function tokenize(line) {
   let expectTarget;
   let i = 0;
   const startWord = () => {
-    if (!word) word = { text: "", raw: "", quoted: false, cmdsub: false, tilde: false, params: [], start: i };
+    if (!word) word = { text: "", raw: "", quoted: false, cmdsub: false, tilde: false, glob: false, params: [], start: i };
   };
   const endWord = () => {
     if (!word) return;
@@ -215,6 +216,7 @@ export function tokenize(line) {
       continue;
     }
     if (ch === "~" && word.text === "" && !word.quoted) word.tilde = true;
+    if (GLOB_CHARS.includes(ch)) word.glob = true;
     word.text += ch;
     i++;
   }
@@ -313,6 +315,7 @@ function forcedReason(cmd, ctx) {
   if (cmd.op === "&") return "background job (&)";
   const all = [...cmd.assigns, ...cmd.words, ...cmd.redirects.map((r) => r.word)];
   for (const w of all) {
+    if (w.glob) return `unquoted glob or brace character in ${w.raw}`;
     if (w.cmdsub) return "command substitution";
     if (w.params.includes("HOME")) return "$HOME";
     if (w.params.length) return `parameter expansion $${w.params[0]}`;
@@ -368,18 +371,11 @@ function allowed(cmd, ctx, cwd) {
   }
   if (cmd.redirects.length) return { ok: false, reason: `redirection ${cmd.redirects[0].op} ${cmd.redirects[0].target}` };
   const [a0, a1] = argv;
-  if (a0 === "git" && a1 === "clone") {
-    const pos = [];
-    for (let i = 2; i < argv.length; i++) {
-      if (argv[i] === "--branch" || argv[i] === "-b" || argv[i] === "--depth") i++;
-      else if (argv[i].startsWith("-")) return notAllowed;
-      else pos.push(argv[i]);
-    }
-    if (pos.length !== 2 || pos[0] !== `file://${ctx.repo}`) return notAllowed;
-    if (pos[1].startsWith("/") || !inside(resolve(cwd, pos[1]), ctx.dir) || resolve(cwd, pos[1]) === ctx.dir) return notAllowed;
-    return { ok: true, cwd };
-  }
-  if (a0 === "git" && (a1 === "fetch" || a1 === "checkout")) return inside(cwd, ctx.clone) ? { ok: true, cwd } : notAllowed;
+  if (a0 === "git" && a1 === "clone") return gitCloneShape(argv.slice(2), ctx, cwd) ? { ok: true, cwd } : notAllowed;
+  if (a0 === "git" && a1 === "fetch")
+    return argv.length === 3 && argv[2] === "--tags" && inside(cwd, ctx.clone) ? { ok: true, cwd } : notAllowed;
+  if (a0 === "git" && a1 === "checkout")
+    return argv.length === 3 && RELEASE_TAG.test(argv[2]) && inside(cwd, ctx.clone) ? { ok: true, cwd } : notAllowed;
   if (a0 === "cd") {
     if (argv.length !== 2) return notAllowed;
     const to = resolve(cwd, argv[1]);
@@ -388,9 +384,9 @@ function allowed(cmd, ctx, cwd) {
   if (a0 === "docker" && a1 === "compose") {
     if (!COMPOSE_SUBS.has(argv[2])) return notAllowed;
     if (!inside(cwd, ctx.clone)) return { ok: false, reason: "docker compose outside the clone" };
-    return { ok: true, cwd, docker: true };
+    return { ok: true, cwd, docker: { cwd, preflight: [...argv.slice(1, 2), "config", "--format", "json"] } };
   }
-  if (a0 === "docker" && ((a1 === "image" && argv[2] === "ls") || a1 === "ps")) return { ok: true, cwd, docker: true };
+  if (a0 === "docker" && ((a1 === "image" && argv[2] === "ls") || a1 === "ps")) return { ok: true, cwd, docker: { cwd } };
   if (a0 === "curl") {
     const urls = argv.slice(1).filter((a) => !a.startsWith("-"));
     const flags = argv.slice(1).filter((a) => a.startsWith("-"));
@@ -411,9 +407,30 @@ function allowed(cmd, ctx, cwd) {
   return notAllowed;
 }
 
+const RELEASE_TAG = /^v\d+\.\d+\.\d+(?:-rc\.\d+)?$/;
+
+function gitCloneShape(args, ctx, cwd) {
+  const rest = [...args];
+  if (rest[0] === "--branch") {
+    if (rest[1] !== ctx.branch) return false;
+    rest.splice(0, 2);
+  }
+  if (rest[0] === "--depth") {
+    if (rest[1] !== "1") return false;
+    rest.splice(0, 2);
+  }
+  if (rest[0] !== `file://${ctx.repo}` || rest.length > 2) return false;
+  const dir = rest[1];
+  if (dir === undefined) return true;
+  if (dir.startsWith("-") || dir.startsWith("/")) return false;
+  const to = resolve(cwd, dir);
+  return inside(to, ctx.dir) && to !== ctx.dir;
+}
+
 const localUrl = (u, ctx) => new RegExp(`^http://127\\.0\\.0\\.1:${ctx.port}(/\\S*)?$`).test(u);
 
 export function classify(text, ctx, cwd) {
+  if (/\$['"]/.test(text)) return { runnable: false, reason: `$' or $" quoting` };
   const t = tokenize(text);
   if (!t.ok) return { runnable: false, reason: `can't parse: ${t.error}` };
   for (const cmd of t.commands) {
@@ -427,7 +444,7 @@ export function classify(text, ctx, cwd) {
   for (const cmd of t.commands) {
     const r = allowed(cmd, ctx, at);
     if (!r.ok) return { runnable: false, reason: r.reason };
-    if (r.docker) docker.push(at);
+    if (r.docker) docker.push(r.docker);
     if (r.rewrite) rewrites.push({ start: cmd.start, end: cmd.end, text: r.rewrite });
     at = r.cwd;
   }
@@ -479,7 +496,8 @@ export function attestationProblems(text, version, { tagVariable } = {}) {
   const refs = tagVariable ? [ref, `--source-ref "refs/tags/${tagVariable}"`] : [ref];
   const need = [[`--signer-workflow ${SIGNER}`], refs, ["--deny-self-hosted-runners"]];
   const out = [];
-  text.split("\n").forEach((line, i) => {
+  text.split("\n").forEach((raw, i) => {
+    const line = raw.replaceAll("gh attestation verify --help", "");
     if (!/gh attestation verify\s+\S/.test(line)) return;
     const missing = need.filter((alts) => !alts.some((n) => line.includes(n))).map((alts) => alts[0]);
     if (missing.length) out.push(`line ${i + 1}: gh attestation verify lacks ${missing.join(", ")}`);
