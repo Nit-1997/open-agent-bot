@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { ConfigError, loadCoreConfig as loadCore } from "../src/config.js";
-import { loadHostedConfig } from "../src/hosted/config.js";
-import { TEST_ENV } from "./fixtures/config.js";
 
 const RENDERER_SECRET = "b".repeat(64);
 const TELEMETRY_OFF = { COPILOTKIT_TELEMETRY_DISABLED: "true" };
@@ -76,7 +74,7 @@ describe("loadCoreConfig", () => {
 
   it("puts no env value into a ConfigError message from either loader", () => {
     const env = Object.fromEntries(ALL_VARS.map((name) => [name, `short-secret-value-${name}`]));
-    for (const load of [loadCoreConfig, loadHostedConfig]) {
+    for (const load of [loadCoreConfig]) {
       let message = "";
       try {
         load(env);
@@ -93,8 +91,8 @@ describe("loadCoreConfig", () => {
 
 describe("copilot runtime settings", () => {
   it("refuses to start unless CopilotKit telemetry is disabled, naming the variable", () => {
-    for (const load of [loadCore, loadHostedConfig]) {
-      const base = load === loadCore ? { RENDERER_SECRET } : TEST_ENV;
+    for (const load of [loadCore]) {
+      const base = { RENDERER_SECRET };
       for (const value of [undefined, "", "false", "1", "TRUE"]) {
         const env = { ...base, COPILOTKIT_TELEMETRY_DISABLED: value };
         expect(() => load(env), `${load.name} ${value}`).toThrow(ConfigError);

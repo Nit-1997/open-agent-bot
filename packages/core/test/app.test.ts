@@ -58,47 +58,6 @@ describe("createApp guards", () => {
     expect(await res.json()).toMatchObject({ error: "too_large" });
   });
 
-  it("answers signed_out with a bearer challenge when the token is missing or wrong", async () => {
-    const { call } = await makeApp();
-    for (const [method, path] of USER_ROUTES) {
-      const res = await call(null, path, { method });
-      expect(res.status, `${method} ${path}`).toBe(401);
-      expect(res.headers.get("www-authenticate")).toBe('Bearer error="invalid_token"');
-      expect(await res.json()).toMatchObject({ error: "signed_out" });
-    }
-    expect((await call(null, "/profile", { headers: { authorization: "Bearer nope" } })).status).toBe(401);
-  });
-
-  it("refuses a deactivated user with 403 account_disabled", async () => {
-    const { call, accounts } = await makeApp();
-    accounts.users.get(ALICE.id)!.status = "deactivated";
-    const res = await call(ALICE, "/profile");
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ error: "account_disabled" });
-  });
-
-  it("fails closed with 503 when the status lookup is down", async () => {
-    const { call, accounts } = await makeApp();
-    vi.spyOn(accounts, "repo").mockImplementation(() => {
-      throw new Error("db down");
-    });
-    const quiet = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const res = await call(BOB, "/profile");
-    expect(res.status).toBe(503);
-    expect(await res.json()).toMatchObject({ error: "auth_unavailable" });
-    quiet.mockRestore();
-  });
-
-  it("hides admin routes from non-admins behind a 404", async () => {
-    const { call } = await makeApp();
-    for (const path of ["/admin/users", "/admin/access-requests"]) {
-      const res = await call(ALICE, path);
-      expect(res.status).toBe(404);
-      expect(await res.json()).toMatchObject({ error: "not_found" });
-    }
-    expect((await call(ADMIN, "/admin/users")).status).toBe(200);
-  });
-
   it("answers OPTIONS with 405 and sends no CORS headers", async () => {
     const { call } = await makeApp();
     const res = await call(null, "/profile", { method: "OPTIONS", secret: null });

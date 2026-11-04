@@ -6,9 +6,9 @@ import { hostedRoutes } from "../../src/hosted/routes.js";
 import { BackgroundQueue } from "../../src/lib/backgroundQueue.js";
 import { RateLimiter } from "../../src/lib/rateLimit.js";
 import { checkMounts } from "../../src/startAgent.js";
-import { FakeAccounts, makeApp } from "../fixtures/app.js";
-import { TEST_SECRET } from "../fixtures/config.js";
-import { ADMIN, ALICE } from "../fixtures/users.js";
+import { FakeAccounts, makeHostedApp } from "./fixtures/hostedApp.js";
+import { TEST_SECRET } from "./fixtures/config.js";
+import { ADMIN, ALICE } from "./fixtures/users.js";
 
 function mounts() {
   const accounts = new FakeAccounts();
@@ -53,21 +53,21 @@ describe("hostedRoutes", () => {
   });
 
   it("hides admin routes from a non-admin and lets the admin list users and requests", async () => {
-    const { call } = await makeApp();
+    const { call } = await makeHostedApp();
     expect((await call(ALICE, "/admin/users")).status).toBe(404);
     expect((await call(ADMIN, "/admin/users")).status).toBe(200);
     expect((await call(ADMIN, "/admin/access-requests")).status).toBe(200);
   });
 
   it.each(["/admin/nope", "/admin", "/admin/"])("answers 401 signed_out on %s without a bearer", async (path) => {
-    const { call } = await makeApp();
+    const { call } = await makeHostedApp();
     const res = await call(null, path);
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ error: "signed_out" });
   });
 
   it("never authenticates inside the admin guard", async () => {
-    const h = await makeApp();
+    const h = await makeHostedApp();
     const spy = vi.spyOn(h.identity, "authenticate");
     expect((await h.call(ADMIN, "/admin/users")).status).toBe(200);
     expect((await h.call(ALICE, "/admin/users")).status).toBe(404);
@@ -76,7 +76,7 @@ describe("hostedRoutes", () => {
   });
 
   it("refuses a wrong service secret before anything else", async () => {
-    const { call } = await makeApp();
+    const { call } = await makeHostedApp();
     expect((await call(ADMIN, "/admin/users", { secret: `${TEST_SECRET.slice(1)}b` })).status).toBe(401);
   });
 });

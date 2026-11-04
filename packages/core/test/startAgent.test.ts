@@ -3,45 +3,21 @@ import { createServer } from "node:net";
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BrowserPool } from "../src/browser/pool.js";
-import { parseCredentialKeys } from "../src/secrets/keys.js";
-import { LocalKeyWrapper } from "../src/secrets/keyWrapper.js";
-import { createAdminGuard } from "../src/hosted/identity/adminGuard.js";
-import { hostedRoutes } from "../src/hosted/routes.js";
-import type { AuthEnv, Identity, RouteMount } from "../src/identity/types.js";
+import type { AuthEnv, RouteMount } from "../src/identity/types.js";
 import { SessionStore } from "../src/session/sessionStore.js";
 import { type AgentDeps, type RunningAgent, startAgent } from "../src/startAgent.js";
+import { coreDeps } from "./fixtures/agent.js";
+import { testConfig } from "./fixtures/config.js";
 import type { Store } from "../src/store/types.js";
-import { FakeAccounts } from "./fixtures/app.js";
-import { TEST_KEY_B64, testConfig } from "./fixtures/config.js";
 import { MemoryDb } from "./fixtures/memoryRepos.js";
 import { ALICE, CHAT_1 } from "./fixtures/users.js";
-import { createAccessService } from "../src/hosted/access/service.js";
-import { createAdminService } from "../src/hosted/admin/service.js";
-import { BackgroundQueue } from "../src/lib/backgroundQueue.js";
-import { RateLimiter, rateLimitError } from "../src/lib/rateLimit.js";
-
-const localIdentity: Identity = {
-  kind: "local",
-  admitCaller: () => undefined,
-  authenticate: async () => ({ ok: true, principal: ALICE }),
-};
+import { type RateLimiter, rateLimitError } from "../src/lib/rateLimit.js";
 
 const running: RunningAgent[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(running.splice(0).map((a) => a.close()));
 });
-
-function coreDeps(over: Partial<AgentDeps> = {}): AgentDeps {
-  return {
-    config: testConfig({ LOG_LEVEL: "error" }),
-    store: new MemoryDb(),
-    identity: localIdentity,
-    keyWrapper: new LocalKeyWrapper(parseCredentialKeys(`v1:${TEST_KEY_B64}`)),
-    port: 0,
-    ...over,
-  };
-}
 
 async function start(over: Partial<AgentDeps> = {}) {
   const agent = await startAgent(coreDeps(over));
@@ -55,26 +31,6 @@ const portFree = (port: number) =>
     probe.once("error", () => resolve(false));
     probe.listen(port, "127.0.0.1", () => probe.close(() => resolve(true)));
   });
-
-function hostedMounts(limiter = new RateLimiter()): RouteMount[] {
-  const accounts = new FakeAccounts();
-  return hostedRoutes({
-    access: createAccessService({
-      pepper: Buffer.alloc(32, 9),
-      limiter,
-      queue: new BackgroundQueue({ name: "access", max: 5, concurrency: 1 }),
-      submit: async () => "inserted",
-      sendMagicLink: async () => ({}),
-    }),
-    admin: createAdminService({
-      repo: accounts.repo(),
-      auth: accounts.auth(),
-      hooks: { onDisabled: async () => {}, onEnabled: () => {} },
-    }),
-    adminGuard: createAdminGuard({ isLiveAdmin: async () => true }),
-    limiter,
-  });
-}
 
 const mountWith = (stage: RouteMount["stage"], basePath: string, register: (app: Hono<AuthEnv>) => void): RouteMount => {
   const routes = new Hono<AuthEnv>();
@@ -167,13 +123,6 @@ describe("startAgent", () => {
     const agent = await start({ listen: true });
     expect(agent.port).toBeGreaterThan(0);
     expect((await fetch(`http://127.0.0.1:${agent.port}/health`)).status).toBe(200);
-  });
-
-  it("starts with the hosted mounts", async () => {
-    const agent = await start({ routes: () => hostedMounts() });
-    const link = await agent.app.request("/auth/email-link", { method: "POST", body: JSON.stringify({ email: "a@example.test" }) });
-    expect(link.status).toBe(202);
-    expect((await agent.app.request("/admin/users")).status).toBe(404);
   });
 });
 

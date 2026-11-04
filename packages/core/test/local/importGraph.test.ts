@@ -80,7 +80,9 @@ describe("the local entry's import graph", () => {
     ["jose", 'export const j = () => import("jose");\n', "jose"],
   ])("catches %s injected into start.ts", (_label, line, hit) => {
     const start = join(CORE_SRC, "local/start.ts");
+    const hosted = join(CORE_SRC, "hosted/");
     const injected: Reader = (file) => {
+      if (file.startsWith(hosted)) return "export {};\n";
       const code = readDisk(file);
       return file === start && code !== undefined ? `${code}${line}` : code;
     };

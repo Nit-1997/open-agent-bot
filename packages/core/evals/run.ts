@@ -288,13 +288,11 @@ export type TransportInput = {
   fetch?: typeof fetch;
 };
 
-export async function transportFor(input: TransportInput): Promise<Transport> {
+export type Target = (input: TransportInput) => Promise<Transport>;
+export type Targets = Readonly<Record<string, Target>>;
+
+async function localTarget(input: TransportInput): Promise<Transport> {
   const env = input.env ?? process.env;
-  if (input.target === "hosted") {
-    const { evalAuth } = await import("./auth/hosted.js");
-    return { url: input.url, headers: await evalAuth(input.repoRoot, env) };
-  }
-  if (input.target !== "local") throw new Error(`--target must be hosted or local; got '${input.target}'`);
   if (!input.origin) throw new Error("--target local needs --origin, e.g. --origin http://127.0.0.1:18330");
   let openrouterKey: string | undefined;
   if (input.keyEnv) {
@@ -302,6 +300,28 @@ export async function transportFor(input: TransportInput): Promise<Transport> {
     if (!openrouterKey) throw new Error(`${input.keyEnv} is empty or unset`);
   }
   return localTransport({ origin: input.origin, openrouterKey, fetch: input.fetch });
+}
+
+export const BUILT_IN_TARGETS: Targets = Object.freeze({ local: localTarget });
+
+export const CLI_TARGETS: Targets = Object.freeze({
+  hosted: async (input: TransportInput) => (await import("./auth/hosted.js")).hostedTarget(input),
+});
+
+function registry(targets: Targets): Targets {
+  for (const name of Object.keys(targets)) {
+    if (Object.hasOwn(BUILT_IN_TARGETS, name)) throw new Error(`the ${name} target is built in and can't be registered`);
+  }
+  return { ...targets, ...BUILT_IN_TARGETS };
+}
+
+export const defaultTarget = (targets: Targets): string => Object.keys(registry(targets))[0];
+
+export async function transportFor(input: TransportInput, targets: Targets = {}): Promise<Transport> {
+  const all = registry(targets);
+  const make = Object.hasOwn(all, input.target) ? all[input.target] : undefined;
+  if (!make) throw new Error(`--target must be ${Object.keys(all).join(" or ")}; got '${input.target}'`);
+  return make(input);
 }
 
 export async function pool<T>(items: T[], concurrency: number, work: (item: T) => Promise<void>): Promise<void> {
@@ -313,8 +333,9 @@ export async function pool<T>(items: T[], concurrency: number, work: (item: T) =
   );
 }
 
-async function main() {
+export async function main(argv: string[], targets: Targets) {
   const { values } = parseArgs({
+    args: argv,
     options: {
       model: { type: "string", default: "chat-default" },
       only: { type: "string" },
@@ -322,7 +343,7 @@ async function main() {
       runs: { type: "string", default: "1" },
       label: { type: "string", default: "adhoc" },
       url: { type: "string", default: "http://localhost:8000/agui" },
-      target: { type: "string", default: "hosted" },
+      target: { type: "string", default: defaultTarget(targets) },
       origin: { type: "string" },
       "openrouter-key-env": { type: "string" },
       concurrency: { type: "string", default: "1" },
@@ -344,13 +365,16 @@ async function main() {
       .filter(Boolean),
     values.set,
   );
-  const transport = await transportFor({
-    target: values.target as string,
-    url: values.url as string,
-    repoRoot: resolve(evalsDir, "../../.."),
-    origin: values.origin,
-    keyEnv: values["openrouter-key-env"],
-  });
+  const transport = await transportFor(
+    {
+      target: values.target as string,
+      url: values.url as string,
+      repoRoot: resolve(evalsDir, "../../.."),
+      origin: values.origin,
+      keyEnv: values["openrouter-key-env"],
+    },
+    targets,
+  );
   const date = new Date().toISOString().slice(0, 10);
   const outDir = join(evalsDir, "results", `${date}-${label}-${model}`);
   await mkdir(outDir, { recursive: true });
@@ -416,7 +440,7 @@ async function rescoreDir(dir: string, priceArg: string | undefined, writeBaseli
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((err) => {
+  main(process.argv.slice(2), CLI_TARGETS).catch((err) => {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);
   });

@@ -3,8 +3,8 @@ import { createSupabaseIdentity, serviceSecretMatches } from "../../src/hosted/i
 import { UserStatusCache } from "../../src/hosted/identity/status.js";
 import { AuthError, type VerifiedUser } from "../../src/hosted/identity/verify.js";
 import { UserError } from "../../src/lib/errors.js";
-import { TEST_SECRET } from "../fixtures/config.js";
-import { ALL_CAPABILITIES } from "../fixtures/users.js";
+import { TEST_SECRET } from "./fixtures/config.js";
+import { ALL_CAPABILITIES } from "./fixtures/users.js";
 
 const VERIFIED: VerifiedUser = {
   id: "11111111-1111-4111-8111-111111111111",
