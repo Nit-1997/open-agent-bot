@@ -10,10 +10,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CODE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/i;
 const GLOB = /[*?{[]/;
 const TOKEN = /(?<![\w@./-])(?:\.\/|(?:\.\.\/)+)?cloud(?:\/[^\s"'`,;()<>|&\]}]*)?(?![\w.-])/gi;
-const RULE_C = /(^|[./])cloud\/(agent|web|e2e|supabase|deploy)\b/i;
+const CLOUD_ENTRIES = ["agent", "web", "e2e", "supabase", "deploy"];
 const PATH_CALLS = new Set(["join", "resolve"]);
 const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
-const TSCONFIG_FIELDS = ["paths", "references", "extends", "include"];
+const TSCONFIG_FIELDS = ["paths", "references", "extends", "include", "files"];
 
 const git = (root, args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const lower = (p) => p.toLowerCase();
@@ -22,6 +22,17 @@ const quote = (s) => {
   return q.length > 80 ? `${q.slice(0, 77)}..."` : q;
 };
 const lineAt = (text, index) => text.slice(0, Math.max(0, index)).split("\n").length;
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export function cloudEntries(root) {
+  const dir = join(root, "cloud");
+  const found = existsSync(dir) ? readdirSync(dir).filter((n) => !n.startsWith(".")) : [];
+  return [...new Set([...CLOUD_ENTRIES, ...found])].sort();
+}
+
+export function ruleCPattern(entries = CLOUD_ENTRIES) {
+  return new RegExp(`(^|[./])cloud\\/(${entries.map(escapeRe).join("|")})\\b`, "i");
+}
 
 export function isCloudPath(root, abs) {
   const cloud = lower(join(root, "cloud"));
@@ -127,11 +138,11 @@ export function codeLiterals(file, text) {
   return out;
 }
 
-export function ruleCMatch(value, pathArg) {
-  const m = RULE_C.exec(value);
+export function ruleCMatch(value, pathArg, pattern = ruleCPattern()) {
+  const m = pattern.exec(value);
   if (m) return m[0].replace(/^[./]/, "");
-  const v = lower(value);
-  return v === "cloud/" || (pathArg && v === "cloud") ? value : null;
+  const v = lower(value).replace(/\/+$/, "");
+  return lower(value) === "cloud/" || (pathArg && (v === "cloud" || v.endsWith("/cloud"))) ? value : null;
 }
 
 export function shellWords(text) {
@@ -146,8 +157,8 @@ export function shellWords(text) {
   return out;
 }
 
-export function shellMatch(word) {
-  const m = RULE_C.exec(word);
+export function shellMatch(word, pattern = ruleCPattern()) {
+  const m = pattern.exec(word);
   if (m) return m[0].replace(/^[./]/, "");
   const w = lower(word).replace(/\/+$/, "");
   return w === "cloud" || /\/cloud$/.test(w) ? word : null;
@@ -158,6 +169,9 @@ const stripHashComments = (text) => text.replace(/(^|\s)#.*$/gm, (m, p) => p + "
 const isDockerfile = (f) => /(^|\/)(Dockerfile[^/]*|[^/]+\.Dockerfile)$/i.test(f);
 const isCompose = (f) => /(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(f);
 const isTsconfig = (f) => /(^|\/)tsconfig[^/]*\.json$/i.test(f);
+const shebang = (text) => (text.startsWith("#!") ? text.slice(0, text.indexOf("\n") >>> 0) : "");
+const isShellScript = (file, text) => /\.sh$/i.test(file) || (!/\.[^/]+$/.test(file) && /\b(ba|z|da|k)?sh\b/.test(shebang(text)));
+const isNodeScript = (file, text) => !/\.[^/]+$/.test(file) && /\bnode\b/.test(shebang(text));
 const isBundlerConfig = (f) =>
   /(^|\/)(vite\.config|vitest\.config|next\.config|playwright[^/]*\.config)\.[^/]+$/i.test(f) || /(^|\/)electron-builder\.ya?ml$/i.test(f);
 
@@ -168,54 +182,60 @@ function collectStrings(value, out = []) {
   return out;
 }
 
-export function checkFile({ root, file, text, cloudNames }) {
+export function checkFile({ root, file, text, cloudNames, entries = cloudEntries(root) }) {
   const abs = join(root, file);
   const dir = dirname(abs);
   const hits = [];
-  const add = (rule, index, token, resolved, line, shown) =>
+  const pattern = ruleCPattern(entries);
+  const add = (rule, index, token, resolved, line, shown, field) =>
     hits.push({
       file,
       line: line ?? lineAt(text, index),
       rule,
       token,
       resolved: shown ?? (resolved ? relative(root, resolved) || "." : token),
+      ...(field ? { field } : {}),
     });
-  const relativeHit = (spec) => (isRelative(spec) ? resolve(dir, spec) : null);
+  const relativeHit = (spec) => (isRelative(spec) ? resolve(dir, spec) : isAbsolute(spec) ? resolve(spec) : null);
   const tokenHits = (rule, body, base, offset = 0) => {
     for (const t of pathTokens(body)) {
       const resolved = resolve(base, t.literal);
       if (isCloudPath(root, resolved)) add(rule, offset + t.index, t.token, resolved);
     }
   };
-  const jsonStringHits = (rule, strings) => {
+  const jsonStringHits = (rule, strings, field) => {
     for (const s of strings)
       for (const t of pathTokens(s)) {
         const resolved = resolve(dir, t.literal);
-        if (isCloudPath(root, resolved)) add(rule, Math.max(0, text.indexOf(s)), t.token, resolved);
+        if (isCloudPath(root, resolved)) add(rule, Math.max(0, text.indexOf(s)), t.token, resolved, undefined, undefined, field);
       }
   };
+  const code = CODE.test(file) || isNodeScript(file, text);
 
-  if (CODE.test(file) || /\.css$/i.test(file)) {
+  if (code || /\.css$/i.test(file)) {
     const imports = /\.css$/i.test(file) ? cssImports(text) : codeImports(text);
     for (const { spec, index } of imports) {
       const target = relativeHit(spec);
       if (target && isCloudPath(root, target)) add("A", index, spec, target);
-      else if (!target && !spec.startsWith("/") && !spec.startsWith("node:") && isCloudPackage(spec, cloudNames))
-        add("A", index, spec, null);
+      else if (!target && !spec.startsWith("node:") && isCloudPackage(spec, cloudNames)) add("A", index, spec, null);
     }
   }
 
-  if (CODE.test(file)) {
-    for (const lit of codeLiterals(file, text)) {
-      const match = ruleCMatch(lit.value, lit.pathArg);
+  if (code) {
+    for (const lit of codeLiterals(
+      isNodeScript(file, text) ? `${file}.mjs` : file,
+      text.replace(/^#!.*/, (l) => " ".repeat(l.length)),
+    )) {
+      const match =
+        ruleCMatch(lit.value, lit.pathArg, pattern) ?? (isAbsolute(lit.value) && isCloudPath(root, lit.value) ? lit.value : null);
       if (match) add("C", lit.index, quote(lit.value), null, undefined, match);
     }
     if (isBundlerConfig(file)) for (const lit of codeLiterals(file, text)) tokenHits("B", lit.value, dir, lit.index);
   }
 
-  if (/\.sh$/i.test(file) && /^(scripts|e2e)\//.test(file))
+  if (isShellScript(file, text))
     for (const { word, line } of shellWords(text)) {
-      const match = shellMatch(word);
+      const match = shellMatch(word, pattern) ?? (isAbsolute(word) && isCloudPath(root, word) ? word : null);
       if (match) add("C", 0, quote(word), null, line, match);
     }
 
@@ -223,16 +243,18 @@ export function checkFile({ root, file, text, cloudNames }) {
     const pkg = JSON.parse(text);
     for (const field of DEPENDENCY_FIELDS)
       for (const [name, version] of Object.entries(pkg[field] ?? {})) {
-        if (isCloudPackage(name, cloudNames)) add("B", Math.max(0, text.indexOf(`"${name}"`)), name, null);
-        jsonStringHits("B", [String(version).replace(/^(file|link|workspace):/, "")]);
+        if (isCloudPackage(name, cloudNames)) add("B", Math.max(0, text.indexOf(`"${name}"`)), name, null, undefined, undefined, field);
+        jsonStringHits("B", [String(version).replace(/^(file|link|workspace):/, "")], field);
       }
-    jsonStringHits("B", collectStrings([pkg.scripts ?? {}, pkg.workspaces ?? [], pkg.files ?? []]));
+    for (const [name, cmd] of Object.entries(pkg.scripts ?? {})) jsonStringHits("B", collectStrings([name, cmd]), `scripts.${name}`);
+    jsonStringHits("B", collectStrings(pkg.workspaces ?? []), "workspaces");
+    jsonStringHits("B", collectStrings(pkg.files ?? []), "files");
   }
 
   if (isTsconfig(file)) {
     const { config } = ts.parseConfigFileTextToJson(file, text);
     const c = config ?? {};
-    jsonStringHits("B", collectStrings(TSCONFIG_FIELDS.map((f) => c[f] ?? c.compilerOptions?.[f] ?? [])));
+    for (const f of TSCONFIG_FIELDS) jsonStringHits("B", collectStrings(c[f] ?? c.compilerOptions?.[f] ?? []), f);
   }
 
   if (isDockerfile(file)) tokenHits("B", stripHashComments(text), root);
@@ -284,7 +306,7 @@ export function packageNameHits(root) {
 }
 
 const matchesEntry = (entry, file) =>
-  entry.file.endsWith("/**") ? file.startsWith(entry.file.slice(0, -2)) : entry.file.toLowerCase() === file.toLowerCase();
+  entry.file.endsWith("/**") ? lower(file).startsWith(lower(entry.file.slice(0, -2))) : lower(entry.file) === lower(file);
 
 export function loadAllowlist(root) {
   const path = join(root, "scripts/boundary/allow.json");
@@ -293,7 +315,15 @@ export function loadAllowlist(root) {
 
 export function allowedBy(allow, hit) {
   if (hit.rule === "A") return null;
-  return allow.find((e) => matchesEntry(e, hit.file) && (e.line === undefined || e.line === hit.line)) ?? null;
+  return (
+    allow.find(
+      (e) =>
+        matchesEntry(e, hit.file) &&
+        (e.line === undefined || e.line === hit.line) &&
+        (e.field === undefined || e.field === hit.field) &&
+        (e.token === undefined || e.token === hit.token),
+    ) ?? null
+  );
 }
 
 export function checkRepo(root, { allow = loadAllowlist(root) } = {}) {
@@ -301,6 +331,7 @@ export function checkRepo(root, { allow = loadAllowlist(root) } = {}) {
   const cloudNames = cloudPackageNames(root)
     .map((p) => p.name)
     .filter((n) => typeof n === "string");
+  const entries = cloudEntries(root);
   const hits = [];
   for (const file of files) {
     const abs = join(root, file);
@@ -313,7 +344,7 @@ export function checkRepo(root, { allow = loadAllowlist(root) } = {}) {
     if (!st.isFile()) continue;
     const buf = readFileSync(abs);
     if (buf.includes(0)) continue;
-    hits.push(...checkFile({ root, file, text: buf.toString("utf8"), cloudNames }));
+    hits.push(...checkFile({ root, file, text: buf.toString("utf8"), cloudNames, entries }));
   }
   hits.push(...symlinkHits(root), ...packageNameHits(root));
   const violations = [];

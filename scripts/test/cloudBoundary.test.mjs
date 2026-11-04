@@ -110,6 +110,20 @@ const FAILING = [
     { "packages/x/package.json": '{\n  "scripts": { "t": "node ../../cloud/deploy/t.mjs" }\n}\n' },
     "packages/x/package.json:2 B",
   ],
+  ["tsconfig files", { "packages/x/tsconfig.json": '{ "files": ["../../cloud/agent/src/a.ts"] }\n' }, "B"],
+  [
+    "Rule C string naming any cloud/ folder",
+    { "packages/x/src/a.ts": 'export const p = "cloud/newpkg/x";\n', "cloud/newpkg/x": "x\n" },
+    "packages/x/src/a.ts:1 C",
+  ],
+  [
+    "join(ROOT, '../cloud')",
+    { "scripts/a.mjs": 'import { join } from "node:path";\nexport const p = join(ROOT, "../cloud");\n' },
+    "scripts/a.mjs:2 C",
+  ],
+  ["shell word in a .sh file outside scripts/ and e2e/", { "local/x/run.sh": "#!/bin/sh\ncat cloud/deploy/x\n" }, "local/x/run.sh:2 C"],
+  ["shell word in an extensionless shebang script", { "bin/tool": "#!/usr/bin/env bash\ncp cloud/web/x y\n" }, "bin/tool:2 C"],
+  ["string in an extensionless node script", { "bin/tool": '#!/usr/bin/env node\nconst p = "cloud/web/x";\n' }, "bin/tool:2 C"],
 ];
 
 describe("cloud boundary: each injected case fails with its own rule", () => {
@@ -122,6 +136,35 @@ describe("cloud boundary: each injected case fails with its own rule", () => {
       );
     });
   }
+
+  it("an absolute import specifier into cloud/", () => {
+    const root = repo({});
+    writeFileSync(join(root, "a.ts"), `import x from "${join(root, "cloud/agent/src/a.ts")}";\nexport default x;\n`);
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    assert.deepEqual(rules(checkRepo(root).violations), ["a.ts:1 A"]);
+  });
+
+  it("an absolute string literal into cloud/", () => {
+    const root = repo({});
+    writeFileSync(join(root, "a.mjs"), `export const p = "${join(root, "cloud")}";\n`);
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    assert.deepEqual(rules(checkRepo(root).violations), ["a.mjs:1 C"]);
+  });
+
+  it("the root package.json allow entry covers only the cloud/* workspaces token", () => {
+    const allow = JSON.parse(readFileSync(join(ROOT, "scripts/boundary/allow.json"), "utf8")).filter((e) => e.file === "package.json");
+    assert.equal(allow.length, 1);
+    const pkg = (extra) => `${JSON.stringify({ name: "root", workspaces: ["packages/*", "cloud/*"], ...extra }, null, 2)}\n`;
+    assert.deepEqual(rules(violations({ "package.json": pkg({}) }, { allow })), []);
+    assert.deepEqual(rules(violations({ "package.json": pkg({ dependencies: { "@oab/cloud-web": "file:cloud/web" } }) }, { allow })), [
+      "package.json:8 B",
+      "package.json:8 B",
+    ]);
+    assert.deepEqual(rules(violations({ "package.json": pkg({ scripts: { start: "node cloud/agent/dist/server.js" } }) }, { allow })), [
+      "package.json:8 B",
+    ]);
+    assert.deepEqual(rules(violations({ "package.json": pkg({ scripts: { wipe: "rm -rf cloud/*" } }) }, { allow })), ["package.json:8 B"]);
+  });
 
   it("a tracked symlink into cloud/", () => {
     assert.deepEqual(rules(violations({}, { links: { "packages/x/src/link": "../../../cloud/agent/src" } })), ["packages/x/src/link:1 D"]);
@@ -230,9 +273,16 @@ describe("cloud boundary: passing cases", () => {
     assert.deepEqual(rules(got), ["scripts/a.mjs:2 C"]);
   });
 
-  it("allow entries ending in /** cover their folder", () => {
+  it("allow entries ending in /** cover their folder, case-insensitively", () => {
     const allow = [{ file: "scripts/boundary/**", reason: "the checker" }];
     assert.deepEqual(rules(violations({ "scripts/boundary/x.mjs": 'export const a = "cloud/";\n' }, { allow })), []);
+    assert.deepEqual(rules(violations({ "Scripts/Boundary/x.mjs": 'export const a = "cloud/";\n' }, { allow })), []);
+  });
+
+  it("a field and token pinned entry exempts only that field and token", () => {
+    const allow = [{ file: "packages/x/package.json", field: "workspaces", token: "../../cloud/*", reason: "pinned" }];
+    const text = '{\n  "workspaces": ["../../cloud/*"],\n  "files": ["../../cloud/*"]\n}\n';
+    assert.deepEqual(rules(violations({ "packages/x/package.json": text }, { allow })), ["packages/x/package.json:2 B"]);
   });
 });
 
@@ -266,6 +316,15 @@ describe("allow.json", () => {
   const allow = JSON.parse(readFileSync(join(ROOT, "scripts/boundary/allow.json"), "utf8"));
   const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
 
+  it("every entry exempts at least one hit in this repo", () => {
+    const { allowed } = checkRepo(ROOT, { allow });
+    for (const e of allow)
+      assert.ok(
+        allowed.some((a) => a.reason === e.reason && a.file.toLowerCase().startsWith(e.file.replace(/\*\*$/, "").toLowerCase())),
+        `allow entry ${e.file} exempts nothing`,
+      );
+  });
+
   it("every entry names a file (or folder/**) outside cloud/ and gives a reason", () => {
     assert.ok(Array.isArray(allow) && allow.length > 0);
     for (const e of allow) {
@@ -273,9 +332,9 @@ describe("allow.json", () => {
       assert.ok(!/^cloud(\/|$)/i.test(e.file), e.file);
       assert.ok(typeof e.reason === "string" && e.reason.trim().length > 10, `${e.file} needs a reason`);
       assert.deepEqual(
-        Object.keys(e).filter((k) => !["file", "line", "reason"].includes(k)),
+        Object.keys(e).filter((k) => !["file", "line", "field", "token", "reason"].includes(k)),
         [],
-        `${e.file}: only file, line, reason`,
+        `${e.file}: only file, line, field, token, reason`,
       );
       if (e.line !== undefined) assert.ok(Number.isInteger(e.line) && e.line > 0, e.file);
     }
