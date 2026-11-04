@@ -32,7 +32,7 @@ import {
   teardownClone,
   writeDockerConfig,
 } from "../docs/run-doc-commands.mjs";
-import { fillDigests, resetDigests } from "../docs/fill-digests.mjs";
+import { applyDigests, fillDigests, resetDigests } from "../docs/fill-digests.mjs";
 import { notes } from "../release/releaseLib.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -900,8 +900,11 @@ describe("hosted docs moved out of the README", () => {
       assert.ok(HOSTED.includes(s), `docs/hosted.md lacks ${s}`);
   });
   it("targets the hosted project in every compose command", () => {
+    const prose = linesOf(HOSTED)
+      .filter((l) => !l.startsWith("> **Warning.**"))
+      .join("\n");
     const spans = [
-      ...[...HOSTED.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]),
+      ...[...prose.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]),
       ...extractCommands(HOSTED, "docs/hosted.md").map((c) => c.command),
     ];
     const compose = spans.filter((c) => /\bdocker compose\b/.test(c));
@@ -1126,7 +1129,7 @@ describe("fill-digests", () => {
       filled.includes(`printf 'OPEN_AGENT_IMAGE=${manifest.images.agent}\\nOPEN_AGENT_SEARCH_IMAGE=${manifest.images.search}\\n' > .env`),
     );
     assert.ok(filled.includes(`gh attestation verify oci://${manifest.images.agent} `));
-    assert.ok(!filled.includes("<agent-digest>") && !filled.includes("<search-digest>"));
+    assert.doesNotMatch(filled, /@sha256:<(agent|search)-digest>/);
     assert.deepEqual(imageTagProblems(filled), []);
     assert.deepEqual(attestationProblems(filled, "1.0.0"), []);
     assert.equal(guideVersion(filled), "1.0.0");
@@ -1146,6 +1149,14 @@ describe("fill-digests", () => {
       [{ ...manifest, images: { agent: manifest.images.agent } }, /search/],
     ])
       assert.throws(() => fillDigests(INSTALL, m), want);
+  });
+  it("keeps doc-commands.json in step with the filled guide", () => {
+    const digests = { agent: D("a"), search: D("b") };
+    const all = JSON.parse(applyDigests(readFileSync(join(ROOT, "scripts/docs/doc-commands.json"), "utf8"), digests));
+    const commands = { commands: all.commands.filter((e) => e.file === "docs/INSTALL.md") };
+    const { missing, extra } = coverage(extractCommands(filled, "docs/INSTALL.md"), commands, ["docs/INSTALL.md"]);
+    assert.deepEqual([missing, extra], [[], []]);
+    assert.deepEqual(manifestProblems(commands, Object.keys(RULES)), []);
   });
   it("refuses a guide without the §9 refs", () => {
     assert.throws(() => fillDigests("Version in this guide: 1.0.0\n", manifest), /no image refs/);

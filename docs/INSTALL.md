@@ -188,7 +188,7 @@ curl -fsS http://127.0.0.1:3000/health
 docker compose ps
 ```
 
-**Prebuilt images instead of building:** take the two image references from the release's `open-agent-services.json` (`images.agent` and `images.search`). The release notes print them too. Always use these `@sha256:` references, never a tag. In the `open-agent-bot` folder, put them in a `.env` file. Replace `<agent-digest>` and `<search-digest>` with the digests from the release:
+**Prebuilt images instead of building:** take the two image references from the release's `open-agent-services.json` (`images.agent` and `images.search`). The release notes print them too. Always use these `@sha256:` references, never a tag. In the `open-agent-bot` folder, put them in a `.env` file. The line below names the images of version 1.0.0; if it still shows `<agent-digest>` and `<search-digest>`, replace them with the digests from the release:
 
 ```bash
 printf 'OPEN_AGENT_IMAGE=ghcr.io/nit-1997/open-agent@sha256:<agent-digest>\nOPEN_AGENT_SEARCH_IMAGE=ghcr.io/nit-1997/open-agent-search@sha256:<search-digest>\n' > .env

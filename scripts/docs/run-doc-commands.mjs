@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { isMain, main } from "../release/cli.mjs";
 import { LOCAL_REGISTRY_REF } from "../release/releaseLib.mjs";
@@ -138,6 +138,22 @@ export function parseRunnerArgs(argv, { tmp = realpathSync(tmpdir()), repo = REP
   return { scratch, releaseDir, log: resolve(values.log), tsv: resolve(values.tsv), branch: values.branch };
 }
 
+export function fileContext(base, file) {
+  const work = join(base.dir, "work", basename(file).replace(/\.md$/, ""));
+  return { ...base, work, clone: join(work, "open-agent-bot") };
+}
+
+export function teardownClone(ctx, env, exec, log, hasCompose = (d) => existsSync(join(d, "docker-compose.yml"))) {
+  if (!hasCompose(ctx.clone)) return;
+  const pf = preflight(ctx.clone, env, exec, ctx.project, ctx.port);
+  if (!pf.ok) {
+    log(`[runner] teardown of ${ctx.clone} skipped: preflight ${pf.reason}\n`);
+    return;
+  }
+  const r = exec("docker", ["compose", "down", "-v", "--remove-orphans"], { cwd: ctx.clone, env });
+  log(`[runner] teardown ${ctx.clone} docker compose down -v --remove-orphans (${ctx.project}): exit ${r.status}\n${r.stderr ?? ""}`);
+}
+
 export function createRunner({
   ctx,
   env,
@@ -150,7 +166,7 @@ export function createRunner({
   const rules = substitutionRules(ctx);
   const byKey = new Map((manifest.commands ?? []).map((e) => [`${e.file}\0${e.command}`, e]));
   const runner = {
-    cwd: ctx.dir,
+    cwd: ctx.work ?? ctx.dir,
     rows: [],
     run(occ) {
       const source = `${occ.file}:${occ.line}`;
@@ -279,10 +295,9 @@ export function runDocCommands(argv) {
       throw new Error(`the dry-run lock's ${k} ref is not a local-registry ref: ${lock.images?.[k]}`);
   const dmgName = readdirSync(join(o.releaseDir, "release")).find((f) => /^Open-Agent-.+-arm64\.dmg$/.test(f));
   const install = readFileSync(join(REPO, "docs/INSTALL.md"), "utf8");
-  const ctx = {
+  const base = {
     repo: REPO,
     dir,
-    clone: join(dir, "open-agent-bot"),
     downloads: join(dir, "downloads"),
     installApp: join(dir, "install", "Open Agent.app"),
     port: SCRATCH.port,
@@ -296,7 +311,7 @@ export function runDocCommands(argv) {
   const extracted = COVERED_FILES.flatMap((f) => extractCommands(readFileSync(join(REPO, f), "utf8"), f));
   const cov = coverage(extracted, manifest, COVERED_FILES);
   const problems = [
-    ...manifestProblems(manifest, Object.keys(substitutionRules(ctx))),
+    ...manifestProblems(manifest, Object.keys(substitutionRules(base))),
     ...cov.missing.map((m) => `missing: ${m}`),
     ...cov.extra.map((m) => `extra: ${m}`),
   ];
@@ -318,9 +333,9 @@ export function runDocCommands(argv) {
     if (r.status !== 0)
       throw new Error(`self-check docker ${args.join(" ")} failed in the scratch environment (exit ${r.status}): ${r.stderr.trim()}`);
   }
-  mkdirSync(ctx.downloads);
-  for (const f of readdirSync(join(o.releaseDir, "release"))) copyFileSync(join(o.releaseDir, "release", f), join(ctx.downloads, f));
-  log(`[runner] downloads: ${readdirSync(ctx.downloads).join(", ")}\n`);
+  mkdirSync(base.downloads);
+  for (const f of readdirSync(join(o.releaseDir, "release"))) copyFileSync(join(o.releaseDir, "release", f), join(base.downloads, f));
+  log(`[runner] downloads: ${readdirSync(base.downloads).join(", ")}\n`);
   prepareInstall(dir, o.releaseDir, log);
   const preflightDir = join(dir, ".preflight");
   mkdirSync(preflightDir);
@@ -329,27 +344,31 @@ export function runDocCommands(argv) {
   const imagesBefore = localImages(env);
   log(`[runner] local tags before: ${JSON.stringify(imagesBefore)}\n`);
 
-  const runner = createRunner({ ctx, env, manifest, exec: spawnExec, log, preflightDir });
+  const rows = [];
   try {
-    for (const occ of extracted) runner.run(occ);
-  } finally {
-    if (existsSync(join(ctx.clone, "docker-compose.yml"))) {
-      const pf = preflight(ctx.clone, env, spawnExec, ctx.project, ctx.port);
-      if (pf.ok) {
-        const r = spawnExec("docker", ["compose", "down", "-v", "--remove-orphans"], { cwd: ctx.clone, env });
-        log(`[runner] teardown docker compose down -v --remove-orphans (${ctx.project}): exit ${r.status}\n${r.stderr}`);
-      } else log(`[runner] teardown skipped: preflight ${pf.reason}\n`);
+    for (const file of COVERED_FILES) {
+      const ctx = fileContext(base, file);
+      mkdirSync(ctx.work, { recursive: true });
+      log(`[runner] ${file}: workspace ${ctx.work}\n`);
+      const runner = createRunner({ ctx, env, manifest, exec: spawnExec, log, preflightDir });
+      try {
+        for (const occ of extracted.filter((c) => c.file === file)) runner.run(occ);
+      } finally {
+        rows.push(...runner.rows);
+        teardownClone(ctx, env, spawnExec, log);
+      }
     }
+  } finally {
     restoreLocalImages(imagesBefore, env, log);
     writeFileSync(
       o.tsv,
-      `${[tsvRow(TSV_HEADER), ...runner.rows.map((r) => tsvRow([r.source, r.documented, r.mode, r.asRun, r.exit, r.note]))].join("\n")}\n`,
+      `${[tsvRow(TSV_HEADER), ...rows.map((r) => tsvRow([r.source, r.documented, r.mode, r.asRun, r.exit, r.note]))].join("\n")}\n`,
     );
   }
-  const failed = runner.rows.filter((r) => !r.ok);
-  const count = (m) => runner.rows.filter((r) => r.mode === m).length;
+  const failed = rows.filter((r) => !r.ok);
+  const count = (m) => rows.filter((r) => r.mode === m).length;
   log(
-    `[runner] ${runner.rows.length} commands: run ${count("run")}, env ${count("env")}, subst ${count("subst")}, owner ${count("owner")}; failed ${failed.length}\n`,
+    `[runner] ${rows.length} commands: run ${count("run")}, env ${count("env")}, subst ${count("subst")}, owner ${count("owner")}; failed ${failed.length}\n`,
   );
   for (const f of failed) log(`[runner] FAILED ${f.source} exit ${f.exit}: ${f.documented} ${f.note}\n`);
   return failed.length ? 1 : 0;
