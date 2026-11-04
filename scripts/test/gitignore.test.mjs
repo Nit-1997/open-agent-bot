@@ -56,6 +56,13 @@ describe(".gitignore", () => {
     assert.equal(tracked, "");
   });
 
+  it("ignores local Claude Code folders at any depth", () => {
+    assert.equal(checkIgnore(".claude/settings.local.json"), 0);
+    assert.equal(checkIgnore("cloud/web/.claude/settings.json"), 0);
+    const tracked = execFileSync("git", ["ls-files", "**/.claude/**"], { cwd: ROOT, encoding: "utf8" });
+    assert.equal(tracked, "");
+  });
+
   it("ignores no tracked file", () => {
     const tracked = execFileSync("git", ["ls-files", "-ci", "--exclude-standard"], { cwd: ROOT, encoding: "utf8" });
     assert.equal(tracked, "");

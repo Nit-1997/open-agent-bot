@@ -49,3 +49,6 @@ apps/desktop/release/
 
 # Planning specs stay out of the public repo
 docs/superpowers/
+
+# Local Claude Code settings and memory
+**/.claude/
