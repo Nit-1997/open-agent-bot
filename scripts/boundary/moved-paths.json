@@ -193,6 +193,14 @@
         "reason": "pins the supabase/setup-cli GitHub Action of the cloud-supabase job, not the old supabase/ folder (M7 7.0)"
       },
       {
+        "file": "scripts/make/web-local.sh",
+        "reason": "the install hint names the Homebrew tap supabase/tap/supabase for the Supabase CLI, not the old supabase/ folder"
+      },
+      {
+        "file": "scripts/test/webLocal.test.mjs",
+        "reason": "\"supabase\" is the fake Supabase CLI binary the make web-local tests put on PATH, not the old root folder"
+      },
+      {
         "file": "cloud/supabase/scripts/local-stack.mjs",
         "reason": "\"supabase\" is the Supabase CLI binary and the CLI's own workdir folder (<workdir>/supabase/config.toml) of the local stack, not the old root folder (M7 7.0)"
       },
