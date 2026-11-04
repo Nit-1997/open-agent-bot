@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const HOSTED = "cloud/deploy/compose.hosted.yml";
 const PREVIEW = "cloud/deploy/compose.preview.yml";
-const BASELINE = "6986a4c";
+const BASELINE = "the pre-M6 baseline";
 const HOSTED_PROFILES = ["--profile", "local", "--profile", "litellm", "--profile", "ollama"];
 const PASS_ENV = ["PATH", "HOME", "DOCKER_HOST", "DOCKER_CONFIG", "DOCKER_CONTEXT", "DOCKER_CERT_PATH", "DOCKER_TLS_VERIFY"];
 const WORK = mkdtempSync(join(tmpdir(), "compose-hosted-"));
@@ -73,10 +73,11 @@ const LINE_MOVES = [
   [/^( {6}- )\/app\/web\/\.next\/cache(:size=256m,uid=1000,gid=1000,mode=0700)$/m, "$1/app/cloud/web/.next/cache$2"],
 ];
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
-const baselineText = () => execFileSync("git", ["show", `${BASELINE}:docker-compose.yml`], { cwd: ROOT, encoding: "utf8" });
+const FIXTURE = join(ROOT, "cloud/deploy/test/fixtures/compose-hosted-baseline.yml");
+const baselineText = () => readFileSync(FIXTURE, "utf8");
 
 describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
-  it(`is the ${BASELINE} root docker-compose.yml plus one name line, with only its paths moved to cloud/deploy`, () => {
+  it(`is the ${BASELINE} root docker-compose.yml (fixtures/compose-hosted-baseline.yml) plus one name line, with only its paths moved to cloud/deploy`, () => {
     let moved = baselineText();
     for (const [re, to] of LINE_MOVES) {
       assert.match(moved, new RegExp(re.source, re.flags.replace("g", "")), String(re));

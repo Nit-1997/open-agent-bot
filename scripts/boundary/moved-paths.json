@@ -14,7 +14,7 @@
       },
       {
         "file": "scripts/demo/m6/**",
-        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       }
     ]
   },
@@ -37,7 +37,7 @@
       },
       {
         "file": "scripts/demo/m6/**",
-        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       }
     ]
   },
@@ -56,7 +56,7 @@
       },
       {
         "file": "scripts/demo/m6/**",
-        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       }
     ]
   },
@@ -138,11 +138,11 @@
       },
       {
         "file": "cloud/deploy/test/composeHosted.test.mjs",
-        "reason": "checks the 6986a4c baseline's old web build path and cache tmpfs against the moved ones"
+        "reason": "checks the pre-M6 baseline fixture's old web build path and cache tmpfs against the moved ones"
       },
       {
         "file": "scripts/demo/m6/**",
-        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       },
       {
         "file": "cloud/README.md",
@@ -171,10 +171,6 @@
       {
         "file": "packages/local-web/test/build.test.ts",
         "reason": "\"supabase\" is a needle the local bundle must not contain, not a path"
-      },
-      {
-        "file": "cloud/deploy/test/migrations.test.mjs",
-        "reason": "reads supabase/migrations at the 4879d41 pin with git to compare names and SHA-256 (D15)"
       },
       {
         "file": "cloud/deploy/test/docs.test.mjs",
@@ -245,7 +241,7 @@
       },
       {
         "file": "cloud/deploy/test/composeHosted.test.mjs",
-        "reason": "checks the 6986a4c baseline's deploy-config/ values against the moved ones (D9)"
+        "reason": "checks the pre-M6 baseline fixture's deploy-config/ values against the moved ones (D9)"
       },
       {
         "file": "cloud/deploy/test/docs.test.mjs",
@@ -257,7 +253,7 @@
       },
       {
         "file": "scripts/demo/m6/**",
-        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       }
     ]
   },
@@ -288,7 +284,7 @@
       },
       {
         "file": "scripts/demo/m6/**",
-        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       },
       {
         "file": "cloud/README.md",
@@ -315,7 +311,7 @@
       },
       {
         "file": "scripts/demo/m6/**",
-        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
       }
     ]
   },

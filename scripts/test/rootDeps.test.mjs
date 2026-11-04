@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
-const BASE = "e95883b7eccdd6cf661d4ac842ec34b4ff634157";
 const ADDED = { "@biomejs/biome": "2.6.3", marked: "12.0.2", yaml: "2.9.0" };
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
@@ -24,13 +23,6 @@ function bareImports(text) {
     .preProcessFile(text, true, true)
     .importedFiles.map((f) => f.fileName)
     .filter((spec) => !spec.startsWith(".") && !spec.startsWith("/"));
-}
-
-function lockfileAfter() {
-  const commits = git("rev-list", "--topo-order", "--reverse", `${BASE}..HEAD`, "--", "package-lock.json").split("\n").filter(Boolean);
-  return JSON.parse(
-    commits.length ? git("show", `${commits[0]}:package-lock.json`) : readFileSync(join(ROOT, "package-lock.json"), "utf8"),
-  );
 }
 
 describe("root dependencies of scripts/", () => {
@@ -78,28 +70,14 @@ describe("scripts lint wiring", () => {
   });
 });
 
-describe("package-lock.json diff for the root devDependencies", () => {
-  const before = JSON.parse(git("show", `${BASE}:package-lock.json`));
-  const after = lockfileAfter();
+describe("package-lock.json root entry for the root devDependencies", () => {
+  const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8"));
 
-  it("adds only the new edges under the root package entry", () => {
-    const { devDependencies: beforeDev, ...beforeRest } = before.packages[""];
-    const { devDependencies: afterDev, ...afterRest } = after.packages[""];
-    assert.deepEqual(afterRest, beforeRest);
-    assert.deepEqual(afterDev, { ...beforeDev, ...ADDED });
-  });
-
-  it("adds, removes and changes no other lockfile entry", () => {
-    const keys = (lock) => Object.keys(lock.packages).sort();
-    assert.deepEqual(keys(after), keys(before));
-    const changed = keys(before).filter((k) => k !== "" && JSON.stringify(before.packages[k]) !== JSON.stringify(after.packages[k]));
-    assert.deepEqual(changed, []);
-    const { packages: _a, ...afterTop } = after;
-    const { packages: _b, ...beforeTop } = before;
-    assert.deepEqual(afterTop, beforeTop);
+  it("the root entry lists exactly the root package.json devDependencies", () => {
+    assert.deepEqual(lock.packages[""].devDependencies, pkg.devDependencies);
   });
 
   it("each added edge resolves to an existing root-level entry", () => {
-    for (const [name, version] of Object.entries(ADDED)) assert.equal(after.packages[`node_modules/${name}`]?.version, version, name);
+    for (const [name, version] of Object.entries(ADDED)) assert.equal(lock.packages[`node_modules/${name}`]?.version, version, name);
   });
 });

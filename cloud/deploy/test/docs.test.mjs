@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -128,7 +127,7 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
     const sw = section(SWITCH, GATE6);
     for (const s of [
       "`c1c0f4e`",
-      "<old checkout>",
+      "the old checkout (`$OLD` below)",
       "**one sitting**",
       "`/copilotkit`",
       "`/agui`",
@@ -167,9 +166,11 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
     const g7 = section(GATE7);
     const steps = [
       "**Never `git pull` the old checkout before the switch.**",
-      "OLD=<old checkout>",
+      'OLD="<path of the old checkout>"',
+      'AGENT_HOST="<public agent host>"',
       'git clone https://github.com/Nit-1997/open-agent-bot "$NEW"',
       "git checkout <main commit after M6>",
+      'git -C "$OLD" status --porcelain --ignored -- "$OLD/deploy-config"',
       'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy --copy --dry-run',
       'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy --copy',
       `docker compose -p oab-gate7 ${COMPOSE} --env-file cloud/deploy/.env-nextjs --profile local run --rm --no-deps --build agent node -e "import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})"`,
@@ -179,15 +180,17 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
       "http://localhost:18300",
       "$P down",
       "docker volume rm $(docker volume ls -q --filter label=com.docker.compose.project=oab-gate7)",
-      `docker compose ${COMPOSE} --env-file cloud/deploy/.env-nextjs --profile local config --format json | jq '{name, volumes: [.volumes[].name]}'`,
+      `docker compose ${COMPOSE} --env-file cloud/deploy/.env-nextjs --profile local config --format json --no-env-resolution | jq '{name, volumes: [.volumes[].name]}'`,
+      `test -f "$OLD/.env" && grep -oE '^(CADDYFILE|CADDY_BIND|COMPOSE_PROFILES)=' "$OLD/.env"`,
       'git -C "$OLD" rev-parse HEAD',
       "docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Names}} {{.Image}} {{.CreatedAt}}'",
       "docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Label \"com.docker.compose.service\"}} {{.Image}}'",
       // biome-ignore lint/suspicious/noTemplateCurlyInString: the documented shell command strips the image tag with ${img%:*}
       'docker tag "$img" "${img%:*}:rollback-$SHA"',
+      'test "$(wc -l < "$HOME/open-agent-rollback.txt")" -eq "$want"',
       LIVE_UP,
       "curl -fsS http://127.0.0.1:8000/health",
-      "curl -fsS https://<public agent host>/health",
+      'curl -fsS "https://$AGENT_HOST/health"',
       "**without `--build`**",
       'while read -r svc img tag; do docker tag "$tag" "$img"; done < "$HOME/open-agent-rollback.txt"',
       OLD_COMMANDS[1],
@@ -202,6 +205,24 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
     }
     for (const n of ["searxng-data", "caddy-data", "caddy-config", "ollama-data"]) assert.ok(g7.includes(`\`open-agent-bot_${n}\``), n);
   });
+  it("names no personal path or live host, records the old .env names and profiles, allows two retag lines, checks the tunnel and documents the old web window", () => {
+    assert.doesNotMatch(HOSTED, /\/Users\/|worksimulation/);
+    const g6 = section(GATE6, GATE7);
+    assert.ok(g6.includes("do steps 3 to 5 of the sitting back to back instead"));
+    const g7 = section(GATE7);
+    for (const s of [
+      "`CADDYFILE`, `CADDY_BIND` and `COMPOSE_PROFILES`",
+      "the same `--profile` flags",
+      "or two (agent, renderer) if the web app isn't part of the live project",
+      "Confirm the tunnel (cloudflared) runs outside the compose project",
+      "legacy `deploy-config/` lines",
+      "### Old web app against the new agent",
+      "the same 38 method and path pairs",
+      "npm run compat -w @oab/cloud-e2e",
+      "known `c1c0f4e` bug",
+    ])
+      assert.ok(g7.includes(s), `Gate 7 lacks ${s}`);
+  });
   it("every shell line in cloud/README.md is in cloud/deploy/doc-commands.json as owner-only, with a reason", () => {
     const r = loadOwnerDocs(join(ROOT, "cloud/deploy/doc-commands.json"), ROOT);
     assert.deepEqual(r.problems, []);
@@ -213,11 +234,12 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
 describe("cloud/SECURITY.md", () => {
   const SEC = read("cloud/SECURITY.md");
   const ROOT_SEC = read("SECURITY.md");
-  const baseline = spawnSync("git", ["-C", ROOT, "show", "4124272:SECURITY.md"], { encoding: "utf8" });
+  const fixture = read("cloud/deploy/test/fixtures/security-pre-m6.md");
   it("holds the hosted threat model that left SECURITY.md, verbatim but for the moved test command", () => {
-    assert.equal(baseline.status, 0, baseline.stderr);
-    const old = baseline.stdout.slice(baseline.stdout.indexOf("### Threat model"));
-    const want = old.replace("`npm run test:supabase -w @oab/core`", "`npm run test:supabase -w @oab/cloud-agent`");
+    const old = fixture.slice(fixture.indexOf("### Threat model"));
+    const want = old
+      .replace("`npm run test:supabase -w @oab/core`", "`npm run test:supabase -w @oab/cloud-agent`")
+      .replace(" The full design is `docs/superpowers/specs/2026-10-31-supabase-auth-design.md`.", "");
     assert.notEqual(want, old);
     assert.ok(SEC.includes(want.trimEnd()), "cloud/SECURITY.md differs from the moved section");
     assert.match(linesOf(SEC)[0], /^# /);

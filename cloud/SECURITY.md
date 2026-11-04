@@ -8,7 +8,7 @@ The invite-only hosted deployment (setup in [README.md](README.md)).
 
 ### Threat model
 
-Open Agent runs for a small invited group: the web app on Vercel, the agent behind Caddy on one server, and every user's data in one Supabase project. The full design is `docs/superpowers/specs/2026-10-31-supabase-auth-design.md`.
+Open Agent runs for a small invited group: the web app on Vercel, the agent behind Caddy on one server, and every user's data in one Supabase project.
 
 - **Invite-only accounts.** Supabase sign-ups are off (`disable_signup`), and a `before-user-created` Postgres hook only lets in emails an admin approved (`public.invited_emails`). The admin API's `createUser` does not run that hook, so only the owner's admin scripts call it.
 - **Sessions.** The web app holds the Supabase session in `HttpOnly; Secure; SameSite=Lax` host-only cookies through `@supabase/ssr` server clients. The browser has no Supabase client and no readable token.
