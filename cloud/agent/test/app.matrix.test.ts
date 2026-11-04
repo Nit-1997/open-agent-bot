@@ -153,7 +153,7 @@ async function harnessFor() {
         if (id === DEACTIVATED.id) return "deactivated";
         return KNOWN.some((u) => u.id === id) ? "active" : undefined;
       },
-      isLiveAdmin: async (u) => (live.get(u.id) ?? (async () => u.capabilities.admin))(),
+      isLiveAdmin: async (id) => (live.get(id) ?? (async () => !!KNOWN.find((u) => u.id === id)?.capabilities.admin))(),
     },
   });
   for (const u of [DEACTIVATED, STATUS_THROWS, ADMIN_NOT_LIVE, ADMIN_LIVE_THROWS]) h.accounts.add(u);

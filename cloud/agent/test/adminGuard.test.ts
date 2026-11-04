@@ -9,13 +9,17 @@ import { UserError } from "@oab/core/lib/errors.js";
 const ADMIN: Principal = { id: "33333333-3333-4333-8333-333333333333", email: "admin@example.test", capabilities: ALL_CAPABILITIES };
 const USER: Principal = { id: "11111111-1111-4111-8111-111111111111", email: "alice@example.test", capabilities: NO_CAPABILITIES };
 
-function harness(outcome: AuthOutcome, isLiveAdmin: (p: Principal) => Promise<boolean> = async () => true) {
+function harness(
+  outcome: AuthOutcome,
+  isLiveAdmin: (p: Principal) => Promise<boolean> = async () => true,
+  roleUnverified?: (p: Principal) => boolean,
+) {
   const authenticate = vi.fn(async () => outcome);
   const identity: Identity = { kind: "hosted", admitCaller: () => undefined, authenticate };
   const live = vi.fn(isLiveAdmin);
   const handler = vi.fn();
   const app = new Hono<AuthEnv>();
-  app.use("/admin/*", createGuards(identity).requireUser, createAdminGuard({ isLiveAdmin: live }));
+  app.use("/admin/*", createGuards(identity).requireUser, createAdminGuard({ isLiveAdmin: live, roleUnverified }));
   app.get("/admin/users", (c) => {
     handler(c.get("user"));
     return c.json({ ok: true });
@@ -52,6 +56,23 @@ describe("createAdminGuard behind the core requireUser", () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ error: "auth_unavailable" });
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("answers 503 auth_unavailable to a principal whose admin claim the identity couldn't verify live", async () => {
+    const unverified = vi.fn((p: Principal) => p === USER);
+    const { call, live, handler } = harness({ ok: true, principal: USER }, async () => true, unverified);
+    const res = await call();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: "auth_unavailable" });
+    expect(unverified).toHaveBeenCalledWith(USER);
+    expect(live).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+    const member = harness(
+      { ok: true, principal: USER },
+      async () => true,
+      () => false,
+    );
+    expect((await member.call()).status).toBe(404);
   });
 
   it("renders the authentication error verbatim", async () => {

@@ -21,10 +21,12 @@ function app(
     serviceSecret: TEST_SECRET,
     verify,
     status: new UserStatusCache(opts.status ?? (async () => "active")),
+    liveAdmin: async () => opts.liveAdmin ?? true,
+    onDemoted: async () => {},
   });
   const guards = {
     ...createGuards(identity),
-    requireAdmin: createAdminGuard({ isLiveAdmin: async () => opts.liveAdmin ?? true }),
+    requireAdmin: createAdminGuard({ isLiveAdmin: async () => opts.liveAdmin ?? true, roleUnverified: identity.roleUnverified }),
   };
   const a = new Hono<AuthEnv>();
   a.use("*", guards.requireService);
