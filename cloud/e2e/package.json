@@ -14,6 +14,7 @@
     "test": "node --test --disable-warning=ExperimentalWarning support/*.test.ts scripts/auth-probes.test.ts",
     "e2e": "playwright test --project=desktop --project=tablet --project=phone",
     "smoke": "playwright test --project=smoke",
+    "compat": "playwright test --project=compat",
     "m1": "playwright test --project=preview-m1",
     "m2": "playwright test --project=preview-m2",
     "demo": "npm run e2e && node scripts/make-demo.mjs"

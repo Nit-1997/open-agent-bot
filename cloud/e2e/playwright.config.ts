@@ -54,6 +54,7 @@ export default defineConfig({
       },
     },
     { name: "smoke", testMatch: /preview-smoke\.spec\.ts/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },
+    { name: "compat", testMatch: /compat-old-web\.spec\.ts/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },
     { name: "preview-m1", testMatch: /preview-m1\.spec\.ts/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },
     { name: "preview-m2", testMatch: /preview-m2\.spec\.ts/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },
   ],

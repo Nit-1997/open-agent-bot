@@ -23,6 +23,7 @@ function spies() {
     },
     finish: async () => {
       calls.finish += 1;
+      return 0;
     },
     log: (line) => lines.push(line),
   };
@@ -79,11 +80,13 @@ describe("auth probes verdicts", () => {
       prepare: async () => session,
       finish: async () => {
         finished += 1;
+        return 2;
       },
       log: (line) => lines.push(line),
     };
     assert.equal(await runAuthProbes(env, io), 1);
     assert.equal(finished, 1);
+    assert.ok(lines.includes("e2e users cleaned up: 2 removed"), lines.join("\n"));
     assert.ok(urls.length > 0 && urls.every((url) => url.startsWith(`${APP}/`) || url.startsWith(`${AGENT}/`)), urls.join("\n"));
     assert.match(lines.join("\n"), /FAIL web, no cookies: GET localhost:18300\/api\/chats -> 200/);
     assert.match(lines.at(-1) ?? "", /SOME PROBES FAILED/);
@@ -100,11 +103,13 @@ describe("auth probes verdicts", () => {
       },
       finish: async () => {
         finished += 1;
+        return 0;
       },
       log: (line) => lines.push(line),
     };
     assert.equal(await runAuthProbes(env, io), 1);
     assert.equal(finished, 1);
     assert.match(lines.join("\n"), /probe run failed: setup broke/);
+    assert.ok(lines.includes("e2e users cleaned up: 0 removed"), lines.join("\n"));
   });
 });

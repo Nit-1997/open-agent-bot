@@ -11,7 +11,7 @@ export type Session = { secret: string; demoToken: string; demoCookie: string; o
 export type ProbeIo = {
   fetch: Fetch;
   prepare: () => Promise<Session>;
-  finish: () => Promise<void>;
+  finish: () => Promise<number>;
   log: (line: string) => void;
 };
 
@@ -200,8 +200,8 @@ export async function runAuthProbes(env: Env, io: ProbeIo): Promise<number> {
     io.log(`probe run failed: ${err instanceof Error ? err.message : String(err)}`);
     ok = false;
   } finally {
-    await io.finish();
-    io.log("e2e users cleaned up");
+    const removed = await io.finish();
+    io.log(`e2e users cleaned up: ${removed} removed`);
   }
   io.log(ok ? "ALL PROBES PASS" : "SOME PROBES FAILED");
   return ok ? 0 : 1;
@@ -259,7 +259,7 @@ function previewIo(): ProbeIo {
     },
     finish: async () => {
       const { default: teardown } = await import("../global-teardown.ts");
-      await teardown();
+      return teardown();
     },
   };
 }

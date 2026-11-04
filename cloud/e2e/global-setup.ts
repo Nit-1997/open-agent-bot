@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { chromium, type FullConfig, request } from "@playwright/test";
+import { prepareAuthDir } from "./support/authFiles";
 import { AUTH_DIR, env } from "./support/env";
 import { seed } from "./support/seed";
 import { saveSeeded } from "./support/state";
@@ -14,7 +14,7 @@ async function saveModelKey(storageState: string, origin: string): Promise<void>
 }
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
-  mkdirSync(AUTH_DIR, { recursive: true });
+  prepareAuthDir(AUTH_DIR);
   cleanupE2e();
   try {
     await createUser(DEMO_USER);
