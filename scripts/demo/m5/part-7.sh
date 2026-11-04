@@ -20,4 +20,5 @@ STUB_PORT=18503 npx tsx e2e/support/stubModel.ts &
 PIDS+=("$!")
 run wait-servers "for i in \$(seq 1 60); do nc -z 127.0.0.1 18502 && nc -z 127.0.0.1 18503 && break; sleep 0.5; done; nc -z 127.0.0.1 18502 && nc -z 127.0.0.1 18503"
 run playwright-app "(cd e2e && DEMO_M5=1 DEMO_OUT=../$DEMO_DIR DEMO_RANGE=18515-18519 DEMO_STUB_PORT=18503 DEMO_RELEASES_PORT=18502 DEMO_PROJECT=oab-factory-m5-demo DEMO_LOCK=../$A/lock/services.lock.json DEMO_UPDATE_VERSION=$V2 DEMO_SLOWMO=250 npx playwright test -c playwright.desktop.config.ts --project desktop-demo -g 'M5 app')"
+run keep-videos "rm -rf \"$DEMO_DIR/playwright-app\" && cp -R e2e/test-results/desktop \"$DEMO_DIR/playwright-app\" && find \"$DEMO_DIR/playwright-app\" -name '*.webm'"
 run mock-log "cat \"$DEMO_DIR/mock.log\""
