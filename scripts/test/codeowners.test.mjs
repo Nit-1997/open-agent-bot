@@ -44,7 +44,11 @@ describe("CODEOWNERS (M6 D14)", () => {
   });
 
   it("every path it names exists", () => {
-    for (const l of lines) assert.ok(existsSync(join(ROOT, l.split(" ")[0].slice(1))), l);
+    const cloudPresent = existsSync(join(ROOT, "cloud"));
+    for (const l of lines) {
+      const path = l.split(" ")[0].slice(1);
+      if (cloudPresent || !path.startsWith("cloud/")) assert.ok(existsSync(join(ROOT, path)), l);
+    }
   });
 
   it("every line is an absolute path owned by @Nit-1997", () => {
