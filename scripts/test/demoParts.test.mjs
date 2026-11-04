@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { PARTS, PARTS_DIR, LIB, libProblems, partProblems } from "../demo/partChecks.mjs";
+import { functionsOf, LIB, libOf, libProblems, MILESTONES, PARTS, PARTS_DIR, partProblems, partsOf } from "../demo/partChecks.mjs";
 import { addIds, DOCS, idProblems, renderAll, renderDoc } from "../docs/render-docs.mjs";
 
 const read = (f) => readFileSync(f, "utf8");
@@ -257,6 +257,249 @@ describe("demo part scripts", () => {
   it("the lib check fails without the preflight, the oab guard or the exit-code record", () => {
     assert.match(libProblems("set -u\n").join("\n"), /preview-preflight/);
     assert.match(libProblems(". scripts/preview-preflight.sh\n").join("\n"), /oab/);
+  });
+});
+
+describe("m6 demo part scripts", () => {
+  const M6 = MILESTONES.m6.dir;
+  const M6_LIB = libOf("m6");
+  const m6 = (body) => partProblems(good(body), "x.sh", "m6");
+  const refuses = (body, re) => assert.match(m6(body).join("\n"), re, body);
+  const passes = (body) => assert.deepEqual(m6(body), [], body);
+
+  it("has parts 0 to 8 and the shared lib", () => {
+    assert.deepEqual(
+      partsOf("m6"),
+      [0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => `part-${n}.sh`),
+    );
+    assert.deepEqual(
+      readdirSync(M6)
+        .filter((f) => f.endsWith(".sh"))
+        .sort(),
+      ["lib.sh", ...partsOf("m6")].sort(),
+    );
+  });
+
+  it("every committed m6 part and the lib pass the static checks and parse with bash -n", () => {
+    for (const p of partsOf("m6")) assert.deepEqual(partProblems(read(join(M6, p)), p, "m6"), [], p);
+    assert.deepEqual(libProblems(read(M6_LIB), "m6"), []);
+    for (const f of [M6_LIB, ...partsOf("m6").map((p) => join(M6, p))]) {
+      const r = spawnSync("bash", ["-n", f], { encoding: "utf8" });
+      assert.equal(r.status, 0, `${f}: ${r.stderr}`);
+    }
+  });
+
+  it("keeps the M6 port map: 18600-18649 plus the preview's 18300 and 18800", () => {
+    for (const bad of [
+      "curl -fsS http://127.0.0.1:8000/health",
+      "OPEN_AGENT_PORT=18520 x",
+      "open http://localhost:18301",
+      "y --port 18650",
+    ])
+      refuses(bad, /port/);
+    for (const ok of ["OPEN_AGENT_PORT=18610 x", "APP_ORIGIN=http://localhost:18300 y", "AGENT_ORIGIN=http://127.0.0.1:18800 z"])
+      passes(ok);
+  });
+
+  it("never names the open-agent or open-agent-bot project without -p oab-", () => {
+    for (const bad of [
+      "docker compose -f cloud/deploy/compose.hosted.yml up -d",
+      "docker compose -p open-agent-bot ps",
+      "docker compose --project-name open-agent down",
+      "docker compose up -d --build",
+    ])
+      refuses(bad, /docker compose|open-agent/);
+    passes("docker compose -p oab-factory-m6-hosted -f cloud/deploy/compose.hosted.yml ps");
+  });
+
+  it("refuses a bare down -v in a part", () => {
+    for (const bad of [
+      "docker compose -p oab-factory-m6-hosted down -v",
+      "docker compose -p oab-factory-m6-oss -f docker-compose.yml down --volumes --remove-orphans",
+    ])
+      refuses(bad, /down -v/);
+    passes("down_hosted");
+  });
+
+  it("refuses docker exec and logs, and docker inspect without --format or on a non-oab object", () => {
+    for (const bad of [
+      "docker exec oab-factory-m6-hosted-agent-1 ls",
+      "docker logs oab-factory-m6-hosted-agent-1",
+      "docker compose -p oab-factory-m6-hosted logs agent",
+      "docker compose -p oab-factory-m6-hosted exec agent ls",
+    ])
+      refuses(bad, /exec or logs/);
+    for (const bad of [
+      "docker inspect oab-factory-m6-hosted-agent-1",
+      "docker image inspect oab-factory-m6-hosted-agent",
+      "docker inspect --format '{{.Mounts}}' searxng",
+      "docker image inspect --format '{{.Id}}' open-agent-bot-agent",
+      `docker inspect --format '{{json .Config.Env}}' "$c"`,
+    ])
+      refuses(bad, /docker inspect/);
+    for (const ok of [
+      "docker image inspect --format '{{json .Config.Cmd}} {{.Config.WorkingDir}}' oab-factory-m6-hosted-agent",
+      `run mounts "docker inspect --format '{{range .Mounts}}{{.Source}} -> {{.Destination}} {{end}}' oab-factory-m6-hosted-search-1"`,
+      "inspect_oab '{{.Name}}' \"$c\"",
+    ])
+      passes(ok);
+  });
+
+  it("lets the lib inspect a variable only inside a helper that calls require_oab_ref first", () => {
+    const lib = (body) => `. "$REPO/scripts/preview-preflight.sh"\nrequire_oab oab-x\nEXITS=exit-codes.txt\n${body}\n`;
+    assert.deepEqual(
+      libProblems(lib(`inspect_oab() {\n  require_oab_ref "$2" || return 1\n  docker inspect --format "$1" "$2"\n}`), "m6"),
+      [],
+    );
+    assert.match(libProblems(lib(`inspect_oab() {\n  docker inspect --format "$1" "$2"\n}`), "m6").join("\n"), /require_oab_ref/);
+    assert.match(libProblems(lib(`docker inspect --format "$1" "$2"`), "m6").join("\n"), /guarded helper/);
+  });
+
+  it("lets the lib run down -v only in a down_* helper after preflight … || return 1", () => {
+    const lib = (body) => `. "$REPO/scripts/preview-preflight.sh"\nrequire_oab oab-x\nEXITS=exit-codes.txt\n${body}\n`;
+    const P = "docker compose -p oab-factory-m6-hosted -f x.yml";
+    assert.deepEqual(libProblems(lib(`down_hosted() {\n  preflight ${P} || return 1\n  ${P} down -v --remove-orphans\n}`), "m6"), []);
+    assert.match(libProblems(lib(`down_hosted() {\n  ${P} down -v\n}`), "m6").join("\n"), /without a preflight/);
+    assert.match(libProblems(lib(`wipe() {\n  preflight ${P} || return 1\n  ${P} down -v\n}`), "m6").join("\n"), /down_\* helper/);
+    assert.match(libProblems(lib(`${P} down -v`), "m6").join("\n"), /guarded helper/);
+  });
+
+  it("pipes compose config only into a names-only jq filter", () => {
+    for (const bad of [
+      "docker compose -p oab-factory-m6-hosted -f cloud/deploy/compose.hosted.yml config",
+      "docker compose -f cloud/deploy/compose.hosted.yml config --format json | jq .",
+      "docker compose -f cloud/deploy/compose.hosted.yml config --format json > x.json",
+      "docker compose --env-file /dev/null -f cloud/deploy/compose.hosted.yml config --format json --no-env-resolution | jq .services",
+    ])
+      refuses(bad, /names-only jq/);
+    for (const ok of [
+      "docker compose config --format json | jq -r .name",
+      "docker compose -f cloud/deploy/compose.hosted.yml config --format json | jq -r .name",
+      "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json | jq_names",
+      "docker compose --env-file /dev/null -f cloud/deploy/compose.hosted.yml --profile local config --format json --no-env-resolution | jq_names_ports",
+      "preflight docker compose -p oab-factory-m6-hosted -f x/deploy-config/compose.preview.yml",
+    ])
+      passes(ok);
+  });
+
+  it("refuses set -x, env, printenv, export -p and declare -p", () => {
+    for (const bad of [
+      "set -x",
+      "set -eux",
+      "set -o xtrace",
+      "env",
+      "env | sort",
+      "printenv OPENAI_API_KEY",
+      "x; printenv",
+      "export -p",
+      "declare -p",
+    ])
+      refuses(bad, /set -x|env/);
+    for (const ok of [
+      "set -euo pipefail",
+      "node cloud/deploy/scripts/env-files.mjs --from a/deploy-config --to b/cloud/deploy --copy",
+      'docker compose -p oab-factory-m6-hosted --env-file "$M6/cloud/deploy/.env-nextjs" ps',
+    ])
+      passes(ok);
+  });
+
+  it("never sets GITHUB_ACTIONS, RUNNER_TEMP or GITHUB_WORKSPACE", () => {
+    for (const bad of [
+      "GITHUB_ACTIONS=true bash scripts/ci/standalone.sh",
+      "export RUNNER_TEMP=/tmp/x",
+      "docker run --rm -e GITHUB_WORKSPACE=/src img",
+      "docker run --rm -e GITHUB_ACTIONS img",
+    ])
+      refuses(bad, /GITHUB_ACTIONS/);
+    passes("unset GITHUB_ACTIONS RUNNER_TEMP GITHUB_WORKSPACE");
+  });
+
+  it("feeds env-file values only to grep -F -c -f <(…), never to the screen or argv", () => {
+    for (const bad of [
+      "cat cloud/deploy/.env-agent",
+      "grep SECRET cloud/deploy/.env-agent",
+      "sed -n 1p cloud/deploy/env-files/.env-e2e",
+      'grep -F -c -e "$(cut -d= -f2 cloud/deploy/.env-agent)" x.log',
+      "diff a/deploy-config/.env-agent b/cloud/deploy/.env-agent",
+    ])
+      refuses(bad, /env-file contents/);
+    for (const ok of [
+      'grep -F -c -f <(secret_patterns cloud/deploy/.env-* cloud/deploy/env-files/.env-*) "$f"',
+      "ls -l cloud/deploy/.env-agent",
+      "git check-ignore -v cloud/deploy/.env-agent",
+      'install -m 600 cloud/deploy/.env-agent "$OLD/deploy-config/.env-agent"',
+      "(set -a && . cloud/deploy/.env-nextjs && set +a && npm run build)",
+    ])
+      passes(ok);
+  });
+
+  it("the m6 lib pins busybox by digest, scopes names and holds the guarded helpers", () => {
+    const lib = read(M6_LIB);
+    assert.match(lib, /^BUSYBOX="busybox:[\d.]+@sha256:[0-9a-f]{64}"$/m);
+    for (const f of [
+      "down_hosted",
+      "down_oss",
+      "down_gate7",
+      "inspect_oab",
+      "image_inspect_oab",
+      "m6_images",
+      "secret_patterns",
+      "jq_names",
+      "jq_names_ports",
+    ])
+      assert.ok(
+        functionsOf(lib).some((x) => x.name === f),
+        f,
+      );
+    assert.match(lib, /^DEMO_DIR="\$\{DEMO_DIR:-\.factory\/m6\/demo\}"$/m);
+    assert.match(
+      lib,
+      /^m6_images\(\) \{ docker image ls --format '\{\{\.Repository\}\}:\{\{\.Tag\}\}' \| grep -E '\^oab-factory-m6-'; \}$/m,
+    );
+  });
+
+  it("part 8 scans for env-file values through grep -F -c -f <(…) and prints counts only", () => {
+    const p8 = read(join(M6, "part-8.sh"));
+    assert.match(p8, /grep -F -c -f <\(secret_patterns /);
+    assert.match(p8, /unzip -p/);
+    assert.match(p8, /^no_open_agent_project$/m);
+  });
+
+  it("part 4 rehearses c1c0f4e, tears it down, then 4879d41 with the rollback exercised", () => {
+    const p4 = read(join(M6, "part-4.sh"));
+    const a = p4.search(/^rehearse c1c0f4e docker-compose\.yml teardown$/m);
+    const b = p4.search(/^rehearse 4879d41 compose\.hosted\.yml keep$/m);
+    assert.ok(a >= 0 && b > a, "rehearsal order");
+    for (const s of ["retag_rollback", "retag_back", "compare_facts", "gate7_config_check", "env-files.mjs"]) assert.ok(p4.includes(s), s);
+  });
+
+  it("part 7 lists the build context of a dummy-secret clone with --no-cache and removes the image", () => {
+    const p7 = read(join(M6, "part-7.sh"));
+    assert.match(p7, /docker build --no-cache/);
+    assert.match(p7, /-t oab-factory-m6-ctx:dev/);
+    assert.match(p7, /docker image rm oab-factory-m6-ctx:dev/);
+  });
+
+  it("the m6 recall only returns folders under $TMPDIR or the demo dir", () => {
+    const demo = `.factory/m6/test-recall-${process.pid}`;
+    const repo = join(M6, "../../..");
+    const outside = mkdtempSync("/var/tmp/oab-m6-recall-outside-");
+    const r = spawnSync(
+      "bash",
+      ["-c", `. scripts/demo/m6/lib.sh; printf '%s\\n' "$1" > "$DEMO_DIR/x.path"; recall x`, "part-test", outside],
+      {
+        cwd: repo,
+        encoding: "utf8",
+        env: { ...process.env, DEMO_DIR: demo },
+      },
+    );
+    try {
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, /outside/);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+      rmSync(join(repo, demo), { recursive: true, force: true });
+    }
   });
 });
 

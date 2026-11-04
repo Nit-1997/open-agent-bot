@@ -1,0 +1,187 @@
+{
+  "files": [
+    "cloud/README.md"
+  ],
+  "commands": [
+    {
+      "file": "cloud/README.md",
+      "command": "npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w @oab/cloud-e2e",
+      "mode": "owner",
+      "reason": "creates and removes real Supabase test users against a hosted preview; the M6 demo part 5 runs the smoke project instead"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "OLD=<old checkout>",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): names the live checkout, which the factory never touches; a variable assignment"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "NEW=\"$HOME/open-agent-hosted\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): the new hosted checkout in the owner's real home folder; a variable assignment"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "git clone https://github.com/Nit-1997/open-agent-bot \"$NEW\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): clones main after the owner merges M6"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "cd \"$NEW\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): the owner's new hosted checkout"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "git checkout <main commit after M6>",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): the main commit exists only after the owner merges M6"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "node cloud/deploy/scripts/env-files.mjs --from \"$OLD/deploy-config\" --to cloud/deploy --copy --dry-run",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): reads the live checkout's settings files; rehearsed on oab- trees in demo part 4, unit-tested in cloud/deploy/test/envFiles.test.mjs"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "node cloud/deploy/scripts/env-files.mjs --from \"$OLD/deploy-config\" --to cloud/deploy --copy",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): copies the live checkout's settings files; rehearsed on oab- trees in demo part 4"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker compose -p oab-gate7 -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local run --rm --no-deps --build agent node -e \"import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): loads the owner's real settings files into the new agent image; rehearsed as gate7_config_check in demo part 4"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": ". scripts/preview-preflight.sh",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): sources the preflight into the owner's shell for the preview"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "P=\"docker compose -p oab-gate7 --env-file cloud/deploy/.env-nextjs -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): a variable assignment for the owner's preview"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "preflight $P && $P up -d --build search renderer agent web",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): a preview with the owner's real settings files on 18300/18800; rehearsed as oab-factory-m6-hosted in demo part 4"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "$P down",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): removes the owner's oab-gate7 preview"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker volume ls --filter label=com.docker.compose.project=oab-gate7 --format '{{.Name}}'",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): lists the owner's oab-gate7 preview volumes"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker volume rm $(docker volume ls -q --filter label=com.docker.compose.project=oab-gate7)",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): removes the owner's oab-gate7 preview volumes"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker image rm oab-gate7-agent oab-gate7-renderer oab-gate7-web",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): removes the owner's oab-gate7 preview images"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json | jq '{name, volumes: [.volumes[].name]}'",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "git -C \"$OLD\" rev-parse HEAD",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): reads the live checkout"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Names}} {{.Image}} {{.CreatedAt}}'",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "SHA=$(git -C \"$OLD\" rev-parse --short HEAD)",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): reads the live checkout; a variable assignment"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Label \"com.docker.compose.service\"}} {{.Image}}' | while read -r svc img; do case \"$svc\" in agent|renderer|web) docker tag \"$img\" \"${img%:*}:rollback-$SHA\" && echo \"$svc $img ${img%:*}:rollback-$SHA\" ;; esac; done | tee \"$HOME/open-agent-rollback.txt\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local up -d --build",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml ps",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker volume ls --filter label=com.docker.compose.project=open-agent-bot --format '{{.Name}}'",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "curl -fsS http://127.0.0.1:8000/health",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): the live agent's port"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "curl -fsS https://<public agent host>/health",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): the live agent through the Cloudflare tunnel"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "while read -r svc img tag; do docker tag \"$tag\" \"$img\"; done < \"$HOME/open-agent-rollback.txt\"",
+      "mode": "owner",
+      "reason": "Gate 7 rollback (owner): retags the live images; rehearsed as retag_back in demo part 4"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker compose --project-directory \"$OLD\" -f \"$OLD/docker-compose.yml\" --env-file \"$OLD/deploy-config/.env-nextjs\" --profile local up -d",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "rm \"$OLD\"/deploy-config/.env-* \"$OLD\"/deploy-config/env-files/.env-*",
+      "mode": "owner",
+      "reason": "Gate 7 burn-in (owner): deletes the live checkout's settings files"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "while read -r svc img tag; do docker image rm \"$tag\"; done < \"$HOME/open-agent-rollback.txt\"",
+      "mode": "owner",
+      "reason": "Gate 7 burn-in (owner): removes the live rollback tags"
+    }
+  ]
+}

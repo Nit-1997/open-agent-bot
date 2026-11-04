@@ -82,6 +82,24 @@ export function coverage(extracted, manifest, files) {
   };
 }
 
+export function ownerDocsProblems(manifest, extracted) {
+  const files = manifest.files ?? [];
+  const out = [];
+  if (files.length === 0) out.push("an owner-docs manifest names its files");
+  out.push(...manifestProblems(manifest, []));
+  for (const e of manifest.commands ?? [])
+    if (e.mode !== "owner") out.push(`${keyOf(e)}: commands in an owner-docs manifest are owner only`);
+  const cov = coverage(extracted, manifest, files);
+  out.push(...cov.missing.map((m) => `missing: ${m}`), ...cov.extra.map((m) => `extra: ${m}`));
+  return out;
+}
+
+export function loadOwnerDocs(path, repo = REPO) {
+  const manifest = loadManifest(path);
+  const extracted = (manifest.files ?? []).flatMap((f) => extractCommands(readFileSync(join(repo, f), "utf8"), f));
+  return { manifest, extracted, problems: ownerDocsProblems(manifest, extracted) };
+}
+
 const GLOB_CHARS = "{}*?[";
 const OPERATORS = ["&&", "||", ";;", ";", "|", "&", "(", ")"];
 const REDIRECTS = [">>", ">&", "<&", ">|", "&>", "<<", ">", "<"];

@@ -11,6 +11,10 @@
       {
         "file": "scripts/move/**",
         "reason": "the move verifier names the moved paths to classify the move commits"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
       }
     ]
   },
@@ -30,6 +34,10 @@
       {
         "file": "scripts/test/verifyMove.test.mjs",
         "reason": "fixture-only paths written into a temp repo to test the deleted-entry case"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
       }
     ]
   },
@@ -45,6 +53,10 @@
       {
         "file": "scripts/move/**",
         "reason": "the move verifier names the moved paths to classify the move commits"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
       }
     ]
   },
@@ -127,6 +139,14 @@
       {
         "file": "cloud/deploy/test/composeHosted.test.mjs",
         "reason": "checks the 6986a4c baseline's old web build path and cache tmpfs against the moved ones"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+      },
+      {
+        "file": "cloud/README.md",
+        "reason": "the Gate 6/7 switch-over names the old checkout's web/Dockerfile and the old Vercel Root Directory"
       }
     ]
   },
@@ -234,6 +254,10 @@
       {
         "file": "cloud/README.md",
         "reason": "the env-files.mjs line names an older checkout's deploy-config/ as the source (D10, D17)"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
       }
     ]
   },
@@ -261,6 +285,14 @@
       {
         "file": "scripts/test/docCommands.test.mjs",
         "reason": "asserts the README names no hosted compose file (the substring also covers cloud/deploy/compose.hosted.yml)"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
+      },
+      {
+        "file": "cloud/README.md",
+        "reason": "the Gate 7 precondition and rollback name the old checkout's post-revamp compose.hosted.yml and its command"
       }
     ]
   },
@@ -280,6 +312,10 @@
       {
         "file": "cloud/deploy/test/docs.test.mjs",
         "reason": "asserts cloud/README.md no longer links docs/hosted.md"
+      },
+      {
+        "file": "scripts/demo/m6/**",
+        "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and 4879d41 layouts that still use them"
       }
     ]
   },

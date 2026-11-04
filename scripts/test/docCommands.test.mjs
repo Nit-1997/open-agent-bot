@@ -15,7 +15,9 @@ import {
   htmlProblems,
   imageTagProblems,
   loadManifest,
+  loadOwnerDocs,
   manifestProblems,
+  ownerDocsProblems,
   PREFLIGHT_ARGS,
   substitute,
   substitutionRules,
@@ -704,6 +706,65 @@ describe("workspaces", () => {
   });
 });
 
+describe("owner-only docs manifests", () => {
+  const tmp = realpathSync(tmpdir());
+  const fixture = (doc, manifest) => {
+    const d = mkdtempSync(join(tmp, "oab-m6-owner-docs-"));
+    mkdirSync(join(d, "docs"));
+    writeFileSync(join(d, "docs/x.md"), doc);
+    writeFileSync(join(d, "owner.json"), JSON.stringify(manifest));
+    return d;
+  };
+  const DOC = "# X\n\n```bash\ndocker compose -p oab-x up -d\necho \\\n  hi\n```\n\n`inline` is not covered\n";
+  const entry = (command, extra = {}) => ({ file: "docs/x.md", command, mode: "owner", reason: "touches the live stack", ...extra });
+  it("covers every shell line of the files it names, each owner with a reason", () => {
+    const d = fixture(DOC, { files: ["docs/x.md"], commands: [entry("docker compose -p oab-x up -d"), entry("echo hi")] });
+    const r = loadOwnerDocs(join(d, "owner.json"), d);
+    assert.deepEqual(r.problems, []);
+    assert.deepEqual(
+      r.extracted.map((c) => c.command),
+      ["docker compose -p oab-x up -d", "echo hi"],
+    );
+  });
+  it("refuses a missing, stale, non-owner or reasonless entry and a manifest without files", () => {
+    const problems = (m) => ownerDocsProblems(m, extractCommands(DOC, "docs/x.md")).join("\n");
+    assert.match(problems({ files: ["docs/x.md"], commands: [entry("echo hi")] }), /missing: docs\/x.md: docker compose -p oab-x up -d/);
+    assert.match(
+      problems({ files: ["docs/x.md"], commands: [entry("docker compose -p oab-x up -d"), entry("echo hi"), entry("echo gone")] }),
+      /extra: docs\/x.md: echo gone/,
+    );
+    assert.match(
+      problems({
+        files: ["docs/x.md"],
+        commands: [entry("docker compose -p oab-x up -d", { mode: "run", reason: undefined }), entry("echo hi")],
+      }),
+      /owner only/,
+    );
+    assert.match(
+      problems({ files: ["docs/x.md"], commands: [entry("docker compose -p oab-x up -d", { reason: "" }), entry("echo hi")] }),
+      /needs a reason/,
+    );
+    assert.match(problems({ commands: [] }), /names its files/);
+  });
+  it("the runner takes --owner-docs manifests and refuses one that doesn't exist", () => {
+    const d = mkdtempSync(join(tmp, "oab-m6-docs-"));
+    mkdirSync(join(d, "rel/lock"), { recursive: true });
+    mkdirSync(join(d, "rel/release"));
+    writeFileSync(join(d, "rel/lock/services.lock.json"), "{}");
+    writeFileSync(join(d, "rel/release/SHA256SUMS"), "");
+    writeFileSync(join(d, "owner.json"), "{}");
+    const base = ["--scratch", join(d, "s"), "--release-dir", join(d, "rel"), "--log", "l", "--tsv", "t"];
+    assert.deepEqual(parseRunnerArgs(base, { tmp, repo: ROOT }).ownerDocs, []);
+    assert.deepEqual(parseRunnerArgs([...base, "--owner-docs", join(d, "owner.json")], { tmp, repo: ROOT }).ownerDocs, [
+      join(d, "owner.json"),
+    ]);
+    assert.throws(
+      () => parseRunnerArgs([...base, "--owner-docs", join(d, "nope.json")], { tmp, repo: ROOT }),
+      /--owner-docs .* does not exist/,
+    );
+  });
+});
+
 describe("runner arguments", () => {
   const tmp = realpathSync(tmpdir());
   it("refuses a scratch dir outside the temp dir and .factory", () => {
@@ -1001,14 +1062,17 @@ describe("SECURITY", () => {
       "- **Fuses and signing.**",
       "- **Export without keys.**",
       "- **Residual risks.**",
-      "- **Invite-only accounts.**",
-      "- **Stale admin capabilities.**",
       "pinned by digest",
       "only from attested digests",
       "immutable once published",
       "not the app's JavaScript",
     ])
       assert.ok(SEC.includes(s), `SECURITY.md lacks ${s}`);
+  });
+  it("points at cloud/SECURITY.md for the hosted threat model and holds none of it", () => {
+    const hosted = SEC.slice(SEC.indexOf("## Hosted service"));
+    assert.equal(hosted.trim(), "## Hosted service\n\nHosted service: see [cloud/SECURITY.md](cloud/SECURITY.md).");
+    for (const s of ["### Threat model", "Invite-only accounts", "Stale admin capabilities"]) assert.ok(!SEC.includes(s), s);
   });
 });
 
@@ -1037,6 +1101,35 @@ describe("CONTRIBUTING", () => {
   it("points at cloud/README.md for the hosted stack, not the README", () => {
     assert.ok(C.includes("(cloud/README.md)"));
     assert.ok(!/README[^\n]*(reference table|"End-to-end demo"|\*\*Run\*\*)/.test(C));
+  });
+  it("leaves hosted development to cloud/README.md with one link from Setup", () => {
+    const setup = C.slice(C.indexOf("## Setup"), C.indexOf("## Checks"));
+    assert.equal(setup.split("(cloud/README.md)").length - 1, 1);
+    for (const s of ["cd cloud/agent && npm run build", "cd cloud/web &&", "AGENT_URL="])
+      assert.ok(!setup.includes(s), `Setup still has ${s}`);
+    assert.ok(setup.includes('"Develop the hosted stack"'));
+  });
+  it("has the cloud boundary section: the rule, the static check and the standalone job", () => {
+    assert.match(C, /^### Cloud boundary$/m);
+    const b = C.slice(C.indexOf("### Cloud boundary"));
+    for (const s of [
+      "Nothing outside `cloud/`",
+      "node scripts/boundary/cloud-boundary.mjs",
+      "npm run lint:boundary",
+      "scripts/boundary/allow.json",
+      "scripts/boundary/moved-paths.json",
+      "Tests outside `cloud/` never read files under `cloud/`",
+      "scripts/ci/standalone.sh",
+      "OAB_STANDALONE_ALLOW_DELETE=1",
+      "--docker --hosted-free",
+      "`standalone`",
+    ])
+      assert.ok(b.includes(s), `Cloud boundary lacks ${s}`);
+  });
+  it("lists the cloud docs and the boundary, move and CI scripts in Layout", () => {
+    const layout = C.slice(C.indexOf("## Layout"));
+    for (const s of ["cloud/README.md", "cloud/SECURITY.md", "scripts/boundary/", "scripts/move/", "scripts/ci/"])
+      assert.ok(layout.includes(s), `Layout lacks ${s}`);
   });
 });
 

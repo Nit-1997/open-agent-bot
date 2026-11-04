@@ -10,12 +10,7 @@ You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model
 npm ci && npx playwright install chromium
 ```
 
-To run the local stack, follow the [README](README.md); the hosted stack (Supabase, web app, Caddy) is in [cloud/README.md](cloud/README.md). To work on one side of the hosted stack, run the other in Docker and point at it:
-
-- Agent: `cd cloud/agent && npm run build && set -a && . ../deploy/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table in cloud/README.md). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
-- Web: `cd cloud/web && set -a && . ../deploy/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
-
-Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" in cloud/README.md). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
+To run the local stack, follow the [README](README.md). To run or develop the hosted stack (Supabase, the web app, Caddy), see "Develop the hosted stack" in [cloud/README.md](cloud/README.md). Every host-run agent, script and eval needs `COPILOTKIT_TELEMETRY_DISABLED=true` (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`); the agent refuses to start without it, and the images set it already.
 
 ## Checks
 
@@ -282,12 +277,19 @@ e2e/                   Playwright checks: the local stack (see "End-to-end tests
                        app (playwright.desktop.config.ts); support/ also holds origin.ts and onboarding.ts for cloud/e2e
 cloud/e2e/             the @oab/cloud-e2e package: hosted preview Playwright specs (the "End-to-end demo" section of cloud/README.md)
 cloud/deploy/          the @oab/cloud-deploy package: the hosted compose file and its preview override, caddy/, litellm/,
-                       renderer/, searxng/, env.examples/, scripts/env-files.mjs and the hosted deploy tests
+                       renderer/, searxng/, env.examples/, scripts/env-files.mjs, doc-commands.json (the owner-only
+                       commands of cloud/README.md) and the hosted deploy tests
+cloud/README.md        the hosted deployment: run, develop, e2e, evals, and the Gate 6/7 switch-over runbook
+cloud/SECURITY.md      the hosted threat model and known limitations
 scripts/release/       one script per release step (gate, image checks, index and lock checks, notes, sums, dry run);
                        release.yml and the dry run call only these, and scripts/test/ tests each one
 scripts/docs/          the docs-commands extractor, its manifest (doc-commands.json), the scratch-clone runner and
                        fill-digests.mjs (the release digests in INSTALL section 9)
-scripts/demo/          the milestone demo parts the verifier records (part-<n>.sh)
+scripts/demo/          the milestone demo parts the verifier records (m<n>/part-<n>.sh, m<n>/lib.sh) and their
+                       static checks (partChecks.mjs)
+scripts/boundary/      the cloud boundary check (cloud-boundary.mjs, allow.json) and the stale-path guard (moved-paths.*)
+scripts/move/          verify-move.mjs: classifies the commits of a move PR (renames, import lines, path lines, other)
+scripts/ci/            standalone.sh: removes cloud/ from a fresh clone and checks, builds and runs the rest
 scripts/test/          node --test suites for the root scripts, the workflows, the base pins and the docs
 ```
 
@@ -299,6 +301,15 @@ Core never depends on the hosted implementation; the hosted code in `cloud/agent
 - `@oab/core/scripts/*` and `@oab/core/local/*` are blocked: the `exports` map sets them to `null`. Core has no hosted modules. Hosted code never imports `@oab/core/identity/local*`, `@oab/core/local/*` or `node:sqlite` (`noRestrictedImports` in `cloud/agent/biome.json`).
 - Nothing in `packages/core` imports `cloud/`, `@supabase/*`, `jose` or `@oab/core/*`, with no exceptions: `noRestrictedImports` in `packages/core/biome.json` over all of `src/**`, and `packages/core/test/lint/noHostedInCoreTests.test.ts` over `src`, `test`, `evals` and `package.json`.
 - Rules B1–B6 (spec `docs/superpowers/specs/2026-11-02-m1-seams-design.md`, "Boundary rules") are checked by `cloud/agent/test/lint/hostedBoundary.test.ts` over core's `src/**/*.ts` together with `cloud/agent/src` (as `hosted/`), with the refusal fixtures in `packages/core/test/lint/hostedBoundary.test.ts`.
+
+### Cloud boundary
+
+Everything hosted lives in `cloud/`, and the open-source app builds, tests and runs with `cloud/` deleted. Nothing outside `cloud/` imports, builds from or points into it; code inside `cloud/` may use the rest of the repo.
+
+- **Static check.** `node scripts/boundary/cloud-boundary.mjs` (run by `npm run lint:boundary`, the last step of the root `npm run lint`) parses every tracked and untracked file outside `cloud/` and `docs/superpowers/`: imports in code and CSS (Rule A, never allowlisted), build inputs such as `package.json`, `tsconfig*.json`, bundler and test configs, Dockerfiles, compose files and `local/` (Rule B), string literals in code and shell scripts that name a `cloud/` path (Rule C), and tracked symlinks into `cloud/` plus `cloud/*/package.json` names that don't start with `@oab/cloud-` (Rule D). Each hit prints `VIOLATION <file>:<line> <rule> <token> -> <resolved>`. Rules B and C may be exempted file by file, with a reason, in `scripts/boundary/allow.json`.
+- **Stale paths.** `scripts/boundary/moved-paths.json` lists every path M6 moved; `scripts/test/movedPaths.test.mjs` fails if an old path is still tracked or named outside its row's reasoned allow list.
+- **Tests.** Tests outside `cloud/` never read files under `cloud/`; a test that checks a cloud file lives in `cloud/*/test`.
+- **Standalone job.** `scripts/ci/standalone.sh` removes `cloud/` with `git rm` in a fresh clone under the temp folder (or a CI runner) and then runs `npm ci`, lint, format, typecheck, tests, build and the boundary check; `--hosted-free` also checks that core's build has no hosted code, and `--docker` builds the local images and starts the local stack on an `oab-` project. It refuses (exit 2, before deleting anything) without `OAB_STANDALONE_ALLOW_DELETE=1`, in a linked worktree, in a dirty tree or with ignored files under `cloud/`. CI's `standalone` job runs it with `--docker --hosted-free`; locally: `D=$(mktemp -d) && git clone -q "file://$PWD" "$D/oss" && cd "$D/oss" && OAB_STANDALONE_ALLOW_DELETE=1 bash scripts/ci/standalone.sh`.
 
 ## Adding a tool
 
@@ -349,7 +360,7 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 - Keys are added in the app and stored encrypted by the agent. Settings live in `cloud/deploy/.env-*` and `cloud/deploy/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `cloud/deploy/env.examples/`. Move them from an older checkout with `cloud/deploy/scripts/env-files.mjs` (see cloud/README.md).
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
 - **Base pins.** The Playwright base image (the `v<x>-noble` tag with its `@sha256:` digest, as in the Node 24 command above) is the same everywhere it appears (the agent Dockerfile, the workflows, this file, the README, `docs/` and `scripts/`), and `<x>` equals the `playwright` pin in `packages/core/package.json` and `@playwright/test` in `e2e/package.json`; the SearXNG base is pinned by digest, and no workflow image runs without a digest. `scripts/test/basePins.test.mjs` enforces it, so a base change is one PR that updates all of them.
-- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). Keep other docs' commands in inline code or non-shell blocks.
+- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). The shell blocks of `cloud/README.md` (the Gate 7 runbook) are listed in `cloud/deploy/doc-commands.json`, every one `owner` with a reason (`cloud/deploy/test/docs.test.mjs` checks it); pass `--owner-docs cloud/deploy/doc-commands.json` to the runner to list them in its log and TSV. Keep other docs' commands in inline code or non-shell blocks.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).
 
 ## Safety rails

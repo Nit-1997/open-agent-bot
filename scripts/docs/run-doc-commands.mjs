@@ -24,6 +24,7 @@ import {
   forbiddenNames,
   guideVersion,
   loadManifest,
+  loadOwnerDocs,
   manifestProblems,
   PREFLIGHT_ARGS,
   REPO,
@@ -125,6 +126,7 @@ export function parseRunnerArgs(argv, { tmp = realpathSync(tmpdir()), repo = REP
       log: { type: "string" },
       tsv: { type: "string" },
       branch: { type: "string", default: SCRATCH.branch },
+      "owner-docs": { type: "string", multiple: true, default: [] },
     },
   });
   if (!values.scratch) throw new Error("pass --scratch <empty dir>");
@@ -137,7 +139,9 @@ export function parseRunnerArgs(argv, { tmp = realpathSync(tmpdir()), repo = REP
   const releaseDir = resolve(values["release-dir"]);
   for (const f of ["lock/services.lock.json", "release/SHA256SUMS"])
     if (!existsSync(join(releaseDir, f))) throw new Error(`--release-dir ${values["release-dir"]} has no ${f}`);
-  return { scratch, releaseDir, log: resolve(values.log), tsv: resolve(values.tsv), branch: values.branch };
+  const ownerDocs = values["owner-docs"].map((f) => resolve(f));
+  for (const f of ownerDocs) if (!existsSync(f)) throw new Error(`--owner-docs ${f} does not exist`);
+  return { scratch, releaseDir, log: resolve(values.log), tsv: resolve(values.tsv), branch: values.branch, ownerDocs };
 }
 
 export function fileContext(base, file) {
@@ -318,6 +322,8 @@ export function runDocCommands(argv) {
     ...cov.extra.map((m) => `extra: ${m}`),
   ];
   if (problems.length) throw new Error(`doc-commands.json: ${problems.join("; ")}`);
+  const ownerDocs = o.ownerDocs.map((f) => ({ path: f, ...loadOwnerDocs(f) }));
+  for (const d of ownerDocs) if (d.problems.length) throw new Error(`${d.path}: ${d.problems.join("; ")}`);
 
   mkdirSync(join(dir, "home"), { mode: 0o700 });
   const docker = writeDockerConfig({ dir });
@@ -359,6 +365,12 @@ export function runDocCommands(argv) {
         rows.push(...runner.rows);
         teardownClone(ctx, env, spawnExec, log);
       }
+    }
+    for (const d of ownerDocs) {
+      log(`[runner] owner-only docs ${d.path}\n`);
+      const runner = createRunner({ ctx: fileContext(base, d.path), env, manifest: d.manifest, exec: spawnExec, log, preflightDir });
+      for (const occ of d.extracted) runner.run(occ);
+      rows.push(...runner.rows);
     }
   } finally {
     restoreLocalImages(imagesBefore, env, log);
