@@ -11,14 +11,17 @@ describe("css-selectors", () => {
     assert.deepEqual([...selectorsOf(css)].sort(), [
       ".a",
       ".b:is(.c,.d)",
-      "@layer base > @supports (x:y) > a[href=\"a,b\"]",
+      '@layer base > @supports (x:y) > a[href="a,b"]',
       "@media (min-width:40rem) > .sm\\:p-2",
     ]);
   });
 
   it("describes @font-face by family, style, weight and display, without the source url", () => {
     const css = `@font-face{font-family:'DM Sans Variable';font-style:normal;font-weight:100 1000;font-display:swap;src:url(./x.woff2)}`;
-    assert.deepEqual([...selectorsOf(css)], ["@font-face font-family:'DM Sans Variable'; font-style:normal; font-weight:100 1000; font-display:swap"]);
+    assert.deepEqual(
+      [...selectorsOf(css)],
+      ["@font-face font-family:'DM Sans Variable'; font-style:normal; font-weight:100 1000; font-display:swap"],
+    );
   });
 
   it("adds a line for each --font-* custom property and ignores other declarations", () => {
@@ -38,7 +41,7 @@ describe("css-selectors", () => {
   it("treats a backslash-escaped quote in a selector as part of the selector, not a string", () => {
     const css = `.content-\\"x\\"{color:red}.a\\'b{x:y}@font-face{font-family:'DM Mono';font-style:normal;font-weight:400;font-display:swap}`;
     assert.deepEqual([...selectorsOf(css)].sort(), [
-      '.a\\\'b',
+      ".a\\'b",
       '.content-\\"x\\"',
       "@font-face font-family:'DM Mono'; font-style:normal; font-weight:400; font-display:swap",
     ]);

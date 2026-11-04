@@ -192,7 +192,7 @@ describe("ci.yml desktop jobs", () => {
     const changes = jobs["desktop-changes"];
     assert.equal(changes["runs-on"], "ubuntu-24.04");
     assert.deepEqual(changes.permissions, { contents: "read" });
-    assert.equal(changes.outputs.desktop, "${{ steps.filter.outputs.desktop }}");
+    assert.equal(changes.outputs.desktop, `\${{ steps.filter.outputs.desktop }}`);
     const filter = changes.steps.find((s) => s.id === "filter");
     for (const path of ["apps/desktop/", "docker-compose\\.yml", "local/renderer/seccomp\\.json", "\\.github/workflows/ci\\.yml"])
       assert.ok(filter.run.includes(path), path);

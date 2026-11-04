@@ -14,8 +14,7 @@ async function lastReplyLength(page: Page): Promise<number> {
   return (await reply.innerText()).trim().length;
 }
 
-const LONG_PROMPT =
-  "List eight facts about the ocean as a numbered list. Each item must be one full sentence of at least fifteen words.";
+const LONG_PROMPT = "List eight facts about the ocean as a numbered list. Each item must be one full sentence of at least fifteen words.";
 const POLL_MS = 75;
 
 async function send(page: Page, text: string): Promise<void> {

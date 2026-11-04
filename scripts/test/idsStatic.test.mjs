@@ -42,7 +42,11 @@ describe("static ids", () => {
       );
       const scan = scanIds({ repo, roots: ["s"], allowlist: [] });
       assert.equal(scan.elements.length, 9);
-      assert.deepEqual(scan.missing, [`${join("s", "index.html")}:3 <meta>`, `${join("s", "index.html")}:5 <p>`, `${join("s", "index.html")}:5 <img>`]);
+      assert.deepEqual(scan.missing, [
+        `${join("s", "index.html")}:3 <meta>`,
+        `${join("s", "index.html")}:5 <p>`,
+        `${join("s", "index.html")}:5 <img>`,
+      ]);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -55,7 +59,8 @@ describe("static ids", () => {
   });
 
   it("scans the ui, web, local-web and desktop screen sources", () => {
-    for (const root of ["packages/ui/src", "packages/local-web/src", "web/app", "web/components", "apps/desktop/src/screens"]) assert.ok(ID_ROOTS.includes(root), root);
+    for (const root of ["packages/ui/src", "packages/local-web/src", "web/app", "web/components", "apps/desktop/src/screens"])
+      assert.ok(ID_ROOTS.includes(root), root);
   });
 
   it("keeps the spread allowlist short, justified and in use", () => {

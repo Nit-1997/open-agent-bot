@@ -40,13 +40,66 @@ function webProbes(app: string, s: Session): Probe[] {
   const signedIn = { cookie: s.demoCookie };
   return [
     { name: "web, no cookies", method: "GET", url: `${app}/api/chats`, status: 401, code: "signed_out" },
-    { name: "web, no cookies", method: "POST", url: `${app}/api${RUN}`, headers: { origin: app }, body: {}, status: 401, code: "signed_out" },
-    { name: "web, evil origin", method: "PUT", url: `${app}/api/profile`, headers: { ...signedIn, origin: EVIL }, body: {}, status: 403, code: "bad_origin" },
-    { name: "web, evil origin", method: "POST", url: `${app}/api${RUN}`, headers: { ...signedIn, origin: EVIL }, body: {}, status: 403, code: "bad_origin" },
-    { name: "web, signed in", method: "GET", url: `${app}/api/copilotkit/threads?agentId=openagent`, headers: signedIn, status: 404, code: "not_found" },
-    { name: "web, signed in", method: "PATCH", url: `${app}/api/copilotkit/info`, headers: { ...signedIn, origin: app }, status: 405, code: "method_not_allowed" },
-    { name: "web, signed in", method: "GET", url: `${app}/api/copilotkit/info`, headers: signedIn, status: 200, header: ["cache-control", "private, no-store"] },
-    { name: "web, signed in, no threadId", method: "POST", url: `${app}/api${RUN}`, headers: { ...signedIn, origin: app }, body: {}, status: 400, code: "invalid" },
+    {
+      name: "web, no cookies",
+      method: "POST",
+      url: `${app}/api${RUN}`,
+      headers: { origin: app },
+      body: {},
+      status: 401,
+      code: "signed_out",
+    },
+    {
+      name: "web, evil origin",
+      method: "PUT",
+      url: `${app}/api/profile`,
+      headers: { ...signedIn, origin: EVIL },
+      body: {},
+      status: 403,
+      code: "bad_origin",
+    },
+    {
+      name: "web, evil origin",
+      method: "POST",
+      url: `${app}/api${RUN}`,
+      headers: { ...signedIn, origin: EVIL },
+      body: {},
+      status: 403,
+      code: "bad_origin",
+    },
+    {
+      name: "web, signed in",
+      method: "GET",
+      url: `${app}/api/copilotkit/threads?agentId=openagent`,
+      headers: signedIn,
+      status: 404,
+      code: "not_found",
+    },
+    {
+      name: "web, signed in",
+      method: "PATCH",
+      url: `${app}/api/copilotkit/info`,
+      headers: { ...signedIn, origin: app },
+      status: 405,
+      code: "method_not_allowed",
+    },
+    {
+      name: "web, signed in",
+      method: "GET",
+      url: `${app}/api/copilotkit/info`,
+      headers: signedIn,
+      status: 200,
+      header: ["cache-control", "private, no-store"],
+    },
+    {
+      name: "web, signed in, no threadId",
+      method: "POST",
+      url: `${app}/api${RUN}`,
+      headers: { ...signedIn, origin: app },
+      body: {},
+      status: 400,
+      code: "invalid",
+    },
   ];
 }
 
@@ -54,11 +107,49 @@ function agentProbes(agent: string, s: Session): Probe[] {
   const as = (token: string) => ({ "x-agent-secret": s.secret, authorization: `Bearer ${token}` });
   return [
     { name: "agent, no secret", method: "GET", url: `${agent}/copilotkit/info`, status: 401 },
-    { name: "agent, secret but no bearer", method: "GET", url: `${agent}/copilotkit/info`, headers: { "x-agent-secret": s.secret }, status: 401, code: "signed_out" },
-    { name: "agent, other user's stop on the demo chat", method: "POST", url: `${agent}/copilotkit/agent/openagent/stop/${s.bigSur}`, headers: as(s.otherToken), body: {}, status: 403, code: "forbidden" },
-    { name: "agent, other user's connect on the demo chat", method: "POST", url: `${agent}/copilotkit/agent/openagent/connect`, headers: as(s.otherToken), body: { threadId: s.bigSur }, status: 403, code: "forbidden" },
-    { name: "agent, nested path", method: "GET", url: `${agent}/copilotkit/a/b/info`, headers: as(s.demoToken), status: 404, code: "not_found" },
-    { name: "agent, run without threadId", method: "POST", url: `${agent}${RUN}`, headers: as(s.demoToken), body: {}, status: 400, code: "invalid" },
+    {
+      name: "agent, secret but no bearer",
+      method: "GET",
+      url: `${agent}/copilotkit/info`,
+      headers: { "x-agent-secret": s.secret },
+      status: 401,
+      code: "signed_out",
+    },
+    {
+      name: "agent, other user's stop on the demo chat",
+      method: "POST",
+      url: `${agent}/copilotkit/agent/openagent/stop/${s.bigSur}`,
+      headers: as(s.otherToken),
+      body: {},
+      status: 403,
+      code: "forbidden",
+    },
+    {
+      name: "agent, other user's connect on the demo chat",
+      method: "POST",
+      url: `${agent}/copilotkit/agent/openagent/connect`,
+      headers: as(s.otherToken),
+      body: { threadId: s.bigSur },
+      status: 403,
+      code: "forbidden",
+    },
+    {
+      name: "agent, nested path",
+      method: "GET",
+      url: `${agent}/copilotkit/a/b/info`,
+      headers: as(s.demoToken),
+      status: 404,
+      code: "not_found",
+    },
+    {
+      name: "agent, run without threadId",
+      method: "POST",
+      url: `${agent}${RUN}`,
+      headers: as(s.demoToken),
+      body: {},
+      status: 400,
+      code: "invalid",
+    },
     { name: "agent, control", method: "GET", url: `${agent}/copilotkit/info`, headers: as(s.demoToken), status: 200 },
   ];
 }
@@ -76,9 +167,14 @@ async function errorCode(res: Response): Promise<string> {
 async function check(io: ProbeIo, p: Probe): Promise<boolean> {
   const headers: Record<string, string> = { ...p.headers };
   if (p.body !== undefined) headers["content-type"] = "application/json";
-  const res = await io.fetch(p.url, { method: p.method, headers, body: p.body === undefined ? undefined : JSON.stringify(p.body), redirect: "manual" });
+  const res = await io.fetch(p.url, {
+    method: p.method,
+    headers,
+    body: p.body === undefined ? undefined : JSON.stringify(p.body),
+    redirect: "manual",
+  });
   const code = await errorCode(res);
-  const header = p.header ? res.headers.get(p.header[0]) ?? "" : undefined;
+  const header = p.header ? (res.headers.get(p.header[0]) ?? "") : undefined;
   const ok = res.status === p.status && (p.code === undefined || code === p.code) && (p.header === undefined || header === p.header[1]);
   const path = new URL(p.url);
   const want = [p.status, p.code, p.header && `${p.header[0]}: ${p.header[1]}`].filter(Boolean).join(" ");
@@ -132,7 +228,10 @@ function agentSecret(): string {
   const line = readFileSync(resolve(ROOT, "deploy-config/.env-agent"), "utf8")
     .split("\n")
     .find((l) => l.trim().startsWith("AGENT_SERVICE_SECRET="));
-  const secret = line?.slice(line.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "");
+  const secret = line
+    ?.slice(line.indexOf("=") + 1)
+    .trim()
+    .replace(/^["']|["']$/g, "");
   if (!secret) throw new Error("AGENT_SERVICE_SECRET missing in deploy-config/.env-agent");
   return secret;
 }
@@ -142,11 +241,21 @@ function previewIo(): ProbeIo {
     fetch: (url, init) => fetch(url, init),
     log: (line) => console.log(line),
     prepare: async () => {
-      const [{ default: setup }, users, state] = await Promise.all([import("../global-setup.ts"), import("../support/users.ts"), import("../support/state.ts")]);
+      const [{ default: setup }, users, state] = await Promise.all([
+        import("../global-setup.ts"),
+        import("../support/users.ts"),
+        import("../support/state.ts"),
+      ]);
       await setup({} as Parameters<typeof setup>[0]);
       const demo = readState(users.storageFor(users.DEMO_USER));
       const other = readState(users.storageFor(users.OTHER_USER));
-      return { secret: agentSecret(), demoToken: accessToken(demo), demoCookie: cookieHeader(demo), otherToken: accessToken(other), bigSur: state.seeded().bigSur };
+      return {
+        secret: agentSecret(),
+        demoToken: accessToken(demo),
+        demoCookie: cookieHeader(demo),
+        otherToken: accessToken(other),
+        bigSur: state.seeded().bigSur,
+      };
     },
     finish: async () => {
       const { default: teardown } = await import("../global-teardown.ts");

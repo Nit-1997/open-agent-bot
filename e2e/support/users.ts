@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { Browser } from "@playwright/test";
 import { isTestEmail } from "../../supabase/scripts/test-users.mjs";
 import { admin } from "./admin";
-import { AUTH_DIR, env, ROOT, scriptEnv } from "./env";
+import { AUTH_DIR, env, ROOT, scriptEnv } from "./hostedEnv";
 
 export const DEMO_USER = "oab-e2e+shell@example.test";
 export const OTHER_USER = "oab-e2e+other@example.test";

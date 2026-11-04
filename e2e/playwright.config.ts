@@ -26,7 +26,12 @@ export default defineConfig({
     screenshot: "off",
   },
   projects: [
-    { name: "desktop", testMatch: /app-shell\.demo\.spec\.ts/, grep: /@desktop/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },
+    {
+      name: "desktop",
+      testMatch: /app-shell\.demo\.spec\.ts/,
+      grep: /@desktop/,
+      use: { viewport: desktop, video: { mode: "on", size: desktop } },
+    },
     {
       name: "tablet",
       testMatch: /app-shell\.demo\.spec\.ts/,
@@ -39,7 +44,14 @@ export default defineConfig({
       testMatch: /app-shell\.demo\.spec\.ts/,
       grep: /@phone/,
       dependencies: ["tablet"],
-      use: { ...devices["iPhone 13"], browserName: "chromium", viewport: phone, isMobile: true, hasTouch: true, video: { mode: "on", size: phone } },
+      use: {
+        ...devices["iPhone 13"],
+        browserName: "chromium",
+        viewport: phone,
+        isMobile: true,
+        hasTouch: true,
+        video: { mode: "on", size: phone },
+      },
     },
     { name: "smoke", testMatch: /preview-smoke\.spec\.ts/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },
     { name: "preview-m1", testMatch: /preview-m1\.spec\.ts/, use: { viewport: desktop, video: { mode: "on", size: desktop } } },

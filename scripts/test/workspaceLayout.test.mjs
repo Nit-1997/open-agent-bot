@@ -115,7 +115,8 @@ describe("workspace layout", () => {
     ].join("\n");
     assert.deepEqual(specifiersOf(text).sort(), ["@scope/pkg-css/file.css", "pkg-a", "pkg-b", "pkg-dynamic", "pkg-side"]);
     const ui = bareImports(join(ROOT, "packages/ui/src"));
-    for (const name of ["@fontsource/dm-mono", "@fontsource/instrument-serif", "@fontsource-variable/dm-sans"]) assert.ok(ui.has(name), name);
+    for (const name of ["@fontsource/dm-mono", "@fontsource/instrument-serif", "@fontsource-variable/dm-sans"])
+      assert.ok(ui.has(name), name);
   });
 
   it("the lockfile has an entry for every workspace", () => {

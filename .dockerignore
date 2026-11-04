@@ -12,6 +12,11 @@ deploy-config/env-files
 e2e/.auth
 e2e/test-results
 e2e/playwright-report
+**/.env-*
+**/env-files/
+**/.auth/
+cloud/e2e/test-results/
+cloud/e2e/playwright-report/
 **/*.pem
 **/*.key
 .mcp.json

@@ -22,13 +22,15 @@ function config(args, env = {}, flags = []) {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   });
-  if (res.status !== 0) throw new Error(`docker compose ${args.join(" ")} config exited ${res.status}: ${(res.stderr ?? "").slice(0, 400)}`);
+  if (res.status !== 0)
+    throw new Error(`docker compose ${args.join(" ")} config exited ${res.status}: ${(res.stderr ?? "").slice(0, 400)}`);
   return JSON.parse(res.stdout);
 }
 
 function diffPaths(a, b, path = "") {
   if (a === b) return [];
-  if (typeof a !== typeof b || a === null || b === null || typeof a !== "object" || Array.isArray(a) !== Array.isArray(b)) return [path || "."];
+  if (typeof a !== typeof b || a === null || b === null || typeof a !== "object" || Array.isArray(a) !== Array.isArray(b))
+    return [path || "."];
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   return [...keys].sort().flatMap((k) => diffPaths(a[k], b[k], `${path}.${k}`));
 }
@@ -58,15 +60,12 @@ describe("hosted compose (compose.hosted.yml)", () => {
     }
     assert.deepEqual(diffPaths(hosted, before), [], "differing config paths (values never printed)");
     assert.equal(hosted.name, "open-agent-bot");
-    assert.deepEqual(
-      Object.fromEntries(Object.entries(hosted.volumes).map(([k, v]) => [k, v.name])),
-      {
-        "searxng-data": "open-agent-bot_searxng-data",
-        "caddy-data": "open-agent-bot_caddy-data",
-        "caddy-config": "open-agent-bot_caddy-config",
-        "ollama-data": "open-agent-bot_ollama-data",
-      },
-    );
+    assert.deepEqual(Object.fromEntries(Object.entries(hosted.volumes).map(([k, v]) => [k, v.name])), {
+      "searxng-data": "open-agent-bot_searxng-data",
+      "caddy-data": "open-agent-bot_caddy-data",
+      "caddy-config": "open-agent-bot_caddy-config",
+      "ollama-data": "open-agent-bot_ollama-data",
+    });
     assert.equal(hosted.services.agent.build.context, ROOT);
   });
 });
@@ -134,7 +133,10 @@ describe("local compose (docker-compose.yml)", () => {
     assert.equal(agent.build.context, ROOT);
     assert.equal(agent.build.dockerfile, "packages/core/Dockerfile");
     assert.equal(search.build.context, join(ROOT, "local/searxng"));
-    const c = localConfig({ OPEN_AGENT_IMAGE: "ghcr.io/x/open-agent@sha256:1", OPEN_AGENT_SEARCH_IMAGE: "ghcr.io/x/open-agent-search@sha256:2" });
+    const c = localConfig({
+      OPEN_AGENT_IMAGE: "ghcr.io/x/open-agent@sha256:1",
+      OPEN_AGENT_SEARCH_IMAGE: "ghcr.io/x/open-agent-search@sha256:2",
+    });
     assert.equal(c.services.agent.image, "ghcr.io/x/open-agent@sha256:1");
     assert.equal(c.services.renderer.image, "ghcr.io/x/open-agent@sha256:1");
     assert.equal(c.services.search.image, "ghcr.io/x/open-agent-search@sha256:2");
@@ -201,6 +203,14 @@ describe("local SearXNG image (local/searxng/Dockerfile)", () => {
     assert.match(dockerfile, /^ENV SEARXNG_SETTINGS_PATH=\/opt\/open-agent\/settings\.yml$/m);
     assert.doesNotMatch(dockerfile, /\/etc\/searxng/);
     assert.match(dockerfile, /^COPY entrypoint\.sh \/opt\/open-agent\/entrypoint\.sh$/m);
-    assert.match(dockerfile, new RegExp(`^ENTRYPOINT ${JSON.stringify(hosted.entrypoint).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replaceAll(",", ", ")}$`, "m"));
+    assert.match(
+      dockerfile,
+      new RegExp(
+        `^ENTRYPOINT ${JSON.stringify(hosted.entrypoint)
+          .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+          .replaceAll(",", ", ")}$`,
+        "m",
+      ),
+    );
   });
 });

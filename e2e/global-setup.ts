@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { chromium, type FullConfig, request } from "@playwright/test";
-import { AUTH_DIR, env } from "./support/env";
+import { AUTH_DIR, env } from "./support/hostedEnv";
 import { seed } from "./support/seed";
 import { saveSeeded } from "./support/state";
 import { cleanupE2e, createUser, DEMO_USER, OTHER_USER, signIn } from "./support/users";

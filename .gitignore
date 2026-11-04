@@ -17,6 +17,14 @@ packages/core/evals/results/
 # secrets in nested env folders
 deploy-config/**/.env*
 
+# secrets and e2e state anywhere (cloud/ layout included)
+**/.env-*
+**/env-files/
+**/.auth/
+cloud/deploy/.env*
+cloud/e2e/test-results/
+cloud/e2e/playwright-report/
+
 # End-to-end runs
 e2e/test-results/
 e2e/playwright-report/

@@ -22,7 +22,9 @@ export async function expectContrast(page: Page, label: string): Promise<void> {
         runOnly: { type: "rule", values: ["color-contrast"] },
       })) as unknown,
   );
-  const violations = (result as AxeResult).violations.flatMap((v) => v.nodes.map((n) => `${n.target.join(" ")}: ${n.failureSummary ?? ""}`));
+  const violations = (result as AxeResult).violations.flatMap((v) =>
+    v.nodes.map((n) => `${n.target.join(" ")}: ${n.failureSummary ?? ""}`),
+  );
   expect(violations, `color-contrast on ${label}`).toEqual([]);
 }
 

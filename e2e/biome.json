@@ -2,17 +2,15 @@
   "$schema": "../node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
     "includes": [
-      "local/**/*.ts",
-      "local/**/*.json",
-      "playwright.local.config.ts",
-      "support/localStack.ts",
-      "support/onboarding.ts",
-      "support/stubModel.ts",
-      "support/stubModel.test.ts",
-      "scripts/local-probes.mts",
-      "scripts/local-probes.test.ts",
-      "desktop/**/*.ts",
-      "playwright.desktop.config.ts"
+      "**/*.ts",
+      "**/*.mts",
+      "**/*.mjs",
+      "**/*.json",
+      "!**/node_modules",
+      "!**/.auth",
+      "!**/test-results",
+      "!**/playwright-report",
+      "!**/.local"
     ]
   },
   "formatter": {

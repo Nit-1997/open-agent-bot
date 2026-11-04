@@ -84,7 +84,10 @@ function logger(testInfo: TestInfo) {
   };
 }
 
-test("preview: stop without a banner, reports and PDF, search, settings, 404s, fonts and refusals @m2", async ({ page, baseURL }, testInfo) => {
+test("preview: stop without a banner, reports and PDF, search, settings, 404s, fonts and refusals @m2", async ({
+  page,
+  baseURL,
+}, testInfo) => {
   test.setTimeout(480_000);
   const app = baseURL as string;
   const s = seeded();
@@ -242,24 +245,40 @@ test("preview: stop without a banner, reports and PDF, search, settings, 404s, f
     try {
       expect(await line("no cookies GET /api/chats", await anon.get("/api/chats"))).toEqual({ status: 401, code: "signed_out" });
       expect(
-        await line("no cookies POST /api/copilotkit/agent/openagent/run", await anon.post("/api/copilotkit/agent/openagent/run", { headers: { origin: app }, data: {} })),
+        await line(
+          "no cookies POST /api/copilotkit/agent/openagent/run",
+          await anon.post("/api/copilotkit/agent/openagent/run", { headers: { origin: app }, data: {} }),
+        ),
       ).toEqual({ status: 401, code: "signed_out" });
     } finally {
       await anon.dispose();
     }
     const evil = { origin: EVIL };
-    expect(await line("evil origin PUT /api/profile", await page.request.put("/api/profile", { headers: evil, data: {} }))).toEqual({ status: 403, code: "bad_origin" });
+    expect(await line("evil origin PUT /api/profile", await page.request.put("/api/profile", { headers: evil, data: {} }))).toEqual({
+      status: 403,
+      code: "bad_origin",
+    });
     expect(
-      await line("evil origin POST /api/copilotkit/agent/openagent/run", await page.request.post("/api/copilotkit/agent/openagent/run", { headers: evil, data: {} })),
+      await line(
+        "evil origin POST /api/copilotkit/agent/openagent/run",
+        await page.request.post("/api/copilotkit/agent/openagent/run", { headers: evil, data: {} }),
+      ),
     ).toEqual({ status: 403, code: "bad_origin" });
-    expect((await line("GET /api/copilotkit/threads", await page.request.get("/api/copilotkit/threads?agentId=openagent"))).status).toBe(404);
-    expect((await line("PATCH /api/copilotkit/info", await page.request.patch("/api/copilotkit/info", { headers: { origin: app } }))).status).toBe(405);
+    expect((await line("GET /api/copilotkit/threads", await page.request.get("/api/copilotkit/threads?agentId=openagent"))).status).toBe(
+      404,
+    );
+    expect(
+      (await line("PATCH /api/copilotkit/info", await page.request.patch("/api/copilotkit/info", { headers: { origin: app } }))).status,
+    ).toBe(405);
     const info = await page.request.get("/api/copilotkit/info");
     out.log(`GET /api/copilotkit/info -> ${info.status()} cache-control: ${info.headers()["cache-control"]}`);
     expect(info.status()).toBe(200);
     expect(info.headers()["cache-control"]).toBe("private, no-store");
     expect(
-      await line("POST /api/copilotkit/agent/openagent/run without threadId", await page.request.post("/api/copilotkit/agent/openagent/run", { headers: { origin: app }, data: {} })),
+      await line(
+        "POST /api/copilotkit/agent/openagent/run without threadId",
+        await page.request.post("/api/copilotkit/agent/openagent/run", { headers: { origin: app }, data: {} }),
+      ),
     ).toEqual({ status: 400, code: "invalid" });
     await out.attach("web refusals");
   });
