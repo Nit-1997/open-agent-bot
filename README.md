@@ -97,6 +97,7 @@ Results: `docs/findings.md`.
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): setup, checks, the code layout, the Mac app, tests and evals on the local stack, and how to add a tool.
 - [docs/RELEASING.md](docs/RELEASING.md): how a release is made (owner only).
+- `make run app` builds the Mac app from this checkout and opens it (Docker must be running); `make run web` runs the hosted stack on this machine at http://localhost:18300 (it needs the hosted env files described in cloud/README.md); `make stop` stops both; `make help` lists them.
 - [cloud/README.md](cloud/README.md): the invite-only hosted deployment (Supabase, Vercel, EC2), its end-to-end checks and evals.
 - Report security issues as described in [SECURITY.md](SECURITY.md).
 

@@ -103,7 +103,6 @@ describe(".dockerignore", () => {
     "packages/core/src/local/main.ts",
     "packages/local-web/index.html",
     "deploy-config/env.examples/agent.env.example",
-    "cloud/deploy/env.examples/agent.env.example",
     "cloud/deploy/compose.hosted.yml",
     "package-lock.json",
   ]) {

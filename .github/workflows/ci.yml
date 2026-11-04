@@ -68,19 +68,22 @@ jobs:
           node-version-file: .nvmrc
       - name: Both stacks resolve from a fresh clone; the local one needs no env files
         run: |
-          ls cloud/deploy/.env-* 2>/dev/null && exit 1
+          ls cloud/deploy/.env-* cloud/deploy-config/env-files/*/.env 2>/dev/null && exit 1
           docker compose --env-file /dev/null config --quiet
-          touch cloud/deploy/.env-agent cloud/deploy/.env-renderer cloud/deploy/.env-nextjs
-          docker compose -f cloud/deploy/compose.hosted.yml config --quiet
-          docker compose -f cloud/deploy/compose.hosted.yml --profile litellm --profile ollama config --quiet
+          docker compose -f cloud/deploy/compose.hosted.yml config --quiet 2>/dev/null && exit 1
+          mkdir -p cloud/deploy-config/env-files/backend cloud/deploy-config/env-files/frontend
+          printf 'RENDERER_SECRET=ci-placeholder\n' > cloud/deploy-config/env-files/backend/.env
+          touch cloud/deploy-config/env-files/frontend/.env
+          docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env config --quiet
+          docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env --profile litellm --profile ollama config --quiet
           sh cloud/deploy/searxng/entrypoint.sh true
         env:
           SEARXNG_SECRET_FILE: /tmp/searxng-secret/secret
       - name: Project names are pinned; the preview override is named and bound to 127.0.0.1
         run: |
           test "$(docker compose --env-file /dev/null config --format json | jq -r .name)" = open-agent
-          test "$(docker compose --env-file /dev/null -f cloud/deploy/compose.hosted.yml config --format json | jq -r .name)" = open-agent-bot
-          preview="docker compose --env-file /dev/null --profile local -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml config --format json"
+          test "$(docker compose --env-file cloud/deploy-config/env-files/backend/.env -f cloud/deploy/compose.hosted.yml config --format json | jq -r .name)" = open-agent-bot
+          preview="docker compose --env-file cloud/deploy-config/env-files/backend/.env --profile local -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml config --format json"
           test "$($preview | jq -r .name)" = oab-preview
           test "$($preview | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
           test "$($preview | jq '[.services[].ports[]? | .published | tonumber] | all(. >= 18000)')" = true

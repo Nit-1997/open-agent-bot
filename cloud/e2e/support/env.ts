@@ -4,9 +4,9 @@ import { envReader, readEnvFiles } from "../../../e2e/support/env.ts";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-export const ENV_FILES = [resolve(ROOT, "cloud/deploy/env-files/.env-supabase-admin"), resolve(ROOT, "cloud/deploy/env-files/.env-e2e")];
+export const ENV_FILES = [resolve(ROOT, "cloud/deploy-config/env-files/ops/.env")];
 
-export const env = envReader(process.env, () => readEnvFiles(ENV_FILES), "cloud/deploy/env-files/.env-supabase-admin");
+export const env = envReader(process.env, () => readEnvFiles(ENV_FILES), "cloud/deploy-config/env-files/ops/.env");
 
 export const scriptEnv = () => ({
   ...process.env,

@@ -24,7 +24,9 @@ deploy-config/**/.env*
 
 # secrets and e2e state anywhere (cloud/ layout included)
 **/.env-*
-**/env-files/
+**/env-files/**
+!cloud/deploy-config/env-files/*/
+!cloud/deploy-config/env-files/*/.env.example
 **/.auth/
 cloud/deploy/.env*
 cloud/e2e/test-results/

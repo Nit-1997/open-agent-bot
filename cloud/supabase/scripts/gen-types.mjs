@@ -8,7 +8,7 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "agent", "
 const env = (name) => {
   const v = process.env[name]?.trim();
   if (!v) {
-    console.error(`missing ${name} (load cloud/deploy/env-files/.env-supabase-admin)`);
+    console.error(`missing ${name} (load cloud/deploy-config/env-files/ops/.env)`);
     process.exit(1);
   }
   return v;
