@@ -123,6 +123,20 @@ describe("proxy not-found page", () => {
     expect(res.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
   });
 
+  it("renders the not-found target with 404 instead of rewriting it to itself again", async () => {
+    for (const isAdmin of [false, true]) {
+      signedIn(isAdmin);
+      const res = await proxy(new NextRequest(`${APP_ORIGIN}/__not-found`));
+      expect(res.status).toBe(404);
+      expect(res.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(res.headers.get("x-middleware-next")).toBe("1");
+      const nonce = /'nonce-([^']+)'/.exec(res.headers.get("content-security-policy") ?? "")?.[1];
+      expect(res.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
+      expect(res.cookies.get("sb-project-auth-token")?.value).toBe("refreshed");
+      expect(res.headers.get("cache-control")).toBe("private, no-store");
+    }
+  });
+
   it("keeps an admin's /admin and every app page a pass", async () => {
     signedIn(true);
     for (const path of ["/admin", "/", "/chats", "/reports/AbCdEf_-1234", "/search"]) {
