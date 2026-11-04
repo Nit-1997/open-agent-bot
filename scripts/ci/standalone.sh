@@ -133,8 +133,8 @@ if [ "$DOCKER" = 1 ]; then
   step image-tree image_tree
   step image-content node scripts/release/image-checks.mjs content --image "$OPEN_AGENT_IMAGE" --dir /app
   step up "${C[@]}" up -d --wait --wait-timeout 300
-  step health curl -fsS "$APP_ORIGIN/health"
-  echo
+  health() { curl -fsS "$APP_ORIGIN/health" && echo; }
+  step health health
   step probes npx --no-install tsx e2e/scripts/local-probes.mts
   trap - EXIT
   step teardown teardown
