@@ -8,8 +8,7 @@ PLAN="node cloud/supabase/scripts/check-push-plan.mjs"
 
 step "2. the local integration suite on oab-m7-demo, verbose (AC 4, 9, 16, 17, 22, 23)"
 run test-local "cd cloud/agent && COPILOTKIT_TELEMETRY_DISABLED=true npm run test:local -- --reporter=verbose > \"$REPO/$DEMO_DIR/test-local.log\" 2>&1; rc=\$?; grep -E '✓|×|↓|Test Files|Tests ' \"$REPO/$DEMO_DIR/test-local.log\"; exit \$rc"
-note "the suite removes its users in finally, so the usage tables are empty again"
-run usage-tables "psql_demo -c \"select month, count(*) as users, sum(count) as requests from public.request_usage group by month order by month\" -c \"select count(*) as log_rows from public.request_log\""
+note "the suite removes its users in finally; the usage it counted is shown by the verbose test lines above"
 
 step "2. the startup check (AC 11): a missing usage function stops the agent with the Gate 8 message"
 run rename "psql_demo -c \"alter function public.request_usage_summary(timestamptz) rename to request_usage_summary_x\" -c \"notify pgrst, 'reload schema'\" && sleep 2"

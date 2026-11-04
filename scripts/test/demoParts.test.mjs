@@ -818,6 +818,50 @@ describe("m7 demo part scripts", () => {
     assert.match(b, /FORBIDDEN request/);
   });
 
+  it("part 1 shows AC 2: the local paths unchanged since M7_BASE, the desktop and local e2e suites and the standalone job, then no leftovers", () => {
+    const p1 = read(join(M7, "part-1.sh"));
+    const steps = [
+      'git diff --stat --exit-code \\"$M7_BASE\\" HEAD -- docker-compose.yml local apps/desktop .github/workflows/release.yml',
+      "--project desktop-fake",
+      'run local-up "local_up"',
+      "npm run local -w e2e",
+      "down_local",
+      "rm -rf e2e/.local",
+      "scripts/ci/standalone.sh --docker --hosted-free",
+      "ac2_leftovers",
+    ];
+    let at = -1;
+    for (const s of steps) {
+      const i = p1.indexOf(s, at + 1);
+      assert.ok(i > at, `part 1 lacks (or misorders) ${s}`);
+      at = i;
+    }
+    assert.match(p1, /test\/copilot\/parity\.test\.ts --reporter=verbose/);
+    const lib = read(M7_LIB);
+    assert.match(lib, /^M7_BASE="\$\{M7_BASE:-revamp\/clean\}"$/m);
+    assert.match(lib, /^PORTS_USED="18720 18721 18722 18740 18741"$/m);
+    assert.match(lib, /grep -E '\^oab-m7-\(local\|oss\)'/);
+  });
+
+  it("part 3 shows the low and unavailable meter, the cleanup timestamps and N admitted after the server frees; part 2 drops the always-empty usage view", () => {
+    const p3 = read(join(M7, "part-3.sh"));
+    assert.match(p3, /^run agent "agent_up 1 1000 5 8"$/m);
+    assert.match(p3, /test\/limits\/lifecycle\.test\.ts --reporter=verbose/);
+    assert.match(p3, /test\/local\/policy\.local\.test\.ts --reporter=verbose/);
+    assert.doesNotMatch(read(join(M7, "part-2.sh")), /usage-tables/);
+    const b = read(join(M7, "browser.mjs"));
+    for (const needle of [
+      "#sidebar-usage-meter-low",
+      '"data-level", "low"',
+      "#sidebar-usage-meter-unavailable",
+      "#sidebar-usage-meter-retry",
+      "request_usage_get(uuid, timestamptz) from service_role",
+      "toBe(before + 1)",
+      "running.mine = 0; until then a send in B is refused limit_running",
+    ])
+      assert.ok(b.includes(needle), needle);
+  });
+
   it("names no revamp-only commit hash", () => {
     for (const f of readdirSync(M7))
       for (const h of read(join(M7, f)).match(/(?<![0-9A-Za-z])[0-9a-f]{7,40}(?![0-9A-Za-z])/g) ?? [])

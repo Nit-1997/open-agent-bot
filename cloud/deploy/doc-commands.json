@@ -377,9 +377,9 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "SIGNUP_MODE=waitlist node cloud/supabase/scripts/configure-auth.mjs --apply",
+      "command": "SIGNUP_MODE=waitlist node cloud/supabase/scripts/configure-auth.mjs --close",
       "mode": "owner",
-      "reason": "Emergency close (owner): closes production signups; the close order (disable_signup first) is tested against the fake Management API"
+      "reason": "Emergency close (owner): closes production signups with a lone disable_signup PATCH; tested against the fake Management API, including a refused full PATCH"
     }
   ]
 }
