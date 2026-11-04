@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,8 +59,13 @@ export type Shell = Readonly<{
 }>;
 
 const byUrl = async (app: ElectronApplication, prefix: string): Promise<Page> => {
-  await expect.poll(() => app.windows().some((p) => p.url().startsWith(prefix)), { timeout: 20_000 }).toBe(true);
-  const page = app.windows().find((p) => p.url().startsWith(prefix));
+  const find = () => app.windows().find((p) => p.url().startsWith(prefix));
+  try {
+    await expect.poll(() => find() !== undefined, { timeout: 20_000 }).toBe(true);
+  } catch (e) {
+    throw new Error(`no window at ${prefix}; windows: ${JSON.stringify(app.windows().map((p) => p.url()))}`, { cause: e });
+  }
+  const page = find();
   if (!page) throw new Error(`no window at ${prefix}`);
   return page;
 };
@@ -80,6 +85,9 @@ export async function launchShell(env: ShellEnv, info: TestInfo, o: { video?: st
     env: shellEnv(env),
     recordVideo: { dir: info.outputPath(o.video ?? "video"), size: { width: 1200, height: 800 } },
   });
+  const output = info.outputPath(`${o.video ?? "video"}-electron.log`);
+  mkdirSync(info.outputPath(), { recursive: true });
+  for (const stream of [app.process().stdout, app.process().stderr]) stream?.on("data", (chunk: Buffer) => appendFileSync(output, chunk));
   const json = <T>(p: string): T | undefined => {
     try {
       return JSON.parse(readFileSync(p, "utf8")) as T;
