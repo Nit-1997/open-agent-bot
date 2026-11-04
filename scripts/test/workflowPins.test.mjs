@@ -137,7 +137,8 @@ describe("ci.yml desktop jobs", () => {
   }
 
   it("the jobs that never run Electron skip its binary download", () => {
-    for (const name of ["core", "cloud", "local-stack"]) assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
+    for (const name of ["core", "cloud", "cloud-supabase", "local-stack"])
+      assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
   });
 
   it("desktop: Ubuntu, checks and unit tests for @oab/desktop, then the fake-docker e2e under xvfb", () => {
@@ -297,6 +298,39 @@ describe("ci.yml cloud job (M6 D14)", () => {
   it("replaces the web job (6.5)", () => {
     assert.equal(doc("ci.yml").jobs.web, undefined);
     assert.match(JSON.stringify(job.steps.at(-1)), /COPILOTKIT_TELEMETRY_DISABLED/);
+  });
+});
+
+describe("ci.yml cloud-supabase job (M7 D19)", () => {
+  const job = doc("ci.yml").jobs["cloud-supabase"];
+  const runs = () => job.steps.map((s) => s.run ?? "").filter(Boolean);
+
+  it("runs on Ubuntu 24.04 for at most 30 minutes with contents: read, no environment and no secrets", () => {
+    assert.ok(job);
+    assert.equal(job.if, undefined);
+    assert.equal(job["runs-on"], "ubuntu-24.04");
+    assert.equal(Number(job["timeout-minutes"]), 30);
+    assert.deepEqual(job.permissions, { contents: "read" });
+    assert.equal(job.environment, undefined);
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
+  });
+
+  it("installs Supabase CLI 2.111.0 through supabase/setup-cli pinned by commit", () => {
+    const cli = job.steps.find((s) => String(s.uses ?? "").startsWith("supabase/setup-cli@"));
+    assert.match(cli.uses, /^supabase\/setup-cli@[0-9a-f]{40}$/);
+    assert.equal(String(cli.with.version), "2.111.0");
+  });
+
+  it("starts oab-m7-ci on 18740, runs test:local with the stack env, and stops the stack in always()", () => {
+    assert.ok(runs().includes("node cloud/supabase/scripts/local-stack.mjs start --name oab-m7-ci --ports 18740"));
+    const tests = runs().find((r) => r.includes("test:local"));
+    assert.match(tests, /stack_env=\$\(node cloud\/supabase\/scripts\/local-stack\.mjs env --name oab-m7-ci\)/);
+    assert.match(tests, /OAB_SB_API_URL:\?/);
+    assert.match(tests, /npm run test:local -w @oab\/cloud-agent/);
+    const teardown = job.steps.at(-1);
+    assert.equal(teardown.if, "always()");
+    assert.equal(teardown.run, "node cloud/supabase/scripts/local-stack.mjs stop --name oab-m7-ci --ports 18740");
+    assert.doesNotMatch(JSON.stringify(job), /--linked|supabase link|config push|supabase\.co|SUPABASE_ACCESS_TOKEN|SUPABASE_PROJECT_REF/);
   });
 });
 
