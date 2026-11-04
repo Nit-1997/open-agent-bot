@@ -27,15 +27,15 @@ const COPY: Record<SignupMode, { sent: string; toggle: string; label: string }> 
   },
 };
 
-type Props = { startOpen?: boolean; mode?: SignupMode; siteKey?: string };
+type Props = { startOpen?: boolean; mode?: SignupMode; captcha?: boolean; siteKey?: string };
 
-export function EmailLinkForm({ startOpen = false, mode = "waitlist", siteKey }: Props) {
+export function EmailLinkForm({ startOpen = false, mode = "waitlist", captcha = false, siteKey }: Props) {
   const [state, action, pending] = useActionState(requestEmailLink, INITIAL);
   const [open, setOpen] = useState(startOpen);
   const [token, setToken] = useState("");
   const [attempt, setAttempt] = useState(0);
   const copy = COPY[mode];
-  const widgetKey = mode === "open" ? siteKey : undefined;
+  const widgetKey = captcha ? siteKey : undefined;
   if (state.status === "sent") {
     return (
       <p id="login-email-sent" role="status" className="rounded-xl bg-surface px-3.5 py-3 text-sm text-text-secondary">

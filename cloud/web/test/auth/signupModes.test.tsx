@@ -5,12 +5,15 @@ import { EmailLinkForm } from "@/app/login/EmailLinkForm";
 import { requestEmailLink } from "@/app/login/actions";
 import LoginPage from "@/app/login/page";
 import RequestAccessPage from "@/app/request-access/page";
-import { signupMode } from "@/lib/signupMode";
+import { signupMode, signupSettings } from "@/lib/signupMode";
 import { expectUniqueIds } from "../../../../packages/ui/test/support/ids.ts";
 import { installFakeTurnstile, PASS_SITE_KEY, stubSiteKey } from "../humanCheck/fakeTurnstile";
 import { stubAgentEnv } from "../support/agentEnv";
 
-vi.mock("@/lib/signupMode", () => ({ signupMode: vi.fn(async () => "waitlist") }));
+vi.mock("@/lib/signupMode", () => ({
+  signupMode: vi.fn(async () => "waitlist"),
+  signupSettings: vi.fn(async () => ({ mode: "waitlist", captcha: false })),
+}));
 vi.mock("@/lib/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/auth")>()),
   getClaimsOrNull: vi.fn(async () => null),
@@ -28,7 +31,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const el = (id: string) => document.getElementById(id);
-const asMode = (mode: SignupMode) => vi.mocked(signupMode).mockResolvedValue(mode);
+const asMode = (mode: SignupMode, captcha = mode === "open") => {
+  vi.mocked(signupMode).mockResolvedValue(mode);
+  vi.mocked(signupSettings).mockResolvedValue({ mode, captcha });
+};
 const login = async () => render(await LoginPage({ searchParams: Promise.resolve({}) }));
 
 beforeEach(() => {
@@ -83,6 +89,23 @@ describe("/login by signup mode", () => {
     act(() => t.last().expired());
     expect(el("login-email-submit")).toBeDisabled();
     expectUniqueIds(container);
+  });
+});
+
+describe("/login while the mode is unknown", () => {
+  it("shows the waitlist page but keeps the email-link widget, so sign-in by email still works", async () => {
+    asMode("waitlist", true);
+    const t = installFakeTurnstile();
+    await login();
+    expect(el("login-request-link")).toHaveAttribute("href", "/request-access");
+    fireEvent.click(el("login-email-toggle")!);
+    await waitFor(() => expect(t.rendered).toHaveLength(1));
+    expect([t.last().action, t.last().sitekey]).toEqual(["email_link", PASS_SITE_KEY]);
+    expect(t.last().el).toBe(el("login-email-turnstile"));
+    expect(el("login-email-submit")).toBeDisabled();
+    act(() => t.last().callback("tok-email"));
+    expect(el("login-email-captcha")).toHaveValue("tok-email");
+    expect(el("login-email-submit")).not.toBeDisabled();
   });
 });
 
@@ -141,7 +164,7 @@ describe("EmailLinkForm copy by mode", () => {
 
 describe("EmailLinkForm without a site key in open mode", () => {
   it("renders no widget and lets the agent answer (503 → can't send links)", () => {
-    render(<EmailLinkForm startOpen mode="open" siteKey={undefined} />);
+    render(<EmailLinkForm startOpen mode="open" captcha siteKey={undefined} />);
     expect(el("login-email-turnstile")).toBeNull();
     expect(el("login-email-submit")).not.toBeDisabled();
   });

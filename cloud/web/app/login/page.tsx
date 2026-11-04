@@ -4,7 +4,7 @@ import { AuthCard, authPrimary, authSecondary } from "@/components/auth/AuthCard
 import { getClaimsOrNull, safeNext } from "@/lib/auth";
 import { authErrorCopy } from "@oab/ui/lib/authErrors.ts";
 import { firstParam } from "@/lib/authForms";
-import { signupMode } from "@/lib/signupMode";
+import { signupSettings } from "@/lib/signupMode";
 import { turnstileSiteKey } from "@/lib/turnstile";
 import { signInWithGoogle } from "./actions";
 import { EmailLinkForm } from "./EmailLinkForm";
@@ -15,9 +15,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const params = await searchParams;
   if (await getClaimsOrNull()) redirect(safeNext(firstParam(params.next)));
   const error = authErrorCopy(firstParam(params.error));
-  const mode = await signupMode();
+  const { mode, captcha } = await signupSettings();
   const open = mode === "open";
-  const siteKey = open ? turnstileSiteKey() : undefined;
+  const siteKey = captcha ? turnstileSiteKey() : undefined;
   return (
     <AuthCard
       id="login"
@@ -48,7 +48,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           .
         </p>
       )}
-      <EmailLinkForm startOpen={!!error} mode={mode} siteKey={siteKey} />
+      <EmailLinkForm startOpen={!!error} mode={mode} captcha={captcha} siteKey={siteKey} />
       {mode === "waitlist" && (
         <div id="login-request" className="space-y-2 border-t border-border pt-5">
           <p id="login-request-text" className="text-center text-[13px] text-text-secondary">
