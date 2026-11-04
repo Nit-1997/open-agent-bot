@@ -41,8 +41,7 @@ export class FakeUsageStore {
 
   constructor(private readonly ambient: () => Date = () => new Date()) {}
 
-  newUser(email: string = `fake-${randomUUID().slice(0, 8)}@example.test`): { id: string; email: string } {
-    const id = randomUUID();
+  newUser(email: string = `fake-${randomUUID().slice(0, 8)}@example.test`, id: string = randomUUID()): { id: string; email: string } {
     const lower = email.toLowerCase();
     this.users.set(id, lower);
     const now = this.ambient().getTime();
@@ -154,6 +153,13 @@ export class FakeUsageStore {
     };
   }
 
+  lastRequest(userId: string): string | null {
+    const times = [...this.usage.entries()]
+      .filter(([k, r]) => k.startsWith(`${userId}|`) && r.lastAt !== null)
+      .map(([, r]) => r.lastAt as number);
+    return times.length ? new Date(Math.max(...times)).toISOString() : null;
+  }
+
   prune(now: number): void {
     this.log = this.log.filter((l) => l.at > now - HOUR);
     const cutoff = minusMonths(now, 2);
@@ -214,6 +220,7 @@ export class FakeUsageRepo implements UsageRepo {
   get = (userId: string) => this.run(() => this.store.get(userId, this.now()));
   summary = () => this.run(() => this.store.summary(this.now()));
   page = (q: UsagePageQuery) => this.run(() => this.store.page(q, this.now()));
+  lastRequest = (userId: string) => this.run(() => this.store.lastRequest(userId));
   prune = () => this.run(() => this.store.prune(this.now()));
   tombstone = (userId: string) => this.run(() => this.store.tombstone(userId, this.now()));
   humanCheck = {

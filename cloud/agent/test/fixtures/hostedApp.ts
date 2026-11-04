@@ -1,4 +1,5 @@
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
+import type { SignupMode } from "@oab/shared/usage";
 import { PAGE_SIZE } from "@oab/shared/pages";
 import type { Principal } from "@oab/core/identity/types.js";
 import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
@@ -15,7 +16,7 @@ import { hostedRoutes } from "../../src/routes.js";
 import type { AdminRepo } from "../../src/store/admin.js";
 import { type AppOverrides, makeApp, tokenFor } from "../../../../packages/core/test/fixtures/app.js";
 import { TEST_SECRET } from "./config.js";
-import { fakeUsageDeps } from "./usage.js";
+import { type FakeUsageDeps, fakeAdminUsageDeps, fakeUsageDeps } from "./usage.js";
 import { ADMIN, ALICE, BOB, verified } from "./users.js";
 
 export { tokenFor, wrapper } from "../../../../packages/core/test/fixtures/app.js";
@@ -171,12 +172,17 @@ export type IdentitySeams = {
   isLiveAdmin?: (u: Principal) => Promise<boolean>;
 };
 
-export type HostedOverrides = Omit<AppOverrides, "identity" | "routes"> & { seams?: IdentitySeams; access?: AccessService };
+export type HostedOverrides = Omit<AppOverrides, "identity" | "routes"> & {
+  seams?: IdentitySeams;
+  access?: AccessService;
+  usage?: (limiter: RateLimiter) => FakeUsageDeps;
+  signupMode?: () => Promise<SignupMode | "unknown">;
+};
 
 export type HostedHarness = Awaited<ReturnType<typeof makeHostedApp>>;
 
 export async function makeHostedApp(over: HostedOverrides = {}) {
-  const { seams, access: accessOver, ...appOver } = over;
+  const { seams, access: accessOver, usage: usageOver, signupMode, ...appOver } = over;
   const accounts = new FakeAccounts();
   for (const u of [ALICE, BOB, ADMIN]) accounts.add(u);
   const users = new Map([ALICE, BOB, ADMIN].map((u) => [tokenFor(u), u]));
@@ -206,13 +212,15 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
       return {};
     },
   });
+  const usage = (usageOver ?? fakeUsageDeps)(limiter);
   const routes = hostedRoutes({
     access: accessOver ?? access,
     admin,
     adminGuard: createAdminGuard({ isLiveAdmin }),
     limiter,
-    usage: fakeUsageDeps(limiter),
+    usage,
+    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users, signupMode),
   });
   const h = await makeApp({ ...appOver, limiter, identity, routes });
-  return { ...h, accounts, status, queue };
+  return { ...h, accounts, status, queue, usage };
 }

@@ -1,19 +1,28 @@
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
-import type { Limits } from "@oab/shared/usage";
+import type { ProfileView } from "@oab/shared/admin";
+import type { Limits, SignupMode } from "@oab/shared/usage";
+import type { AdminUsageDeps } from "../../src/limits/adminRoutes.js";
 import { humanCheckOff } from "../../src/limits/humanCheckStub.js";
 import { HostedRunPolicy } from "../../src/limits/policy.js";
 import type { UsageRouteDeps } from "../../src/limits/routes.js";
 import { RunSlots } from "../../src/limits/slots.js";
-import { FakeUsageStore } from "../limits/fakeUsage.js";
+import { type FakeUsageRepo, FakeUsageStore } from "../limits/fakeUsage.js";
 
 export const TEST_LIMITS: Limits = { runningPerUser: 1, perHour: 10, perMonth: 50, runningServer: 8 };
 
-export function fakeUsageDeps(
-  limiter: RateLimiter = new RateLimiter(),
-  limits: Limits = TEST_LIMITS,
-): UsageRouteDeps & { store: FakeUsageStore } {
-  const store = new FakeUsageStore();
+export type FakeUsageDeps = UsageRouteDeps & { store: FakeUsageStore; usage: FakeUsageRepo; policy: HostedRunPolicy };
+
+export function fakeUsageDeps(limiter: RateLimiter = new RateLimiter(), limits: Limits = TEST_LIMITS, clock?: () => Date): FakeUsageDeps {
+  const store = new FakeUsageStore(clock);
   const usage = store.repo({ caps: { perMonth: limits.perMonth, perHour: limits.perHour } });
   const policy = new HostedRunPolicy({ limits, usage, slots: new RunSlots({ staleAfterMs: 340_000 }), humanCheck: humanCheckOff, limiter });
   return { store, usage, policy, limits, humanCheck: humanCheckOff, limiter };
+}
+
+export function fakeAdminUsageDeps(
+  u: FakeUsageDeps,
+  profiles: { get(id: string): Promise<ProfileView | undefined> },
+  signupMode: () => Promise<SignupMode | "unknown"> = async () => "waitlist",
+): AdminUsageDeps {
+  return { usage: u.usage, policy: u.policy, limits: u.limits, profiles, signupMode };
 }
