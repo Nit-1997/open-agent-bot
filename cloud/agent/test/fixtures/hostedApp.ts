@@ -15,6 +15,7 @@ import { hostedRoutes } from "../../src/routes.js";
 import type { AdminRepo } from "../../src/store/admin.js";
 import { type AppOverrides, makeApp, tokenFor } from "../../../../packages/core/test/fixtures/app.js";
 import { TEST_SECRET } from "./config.js";
+import { fakeUsageDeps } from "./usage.js";
 import { ADMIN, ALICE, BOB, verified } from "./users.js";
 
 export { tokenFor, wrapper } from "../../../../packages/core/test/fixtures/app.js";
@@ -205,7 +206,13 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
       return {};
     },
   });
-  const routes = hostedRoutes({ access: accessOver ?? access, admin, adminGuard: createAdminGuard({ isLiveAdmin }), limiter });
+  const routes = hostedRoutes({
+    access: accessOver ?? access,
+    admin,
+    adminGuard: createAdminGuard({ isLiveAdmin }),
+    limiter,
+    usage: fakeUsageDeps(limiter),
+  });
   const h = await makeApp({ ...appOver, limiter, identity, routes });
   return { ...h, accounts, status, queue };
 }

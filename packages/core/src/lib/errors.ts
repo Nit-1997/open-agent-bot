@@ -11,7 +11,7 @@ export type UserErrorKind =
   | "unavailable"
   | "internal";
 
-export type UserErrorOptions = { code?: string; retryAfter?: number; details?: Record<string, string> };
+export type UserErrorOptions = { code?: string; retryAfter?: number; details?: Record<string, string | number> };
 
 export class UserError extends Error {
   constructor(

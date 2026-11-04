@@ -22,3 +22,8 @@ drop event trigger if exists ensure_rls;
 create event trigger ensure_rls on ddl_command_end
   when tag in ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
   execute function public.rls_auto_enable();
+
+-- The hosted platform lets service_role (the agent's secret key) read and write every new public table; the CLI image grants it only
+-- truncate, references and trigger there. Default privileges, so the migrations stay byte-identical (A13).
+alter default privileges for role postgres in schema public grant select, insert, update, delete on tables to service_role;
+alter default privileges for role postgres in schema public grant usage, select on sequences to service_role;

@@ -4,7 +4,9 @@ import type { RunAgentInput } from "@ag-ui/core";
 import { serve } from "@hono/node-server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { RunContext } from "../../src/agui/runHandler.js";
+import { parseRunRefusal, RUN_REFUSAL_CODES } from "@oab/shared/runRefusals";
 import { rateLimitError } from "../../src/lib/rateLimit.js";
+import { REFUSAL_SAMPLES, refusalBody, refusalError } from "../fixtures/runRefusals.js";
 import { tokenFor } from "../fixtures/app.js";
 import { TEST_SECRET } from "../fixtures/config.js";
 import { ALICE, BOB } from "../fixtures/users.js";
@@ -179,6 +181,23 @@ const SCENARIOS: Record<string, Scenario> = {
     }
   },
 
+  ...Object.fromEntries(
+    RUN_REFUSAL_CODES.map((code, i): [string, Scenario] => [
+      `refusal ${code}`,
+      async (s, mode) => {
+        s.h.policy.refuse = refusalError(code);
+        try {
+          const res = await send(s, RUN, runBody(thread(mode, 20 + i)));
+          const events = parseSse(await res.text());
+          const errors = visible(events);
+          return { status: res.status, types: events.map((e) => e.type), errors, refusal: parseRunRefusal(errors[0]?.message ?? "") };
+        } finally {
+          s.h.policy.refuse = undefined;
+        }
+      },
+    ]),
+  ),
+
   "400 invalid input": async (s, mode) => outcome(await send(s, RUN, runBody(thread(mode, 5), { runId: "not a valid run id" }))),
 
   "claim refused": async (s, mode) => {
@@ -266,6 +285,26 @@ describe("CoreRunAgent parity with the loopback HttpAgent", () => {
     expect(r.stillRunning).toBe(1);
     expect(r.deltas.at(-1)).toBe(" world");
     expect(r.types.at(-1)).toBe("RUN_FINISHED");
+  });
+
+  it.each(RUN_REFUSAL_CODES)("refusal %s reaches the client with its status and the D8 body on both paths", (code) => {
+    for (const mode of ["in-process", "loopback"] as const) {
+      const r = results[`refusal ${code}`]![mode] as Outcome & { refusal: unknown };
+      expect(r.errors[0]?.message).toContain(`HTTP ${REFUSAL_SAMPLES[code].status}`);
+      expect(r.errors[0]?.auth).toBe(code);
+      const { error, ...rest } = refusalBody(code);
+      expect(r.refusal).toEqual({ code: error, ...rest });
+    }
+  });
+
+  it.each(RUN_REFUSAL_CODES)("POST /agui refusal %s answers its status, retry-after and the D8 body", async (code) => {
+    const h = await copilotHarness({ handle: sessionRun });
+    h.policy.refuse = refusalError(code);
+    const res = await h.call(ALICE, "/agui", { method: "POST", body: JSON.stringify(runBody("30000000-0000-4000-8000-000000000000")) });
+    expect(res.status).toBe(REFUSAL_SAMPLES[code].status);
+    const retryAfter = REFUSAL_SAMPLES[code].retryAfter;
+    expect(res.headers.get("retry-after")).toBe(retryAfter === undefined ? null : String(retryAfter));
+    expect(await res.json()).toEqual(refusalBody(code));
   });
 
   it("refusals reach the client as the same HTTP error text", () => {

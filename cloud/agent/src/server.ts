@@ -1,8 +1,11 @@
 import { ConfigError } from "@oab/core/config.js";
+import { log } from "@oab/core/lib/log.js";
 import { startAgent } from "@oab/core/startAgent.js";
 import { ambientProviderEnv } from "./ambientEnv.js";
 import { type HostedConfig, loadHostedConfig } from "./config.js";
 import { hostedAgentDeps } from "./deps.js";
+import { limitsLine } from "./limits/config.js";
+import { checkUsageFunctions, GATE8_REFUSAL } from "./limits/startup.js";
 
 function fail(message: string): never {
   console.error(message);
@@ -22,7 +25,11 @@ if (ambient.length) {
   );
 }
 
-const agent = await startAgent(hostedAgentDeps(cfg).deps);
+const hosted = hostedAgentDeps(cfg);
+log.info(limitsLine(cfg.limits));
+if ((await checkUsageFunctions(hosted.usage)) === "missing") fail(GATE8_REFUSAL);
+
+const agent = await startAgent(hosted.deps);
 
 let stopping = false;
 for (const sig of ["SIGINT", "SIGTERM"] as const) {

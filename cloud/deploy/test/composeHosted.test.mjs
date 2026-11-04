@@ -132,6 +132,21 @@ describe("hosted preview override (cloud/deploy/compose.preview.yml)", () => {
     const ports = Object.entries(c.services).flatMap(([svc, s]) => (s.ports ?? []).map((p) => `${svc} ${p.host_ip}:${p.published}`));
     assert.deepEqual(ports.sort(), ["agent 127.0.0.1:18800", "web 127.0.0.1:18300"]);
   });
+
+  it("gives the preview agent high request limits so previews and the hosted e2e are never throttled", () => {
+    const env = preview().services.agent.environment;
+    assert.deepEqual(Object.fromEntries(Object.entries(env).filter(([k]) => k.startsWith("LIMIT_"))), {
+      LIMIT_RUNNING_PER_USER: "4",
+      LIMIT_REQUESTS_PER_HOUR: "1000",
+      LIMIT_REQUESTS_PER_MONTH: "100000",
+      LIMIT_RUNNING_SERVER: "50",
+    });
+    const hosted = config(["--profile", "local", "-f", HOSTED]).services.agent.environment ?? {};
+    assert.deepEqual(
+      Object.keys(hosted).filter((k) => k.startsWith("LIMIT_")),
+      [],
+    );
+  });
 });
 
 describe("Compose .env lookup (D9 guard)", () => {

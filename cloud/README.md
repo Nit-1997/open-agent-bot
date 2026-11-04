@@ -63,6 +63,10 @@ Agent settings live in `cloud/deploy/.env-agent` (git-ignored).
 | `COPILOTKIT_TELEMETRY_DISABLED` | required, `true` | The agent refuses to start without it, so CopilotKit never sends telemetry. The agent image sets it; set it for a host-run agent, scripts and evals |
 | `COPILOT_CONNECTS_PER_USER` | `8` | Open `/copilotkit` connect streams per user (1–100); over the cap answers 429 `too_many_connections` |
 | `COPILOT_CONNECT_MAX_MS` | `1800000` (30 min) | Longest a connect stream stays open (60000–86400000 ms) |
+| `LIMIT_RUNNING_PER_USER` | `1` | Runs one user may have open at once, across all chats (1–10); over it a run answers 429 `limit_running` |
+| `LIMIT_REQUESTS_PER_HOUR` | `10` | Counted runs per user in any rolling hour (1–1000); 429 `limit_hourly` |
+| `LIMIT_REQUESTS_PER_MONTH` | `50` | Counted runs per user per UTC calendar month (1–100000); 429 `limit_monthly` |
+| `LIMIT_RUNNING_SERVER` | `8` | Runs open at once on the whole agent (1–200, at least `LIMIT_RUNNING_PER_USER`); 429 `server_busy` |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs prompts, tool arguments and the profile |
 
 ## Develop the hosted stack
@@ -71,6 +75,8 @@ To work on one side of the hosted stack, run the other in Docker and point at it
 
 - Agent: `cd cloud/agent && npm run build && set -a && . ../deploy/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table above). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval. The agent image sets it already.
 - Web: `cd cloud/web && set -a && . ../deploy/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
+
+The request limits (`LIMIT_*`) count runs in the database, so the agent refuses to start until the M7 usage functions exist there (`refusing to start: the M7 usage functions are missing or not executable (apply the migrations first: Gate 8)`). Until the owner runs Gate 8, a hosted preview or the hosted e2e against the production project can't start on M7 code; the preview override (`compose.preview.yml`) sets high limits (4 running per user, 1000 per hour, 100000 per month, 50 on the server) so test runs are never throttled once it can.
 
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" above). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session. The checks for the cloud workspaces are in CONTRIBUTING's checks table; the cloud boundary (nothing outside `cloud/` imports or builds from it) is in CONTRIBUTING's "Cloud boundary".
 

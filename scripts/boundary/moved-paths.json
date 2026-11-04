@@ -203,6 +203,10 @@
       {
         "file": "cloud/supabase/scripts/gen-types.mjs",
         "reason": "\"supabase\" is the Supabase CLI binary gen-types --local runs, not the old root folder (M7 7.1)"
+      },
+      {
+        "file": "cloud/supabase/test/genTypes.test.mjs",
+        "reason": "asserts gen-types --local runs the supabase CLI binary, not the old root folder (M7 7.1, allowed in 7.2)"
       }
     ]
   },

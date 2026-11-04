@@ -5,12 +5,14 @@ import type { AccessService } from "./access/service.js";
 import type { AdminService } from "./admin/service.js";
 import { accessRoutes } from "./http/access.js";
 import { adminRoutes } from "./http/admin.js";
+import { type UsageRouteDeps, usageRoutes } from "./limits/routes.js";
 
 export type HostedRouteDeps = {
   access: AccessService;
   admin: AdminService;
   adminGuard: MiddlewareHandler<AuthEnv>;
   limiter: RateLimiter;
+  usage: UsageRouteDeps;
 };
 
 export function hostedRoutes(deps: HostedRouteDeps): RouteMount[] {
@@ -23,5 +25,6 @@ export function hostedRoutes(deps: HostedRouteDeps): RouteMount[] {
   return [
     { stage: "public", basePath: "/", routes: access },
     { stage: "protected", basePath: "/admin", routes: admin },
+    { stage: "protected", basePath: "/usage", routes: usageRoutes(deps.usage) },
   ];
 }

@@ -80,6 +80,7 @@ const ROUTES: Probe[] = [
   { route: "/providers/:id/models", method: "GET", path: "/providers/openrouter/models" },
   { route: "/providers/:id/models", method: "PUT", path: "/providers/openrouter/models", body: { enabled: [] } },
   { route: "/artifacts/:file", method: "GET", path: `/artifacts/${ID}.pdf` },
+  { route: "/usage", method: "GET", path: "/usage" },
   { route: "/admin/access-requests", method: "GET", path: "/admin/access-requests" },
   { route: "/admin/access-requests/:id/approve", method: "POST", path: `/admin/access-requests/${ID}/approve`, body: {} },
   { route: "/admin/access-requests/:id/reject", method: "POST", path: `/admin/access-requests/${ID}/reject`, body: {} },
@@ -122,6 +123,7 @@ const USER_PATHS = [
   "/reports",
   "/reports/*",
   "/search",
+  "/usage",
 ];
 
 const key = (p: Probe) => `${p.method} ${p.path}`;

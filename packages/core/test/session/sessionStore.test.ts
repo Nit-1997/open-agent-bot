@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { SessionCapacityError, type SessionEntry, type SessionOwner, SessionStore } from "../../src/session/sessionStore.js";
 import { DEFAULT_AGENT } from "@oab/shared/profile";
 import { WorkspaceStore } from "../../src/workspace/store.js";
-import { ALICE, BOB } from "../fixtures/users.js";
+import { NO_CAPABILITIES } from "../../src/identity/types.js";
+import { ALICE, ALL_CAPABILITIES, BOB } from "../fixtures/users.js";
 
 const t1: SessionOwner = { user: ALICE, chatId: "t1" };
 const t2: SessionOwner = { user: ALICE, chatId: "t2" };
@@ -205,5 +206,58 @@ describe("SessionStore.retireUser", () => {
     const next = await store.getOrCreate(t1, null, DEFAULT_AGENT);
     expect(next).not.toBe(first);
     expect(first.dispose).toHaveBeenCalled();
+  });
+});
+
+describe("SessionStore capability fingerprint", () => {
+  const owner = (capabilities = NO_CAPABILITIES) => ({ user: { ...ALICE, capabilities }, chatId: "c" });
+
+  it("drops an idle session built under other capabilities and rebuilds it, logging the change", async () => {
+    const info = vi.spyOn(console, "log").mockImplementation(() => {});
+    const create = vi.fn(async () => entry());
+    const store = new SessionStore({ idleMs: 1000, create });
+    const admin = await store.getOrCreate(owner(ALL_CAPABILITIES), null, DEFAULT_AGENT);
+    expect(store.get(owner(ALL_CAPABILITIES))).toBe(admin);
+    expect(store.get(owner())).toBeUndefined();
+    const member = await store.getOrCreate(owner(), null, DEFAULT_AGENT);
+    expect(member).not.toBe(admin);
+    expect(admin.dispose).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(store.get(owner())).toBe(member);
+    expect(info.mock.calls.flat().join(" ")).toContain(`[session] capabilities changed user=${ALICE.id} chat=c, rebuilt`);
+    info.mockRestore();
+  });
+
+  it("retires a busy session built under other capabilities and rebuilds it on the next run", async () => {
+    const create = vi.fn(async () => entry());
+    const store = new SessionStore({ idleMs: 1000, create });
+    const admin = await store.getOrCreate(owner(ALL_CAPABILITIES), null, DEFAULT_AGENT);
+    admin.busy = true;
+    const during = await store.getOrCreate(owner(), null, DEFAULT_AGENT);
+    expect(during).toBe(admin);
+    expect(admin.retired).toBe(true);
+    expect(admin.dispose).not.toHaveBeenCalled();
+    admin.busy = false;
+    await store.release(owner(), admin);
+    expect(admin.dispose).toHaveBeenCalledTimes(1);
+    const next = await store.getOrCreate(owner(), null, DEFAULT_AGENT);
+    expect(next).not.toBe(admin);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses the session while the capabilities stay the same", async () => {
+    const create = vi.fn(async () => entry());
+    const store = new SessionStore({ idleMs: 1000, create });
+    const first = await store.getOrCreate(owner(ALL_CAPABILITIES), null, DEFAULT_AGENT);
+    const again = await store.getOrCreate({ user: { ...ALICE, capabilities: { ...ALL_CAPABILITIES } }, chatId: "c" }, null, DEFAULT_AGENT);
+    expect(again).toBe(first);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores capabilities that do not change the hub", async () => {
+    const create = vi.fn(async () => entry());
+    const store = new SessionStore({ idleMs: 1000, create });
+    const first = await store.getOrCreate(owner({ ...NO_CAPABILITIES, admin: true }), null, DEFAULT_AGENT);
+    expect(await store.getOrCreate(owner(), null, DEFAULT_AGENT)).toBe(first);
   });
 });
