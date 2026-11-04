@@ -7,7 +7,7 @@ import { parseEnv } from "./env-files.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 export const DEFAULT_DIR = join(ROOT, "cloud/deploy-config/env-files");
-const COMPOSE = join(ROOT, "cloud/deploy/compose.hosted.yml");
+const COMPOSE = join(ROOT, "cloud/deploy-config/compose.hosted.yml");
 
 export const REQUIRED = {
   backend: [
@@ -106,7 +106,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (errors.length) {
     for (const e of errors) console.log(`env-check: ${e}`);
     console.log(
-      "env-check: fill in the missing names, or migrate older env files (names, modes and sizes only are printed): node cloud/deploy/scripts/env-files.mjs --from <old checkout>/cloud/deploy --to cloud/deploy-config/env-files --copy --dry-run",
+      "env-check: fill in the missing names, or migrate older env files (names, modes and sizes only are printed): node cloud/deploy-config/scripts/env-files.mjs --from <old checkout>/cloud/deploy --to cloud/deploy-config/env-files --copy --dry-run",
     );
     process.exit(1);
   }

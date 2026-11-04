@@ -13,7 +13,7 @@ const lines = readFileSync(join(ROOT, ".github/CODEOWNERS"), "utf8")
 describe("CODEOWNERS (M6 D14)", () => {
   it("names the owner for the cloud deploy files, the cloud Dockerfiles, the hosted e2e support, the boundary tooling and the ignore files", () => {
     for (const path of [
-      "/cloud/deploy/",
+      "/cloud/deploy-config/",
       "/cloud/agent/Dockerfile",
       "/cloud/web/Dockerfile",
       "/cloud/e2e/support/",

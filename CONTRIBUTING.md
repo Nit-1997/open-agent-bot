@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `e2e`, and the hosted `cloud/agent`, `cloud/web`, `cloud/e2e`, `cloud/deploy`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `e2e`, and the hosted `cloud/agent`, `cloud/web`, `cloud/e2e`, `cloud/deploy-config`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -277,10 +277,10 @@ cloud/agent/test/      the hosted tests and their harness (fixtures/hostedApp.ts
 e2e/                   Playwright checks: the local stack (see "End-to-end tests and evals on the local stack") and the Mac
                        app (playwright.desktop.config.ts); support/ also holds origin.ts and onboarding.ts for cloud/e2e
 cloud/e2e/             the @oab/cloud-e2e package: hosted preview Playwright specs (the "End-to-end demo" section of cloud/README.md)
-cloud/deploy/          the @oab/cloud-deploy package: the hosted compose file and its preview override, caddy/, litellm/,
-                       renderer/, searxng/, scripts/env-files.mjs and env-check.mjs, doc-commands.json (the owner-only
-                       commands of cloud/README.md) and the hosted deploy tests
-cloud/deploy-config/   env-files/{backend,frontend,ops}/: a tracked .env.example (names only) beside each git-ignored .env
+cloud/deploy-config/   the one deployment folder, the @oab/cloud-deploy package: the hosted compose file and its preview
+                       override, caddy/, litellm/, renderer/, searxng/, scripts/env-files.mjs and env-check.mjs,
+                       doc-commands.json (the owner-only commands of cloud/README.md), the hosted deploy tests, and
+                       env-files/{backend,frontend,ops}/: a tracked .env.example (names only) beside each git-ignored .env
 cloud/README.md        the hosted deployment: run, develop, e2e, evals, and the Gate 6/7 switch-over runbook
 cloud/SECURITY.md      the hosted threat model and known limitations
 scripts/release/       one script per release step (gate, image checks, index and lock checks, notes, sums, dry run);
@@ -359,10 +359,10 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 - Code explains itself through names. Add a comment only for a non-obvious reason.
 - Every rendered HTML element in `cloud/web/` and `packages/ui/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
 - Context for an agent run goes through `useThreadContext` (scoped to one chat's agent). `useAgentContext` is blocked by lint because it reaches every mounted chat.
-- Keys are added in the app and stored encrypted by the agent. Settings live in three git-ignored files, `cloud/deploy-config/env-files/backend/.env` (every backend container; compose hands each service only its own names), `frontend/.env` (the Next.js app) and `ops/.env` (scripts, evals and e2e on the owner's machine); never commit them. The names are in the tracked `.env.example` beside each one. Merge the files of an older checkout into them with `cloud/deploy/scripts/env-files.mjs` (see cloud/README.md).
+- Keys are added in the app and stored encrypted by the agent. Settings live in three git-ignored files, `cloud/deploy-config/env-files/backend/.env` (every backend container; compose hands each service only its own names), `frontend/.env` (the Next.js app) and `ops/.env` (scripts, evals and e2e on the owner's machine); never commit them. The names are in the tracked `.env.example` beside each one. Merge the files of an older checkout into them with `cloud/deploy-config/scripts/env-files.mjs` (see cloud/README.md).
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
 - **Base pins.** The Playwright base image (the `v<x>-noble` tag with its `@sha256:` digest, as in the Node 24 command above) is the same everywhere it appears (the agent Dockerfile, the workflows, this file, the README, `docs/` and `scripts/`), and `<x>` equals the `playwright` pin in `packages/core/package.json` and `@playwright/test` in `e2e/package.json`; the SearXNG base is pinned by digest, and no workflow image runs without a digest. `scripts/test/basePins.test.mjs` enforces it, so a base change is one PR that updates all of them.
-- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). The shell blocks of `cloud/README.md` (the Gate 7 runbook) are listed in `cloud/deploy/doc-commands.json`, every one `owner` with a reason (`cloud/deploy/test/docs.test.mjs` checks it); pass `--owner-docs cloud/deploy/doc-commands.json` to the runner to list them in its log and TSV. Keep other docs' commands in inline code or non-shell blocks.
+- **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). The shell blocks of `cloud/README.md` (the Gate 7 runbook) are listed in `cloud/deploy-config/doc-commands.json`, every one `owner` with a reason (`cloud/deploy-config/test/docs.test.mjs` checks it); pass `--owner-docs cloud/deploy-config/doc-commands.json` to the runner to list them in its log and TSV. Keep other docs' commands in inline code or non-shell blocks.
 - Commit messages follow `type(scope): summary` (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`).
 
 ## Safety rails

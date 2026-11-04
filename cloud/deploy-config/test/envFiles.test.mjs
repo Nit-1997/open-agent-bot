@@ -21,7 +21,7 @@ import { AUTH_DIR, ENV_FILES } from "../../e2e/support/env.ts";
 import { dirProblem, GROUPS, KNOWN, MAX_BYTES, parseEnv, run, TARGETS } from "../scripts/env-files.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const SCRIPT = join(ROOT, "cloud/deploy/scripts/env-files.mjs");
+const SCRIPT = join(ROOT, "cloud/deploy-config/scripts/env-files.mjs");
 const SECRET = "dummy-secret-0f3c9a7e51b2";
 const WORK = realpathSync(mkdtempSync(join(tmpdir(), "env-files-")));
 after(() => rmSync(WORK, { recursive: true, force: true }));
@@ -412,12 +412,12 @@ describe("cloud/e2e state and env files are git-ignored", () => {
     }
   });
 
-  it("ignores every new target and every old env file name under cloud/deploy and the legacy deploy-config", () => {
+  it("ignores every new target and every old env file name under cloud/deploy-config, the M6 cloud/deploy and the legacy deploy-config", () => {
     for (const t of TARGETS) {
       const r = spawnSync("git", ["check-ignore", "-q", join(ROOT, "cloud/deploy-config/env-files", t)], { cwd: ROOT });
       assert.equal(r.status, 0, `${t} is not git-ignored`);
     }
-    for (const base of ["cloud/deploy", "deploy-config"])
+    for (const base of ["cloud/deploy-config", "cloud/deploy", "deploy-config"])
       for (const name of [...KNOWN, ".env"]) {
         const r = spawnSync("git", ["check-ignore", "-q", join(ROOT, base, name)], { cwd: ROOT });
         assert.equal(r.status, 0, `${base}/${name} is not git-ignored`);

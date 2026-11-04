@@ -12,7 +12,7 @@ COPY packages/local-web/package.json packages/local-web/
 COPY apps/desktop/package.json apps/desktop/
 COPY e2e/package.json e2e/
 COPY cloud/agent/package.json cloud/agent/
-COPY cloud/deploy/package.json cloud/deploy/
+COPY cloud/deploy-config/package.json cloud/deploy-config/
 COPY cloud/e2e/package.json cloud/e2e/
 COPY cloud/web/package.json cloud/web/
 RUN npm ci -w @oab/cloud-web --include-workspace-root

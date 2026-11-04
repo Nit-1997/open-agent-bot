@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const FIXTURE = "cloud/deploy/test/fixtures/migrations-pre-m6.sha256";
+const FIXTURE = "cloud/deploy-config/test/fixtures/migrations-pre-m6.sha256";
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 const pinned = readFileSync(join(ROOT, FIXTURE), "utf8")
   .split("\n")

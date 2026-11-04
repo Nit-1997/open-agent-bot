@@ -10,10 +10,10 @@ const read = (f) => readFileSync(join(ROOT, f), "utf8");
 const linesOf = (text) => text.split("\n");
 const README = read("README.md");
 const HOSTED = read("cloud/README.md");
-const COMPOSE = "-f cloud/deploy/compose.hosted.yml";
+const COMPOSE = "-f cloud/deploy-config/compose.hosted.yml";
 const SWITCH = "## Switch-over after M6 (owner only)";
 const GATE6 = "## Vercel (Gate 6)";
-const GATE7 = "## Move the live stack to `cloud/deploy` (Gate 7)";
+const GATE7 = "## Move the live stack to `cloud/deploy-config` (Gate 7)";
 const before = (text, heading) => (text.includes(heading) ? text.slice(0, text.indexOf(heading)) : text);
 const section = (from, to) => {
   const a = HOSTED.indexOf(from);
@@ -28,7 +28,7 @@ const OLD_COMMANDS = [
 ];
 const BACKEND = "--env-file cloud/deploy-config/env-files/backend/.env";
 const BOTH = `${BACKEND} --env-file cloud/deploy-config/env-files/frontend/.env`;
-const LIVE_UP = `docker compose -f cloud/deploy/compose.hosted.yml ${BOTH} --profile local up -d --build`;
+const LIVE_UP = `docker compose -f cloud/deploy-config/compose.hosted.yml ${BOTH} --profile local up -d --build`;
 
 describe("hosted docs moved out of the README", () => {
   const moved = [
@@ -178,12 +178,12 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
       'git clone https://github.com/Nit-1997/open-agent-bot "$NEW"',
       "git checkout <main commit after M6>",
       'git -C "$OLD" status --porcelain --ignored -- "$OLD/deploy-config"',
-      'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy-config/env-files --copy --dry-run',
-      'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy-config/env-files --copy',
-      "node cloud/deploy/scripts/env-check.mjs",
+      'node cloud/deploy-config/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy-config/env-files --copy --dry-run',
+      'node cloud/deploy-config/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy-config/env-files --copy',
+      "node cloud/deploy-config/scripts/env-check.mjs",
       `docker compose -p oab-gate7 ${COMPOSE} ${BOTH} --profile local run --rm --no-deps --build agent node -e "import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})"`,
       ". scripts/preview-preflight.sh",
-      `P="docker compose -p oab-gate7 ${BOTH} -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local"`,
+      `P="docker compose -p oab-gate7 ${BOTH} -f cloud/deploy-config/compose.hosted.yml -f cloud/deploy-config/compose.preview.yml --profile local"`,
       "preflight $P && $P up -d --build search renderer agent web",
       "http://localhost:18300",
       "$P down",
@@ -231,8 +231,8 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
     ])
       assert.ok(g7.includes(s), `Gate 7 lacks ${s}`);
   });
-  it("every shell line in cloud/README.md is in cloud/deploy/doc-commands.json as owner-only, with a reason", () => {
-    const r = loadOwnerDocs(join(ROOT, "cloud/deploy/doc-commands.json"), ROOT);
+  it("every shell line in cloud/README.md is in cloud/deploy-config/doc-commands.json as owner-only, with a reason", () => {
+    const r = loadOwnerDocs(join(ROOT, "cloud/deploy-config/doc-commands.json"), ROOT);
     assert.deepEqual(r.problems, []);
     assert.deepEqual(r.manifest.files, ["cloud/README.md"]);
     assert.ok(r.extracted.some((c) => c.command === LIVE_UP));
@@ -242,7 +242,7 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
 describe("cloud/SECURITY.md", () => {
   const SEC = read("cloud/SECURITY.md");
   const ROOT_SEC = read("SECURITY.md");
-  const fixture = read("cloud/deploy/test/fixtures/security-pre-m6.md");
+  const fixture = read("cloud/deploy-config/test/fixtures/security-pre-m6.md");
   it("holds the hosted threat model that left SECURITY.md, verbatim but for the moved test command", () => {
     const old = fixture.slice(fixture.indexOf("### Threat model"));
     const want = old

@@ -101,13 +101,13 @@ describe("standalone.sh guards", () => {
   });
 
   it("refuses when ignored files sit under cloud/ (they would be deleted)", () => {
-    const oss = clone(WORK, { "cloud/deploy/compose.hosted.yml": "name: x\n" }, { ignore: ".env\n" });
+    const oss = clone(WORK, { "cloud/deploy-config/compose.hosted.yml": "name: x\n" }, { ignore: ".env\n" });
     mkdirSync(join(oss, "cloud/deploy-config/env-files/backend"), { recursive: true });
     writeFileSync(join(oss, "cloud/deploy-config/env-files/backend/.env"), "SECRET=never-printed\n");
     const r = run(oss, { env: ALLOW });
     refused(r, /ignored files under cloud\/ would be deleted: cloud\/deploy-config\/env-files\/backend\/\.env/);
     assert.doesNotMatch(r.out, /never-printed/);
-    assert.ok(existsSync(join(oss, "cloud/deploy/compose.hosted.yml")));
+    assert.ok(existsSync(join(oss, "cloud/deploy-config/compose.hosted.yml")));
   });
 
   it("refuses GITHUB_ACTIONS=true without RUNNER_TEMP", () => {

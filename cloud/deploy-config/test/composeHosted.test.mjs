@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { cleanEnv, composeConfig, requireComposeKeepingEnvFiles, ROOT, standIn } from "./support/composeConfig.mjs";
 
-const HOSTED = "cloud/deploy/compose.hosted.yml";
-const PREVIEW = "cloud/deploy/compose.preview.yml";
+const HOSTED = "cloud/deploy-config/compose.hosted.yml";
+const PREVIEW = "cloud/deploy-config/compose.preview.yml";
 const BASELINE = "the pre-M6 baseline";
 const HOSTED_PROFILES = ["--profile", "local", "--profile", "litellm", "--profile", "ollama"];
 requireComposeKeepingEnvFiles();
@@ -21,7 +21,7 @@ const PLACEHOLDER = "placeholder-not-a-secret";
 const BACKEND_FIXTURE = join(WORK, "backend.env");
 writeFileSync(BACKEND_FIXTURE, `RENDERER_SECRET=${PLACEHOLDER}\n`);
 
-const config = (args, { projectDir = "cloud/deploy", ...opts } = {}) =>
+const config = (args, { projectDir = "cloud/deploy-config", ...opts } = {}) =>
   composeConfig(args, { envFile: ["--env-file", BACKEND_FIXTURE], standInDir: STAND_IN.dir, projectDir, ...opts });
 
 function diffPaths(a, b, path = "") {
@@ -77,7 +77,7 @@ const ENV_REWIRES = [
   ],
   [envFileBlock("renderer", true), `    environment:\n      RENDERER_SECRET: ${RENDERER_GUARD}\n`],
   [envFileBlock("caddy", false), listBlock(CADDY_ENV)],
-  ["      - path: .env-nextjs\n", "      - path: ../deploy-config/env-files/frontend/.env\n"],
+  ["      - path: .env-nextjs\n", "      - path: ./env-files/frontend/.env\n"],
 ];
 const REWIRED = {
   ...Object.fromEntries(Object.keys(OLD_ENV_FILES).map((svc) => [`.services.${svc}.env_file`, undefined])),
@@ -89,10 +89,10 @@ const REWIRED = {
 };
 const ALLOWED = {
   ".services.web.env_file.0.path": [at("deploy-config/.env-nextjs"), at("cloud/deploy-config/env-files/frontend/.env")],
-  ".services.search.volumes.0.source": [at("deploy-config/searxng/settings.yml"), at("cloud/deploy/searxng/settings.yml")],
-  ".services.search.volumes.1.source": [at("deploy-config/searxng/entrypoint.sh"), at("cloud/deploy/searxng/entrypoint.sh")],
-  ".services.llm.volumes.0.source": [at("deploy-config/litellm/config.yaml"), at("cloud/deploy/litellm/config.yaml")],
-  ".services.caddy.volumes.0.source": [at("deploy-config/caddy/Caddyfile.local"), at("cloud/deploy/caddy/Caddyfile.local")],
+  ".services.search.volumes.0.source": [at("deploy-config/searxng/settings.yml"), at("cloud/deploy-config/searxng/settings.yml")],
+  ".services.search.volumes.1.source": [at("deploy-config/searxng/entrypoint.sh"), at("cloud/deploy-config/searxng/entrypoint.sh")],
+  ".services.llm.volumes.0.source": [at("deploy-config/litellm/config.yaml"), at("cloud/deploy-config/litellm/config.yaml")],
+  ".services.caddy.volumes.0.source": [at("deploy-config/caddy/Caddyfile.local"), at("cloud/deploy-config/caddy/Caddyfile.local")],
   ".services.renderer.security_opt.1": ["seccomp=deploy-config/renderer/seccomp.json", "seccomp=renderer/seccomp.json"],
   ".services.agent.build.dockerfile": ["packages/core/Dockerfile", "cloud/agent/Dockerfile"],
   ".services.web.build.dockerfile": ["web/Dockerfile", "cloud/web/Dockerfile"],
@@ -108,11 +108,11 @@ const LINE_MOVES = [
   [/^( {6}- )\/app\/web\/\.next\/cache(:size=256m,uid=1000,gid=1000,mode=0700)$/m, "$1/app/cloud/web/.next/cache$2"],
 ];
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
-const FIXTURE = join(ROOT, "cloud/deploy/test/fixtures/compose-hosted-baseline.yml");
+const FIXTURE = join(ROOT, "cloud/deploy-config/test/fixtures/compose-hosted-baseline.yml");
 const baselineText = () => readFileSync(FIXTURE, "utf8");
 
-describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
-  it(`is the ${BASELINE} root docker-compose.yml (fixtures/compose-hosted-baseline.yml) plus one name line, with only its paths moved to cloud/deploy and its env files rewired to explicit names`, () => {
+describe("hosted compose (cloud/deploy-config/compose.hosted.yml)", () => {
+  it(`is the ${BASELINE} root docker-compose.yml (fixtures/compose-hosted-baseline.yml) plus one name line, with only its paths moved to cloud/deploy-config and its env files rewired to explicit names`, () => {
     let moved = baselineText();
     for (const [re, to] of LINE_MOVES) {
       assert.match(moved, new RegExp(re.source, re.flags.replace("g", "")), String(re));
@@ -166,7 +166,7 @@ describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
     const envFiles = [...text.matchAll(/^ {4}env_file:\n {6}- path: (.+)\n {8}required: (\w+)$/gm)];
     assert.deepEqual(
       envFiles.map((m) => [m[1], m[2]]),
-      [["../deploy-config/env-files/frontend/.env", "true"]],
+      [["./env-files/frontend/.env", "true"]],
     );
     assert.ok(envFiles[0].index > text.indexOf("\n  web:\n"), "the only env_file belongs to web");
     const example = (g) =>
@@ -218,7 +218,7 @@ describe("hosted compose (cloud/deploy/compose.hosted.yml)", () => {
   });
 });
 
-describe("hosted preview override (cloud/deploy/compose.preview.yml)", () => {
+describe("hosted preview override (cloud/deploy-config/compose.preview.yml)", () => {
   const preview = () => config(["--profile", "local", "-f", HOSTED, "-f", PREVIEW]);
 
   it("is named oab-preview and publishes only web 18300 and agent 18800 on 127.0.0.1", () => {
@@ -240,7 +240,7 @@ describe("Compose .env lookup (D9 guard)", () => {
     return composeConfig([...args, "-f", "sub/compose.yml"], { cwd: probe }).name;
   };
 
-  it("reads .env from the compose file's folder, not the working directory, so the guard must sit in cloud/deploy/", () => {
+  it("reads .env from the compose file's folder, not the working directory, so the guard must sit in cloud/deploy-config/", () => {
     assert.equal(name({ "sub/.env": "oab-guard" }), "oab-guard");
     assert.equal(name({ ".env": "oab-guard" }), "pinned");
     assert.equal(name({ ".env": "oab-cwd", "sub/.env": "oab-guard" }), "oab-guard");

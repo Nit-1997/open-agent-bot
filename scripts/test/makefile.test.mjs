@@ -10,7 +10,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const WORK = mkdtempSync(join(tmpdir(), "makefile-"));
 after(() => rmSync(WORK, { recursive: true, force: true }));
 const SECRET = "dummy-secret-7c41e0";
-const HOSTED = existsSync(join(ROOT, "cloud/deploy/compose.hosted.yml"));
+const HOSTED = existsSync(join(ROOT, "cloud/deploy-config/compose.hosted.yml"));
 const STANDALONE = !HOSTED && "cloud/ is removed in the standalone check";
 
 let n = 0;
@@ -106,7 +106,7 @@ describe("Makefile", () => {
     assert.equal(down.length, 1, f.calls());
     assert.match(
       down[0],
-      /^docker compose -p oab-preview --env-file \/dev\/null -f cloud\/deploy\/compose\.hosted\.yml -f cloud\/deploy\/compose\.preview\.yml --profile local down$/,
+      /^docker compose -p oab-preview --env-file \/dev\/null -f cloud\/deploy-config\/compose\.hosted\.yml -f cloud\/deploy-config\/compose\.preview\.yml --profile local down$/,
     );
     assert.match(f.calls(), /^docker stop abc123$/m);
     assert.doesNotMatch(f.calls(), / -v\b|--volumes|open-agent-bot/);
@@ -127,7 +127,7 @@ describe("make web sanity check", { skip: STANDALONE }, () => {
     const r = make(["run", "web"], { bin: f.bin, env: { ENV_DIR: dir } });
     assert.notEqual(r.status, 0, r.out);
     for (const w of want) assert.ok(r.out.includes(w), `${w}\n${r.out}`);
-    assert.ok(r.out.includes("cloud/deploy/scripts/env-files.mjs"), r.out);
+    assert.ok(r.out.includes("cloud/deploy-config/scripts/env-files.mjs"), r.out);
     assert.equal(r.out.includes(SECRET), false);
     assert.equal(f.calls().includes("docker"), false, f.calls());
     return r;
