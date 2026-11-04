@@ -46,8 +46,8 @@ describe("usage copy", () => {
 
   it.each([
     [0, 50, "normal"],
-    [40, 50, "normal"],
-    [41, 50, "low"],
+    [39, 50, "normal"],
+    [40, 50, "low"],
     [49, 50, "low"],
     [50, 50, "exhausted"],
     [51, 50, "exhausted"],
@@ -55,7 +55,8 @@ describe("usage copy", () => {
     [1, 1, "exhausted"],
     [7, 10, "normal"],
     [8, 10, "low"],
-    [3, 4, "low"],
+    [3, 4, "normal"],
+    [4, 5, "low"],
   ] as const)("used %i of %i is %s", (used, limit, level) => {
     expect(meterLevel(used, limit)).toBe(level);
   });

@@ -5,7 +5,14 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(import.meta.dirname, "../..");
 const SRC = join(ROOT, "src");
 
-const HOSTED = [/requests used/i, /Run it on your Mac/i, /Run Open Agent on your own Mac/i, /releases\/latest/, /One quick check/i, /github\.com\/Nit-1997/i];
+const HOSTED = [
+  /requests used/i,
+  /Run it on your Mac/i,
+  /Run Open Agent on your own Mac/i,
+  /releases\/latest/,
+  /One quick check/i,
+  /github\.com\/Nit-1997/i,
+];
 
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

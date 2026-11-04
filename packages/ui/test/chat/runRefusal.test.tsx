@@ -167,6 +167,9 @@ describe("run refusals through the runRefusal slot", () => {
     await endRun(new Error("network down"));
     await waitFor(() => expect(notice()).not.toBeNull());
     expect(banner()).toBeNull();
+    await act(async () => fireEvent.click(el(`${SID}-refusal-close`)!));
+    expect(notice()).toBeNull();
+    expect(banner()).toBeNull();
   });
 
   it("falls back to the banner for a refusal code the slot doesn't list", async () => {

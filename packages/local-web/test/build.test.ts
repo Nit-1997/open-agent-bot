@@ -109,7 +109,13 @@ describe("vite build", () => {
       .filter((path) => /\.(html|js|css)$/.test(path))
       .map(read)
       .join("\n");
-    for (const needle of ["requests used", "Run it on your Mac", "releases/latest", "One quick check", "github.com/Nit-1997/open-agent-bot"])
+    for (const needle of [
+      "requests used",
+      "Run it on your Mac",
+      "releases/latest",
+      "One quick check",
+      "github.com/Nit-1997/open-agent-bot",
+    ])
       expect(text, needle).not.toContain(needle);
     expect(text).toContain("limit_monthly");
   });
