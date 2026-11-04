@@ -60,7 +60,9 @@ test("preview: isolation, provider settings, private URLs refused and admin guar
       await expect(page.locator(`${row}-error`)).toHaveCount(0);
       if (!(await page.locator(`${row}-url`).isVisible())) await page.locator(`${row}-connect`).click();
       await page.locator(`${row}-url`).fill(url);
-      const refused = page.waitForResponse((res) => res.request().method() === "POST" && new URL(res.url()).pathname === "/api/providers/local");
+      const refused = page.waitForResponse(
+        (res) => res.request().method() === "POST" && new URL(res.url()).pathname === "/api/providers/local",
+      );
       await page.locator(`${row}-connect-save`).click();
       expect((await refused).status(), url).toBe(422);
       await expect(page.locator(`${row}-error`)).toHaveText(PRIVATE_TARGET);

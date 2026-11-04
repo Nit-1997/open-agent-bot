@@ -184,7 +184,7 @@ describe("release.yml triggers and shape (AC 1)", () => {
 
   it("has exactly the eight jobs and never cancels a running release", () => {
     assert.deepEqual(Object.keys(jobs()), JOBS);
-    assert.deepEqual(wf.concurrency, { group: "release-${{ github.ref }}", "cancel-in-progress": false });
+    assert.deepEqual(wf.concurrency, { group: `release-\${{ github.ref }}`, "cancel-in-progress": false });
     assert.deepEqual(wf.defaults, { run: { shell: "bash" } });
   });
 
@@ -200,14 +200,14 @@ describe("release.yml triggers and shape (AC 1)", () => {
     const fetch = at("gate", (s) => s.run?.trim() === GATE_FETCH);
     const gate = runAt("gate", /^node scripts\/release\/gate\.mjs --tag "\$TAG"$/);
     assert.ok(fetch >= 0 && gate > fetch, `fetch ${fetch} gate ${gate}`);
-    assert.equal(steps("gate")[fetch].env.TAG, "${{ github.ref_name }}");
-    assert.equal(steps("gate")[gate].env.TAG, "${{ github.ref_name }}");
-    assert.equal(steps("gate")[gate].env.GH_TOKEN, "${{ github.token }}");
+    assert.equal(steps("gate")[fetch].env.TAG, `\${{ github.ref_name }}`);
+    assert.equal(steps("gate")[gate].env.TAG, `\${{ github.ref_name }}`);
+    assert.equal(steps("gate")[gate].env.GH_TOKEN, `\${{ github.token }}`);
     assert.equal(steps("gate")[gate].id, "gate");
     assert.deepEqual(job("gate").outputs, {
-      version: "${{ steps.gate.outputs.version }}",
-      prerelease: "${{ steps.gate.outputs.prerelease }}",
-      tag: "${{ steps.gate.outputs.tag }}",
+      version: `\${{ steps.gate.outputs.version }}`,
+      prerelease: `\${{ steps.gate.outputs.prerelease }}`,
+      tag: `\${{ steps.gate.outputs.tag }}`,
     });
   });
 
@@ -237,7 +237,7 @@ describe("least privilege (AC 2)", () => {
 
   it("runs on the D2 runners; push builds natively on amd64 and arm64", () => {
     for (const [n, r] of Object.entries(RUNNERS)) assert.equal(job(n)["runs-on"], r, n);
-    assert.equal(job("push")["runs-on"], "${{ matrix.runner }}");
+    assert.equal(job("push")["runs-on"], `\${{ matrix.runner }}`);
     const legs = job("push")
       .strategy.matrix.include.map((l) => `${l.image} ${l.arch} ${l.platform} ${l.runner}`)
       .sort();
@@ -291,7 +291,7 @@ describe("no inline release logic (AC 31)", () => {
 
 describe("push: build, check, push the same build, check again, attest (AC 4, 31)", () => {
   const builds = () => usesOf("push", "docker/build-push-action@");
-  const BUILD_ARGS = "OPEN_AGENT_VERSION=${{ needs.gate.outputs.version }}\nOPEN_AGENT_REVISION=${{ github.sha }}";
+  const BUILD_ARGS = `OPEN_AGENT_VERSION=\${{ needs.gate.outputs.version }}\nOPEN_AGENT_REVISION=\${{ github.sha }}`;
 
   it("two build steps with the same inputs, version from gate, no GHA cache anywhere", () => {
     assert.equal(builds().length, 2);
@@ -312,9 +312,9 @@ describe("push: build, check, push the same build, check again, attest (AC 4, 31
     assert.equal(check.with["no-cache"], true);
     assert.equal(check.with.load, true);
     assert.equal(check.with.push, false);
-    assert.equal(check.with.tags, "${{ matrix.image }}:check");
+    assert.equal(check.with.tags, `\${{ matrix.image }}:check`);
     assert.equal(pushed.id, "build");
-    assert.equal(pushed.with.outputs, "type=image,name=${{ matrix.name }},push-by-digest=true,name-canonical=true,push=true");
+    assert.equal(pushed.with.outputs, `type=image,name=\${{ matrix.name }},push-by-digest=true,name-canonical=true,push=true`);
     assert.equal(pushed.with.provenance, "mode=max");
     assert.equal(pushed.with.sbom, true);
     for (const l of job("push").strategy.matrix.include) assert.equal(l.name, `ghcr.io/nit-1997/${l.image}`, `${l.image} ${l.arch}`);
@@ -374,18 +374,18 @@ describe("push: build, check, push the same build, check again, attest (AC 4, 31
       order.every((k) => k >= 0),
       order.join(","),
     );
-    assert.equal(steps("push")[contentBefore].env.IMAGE, "${{ matrix.image }}:check");
-    assert.equal(steps("push")[labels].env.IMAGE, "${{ matrix.image }}:check");
-    assert.equal(steps("push")[labels].env.VERSION, "${{ needs.gate.outputs.version }}");
-    const digestRef = "${{ matrix.name }}@${{ steps.build.outputs.digest }}";
+    assert.equal(steps("push")[contentBefore].env.IMAGE, `\${{ matrix.image }}:check`);
+    assert.equal(steps("push")[labels].env.IMAGE, `\${{ matrix.image }}:check`);
+    assert.equal(steps("push")[labels].env.VERSION, `\${{ needs.gate.outputs.version }}`);
+    const digestRef = `\${{ matrix.name }}@\${{ steps.build.outputs.digest }}`;
     assert.equal(steps("push")[pull].env.IMAGE, digestRef);
     assert.equal(steps("push")[contentAfter].env.IMAGE, digestRef);
     assert.deepEqual(steps("push")[attest].with, {
-      "subject-name": "${{ matrix.name }}",
-      "subject-digest": "${{ steps.build.outputs.digest }}",
+      "subject-name": `\${{ matrix.name }}`,
+      "subject-digest": `\${{ steps.build.outputs.digest }}`,
       "push-to-registry": true,
     });
-    assert.equal(steps("push")[upload].with.name, "digests-${{ matrix.image }}-${{ matrix.arch }}");
+    assert.equal(steps("push")[upload].with.name, `digests-\${{ matrix.image }}-\${{ matrix.arch }}`);
     assert.equal(Number(steps("push")[upload].with["retention-days"]), 1);
   });
 });
@@ -393,7 +393,7 @@ describe("push: build, check, push the same build, check again, attest (AC 4, 31
 describe("merge: index tags :<version> and :sha-<7> via scripts (AC 4)", () => {
   it("computes the inputs with refs.mjs, creates the index with --metadata-file, reads the digest with merge-digest, attests it", () => {
     const download = usesOf("merge", "actions/download-artifact@")[0];
-    assert.equal(download.with.pattern, "digests-${{ matrix.image }}-*");
+    assert.equal(download.with.pattern, `digests-\${{ matrix.image }}-*`);
     assert.equal(download.with["merge-multiple"], true);
     const inputs = runAt(
       "merge",
@@ -415,17 +415,17 @@ describe("merge: index tags :<version> and :sha-<7> via scripts (AC 4)", () => {
     );
     const s = steps("merge");
     assert.equal(s[inputs].id, "inputs");
-    assert.equal(s[inputs].env.VERSION, "${{ needs.gate.outputs.version }}");
-    assert.equal(s[create].env.VERSION_TAG, "${{ steps.inputs.outputs.version_tag }}");
-    assert.equal(s[create].env.SHA_TAG, "${{ steps.inputs.outputs.sha_tag }}");
+    assert.equal(s[inputs].env.VERSION, `\${{ needs.gate.outputs.version }}`);
+    assert.equal(s[create].env.VERSION_TAG, `\${{ steps.inputs.outputs.version_tag }}`);
+    assert.equal(s[create].env.SHA_TAG, `\${{ steps.inputs.outputs.sha_tag }}`);
     assert.equal(s[digest].id, "merge");
     assert.deepEqual(s[attest].with, {
-      "subject-name": "${{ matrix.name }}",
-      "subject-digest": "${{ steps.merge.outputs.digest }}",
+      "subject-name": `\${{ matrix.name }}`,
+      "subject-digest": `\${{ steps.merge.outputs.digest }}`,
       "push-to-registry": true,
     });
-    assert.equal(s[upload].with.name, "index-${{ matrix.image }}");
-    assert.equal(s[upload].with.path, "${{ runner.temp }}/index/${{ matrix.image }}.json");
+    assert.equal(s[upload].with.name, `index-\${{ matrix.image }}`);
+    assert.equal(s[upload].with.path, `\${{ runner.temp }}/index/\${{ matrix.image }}.json`);
     assert.equal(read(RELEASE).includes(":latest"), false);
   });
 });
@@ -516,7 +516,7 @@ describe("lock: verified index, pinned attestation checks before the lock (AC 5,
       order,
       order.join(),
     );
-    for (const k of [vAgent, vSearch]) assert.equal(steps("lock")[k].env.GH_TOKEN, "${{ github.token }}");
+    for (const k of [vAgent, vSearch]) assert.equal(steps("lock")[k].env.GH_TOKEN, `\${{ github.token }}`);
   });
 
   it("refs come from refs.mjs lock-inputs; every step that names an image reads it from that step's outputs", () => {
@@ -526,7 +526,7 @@ describe("lock: verified index, pinned attestation checks before the lock (AC 5,
     );
     assert.ok(k >= 0);
     assert.equal(steps("lock")[k].id, "refs");
-    assert.deepEqual(job("lock").env, { VERSION: "${{ needs.gate.outputs.version }}", TAG: "${{ needs.gate.outputs.tag }}" });
+    assert.deepEqual(job("lock").env, { VERSION: `\${{ needs.gate.outputs.version }}`, TAG: `\${{ needs.gate.outputs.tag }}` });
     const OUTPUT = { AGENT: "agent", SEARCH: "search", AGENT_TAG: "agent_tag", SEARCH_TAG: "search_tag" };
     for (const s of runsOf("lock"))
       for (const [v, o] of Object.entries(OUTPUT))
@@ -537,7 +537,7 @@ describe("lock: verified index, pinned attestation checks before the lock (AC 5,
     const up = usesOf("lock", "actions/upload-artifact@");
     assert.equal(up.length, 1);
     assert.equal(up[0].with.name, "release-lock");
-    assert.equal(up[0].with.path, "${{ runner.temp }}/release-lock");
+    assert.equal(up[0].with.path, `\${{ runner.temp }}/release-lock`);
     assert.equal(up[0].with["if-no-files-found"], "error");
   });
 });
@@ -558,7 +558,7 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     const download = usesOf("desktop", "actions/download-artifact@");
     assert.deepEqual(
       download.map((d) => [d.with.name, d.with.path]),
-      [["release-lock", "${{ runner.temp }}/release-lock"]],
+      [["release-lock", `\${{ runner.temp }}/release-lock`]],
     );
     const stage = runAt("desktop", /stage-stack\.mjs --lock "\$RUNNER_TEMP\/release-lock\/services\.lock\.json"/);
     const build = runAt("desktop", /^node apps\/desktop\/scripts\/build\.mjs$/);
@@ -591,8 +591,8 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     assert.equal(up.length, 1);
     assert.equal(up[0].with.name, "release-dmgs");
     assert.deepEqual(String(up[0].with.path).trim().split("\n"), [
-      "apps/desktop/release/Open-Agent-${{ needs.gate.outputs.version }}-arm64.dmg",
-      "apps/desktop/release/Open-Agent-${{ needs.gate.outputs.version }}-x64.dmg",
+      `apps/desktop/release/Open-Agent-\${{ needs.gate.outputs.version }}-arm64.dmg`,
+      `apps/desktop/release/Open-Agent-\${{ needs.gate.outputs.version }}-x64.dmg`,
     ]);
     assert.equal(up[0].with["if-no-files-found"], "error");
     assert.equal(Number(up[0].with["retention-days"]), 7);
@@ -610,16 +610,16 @@ describe("verify-dmgs: no repo code, pinned shell checks (AC 28)", () => {
   it("downloads release-lock and release-dmgs only, and runs exactly the pinned commands", () => {
     const d = usesOf("verify-dmgs", "actions/download-artifact@").map((s) => [s.with.name, s.with.path]);
     assert.deepEqual(d, [
-      ["release-lock", "${{ runner.temp }}/release-lock"],
-      ["release-dmgs", "${{ runner.temp }}/release-dmgs"],
+      ["release-lock", `\${{ runner.temp }}/release-lock`],
+      ["release-dmgs", `\${{ runner.temp }}/release-dmgs`],
     ]);
     const r = runsOf("verify-dmgs");
     assert.equal(r.length, 1);
     assert.equal(r[0].run, VERIFY_DMGS_RUN);
     assert.deepEqual(r[0].env, {
-      VERSION: "${{ needs.gate.outputs.version }}",
-      LOCK: "${{ runner.temp }}/release-lock/services.lock.json",
-      DMGS: "${{ runner.temp }}/release-dmgs",
+      VERSION: `\${{ needs.gate.outputs.version }}`,
+      LOCK: `\${{ runner.temp }}/release-lock/services.lock.json`,
+      DMGS: `\${{ runner.temp }}/release-dmgs`,
     });
   });
 
@@ -645,8 +645,8 @@ describe("attest: SHA256SUMS from the lock job's manifest and the DMGs (AC 12, 2
     assert.deepEqual(needsOf("attest"), ["gate", "verify-dmgs"]);
     const d = usesOf("attest", "actions/download-artifact@").map((s) => [s.with.name, s.with.path]);
     assert.deepEqual(d, [
-      ["release-lock", "${{ runner.temp }}/assets"],
-      ["release-dmgs", "${{ runner.temp }}/assets"],
+      ["release-lock", `\${{ runner.temp }}/assets`],
+      ["release-dmgs", `\${{ runner.temp }}/assets`],
     ]);
   });
 
@@ -654,16 +654,16 @@ describe("attest: SHA256SUMS from the lock job's manifest and the DMGs (AC 12, 2
     const r = runsOf("attest");
     assert.equal(r.length, 1);
     assert.equal(r[0].run, SUMS_RUN);
-    assert.equal(r[0]["working-directory"], "${{ runner.temp }}/assets");
+    assert.equal(r[0]["working-directory"], `\${{ runner.temp }}/assets`);
     const names = ["Open-Agent-$VERSION-arm64.dmg", "Open-Agent-$VERSION-x64.dmg", "open-agent-services.json"];
     assert.deepEqual([...names].sort(), names);
     const attest = usesOf("attest", "actions/attest-build-provenance@");
     assert.equal(attest.length, 1);
-    assert.deepEqual(attest[0].with, { "subject-checksums": "${{ runner.temp }}/assets/SHA256SUMS" });
+    assert.deepEqual(attest[0].with, { "subject-checksums": `\${{ runner.temp }}/assets/SHA256SUMS` });
     const up = usesOf("attest", "actions/upload-artifact@");
     assert.equal(up.length, 1);
     assert.equal(up[0].with.name, "release-sums");
-    assert.equal(up[0].with.path, "${{ runner.temp }}/assets/SHA256SUMS");
+    assert.equal(up[0].with.path, `\${{ runner.temp }}/assets/SHA256SUMS`);
   });
 });
 
@@ -678,16 +678,16 @@ describe("release: a draft with exactly four assets (AC 13, 28)", () => {
     assert.deepEqual(needsOf("release"), ["gate", "attest"]);
     const d = usesOf("release", "actions/download-artifact@").map((s) => [s.with.name, s.with.path]);
     assert.deepEqual(d, [
-      ["release-lock", "${{ runner.temp }}/release-lock"],
-      ["release-dmgs", "${{ runner.temp }}/release-dmgs"],
-      ["release-sums", "${{ runner.temp }}/release-sums"],
+      ["release-lock", `\${{ runner.temp }}/release-lock`],
+      ["release-dmgs", `\${{ runner.temp }}/release-dmgs`],
+      ["release-sums", `\${{ runner.temp }}/release-sums`],
     ]);
     assert.deepEqual(job("release").env, {
-      TAG: "${{ needs.gate.outputs.tag }}",
-      VERSION: "${{ needs.gate.outputs.version }}",
-      GH_TOKEN: "${{ github.token }}",
-      ASSET_ARM64: "Open-Agent-${{ needs.gate.outputs.version }}-arm64.dmg",
-      ASSET_X64: "Open-Agent-${{ needs.gate.outputs.version }}-x64.dmg",
+      TAG: `\${{ needs.gate.outputs.tag }}`,
+      VERSION: `\${{ needs.gate.outputs.version }}`,
+      GH_TOKEN: `\${{ github.token }}`,
+      ASSET_ARM64: `Open-Agent-\${{ needs.gate.outputs.version }}-arm64.dmg`,
+      ASSET_X64: `Open-Agent-\${{ needs.gate.outputs.version }}-x64.dmg`,
       ASSET_MANIFEST: "open-agent-services.json",
       ASSET_SUMS: "SHA256SUMS",
     });

@@ -76,7 +76,7 @@ describe("the dry run plans release.yml's own verify-dmgs and attest steps", () 
       () =>
         planJob(
           edit((w) => {
-            w.jobs["verify-dmgs"].steps.find((s) => s.run).env.EXTRA = "${{ secrets.X }}";
+            w.jobs["verify-dmgs"].steps.find((s) => s.run).env.EXTRA = `\${{ secrets.X }}`;
           }),
           "verify-dmgs",
           ctxFor("x"),
@@ -106,7 +106,7 @@ describe("the dry run plans release.yml's own verify-dmgs and attest steps", () 
         ),
       /shell: bash/,
     );
-    assert.throws(() => resolveExpr("${{ github.token }}", { temp: "/t", version: V }), /github\.token/);
+    assert.throws(() => resolveExpr(`\${{ github.token }}`, { temp: "/t", version: V }), /github\.token/);
   });
 
   it("refuses step and job keys it does not execute, and expressions inside the run text", () => {

@@ -37,7 +37,10 @@ describe("preflight on the local stack", () => {
   });
 
   it("aborts on OPEN_AGENT_PORT=3000", () => {
-    expectAbort(preflight(LOCAL, { ...TEST_VOLUMES, OPEN_AGENT_PORT: "3000" }), "OPEN_AGENT_PORT must be a port in 18000-19999, got '3000'");
+    expectAbort(
+      preflight(LOCAL, { ...TEST_VOLUMES, OPEN_AGENT_PORT: "3000" }),
+      "OPEN_AGENT_PORT must be a port in 18000-19999, got '3000'",
+    );
   });
 
   for (const port of ["17999", "20000", "abc", "18330;rm"]) {
@@ -65,7 +68,10 @@ describe("preflight on the local stack", () => {
   });
 
   it("aborts on the local project name", () => {
-    expectAbort(preflight("docker compose --env-file /dev/null -f docker-compose.yml", { ...TEST_VOLUMES, OPEN_AGENT_PORT: "18330" }), "project 'open-agent'");
+    expectAbort(
+      preflight("docker compose --env-file /dev/null -f docker-compose.yml", { ...TEST_VOLUMES, OPEN_AGENT_PORT: "18330" }),
+      "project 'open-agent'",
+    );
   });
 });
 
@@ -76,7 +82,10 @@ describe("preflight on the hosted stack", () => {
 
   it("passes the hosted preview under an oab- project", () => {
     expectOk(
-      preflight("docker compose -p oab-factory-m3-5-hosted --env-file /dev/null -f compose.hosted.yml -f deploy-config/compose.preview.yml --profile local", {}),
+      preflight(
+        "docker compose -p oab-factory-m3-5-hosted --env-file /dev/null -f compose.hosted.yml -f deploy-config/compose.preview.yml --profile local",
+        {},
+      ),
     );
   });
 });

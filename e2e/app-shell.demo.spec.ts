@@ -15,7 +15,10 @@ const setTheme = async (page: Page, dark: boolean) => {
 
 const REPORT_PLACEHOLDER = "Ask about this report…";
 const thumbLoaded = (page: Page, sel: string) =>
-  page.locator(sel).evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0).catch(() => false);
+  page
+    .locator(sel)
+    .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)
+    .catch(() => false);
 const historyLength = (page: Page) => page.evaluate(() => window.history.length);
 
 test.describe.configure({ mode: "serial" });
@@ -50,7 +53,8 @@ test("desktop: first run, sidebar, chats, search, reports, saved cards, account 
     await expect(page.locator("#rail")).toHaveAttribute("aria-label", "Main");
     const sidebar = page.locator("#sidebar");
     await expect(sidebar).toBeVisible();
-    for (const group of ["Today", "This week", "Earlier"]) await expect(sidebar.getByRole("heading", { name: group, exact: true })).toBeVisible();
+    for (const group of ["Today", "This week", "Earlier"])
+      await expect(sidebar.getByRole("heading", { name: group, exact: true })).toBeVisible();
     await expect(page.locator("#chat-list-sidebar-count")).toHaveText(`Showing 20 of ${chatCount}`);
     await page.locator("#chat-list-sidebar-more").click();
     await expect(page.locator("#chat-list-sidebar-count")).toHaveText(`Showing ${chatCount} of ${chatCount}`);
@@ -474,11 +478,14 @@ test("phone: top bar, tabs, drawer and account sheet @phone", async ({ page }) =
     const box = await panel.boundingBox();
     const tabs = await page.locator("#mobile-tabs").boundingBox();
     expect(box && tabs && box.y + box.height >= tabs.y + tabs.height).toBe(true);
-    expect(await page.evaluate(() => {
-      const tabs = document.getElementById("mobile-tabs")!.getBoundingClientRect();
-      const top = document.elementFromPoint(tabs.x + tabs.width / 2, tabs.y + tabs.height / 2);
-      return !!top?.closest("[id$='-report-panel']");
-    })).toBe(true);
+    expect(
+      await page.evaluate(() => {
+        const tabs = document.getElementById("mobile-tabs")?.getBoundingClientRect();
+        if (!tabs) return false;
+        const top = document.elementFromPoint(tabs.x + tabs.width / 2, tabs.y + tabs.height / 2);
+        return !!top?.closest("[id$='-report-panel']");
+      }),
+    ).toBe(true);
     await expect(page.locator(`${pane}-report-panel-pdf`)).toHaveAttribute("href", /format=pdf/);
     await expect(page.locator(`${pane}-report-panel-prev`)).toHaveCount(0);
     await expectNoHorizontalScroll(page, "report viewer");

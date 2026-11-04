@@ -75,7 +75,13 @@ const seedPart = (r: { id: string; title: string; toolCallId: string }) => ({
   result: `artifact ${r.id} created: ${r.title}`,
 });
 
-export type Seeded = { chats: Array<{ id: string; title: string }>; bigSur: string; cartChat: string; reports: string[]; otherChat: string };
+export type Seeded = {
+  chats: Array<{ id: string; title: string }>;
+  bigSur: string;
+  cartChat: string;
+  reports: string[];
+  otherChat: string;
+};
 
 const pick = (title: string, price: number) => ({
   title,
@@ -123,7 +129,13 @@ const TRIP_CARD = {
 
 const CART_REPLY = "Here's your taco night cart at Trader Joe's.";
 
-const cardPart = (id: string, widget: object) => ({ type: "tool", id, name: "show_widget", args: JSON.stringify({ widget }), result: "rendered" });
+const cardPart = (id: string, widget: object) => ({
+  type: "tool",
+  id,
+  name: "show_widget",
+  args: JSON.stringify({ widget }),
+  result: "rendered",
+});
 
 export async function seed(demoEmail: string, otherEmail: string): Promise<Seeded> {
   const db = admin();
@@ -144,7 +156,12 @@ export async function seed(demoEmail: string, otherEmail: string): Promise<Seede
       content: i === 0 ? BIG_SUR_REPLY : i === 2 ? CART_REPLY : `Here is what I found for ${c.title.toLowerCase()}.`,
       status: "complete",
       ...(i === 0 && {
-        parts: [seedPart(BIG_SUR_REPORT), seedPart(SECOND_REPORT), cardPart(TRIP_CARD_ID, TRIP_CARD), { type: "text", text: BIG_SUR_REPLY }],
+        parts: [
+          seedPart(BIG_SUR_REPORT),
+          seedPart(SECOND_REPORT),
+          cardPart(TRIP_CARD_ID, TRIP_CARD),
+          { type: "text", text: BIG_SUR_REPLY },
+        ],
       }),
       ...(i === 2 && { parts: [cardPart(CART_CARD_ID, CART_CARD), { type: "text", text: CART_REPLY }], created_at: ago(0, 3) }),
     },
@@ -182,5 +199,11 @@ export async function seed(demoEmail: string, otherEmail: string): Promise<Seede
   const otherChat = randomUUID();
   await must("other chat", db.from("chats").insert({ id: otherChat, user_id: other, title: "Someone else's chat" }));
 
-  return { chats: chats.map((c) => ({ id: c.id, title: c.title })), bigSur, cartChat: chats[2].id, reports: reports.map((r) => r.id), otherChat };
+  return {
+    chats: chats.map((c) => ({ id: c.id, title: c.title })),
+    bigSur,
+    cartChat: chats[2].id,
+    reports: reports.map((r) => r.id),
+    otherChat,
+  };
 }

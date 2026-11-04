@@ -12,7 +12,10 @@ const good = (body) => `#!/usr/bin/env bash\nset -u\n. "$(dirname "$0")/lib.sh"\
 
 describe("demo part scripts", () => {
   it("has parts 0 to 9 and the shared lib", () => {
-    assert.deepEqual(PARTS, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `part-${n}.sh`));
+    assert.deepEqual(
+      PARTS,
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `part-${n}.sh`),
+    );
     for (const p of PARTS) assert.ok(existsSync(join(PARTS_DIR, p)), p);
     assert.ok(existsSync(LIB));
     assert.deepEqual(
@@ -86,7 +89,7 @@ describe("demo part scripts", () => {
       'rm -rf "$HOME/Library/Application Support/Open Agent"',
       "mkdir -p ~/Library/Logs/Open\\ Agent",
       'echo x > "$HOME/Library/Logs/Open Agent/x"',
-      'cp a "${HOME}/Library/Application Support/Open Agent/"',
+      `cp a "\${HOME}/Library/Application Support/Open Agent/"`,
     ])
       assert.match(partProblems(good(bad), "x.sh").join("\n"), /Library/, bad);
     assert.deepEqual(
@@ -122,10 +125,17 @@ describe("demo part scripts", () => {
   });
 
   it("never touches the live open-agent-bot containers", () => {
-    for (const bad of ["docker logs open-agent-bot-agent-1", "docker inspect open-agent-bot-web-1", "docker exec open-agent-bot-agent-1 ls"])
+    for (const bad of [
+      "docker logs open-agent-bot-agent-1",
+      "docker inspect open-agent-bot-web-1",
+      "docker exec open-agent-bot-agent-1 ls",
+    ])
       assert.match(partProblems(good(bad), "x.sh").join("\n"), /open-agent-bot/, bad);
     assert.deepEqual(
-      partProblems(good(`docker ps --format '{{.Names}} {{.Status}}' | grep -E '^open-agent-bot' > "$DEMO_DIR/live-before.txt" || true`), "x.sh"),
+      partProblems(
+        good(`docker ps --format '{{.Names}} {{.Status}}' | grep -E '^open-agent-bot' > "$DEMO_DIR/live-before.txt" || true`),
+        "x.sh",
+      ),
       [],
     );
   });
@@ -213,7 +223,12 @@ describe("demo part scripts", () => {
   it("part 7 refuses a used state folder, present images or demo volumes before the app test, and starts a fresh mock.log", () => {
     const p7 = read(join(PARTS_DIR, "part-7.sh"));
     const at = (re) => p7.search(re);
-    for (const re of [/^need state-fresh /m, /^need images-absent /m, /^need demo-volumes-absent /m, /^run mock-log-reset ": > \\"\$DEMO_DIR\/mock\.log\\""/m])
+    for (const re of [
+      /^need state-fresh /m,
+      /^need images-absent /m,
+      /^need demo-volumes-absent /m,
+      /^run mock-log-reset ": > \\"\$DEMO_DIR\/mock\.log\\""/m,
+    ])
       assert.ok(at(re) >= 0 && at(re) < at(/^run playwright-app /m), String(re));
     assert.ok(at(/^run mock-log-reset /m) < at(/mockReleasesCli\.mts/));
   });
@@ -248,7 +263,7 @@ describe("render-docs", () => {
   const FIXTURE = [
     "# Title",
     "",
-    "Some *text* with a [link](https://example.com) and `<div id=\"x\">` inline.",
+    'Some *text* with a [link](https://example.com) and `<div id="x">` inline.',
     "",
     "## Steps",
     "",
@@ -277,7 +292,26 @@ describe("render-docs", () => {
     const tags = [...html.matchAll(/<([a-zA-Z][a-zA-Z0-9]*)(\s[^<>]*?)?\/?>/g)];
     assert.ok(tags.length > 20);
     for (const t of tags) assert.match(t[0], /\sid="doc-fixture-[a-z0-9]+-\d+"/, t[0]);
-    for (const tag of ["html", "head", "meta", "title", "style", "body", "main", "h1", "h2", "ol", "li", "input", "table", "pre", "code", "hr", "blockquote", "a"])
+    for (const tag of [
+      "html",
+      "head",
+      "meta",
+      "title",
+      "style",
+      "body",
+      "main",
+      "h1",
+      "h2",
+      "ol",
+      "li",
+      "input",
+      "table",
+      "pre",
+      "code",
+      "hr",
+      "blockquote",
+      "a",
+    ])
       assert.match(html, new RegExp(`<${tag} [^>]*id="doc-fixture-${tag}-1"`), tag);
     assert.match(html, /&lt;span id=\\&quot;dup\\&quot;&gt;/);
   });
@@ -303,7 +337,13 @@ describe("render-docs", () => {
     const out = mkdtempSync(join(tmpdir(), "render-docs-"));
     try {
       const written = renderAll({ out });
-      assert.deepEqual(written.map((w) => w.split("/").pop()).sort(), ["index.html", "install.html", "readme.html", "releasing.html", "security.html"]);
+      assert.deepEqual(written.map((w) => w.split("/").pop()).sort(), [
+        "index.html",
+        "install.html",
+        "readme.html",
+        "releasing.html",
+        "security.html",
+      ]);
       for (const w of written) assert.deepEqual(idProblems(read(w)), [], w);
       assert.match(read(join(out, "index.html")), /href="readme\.html"/);
       assert.throws(() => renderAll({ out, render: () => '<html id="x"><body id="x"></body></html>' }), /duplicate id x/);

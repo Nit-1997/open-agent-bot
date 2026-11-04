@@ -86,7 +86,15 @@ describe("liveOriginProblem", () => {
   for (const ok of [LIVE, "https://app.example.com", PREVIEW]) {
     it(`accepts ${ok}`, () => assert.equal(liveOriginProblem(ok), undefined));
   }
-  for (const bad of [undefined, "", "app.localhost", "ftp://app.localhost", "https://app.localhost/", "https://app.localhost/x", "not a url"]) {
+  for (const bad of [
+    undefined,
+    "",
+    "app.localhost",
+    "ftp://app.localhost",
+    "https://app.localhost/",
+    "https://app.localhost/x",
+    "not a url",
+  ]) {
     it(`refuses ${JSON.stringify(bad)}`, () => assert.match(liveOriginProblem(bad) ?? "", /APP_ORIGIN/));
   }
 });
@@ -94,7 +102,8 @@ describe("liveOriginProblem", () => {
 describe("allowLive", () => {
   it("is on only for E2E_ALLOW_LIVE=1", () => {
     assert.equal(allowLive({ [ALLOW_LIVE_ENV]: "1" }), true);
-    for (const value of [undefined, "", "0", "true", "yes", " 1", "1 "]) assert.equal(allowLive({ [ALLOW_LIVE_ENV]: value }), false, String(value));
+    for (const value of [undefined, "", "0", "true", "yes", " 1", "1 "])
+      assert.equal(allowLive({ [ALLOW_LIVE_ENV]: value }), false, String(value));
   });
 });
 
@@ -169,7 +178,10 @@ describe("playwright config", () => {
   });
   it("the auth probes ignore the live opt-in", () => {
     const env: NodeJS.ProcessEnv = { ...process.env, APP_ORIGIN: LIVE, AGENT_ORIGIN: "http://127.0.0.1:18800", [ALLOW_LIVE_ENV]: "1" };
-    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", resolve(E2E, "scripts/auth-probes.mts")], { env, encoding: "utf8" });
+    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", resolve(E2E, "scripts/auth-probes.mts")], {
+      env,
+      encoding: "utf8",
+    });
     assert.equal(run.status, 1, `${run.stdout}${run.stderr}`);
     assert.match(`${run.stdout}${run.stderr}`, /refusing to probe: APP_ORIGIN must be/);
   });

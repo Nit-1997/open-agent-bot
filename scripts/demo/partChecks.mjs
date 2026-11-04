@@ -92,8 +92,7 @@ export function partProblems(text, name) {
   if (!lines.some((l) => /^\s*\.\s+"?\$\(dirname "\$0"\)\/lib\.sh"?\s*$/.test(l.text))) out.push(`${name}: does not source lib.sh`);
   for (const l of lines) {
     const at = `${name}:${l.n}`;
-    for (const p of portsOf(l.text))
-      if (p < PORT_MIN || p > PORT_MAX) out.push(`${at}: port ${p} is outside ${PORT_MIN}-${PORT_MAX}`);
+    for (const p of portsOf(l.text)) if (p < PORT_MIN || p > PORT_MAX) out.push(`${at}: port ${p} is outside ${PORT_MIN}-${PORT_MAX}`);
     for (const p of [composeProblem(l.text), removalProblem(l.text), libraryProblem(l.text), liveProblem(l.text)])
       if (p) out.push(`${at}: ${p}`);
   }
@@ -103,9 +102,10 @@ export function partProblems(text, name) {
 export function libProblems(text) {
   const out = [];
   const code = codeLines(text).map((l) => l.text);
-  if (!code.some((l) => /^\s*\.\s+"?\$REPO\/scripts\/preview-preflight\.sh"?/.test(l))) out.push("lib.sh must source scripts/preview-preflight.sh");
+  if (!code.some((l) => /^\s*\.\s+"?\$REPO\/scripts\/preview-preflight\.sh"?/.test(l)))
+    out.push("lib.sh must source scripts/preview-preflight.sh");
   if (!code.some((l) => /^\s*require_oab\b/.test(l))) out.push("lib.sh must refuse non-oab names (require_oab)");
   if (!code.some((l) => /exit-codes\.txt/.test(l))) out.push("lib.sh must record exit codes to $DEMO_DIR/exit-codes.txt");
-  for (const p of partProblems(text.replace(/^/, "set -u\n. \"$(dirname \"$0\")/lib.sh\"\n"), "lib.sh")) out.push(p);
+  for (const p of partProblems(text.replace(/^/, 'set -u\n. "$(dirname "$0")/lib.sh"\n'), "lib.sh")) out.push(p);
   return out;
 }
