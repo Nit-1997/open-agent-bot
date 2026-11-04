@@ -280,9 +280,28 @@ describe("ConfirmDialog", () => {
     );
     expectUniqueIds(container);
     fireEvent.change(byId("dlg-input"), { target: { value: "a@b.tes" } });
-    fireEvent.submit(byId("dlg-panel"));
+    fireEvent.submit(byId("dlg-form"));
     expect(onConfirm).not.toHaveBeenCalled();
+    fireEvent.change(byId("dlg-input"), { target: { value: " A@B.test " } });
+    fireEvent.submit(byId("dlg-form"));
+    expect(onConfirm).toHaveBeenCalledWith("A@B.test");
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("puts role=alertdialog on a div that holds the form, and uses the solid danger button", () => {
+    render(
+      <ConfirmDialog id="dlg" title="Delete?" body="Gone." confirmLabel="Delete" busy={false} onConfirm={vi.fn()} onCancel={vi.fn()} />,
+    );
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog.tagName).toBe("DIV");
+    expect(dialog).toHaveAttribute("id", "dlg-panel");
+    expect(dialog).toHaveAccessibleName("Delete?");
+    expect(dialog).toHaveAccessibleDescription("Gone.");
+    expect(byId("dlg-form").tagName).toBe("FORM");
+    expect(byId("dlg-form")).not.toHaveAttribute("role");
+    expect(dialog).toContainElement(byId("dlg-form"));
+    expect(byId("dlg-confirm").className).toMatch(/\bbg-danger-fg\b/);
+    expect(byId("dlg-confirm").className).toMatch(/\btext-bg\b/);
   });
 });

@@ -29,7 +29,7 @@
   --status-warn-bg: #fffbeb;
   --status-warn-fg: #b45309;
   --status-danger-bg: #fef2f2;
-  --status-danger-fg: #dc2626;
+  --status-danger-fg: #b91c1c;
   --accent-gradient: linear-gradient(180deg, #dce7e9 0%, #eef3f4 55%, #f7f9f9 100%);
   --orb: radial-gradient(circle at 30% 28%, #ffffff 0%, #d5e3e5 32%, #6f9aa1 70%, #23474d 100%);
   --glass-bg: rgba(255, 255, 255, 0.1);
