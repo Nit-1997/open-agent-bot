@@ -373,13 +373,102 @@ describe("m6 demo part scripts", () => {
     ])
       refuses(bad, /names-only jq/);
     for (const ok of [
-      "docker compose config --format json | jq -r .name",
-      "docker compose -f cloud/deploy/compose.hosted.yml config --format json | jq -r .name",
-      "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json | jq_names",
+      "docker compose config --format json --no-env-resolution | jq -r .name",
+      "docker compose -f cloud/deploy/compose.hosted.yml config --format json --no-env-resolution | jq -r .name",
+      "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json --no-env-resolution | jq_names",
       "docker compose --env-file /dev/null -f cloud/deploy/compose.hosted.yml --profile local config --format json --no-env-resolution | jq_names_ports",
       "preflight docker compose -p oab-factory-m6-hosted -f x/deploy-config/compose.preview.yml",
     ])
       passes(ok);
+  });
+
+  it("runs compose config only with --no-env-resolution", () => {
+    refuses("docker compose config --format json | jq -r .name", /--no-env-resolution/);
+    refuses("docker compose -f cloud/deploy/compose.hosted.yml --profile local config --format json | jq_names", /--no-env-resolution/);
+  });
+
+  it("saves compose up --build output only through redact_build", () => {
+    refuses('new_compose "$m6" up -d --build --wait search > "$DEMO_DIR/switch.log" 2>&1', /redact_build/);
+    passes('new_compose "$m6" up -d --build --wait search 2>&1 | redact_build > "$DEMO_DIR/switch.log"');
+    passes('old_compose "$old" x "$m6" up -d --wait search > "$DEMO_DIR/rollback.log" 2>&1');
+  });
+
+  it("redact_build drops the command text of BuildKit RUN lines", () => {
+    const r = spawnSync(
+      "bash",
+      [
+        "-c",
+        `. scripts/demo/m6/lib.sh\nprintf '%s\\n' '#29 [web build 7/8] RUN test -n "value"' '#30 DONE 0.1s' | redact_build`,
+        "part-test",
+      ],
+      {
+        cwd: join(M6, "../../.."),
+        encoding: "utf8",
+        env: { ...process.env, DEMO_DIR: `.factory/m6/test-redact-${process.pid}` },
+      },
+    );
+    rmSync(join(M6, "../../..", `.factory/m6/test-redact-${process.pid}`), { recursive: true, force: true });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "#29 [web build 7/8] RUN (command line not saved)\n#30 DONE 0.1s\n");
+  });
+
+  it("names no revamp-only commit hash; commit_of resolves each role in commits.json to exactly one commit", () => {
+    for (const f of readdirSync(M6).filter((x) => x.endsWith(".sh")))
+      for (const h of read(join(M6, f)).match(/(?<![0-9A-Za-z])[0-9a-f]{7,40}(?![0-9A-Za-z])/g) ?? [])
+        assert.ok(["c1c0f4e"].includes(h) || /^0+$/.test(h), `${f} pins ${h}`);
+    const roles = Object.keys(JSON.parse(read(join(M6, "commits.json"))));
+    const demo = `.factory/m6/test-commits-${process.pid}`;
+    const repo = join(M6, "../../..");
+    const sh = (body) =>
+      spawnSync("bash", ["-c", `. scripts/demo/m6/lib.sh\n${body}`, "part-test"], {
+        cwd: repo,
+        encoding: "utf8",
+        env: { ...process.env, DEMO_DIR: demo },
+      });
+    try {
+      const r = sh(roles.map((x) => `commit_of ${x} || exit 1`).join("\n"));
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(
+        r.stdout
+          .trim()
+          .split("\n")
+          .filter((l) => /^[0-9a-f]{7,}$/.test(l)).length,
+        roles.length,
+      );
+      const bad = sh("commit_of no-such-role");
+      assert.equal(bad.status, 1);
+      assert.match(bad.stderr, /no-such-role/);
+    } finally {
+      rmSync(join(repo, demo), { recursive: true, force: true });
+    }
+  });
+
+  it("stops when a scratch dir cannot be made", () => {
+    refuses('base="$(scratch "rehearsal-$sha")"', /scratch .*\|\| exit 1/);
+    passes('base="$(scratch "rehearsal-$sha")" || exit 1');
+    passes('INJ="$(scratch inject)" || exit 1');
+  });
+
+  it("compare_facts returns non-zero when the container names differ", () => {
+    const demo = `.factory/m6/test-compare-${process.pid}`;
+    const repo = join(M6, "../../..");
+    const body = [
+      'mkdir -p "$DEMO_DIR"',
+      'printf "a\\n" > "$DEMO_DIR/x-names.txt"; printf "b\\n" > "$DEMO_DIR/y-names.txt"',
+      'for t in x y; do for k in volumes secret containers mounts images; do : > "$DEMO_DIR/$t-$k.txt"; done; done',
+      "compare_facts x y /cloud/deploy/ same",
+    ].join("\n");
+    const r = spawnSync("bash", ["-c", `. scripts/demo/m6/lib.sh\n${body}`, "part-test"], {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, DEMO_DIR: demo },
+    });
+    try {
+      assert.notEqual(r.status, 0, r.stdout);
+      assert.doesNotMatch(r.stdout, /same containers|same volumes/);
+    } finally {
+      rmSync(join(repo, demo), { recursive: true, force: true });
+    }
   });
 
   it("refuses set -x, env, printenv, export -p and declare -p", () => {
@@ -465,10 +554,10 @@ describe("m6 demo part scripts", () => {
     assert.match(p8, /^no_open_agent_project$/m);
   });
 
-  it("part 4 rehearses c1c0f4e, tears it down, then 4879d41 with the rollback exercised", () => {
+  it("part 4 rehearses c1c0f4e, tears it down, then the pre-M6 layout with the rollback exercised", () => {
     const p4 = read(join(M6, "part-4.sh"));
     const a = p4.search(/^rehearse c1c0f4e docker-compose\.yml teardown$/m);
-    const b = p4.search(/^rehearse 4879d41 compose\.hosted\.yml keep$/m);
+    const b = p4.search(/^rehearse "\$PRE_M6" compose\.hosted\.yml keep$/m);
     assert.ok(a >= 0 && b > a, "rehearsal order");
     for (const s of ["retag_rollback", "retag_back", "compare_facts", "gate7_config_check", "env-files.mjs"]) assert.ok(p4.includes(s), s);
   });

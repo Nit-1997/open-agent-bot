@@ -9,25 +9,31 @@ for c in lint format:check typecheck test build; do
 done
 run boundary "node scripts/boundary/cloud-boundary.mjs"
 run script-tests "node --test scripts/test/*.test.mjs > \"$DEMO_DIR/script-tests.log\" 2>&1; rc=\$?; grep -E '^# (tests|pass|fail)' \"$DEMO_DIR/script-tests.log\"; exit \$rc"
-run cloud-deploy "npm test -w @oab/cloud-deploy > \"$DEMO_DIR/cloud-deploy.log\" 2>&1; rc=\$?; grep -E '^ℹ (tests|pass|fail)' \"$DEMO_DIR/cloud-deploy.log\"; exit \$rc"
+run cloud-deploy "npm test -w @oab/cloud-deploy > \"$DEMO_DIR/cloud-deploy.log\" 2>&1; rc=\$?; grep -E '^(#|ℹ) (tests|pass|fail|skipped)' \"$DEMO_DIR/cloud-deploy.log\"; exit \$rc"
 run workflows "npm run lint:workflows"
 
 step "1. the guards, verbose"
 run guard-tests "node --test --test-reporter spec scripts/test/cloudBoundary.test.mjs scripts/test/movedPaths.test.mjs scripts/test/verifyMove.test.mjs scripts/test/standalone.test.mjs scripts/test/demoParts.test.mjs 2>&1 | tee \"$DEMO_DIR/guard-tests.log\" | grep -E '^(▶|✔|✖|ℹ (tests|pass|fail))'"
 
-step "1. pure moves (AC 2): verify-move on the three move PRs, re-run from git"
-run verify-6.4 "node scripts/move/verify-move.mjs cc1c91f 2e5d75e c3e2d0a --moved cloud/agent/src --moved cloud/agent/test --moved cloud/agent/evals/auth --deleted packages/core/src/server.ts"
-run verify-6.5 "node scripts/move/verify-move.mjs 206169a 6e1061a 3c8aaf2 --moved cloud/web --allow cloud/web/package.json --allow cloud/web/Dockerfile --allow cloud/web/eslint.config.mjs --allow cloud/web/README.md --allow cloud/web/test/lint/noCloudImports.test.ts --allow cloud/web/test/idsStatic.test.ts --allow cloud/web/test/desktopBoundary.test.ts"
-run verify-6.6 "node scripts/move/verify-move.mjs 88f3f90 5218aa0 103ffd5 --moved cloud/supabase --moved cloud/deploy/compose.hosted.yml --moved cloud/deploy/compose.preview.yml --moved cloud/deploy/caddy --moved cloud/deploy/litellm --moved cloud/deploy/renderer --moved cloud/deploy/searxng --moved cloud/deploy/env.examples --moved cloud/e2e --moved cloud/README.md --allow cloud/README.md --allow cloud/deploy/compose.hosted.yml --allow cloud/e2e/package.json --allow cloud/e2e/tsconfig.json --allow cloud/e2e/biome.json --allow cloud/e2e/support/env.ts --allow cloud/e2e/support/env.test.ts --allow cloud/e2e/support/playwrightConfig.test.ts --allow cloud/supabase/scripts/gen-types.mjs"
+step "1. pure moves (AC 2): verify-move on the three move PRs, re-run from git (commits found by subject in scripts/demo/m6/commits.json)"
+for pr in 6.4 6.5 6.6; do
+  for role in base rename wiring; do
+    c="$(commit_of "$pr-$role")" || exit 1
+    printf -v "C_${pr/./_}_$role" '%s' "$c"
+  done
+done
+run verify-6.4 "node scripts/move/verify-move.mjs $C_6_4_base $C_6_4_rename $C_6_4_wiring --moved cloud/agent/src --moved cloud/agent/test --moved cloud/agent/evals/auth --deleted packages/core/src/server.ts --alias @oab/core/=packages/core/src/"
+run verify-6.5 "node scripts/move/verify-move.mjs $C_6_5_base $C_6_5_rename $C_6_5_wiring --moved cloud/web --allow cloud/web/package.json --allow cloud/web/Dockerfile --allow cloud/web/eslint.config.mjs --allow cloud/web/README.md --allow cloud/web/test/lint/noCloudImports.test.ts --allow cloud/web/test/idsStatic.test.ts --allow cloud/web/test/desktopBoundary.test.ts"
+run verify-6.6 "node scripts/move/verify-move.mjs $C_6_6_base $C_6_6_rename $C_6_6_wiring --moved cloud/supabase --moved cloud/deploy/compose.hosted.yml --moved cloud/deploy/compose.preview.yml --moved cloud/deploy/caddy --moved cloud/deploy/litellm --moved cloud/deploy/renderer --moved cloud/deploy/searxng --moved cloud/deploy/env.examples --moved cloud/e2e --moved cloud/README.md --allow cloud/README.md --allow cloud/deploy/compose.hosted.yml --allow cloud/e2e/package.json --allow cloud/e2e/tsconfig.json --allow cloud/e2e/biome.json --allow cloud/e2e/support/env.ts --allow cloud/e2e/support/env.test.ts --allow cloud/e2e/support/playwrightConfig.test.ts --allow cloud/supabase/scripts/gen-types.mjs"
 
 step "1. layout (AC 1) and local, desktop and release inputs untouched (AC 7)"
 absent old-paths "nothing tracked at the pre-M6 hosted paths (git ls-files lists none)" \
   "git ls-files packages/core/src/hosted web supabase deploy-config compose.hosted.yml packages/core/src/server.ts packages/core/src/scripts/rotateCredentials.ts docs/hosted.md | grep ."
 run cloud-tree "ls -d cloud/agent cloud/web cloud/e2e cloud/supabase cloud/deploy cloud/README.md cloud/SECURITY.md && jq -c .workspaces package.json && for p in cloud/*/package.json; do jq -r .name \"\$p\"; done"
-run local-unchanged "git diff --exit-code $M3_SHA -- docker-compose.yml local apps/desktop/services.lock.json .github/workflows/release.yml .github/workflows/evals-local.yml && echo 'local, desktop and release inputs unchanged'"
+run local-unchanged "git diff --exit-code $PRE_M6 -- docker-compose.yml local apps/desktop/services.lock.json .github/workflows/release.yml .github/workflows/evals-local.yml && echo 'local, desktop and release inputs unchanged'"
 
 step "1. boundary injections (AC 5), each in a throwaway clone: every case fails with its own VIOLATION line"
-INJ="$(scratch inject)"
+INJ="$(scratch inject)" || exit 1
 run inject-clone "git clone -q \"file://$REPO\" \"$INJ/repo\" && git -C \"$INJ/repo\" log --oneline -1"
 inject() {
   local label="$1" body="$2"
@@ -52,8 +58,8 @@ inject symlink "ln -s ../cloud packages/inject-link"
 run negatives-apply "(cd \"$INJ/repo\" && printf 'import \"@google-cloud/storage\";\nimport \"./cloudy\";\n// import \"../../../cloud/agent/src/config.js\";\n' > packages/core/src/negatives.ts && printf '{ \"files\": { \"includes\": [\"**/cloud/**\"] } }\n' > packages/core/biome.negatives.json && git add -A)"
 run negatives "node scripts/boundary/cloud-boundary.mjs --root \"$INJ/repo\""
 
-step "1. Tailwind still sees the shared UI (AC 21): selectors of the $M3_SHA web build equal the cloud/web build"
-run css-old-clone "clone_at $M3_SHA \"$INJ/old\""
+step "1. Tailwind still sees the shared UI (AC 21): selectors of the $PRE_M6 web build equal the cloud/web build"
+run css-old-clone "clone_at $PRE_M6 \"$INJ/old\""
 run css-old-build "(cd \"$INJ/old\" && npm ci > \"$REPO/$DEMO_DIR/css-old-npm-ci.log\" 2>&1 && set -a && . \"$REPO/cloud/deploy/.env-nextjs\" && set +a && npm run build -w web > \"$REPO/$DEMO_DIR/css-old-build.log\" 2>&1); rc=\$?; tail -n 3 \"$DEMO_DIR/css-old-build.log\"; exit \$rc"
 run css-before "node scripts/css-selectors.mjs \"$INJ/old/web/.next\" > \"$DEMO_DIR/css-selectors-before.txt\" && wc -l < \"$DEMO_DIR/css-selectors-before.txt\""
 run css-after "node scripts/css-selectors.mjs cloud/web/.next > \"$DEMO_DIR/css-selectors-after.txt\" && wc -l < \"$DEMO_DIR/css-selectors-after.txt\""

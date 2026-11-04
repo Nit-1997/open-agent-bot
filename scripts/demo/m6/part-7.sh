@@ -38,7 +38,7 @@ absent all-ignored "every listed path is ignored (no '::' non-matching line)" "g
 run ignore-tests "node --test --test-reporter spec cloud/deploy/test/envFiles.test.mjs scripts/test/gitignore.test.mjs scripts/test/dockerignore.test.mjs 2>&1 | grep -E '^ *(✔|✖|ℹ (tests|pass|fail))'"
 
 step "7. env-files.mjs on dummy files only: dry run, copy, tighten, refusals, unknown file, move"
-SF="$(scratch secretfiles)"
+SF="$(scratch secretfiles)" || exit 1
 run dummy-secret "openssl rand -hex 16 | sed 's/^/oab-dummy-/' > \"$SF/dummy-secret\" && echo \"dummy secret written to the scratch dir (\$(wc -c < \"$SF/dummy-secret\") bytes), never shown\""
 run ef-clone "git clone -q \"file://$REPO\" \"$SF/repo\" && git -C \"$SF/repo\" log --oneline -1"
 run ef-sources "dummy_sources \"$SF/old/deploy-config\""
@@ -67,7 +67,7 @@ absent ctx-secrets "none of the dummy secrets reached the build context (grep fo
   "grep -E '/ctx/.*([.]env[-]x|notes[.]txt|/s[.]json|x[.]pem|x[.]key)' \"$DEMO_DIR/ctx-build.log\""
 run ctx-cleanup "docker image rm oab-factory-m6-ctx:dev && rm -rf \"$SF/ctx\" \"$SF/ctx.Dockerfile\""
 
-step "7. Supabase untouched (AC 13): migrations pinned to $M3_SHA, no migration or auth-config command anywhere in the demo"
+step "7. Supabase untouched (AC 13): migrations pinned by cloud/deploy/test/fixtures/migrations-pre-m6.sha256, no migration or auth-config command anywhere in the demo"
 run migrations "node --test --test-reporter spec cloud/deploy/test/migrations.test.mjs 2>&1 | grep -E '^ *(✔|✖|ℹ (tests|pass|fail))'"
 run gen-types-target "grep -n 'database.types.ts' cloud/supabase/scripts/gen-types.mjs"
 absent no-supabase-change "no migration, auth-config apply or Supabase CLI command in the demo logs (grep found none)" \

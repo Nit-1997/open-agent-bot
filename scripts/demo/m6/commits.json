@@ -1,0 +1,12 @@
+{
+  "pre-m6": "Merge branch 'fix/m5-9-scroll-flake' into revamp/integration (demo-script fixes)",
+  "6.4-base": "Merge revamp/m6-3-core-tests: M6 PR 6.3 core tests and evals without hosted code",
+  "6.4-rename": "move(cloud-agent): rename the hosted agent into cloud/agent",
+  "6.4-wiring": "move(cloud-agent): wire @oab/cloud-agent and make core hosted-free",
+  "6.5-base": "Merge revamp/m6-4-cloud-agent: M6 PR 6.4 move the hosted agent to cloud/agent",
+  "6.5-rename": "move(cloud-web): rename the web app into cloud/web",
+  "6.5-wiring": "move(cloud-web): wire @oab/cloud-web and cloud/deploy",
+  "6.6-base": "Merge revamp/m6-5-cloud-web: M6 PR 6.5 move the web app to cloud/web",
+  "6.6-rename": "move(cloud-rest): rename supabase, hosted e2e, deploy config and hosted compose into cloud/",
+  "6.6-wiring": "move(cloud-rest): wire cloud/deploy, cloud/e2e and cloud/supabase"
+}

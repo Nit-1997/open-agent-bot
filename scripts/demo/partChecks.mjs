@@ -138,8 +138,10 @@ function configProblem(line) {
   const m = /docker compose\b[^|;&]*?\sconfig(?=\s|$)/.exec(line);
   if (!m) return undefined;
   const rest = line.slice(m.index + m[0].length);
-  if (/^[^|;&]*\|\s*(?:jq -r \.name|jq_names_ports|jq_names)(?=$|[\s"';)|])/.test(rest)) return undefined;
-  return "compose config must pipe into a names-only jq filter (jq -r .name, jq_names, jq_names_ports)";
+  const piped = /^([^|;&]*)\|\s*(?:jq -r \.name|jq_names_ports|jq_names)(?=$|[\s"';)|])/.exec(rest);
+  if (!piped) return "compose config must pipe into a names-only jq filter (jq -r .name, jq_names, jq_names_ports)";
+  if (!/--no-env-resolution\b/.test(piped[1])) return "compose config must run with --no-env-resolution";
+  return undefined;
 }
 
 export function strictProblems(line, { inLib = false } = {}) {
@@ -148,6 +150,9 @@ export function strictProblems(line, { inLib = false } = {}) {
   if (/\bdocker\s+(?:container\s+)?(?:exec|logs)\b/.test(line) || /docker compose\b[^|;&]*\s(?:exec|logs)\b/.test(line))
     out.push("no docker exec or logs");
   for (const p of [inspectProblem(line, inLib), configProblem(line)]) if (p) out.push(p);
+  if (/(?:docker compose|_compose)\b[^|;&]*\sup\b[^|;&]*\s--build\b/.test(line) && !/\|\s*redact_build\b/.test(line))
+    out.push("compose up --build output goes through redact_build before it is saved");
+  if (/=\s*"?\$\(scratch\b/.test(line) && !/\|\|\s*exit 1\s*$/.test(line)) out.push("a scratch dir assignment needs || exit 1");
   if (/\bset\s+-[a-z]*x|\bset\s+-o\s+xtrace\b/.test(line)) out.push("no set -x");
   if (/(?:^|[\s;&|(])(?:env|printenv)(?=$|[\s;&|)])/.test(line) || /\b(?:export|declare)\s+-p\b/.test(line))
     out.push("no env, printenv, export -p or declare -p");

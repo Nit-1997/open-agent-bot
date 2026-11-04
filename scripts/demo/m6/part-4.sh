@@ -4,7 +4,7 @@ set -u
 
 rehearse() {
   local sha="$1" file="$2" after="$3" base old m6
-  base="$(scratch "rehearsal-$sha")"
+  base="$(scratch "rehearsal-$sha")" || exit 1
   old="$base/old"
   m6="$base/m6"
   step "4.$sha the old layout ($file at $sha) under oab-factory-m6-hosted, beside the live stack"
@@ -13,7 +13,7 @@ rehearse() {
   run "old-env-$sha" "place_old_env \"$old\""
   need "old-preflight-$sha" "preflight refused the old layout with the preview override" "preflight old_compose \"$old\" $file \"$m6\""
   if ! attempt "old-up-$sha" "the $sha layout did not come up healthy with the factory settings files (see the config check below; recorded as an amendment)" \
-    "old_compose \"$old\" $file \"$m6\" up -d --build --wait --wait-timeout 300 search renderer agent web > \"$DEMO_DIR/old-up-$sha.log\" 2>&1; rc=\$?; tail -n 6 \"$DEMO_DIR/old-up-$sha.log\"; exit \$rc"; then
+    "old_compose \"$old\" $file \"$m6\" up -d --build --wait --wait-timeout 300 search renderer agent web 2>&1 | redact_build > \"$DEMO_DIR/old-up-$sha.log\"; rc=\$?; tail -n 6 \"$DEMO_DIR/old-up-$sha.log\"; exit \$rc"; then
     [ "$after" = teardown ] || exit 1
     run "env-files-$sha" "node \"$m6/cloud/deploy/scripts/env-files.mjs\" --from \"$old/deploy-config\" --to \"$m6/cloud/deploy\" --copy"
     attempt "config-check-$sha" "the M6 config check refused these settings files (the message names the variable)" "gate7_config_check \"$m6\""
@@ -27,12 +27,22 @@ rehearse() {
   run "env-files-$sha" "node \"$m6/cloud/deploy/scripts/env-files.mjs\" --from \"$old/deploy-config\" --to \"$m6/cloud/deploy\" --copy"
   run "config-check-$sha" "gate7_config_check \"$m6\""
   run "gate7-down-$sha" "down_gate7 && docker image rm oab-factory-m6-gate7-agent"
-  run "names-$sha" "docker compose -f \"$m6/cloud/deploy/compose.hosted.yml\" --env-file \"$m6/cloud/deploy/.env-nextjs\" --profile local config --format json | jq_names"
+  run "names-$sha" "docker compose -f \"$m6/cloud/deploy/compose.hosted.yml\" --env-file \"$m6/cloud/deploy/.env-nextjs\" --profile local config --format json --no-env-resolution | jq_names"
   run "retag-$sha" "retag_rollback $sha"
+  run "old-interp-$sha" "interp_names \"$old\""
+
+  if [ "$after" = teardown ]; then
+    step "4.$sha the old web app against the new agent: switch search, renderer and agent first; the old web container stays"
+    need "agent-preflight-$sha" "preflight refused the M6 layout" "preflight new_compose \"$m6\""
+    run "switch-agent-$sha" "new_compose \"$m6\" up -d --build --wait --wait-timeout 300 search renderer agent 2>&1 | redact_build > \"$DEMO_DIR/switch-agent-$sha.log\"; rc=\$?; tail -n 6 \"$DEMO_DIR/switch-agent-$sha.log\"; exit \$rc"
+    run "old-web-kept-$sha" "docker ps --filter label=com.docker.compose.project=oab-factory-m6-hosted --format '{{.Label \"com.docker.compose.service\"}} {{.Image}} {{.CreatedAt}}' | sort"
+    run "compat-$sha" "rm -rf cloud/e2e/test-results && APP_ORIGIN=http://localhost:18300 npm run compat -w @oab/cloud-e2e > \"$DEMO_DIR/compat-$sha.log\" 2>&1; rc=\$?; grep -E '^compat:|passed|failed|teardown' \"$DEMO_DIR/compat-$sha.log\"; exit \$rc"
+    run "compat-video-$sha" "mkdir -p \"$DEMO_DIR/compat-video\" && find cloud/e2e/test-results -name '*.webm' -exec cp {} \"$DEMO_DIR/compat-video/\" \\; && ls -l \"$DEMO_DIR/compat-video\""
+  fi
 
   step "4.$sha owner step 6: switch to cloud/deploy (up -d --build from the M6 clone)"
   need "new-preflight-$sha" "preflight refused the M6 layout" "preflight new_compose \"$m6\""
-  run "switch-$sha" "new_compose \"$m6\" up -d --build --wait --wait-timeout 300 search renderer agent web > \"$DEMO_DIR/switch-$sha.log\" 2>&1; rc=\$?; tail -n 6 \"$DEMO_DIR/switch-$sha.log\"; exit \$rc"
+  run "switch-$sha" "new_compose \"$m6\" up -d --build --wait --wait-timeout 300 search renderer agent web 2>&1 | redact_build > \"$DEMO_DIR/switch-$sha.log\"; rc=\$?; tail -n 6 \"$DEMO_DIR/switch-$sha.log\"; exit \$rc"
   run "new-facts-$sha" "hosted_facts after-$sha"
   run "compare-switch-$sha" "compare_facts before-$sha after-$sha /cloud/deploy/ new"
   run "health-$sha" "curl -fsS http://127.0.0.1:18800/health && echo && curl -fsS -o /dev/null -w 'web /login %{http_code}\n' http://localhost:18300/login"
@@ -54,13 +64,13 @@ rehearse() {
 
   step "4.$sha switch forward again; this stack stays up for part 5"
   need "forward-preflight-$sha" "preflight refused the M6 layout" "preflight new_compose \"$m6\""
-  run "forward-$sha" "new_compose \"$m6\" up -d --build --wait --wait-timeout 300 search renderer agent web > \"$DEMO_DIR/forward-$sha.log\" 2>&1; rc=\$?; tail -n 6 \"$DEMO_DIR/forward-$sha.log\"; exit \$rc"
+  run "forward-$sha" "new_compose \"$m6\" up -d --build --wait --wait-timeout 300 search renderer agent web 2>&1 | redact_build > \"$DEMO_DIR/forward-$sha.log\"; rc=\$?; tail -n 6 \"$DEMO_DIR/forward-$sha.log\"; exit \$rc"
   run "forward-facts-$sha" "hosted_facts forward-$sha && compare_facts rollback-$sha forward-$sha /cloud/deploy/ new"
   remember m6-clone "$m6"
 }
 
 rehearse c1c0f4e docker-compose.yml teardown
-rehearse 4879d41 compose.hosted.yml keep
+rehearse "$PRE_M6" compose.hosted.yml keep
 
 step "4. the hosted images (AC 9): Cmd and WorkingDir, and the rotation script in the agent image"
 for svc in agent renderer web; do
