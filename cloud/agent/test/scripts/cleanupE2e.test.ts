@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain JS owner script without type declarations
-import { cleanupIntegrationUsers, cleanupTestUsers } from "../../../../supabase/scripts/cleanup-e2e.mjs";
+import { cleanupIntegrationUsers, cleanupTestUsers } from "../../../supabase/scripts/cleanup-e2e.mjs";
 // @ts-expect-error plain JS owner script without type declarations
-import { createAdmin } from "../../../../supabase/scripts/admin.mjs";
+import { createAdmin } from "../../../supabase/scripts/admin.mjs";
 import {
   emailRows,
   INTEGRATION_EMAIL_PATTERN,
   isIntegrationEmail,
   isTestEmail,
   TEST_EMAIL_PATTERN,
-} from "../../../../supabase/scripts/test-users.mjs";
+} from "../../../supabase/scripts/test-users.mjs";
 
 const URL_BASE = "https://stub.supabase.test";
 const UUID = "0b7c6f2e-3d4a-4e5f-8a9b-1c2d3e4f5a6b";
@@ -86,7 +86,7 @@ describe("integration test user email pattern", () => {
   });
 });
 
-describe("supabase/scripts/cleanup-e2e.mjs", () => {
+describe("cloud/supabase/scripts/cleanup-e2e.mjs", () => {
   it("never touches oab-test users in default mode", async () => {
     const calls = stubSupabase(
       [

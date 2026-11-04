@@ -98,7 +98,7 @@ Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`,
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): setup, checks, the code layout, the Mac app, tests and evals on the local stack, and how to add a tool.
 - [docs/RELEASING.md](docs/RELEASING.md): how a release is made (owner only).
-- [docs/hosted.md](docs/hosted.md): the invite-only hosted deployment (Supabase, Vercel, EC2), its end-to-end checks and evals.
+- [cloud/README.md](cloud/README.md): the invite-only hosted deployment (Supabase, Vercel, EC2), its end-to-end checks and evals.
 - Report security issues as described in [SECURITY.md](SECURITY.md).
 
 ## Safety rails

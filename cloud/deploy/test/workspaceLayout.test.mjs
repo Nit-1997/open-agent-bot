@@ -31,7 +31,7 @@ describe("cloud workspace layout", () => {
   const cloud = all.filter((ws) => ws.startsWith("cloud/"));
 
   it("finds the cloud workspaces through the cloud/* entry", () => {
-    for (const ws of ["cloud/agent", "cloud/web", "cloud/deploy"]) assert.ok(cloud.includes(ws), ws);
+    for (const ws of ["cloud/agent", "cloud/web", "cloud/deploy", "cloud/e2e"]) assert.ok(cloud.includes(ws), ws);
     assert.ok(all.includes("packages/core") && all.includes("e2e"));
   });
 
@@ -61,6 +61,12 @@ describe("cloud workspace layout", () => {
       const range = json(`${ws}/package.json`).dependencies?.["@oab/shared"];
       if (range !== undefined) assert.equal(range, version, ws);
     }
+  });
+
+  it("@oab/cloud-e2e's test script runs its unit tests only, never Playwright or Supabase", () => {
+    const { scripts } = json("cloud/e2e/package.json");
+    assert.equal(scripts.test, "node --test --disable-warning=ExperimentalWarning support/*.test.ts scripts/auth-probes.test.ts");
+    assert.doesNotMatch(scripts.test, /playwright|supabase|smoke/);
   });
 
   it("the lockfile has an entry for every cloud workspace", () => {

@@ -22,7 +22,7 @@ export function readEnvFile(path: string): Record<string, string> {
 
 function need(env: Record<string, string | undefined>, name: string): string {
   const v = env[name]?.trim();
-  if (!v) throw new Error(`evals need ${name} (deploy-config/.env-agent or deploy-config/env-files/.env-supabase-admin)`);
+  if (!v) throw new Error(`evals need ${name} (cloud/deploy/.env-agent or cloud/deploy/env-files/.env-supabase-admin)`);
   return v;
 }
 
@@ -30,8 +30,8 @@ const AUTH = { persistSession: false, autoRefreshToken: false, detectSessionInUr
 
 export async function evalAuth(repoRoot: string, env: NodeJS.ProcessEnv = process.env): Promise<AuthHeaders> {
   const merged = {
-    ...readEnvFile(resolve(repoRoot, "deploy-config/.env-agent")),
-    ...readEnvFile(resolve(repoRoot, "deploy-config/env-files/.env-supabase-admin")),
+    ...readEnvFile(resolve(repoRoot, "cloud/deploy/.env-agent")),
+    ...readEnvFile(resolve(repoRoot, "cloud/deploy/env-files/.env-supabase-admin")),
     ...env,
   };
   const url = need(merged, "SUPABASE_URL");

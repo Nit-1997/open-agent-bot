@@ -4,18 +4,18 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `e2e`, and the hosted `cloud/agent`, `cloud/web`, `cloud/deploy`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `e2e`, and the hosted `cloud/agent`, `cloud/web`, `cloud/e2e`, `cloud/deploy`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
 ```
 
-To run the local stack, follow the [README](README.md); the hosted stack (Supabase, web app, Caddy) is in [docs/hosted.md](docs/hosted.md). To work on one side of the hosted stack, run the other in Docker and point at it:
+To run the local stack, follow the [README](README.md); the hosted stack (Supabase, web app, Caddy) is in [cloud/README.md](cloud/README.md). To work on one side of the hosted stack, run the other in Docker and point at it:
 
-- Agent: `cd cloud/agent && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table in docs/hosted.md). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
-- Web: `cd cloud/web && set -a && . ../../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
+- Agent: `cd cloud/agent && npm run build && set -a && . ../deploy/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table in cloud/README.md). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
+- Web: `cd cloud/web && set -a && . ../deploy/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
-Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" in docs/hosted.md). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
+Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" in cloud/README.md). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
 
 ## Checks
 
@@ -30,7 +30,8 @@ CI runs these on every pull request. Run them from the repo root before you push
 | `@oab/local-web` | `npm run lint -w @oab/local-web && npm run format:check -w @oab/local-web && npm run typecheck -w @oab/local-web && npm test -w @oab/local-web && npm run build -w @oab/local-web` (the Vite build lands in `packages/local-web/dist/`, which the local agent serves) |
 | `@oab/cloud-agent` | `npm run lint -w @oab/cloud-agent && npm run format:check -w @oab/cloud-agent && npm run typecheck -w @oab/cloud-agent && npm test -w @oab/cloud-agent && npm run build -w @oab/cloud-agent` (the hosted agent; unit tests only) |
 | `@oab/cloud-web` | `npm run lint -w @oab/cloud-web && npm run format:check -w @oab/cloud-web && npm run typecheck -w @oab/cloud-web && npm test -w @oab/cloud-web && npm run build -w @oab/cloud-web` (the hosted Next.js app; Vercel builds it from Root Directory `cloud/web`) |
-| `@oab/cloud-deploy` | `npm run lint -w @oab/cloud-deploy && npm run format:check -w @oab/cloud-deploy && npm test -w @oab/cloud-deploy` (hosted layout checks: cloud workspaces and Dockerfiles) |
+| `@oab/cloud-e2e` | `npm run lint -w @oab/cloud-e2e && npm run format:check -w @oab/cloud-e2e && npm run typecheck -w @oab/cloud-e2e && npm test -w @oab/cloud-e2e` (the hosted Playwright specs; `test` runs only the unit tests, never a browser) |
+| `@oab/cloud-deploy` | `npm run lint -w @oab/cloud-deploy && npm run format:check -w @oab/cloud-deploy && npm test -w @oab/cloud-deploy` (hosted deploy checks: cloud workspaces and Dockerfiles, the hosted compose file against its `6986a4c` baseline, preflight, the `local/` twins, migrations pinned to `4879d41`, the hosted docs and `scripts/env-files.mjs`) |
 | root | `npm run lint:scripts && npm run format:check:scripts` (Biome over `scripts/**/*.mjs`, also run by the root `lint` and `format:check`) and `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, and the unique-id scan over `packages/ui/src`, `packages/local-web/src` and `apps/desktop/src/screens`; `node scripts/ids-static.mjs` prints `ids: N/N`; `cloud/web/test/idsStatic.test.ts` scans those plus `cloud/web/app` and `cloud/web/components`) |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `cloud/agent/test/supabase/` run against the real Supabase project with `npm run test:supabase -w @oab/cloud-agent`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
@@ -85,7 +86,7 @@ APP_ORIGIN=http://127.0.0.1:18330 npm run local -w e2e
 
 Remove the test stack and its volumes afterwards with `docker compose -p oab-e2e down -v`.
 
-`npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` (from `packages/core`, with `COPILOTKIT_TELEMETRY_DISABLED=true`) runs the scenarios in `packages/core/evals/scenarios/` against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. Live runs cost money; `--only a,b` and `--runs N` keep them small. `local` is core's only target; the signed-in `--target hosted` runs from `cloud/agent` (docs/hosted.md "Evals").
+`npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` (from `packages/core`, with `COPILOTKIT_TELEMETRY_DISABLED=true`) runs the scenarios in `packages/core/evals/scenarios/` against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. Live runs cost money; `--only a,b` and `--runs N` keep them small. `local` is core's only target; the signed-in `--target hosted` runs from `cloud/agent` (cloud/README.md "Evals").
 
 ## Mac app
 
@@ -221,7 +222,7 @@ packages/shared/src/   the @oab/shared package: schemas used by both agent and w
                        country (onboarding.ts), flights, list and search types (lists.ts), shell URL parsing
                        (routes.ts); import as `@oab/shared/<file>`; relative imports use the .ts extension
                        (`tsc -b` rewrites them); the agent runs the built dist, web and tests read the source
-supabase/
+cloud/supabase/
   migrations/          SQL applied in order with the Supabase MCP (file name = recorded version)
   scripts/             configure-auth (auth config as code), bootstrap-admin, dev-link, cleanup-e2e
   templates/           invite and magic-link email templates
@@ -277,8 +278,11 @@ cloud/agent/src/       the @oab/cloud-agent package: the hosted (Supabase) imple
   scripts/             operator scripts run inside the container (rotateCredentials.ts)
 cloud/agent/test/      the hosted tests and their harness (fixtures/hostedApp.ts wraps core's makeApp); evals/run.ts
                        registers --target hosted on core's evals runner
-e2e/                   Playwright checks: the local stack (see "End-to-end tests and evals on the local stack"), the Mac
-                       app (playwright.desktop.config.ts) and the hosted preview (docs/hosted.md "End-to-end demo")
+e2e/                   Playwright checks: the local stack (see "End-to-end tests and evals on the local stack") and the Mac
+                       app (playwright.desktop.config.ts); support/ also holds origin.ts and onboarding.ts for cloud/e2e
+cloud/e2e/             the @oab/cloud-e2e package: hosted preview Playwright specs (the "End-to-end demo" section of cloud/README.md)
+cloud/deploy/          the @oab/cloud-deploy package: the hosted compose file and its preview override, caddy/, litellm/,
+                       renderer/, searxng/, env.examples/, scripts/env-files.mjs and the hosted deploy tests
 scripts/release/       one script per release step (gate, image checks, index and lock checks, notes, sums, dry run);
                        release.yml and the dry run call only these, and scripts/test/ tests each one
 scripts/docs/          the docs-commands extractor, its manifest (doc-commands.json), the scratch-clone runner and
@@ -342,7 +346,7 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 - Code explains itself through names. Add a comment only for a non-obvious reason.
 - Every rendered HTML element in `cloud/web/` and `packages/ui/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
 - Context for an agent run goes through `useThreadContext` (scoped to one chat's agent). `useAgentContext` is blocked by lint because it reaches every mounted chat.
-- Keys are added in the app and stored encrypted by the agent. Settings live in `deploy-config/.env-*` and `deploy-config/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `deploy-config/env.examples/`.
+- Keys are added in the app and stored encrypted by the agent. Settings live in `cloud/deploy/.env-*` and `cloud/deploy/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `cloud/deploy/env.examples/`. Move them from an older checkout with `cloud/deploy/scripts/env-files.mjs` (see cloud/README.md).
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.
 - **Base pins.** The Playwright base image (the `v<x>-noble` tag with its `@sha256:` digest, as in the Node 24 command above) is the same everywhere it appears (the agent Dockerfile, the workflows, this file, the README, `docs/` and `scripts/`), and `<x>` equals the `playwright` pin in `packages/core/package.json` and `@playwright/test` in `e2e/package.json`; the SearXNG base is pinned by digest, and no workflow image runs without a digest. `scripts/test/basePins.test.mjs` enforces it, so a base change is one PR that updates all of them.
 - **Docs commands.** Every line in a fenced `bash`, `sh` or `zsh` block of `README.md` and `docs/INSTALL.md` must be listed in `scripts/docs/doc-commands.json` with its mode (`run`, `env`, `subst` with the named substitutions, or `owner` with a reason); `scripts/test/docCommands.test.mjs` fails on a missing or stale entry. After a release dry run, `node scripts/docs/run-doc-commands.mjs --scratch "$(mktemp -d)" --release-dir <dry-run out> --log <file> --tsv <file> --branch <your branch>` runs them in a scratch clone of the committed branch (scratch `HOME` and Docker config, project `oab-factory-m5-clone` on port 18520). Keep other docs' commands in inline code or non-shell blocks.

@@ -69,8 +69,10 @@ describe("hosted env split", () => {
     );
   });
 
-  it("the hosted support files take ROOT, AUTH_DIR and scriptEnv from hostedEnv", () => {
-    for (const path of ["global-setup.ts", "support/admin.ts", "support/state.ts", "support/users.ts"])
-      assert.ok(importsHostedEnv(path), path);
+  it("holds only local and desktop files", () => {
+    assert.deepEqual(
+      walk(E2E).filter((path) => !LOCAL.test(path) && path !== "support/cloudImports.test.ts"),
+      [],
+    );
   });
 });

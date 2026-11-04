@@ -13,6 +13,7 @@ COPY apps/desktop/package.json apps/desktop/
 COPY e2e/package.json e2e/
 COPY cloud/agent/package.json cloud/agent/
 COPY cloud/deploy/package.json cloud/deploy/
+COPY cloud/e2e/package.json cloud/e2e/
 COPY cloud/web/package.json cloud/web/
 RUN npm ci -w @oab/cloud-web --include-workspace-root
 COPY packages/shared ./packages/shared
@@ -24,7 +25,7 @@ ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" && test -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
-  || { echo "Build with --env-file deploy-config/.env-nextjs so the NEXT_PUBLIC_SUPABASE_* build args are set" >&2; exit 1; }
+  || { echo "Build with --env-file cloud/deploy/.env-nextjs so the NEXT_PUBLIC_SUPABASE_* build args are set" >&2; exit 1; }
 RUN npm run build -w @oab/cloud-web
 
 FROM node:22-slim

@@ -14,6 +14,7 @@ COPY apps/desktop/package.json apps/desktop/
 COPY e2e/package.json e2e/
 COPY cloud/agent/package.json cloud/agent/
 COPY cloud/deploy/package.json cloud/deploy/
+COPY cloud/e2e/package.json cloud/e2e/
 COPY cloud/web/package.json cloud/web/
 RUN npm ci -w @oab/cloud-agent -w @oab/core -w @oab/shared -w @oab/bff --include-workspace-root
 RUN grep -q "closeAllConnections() { }" node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-chatgpt.js

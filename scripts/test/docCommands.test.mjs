@@ -99,8 +99,8 @@ describe("manifest", () => {
     assert.deepEqual(r.extra, ["docs/INSTALL.md: echo gone"]);
   });
   it("refuses entries for files outside the covered set", () => {
-    const m = { commands: [{ file: "docs/hosted.md", command: "echo x", mode: "owner", reason: "x" }] };
-    assert.deepEqual(coverage([], m, COVERED_FILES).extra, ["docs/hosted.md: echo x"]);
+    const m = { commands: [{ file: "docs/other.md", command: "echo x", mode: "owner", reason: "x" }] };
+    assert.deepEqual(coverage([], m, COVERED_FILES).extra, ["docs/other.md: echo x"]);
   });
   for (const [name, entry, want] of [
     ["unknown mode", { mode: "maybe" }, /unknown mode maybe/],
@@ -778,8 +778,7 @@ describe("guide checks", () => {
   });
   it("has no raw HTML outside code", () => {
     assert.deepEqual(htmlProblems(INSTALL), []);
-    for (const f of ["README.md", "docs/RELEASING.md", "docs/hosted.md", "SECURITY.md", "CONTRIBUTING.md"])
-      assert.deepEqual(htmlProblems(read(f)), [], f);
+    for (const f of ["README.md", "docs/RELEASING.md", "SECURITY.md", "CONTRIBUTING.md"]) assert.deepEqual(htmlProblems(read(f)), [], f);
     assert.deepEqual(htmlProblems(fixture("html-in-code.md")), []);
     assert.deepEqual(htmlProblems(fixture("html.md")), ['line 3: <div id="x">', "line 3: </div>"]);
   });
@@ -959,61 +958,10 @@ describe("README first screen", () => {
 });
 
 describe("hosted docs moved out of the README", () => {
-  const HOSTED = read("docs/hosted.md");
-  const moved = [
-    "Run the hosted stack",
-    "Deploy",
-    "Optional: Ollama in Docker",
-    "Optional: LiteLLM gateway",
-    "Settings reference",
-    "End-to-end demo",
-    "Evals",
-  ];
-  it("says what it is and where it goes in M6", () => {
-    assert.equal(linesOf(HOSTED)[0].startsWith("# "), true);
-    assert.ok(HOSTED.includes("This is the invite-only hosted deployment. It moves to `cloud/README.md` in M6."));
-  });
-  it("holds every hosted heading that left the README", () => {
-    for (const h of moved) {
-      assert.match(HOSTED, new RegExp(`^#{2,3} ${h}$`, "m"), `docs/hosted.md lacks ${h}`);
-      assert.doesNotMatch(README, new RegExp(`^#{2,3} ${h}$`, "m"), `README still has ${h}`);
-    }
-  });
-  it("keeps the hosted text verbatim", () => {
-    for (const s of [
-      "Every hosted command needs `-f compose.hosted.yml`",
-      "`docker compose -f compose.hosted.yml --env-file deploy-config/.env-nextjs --profile local up -d --build`",
-      "`docker compose -f compose.hosted.yml cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt",
-      "`CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose -f compose.hosted.yml up -d --build`",
-      "`docker compose -f compose.hosted.yml --profile ollama up -d`",
-      "`docker compose -f compose.hosted.yml exec agent node dist/scripts/rotateCredentials.js`",
-      "npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w e2e",
-      "`cd cloud/agent && COPILOTKIT_TELEMETRY_DISABLED=true npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5`",
-    ])
-      assert.ok(HOSTED.includes(s), `docs/hosted.md lacks ${s}`);
-  });
-  it("targets the hosted project in every compose command", () => {
-    const prose = linesOf(HOSTED)
-      .filter((l) => !l.startsWith("> **Warning.**"))
-      .join("\n");
-    const spans = [
-      ...[...prose.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]),
-      ...extractCommands(HOSTED, "docs/hosted.md").map((c) => c.command),
-    ];
-    const compose = spans.filter((c) => /\bdocker compose\b/.test(c));
-    assert.ok(compose.length >= 6);
-    for (const c of compose)
-      assert.ok(
-        c.includes("-f compose.hosted.yml") ||
-          /docker compose -p oab-/.test(c) ||
-          c === "docker compose config --format json | jq -r .name",
-        `untargeted: ${c}`,
-      );
-  });
-  it("leaves no hosted command in the README and links docs/hosted.md once", () => {
-    for (const s of ["compose.hosted.yml", "SUPABASE_", "deploy-config/.env-agent", "app.localhost"])
+  it("leaves no hosted command in the README and links cloud/README.md once", () => {
+    for (const s of ["compose.hosted.yml", "SUPABASE_", ".env-agent", "app.localhost"])
       assert.ok(!README.includes(s), `README still names ${s}`);
-    assert.equal(README.split("(docs/hosted.md)").length - 1, 1);
+    assert.equal(README.split("(cloud/README.md)").length - 1, 1);
   });
 });
 
@@ -1086,8 +1034,8 @@ describe("CONTRIBUTING", () => {
     const layout = C.slice(C.indexOf("## Layout"));
     for (const s of ["scripts/release/", "scripts/docs/", "scripts/demo/"]) assert.ok(layout.includes(s), `Layout lacks ${s}`);
   });
-  it("points at docs/hosted.md for the hosted stack, not the README", () => {
-    assert.ok(C.includes("(docs/hosted.md)"));
+  it("points at cloud/README.md for the hosted stack, not the README", () => {
+    assert.ok(C.includes("(cloud/README.md)"));
     assert.ok(!/README[^\n]*(reference table|"End-to-end demo"|\*\*Run\*\*)/.test(C));
   });
 });

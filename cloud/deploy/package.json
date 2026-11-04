@@ -12,7 +12,7 @@
     "lint": "biome lint",
     "format": "biome format --write",
     "format:check": "biome format",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3"

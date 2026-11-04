@@ -59,7 +59,7 @@ The root `docker-compose.yml` runs Open Agent for one person on their own comput
 
 ## Hosted service
 
-The invite-only hosted deployment (setup in `docs/hosted.md`). This section moves to `cloud/SECURITY.md` with the hosted code.
+The invite-only hosted deployment (setup in `cloud/README.md`). This section moves to `cloud/SECURITY.md` with the hosted code.
 
 ### Threat model
 

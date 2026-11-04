@@ -11,21 +11,14 @@
     "lint": "biome check",
     "format": "biome format --write",
     "format:check": "biome format",
-    "test": "node --test --disable-warning=ExperimentalWarning support/*.test.ts scripts/*.test.ts",
-    "e2e": "playwright test --project=desktop --project=tablet --project=phone",
-    "smoke": "playwright test --project=smoke",
-    "m1": "playwright test --project=preview-m1",
-    "m2": "playwright test --project=preview-m2",
-    "demo": "npm run e2e && node scripts/make-demo.mjs",
+    "test": "node --test --disable-warning=ExperimentalWarning support/*.test.ts scripts/local-probes.test.ts",
     "local": "playwright test -c playwright.local.config.ts --project=local --grep-invert @after-restart",
     "local:after-restart": "playwright test -c playwright.local.config.ts --project=local --grep @after-restart",
     "local:demo": "playwright test -c playwright.local.config.ts --project=local-demo"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
-    "@supabase/supabase-js": "2.118.0",
     "@types/node": "^22.20.5",
-    "axe-core": "4.13.0",
     "typescript": "^5"
   }
 }

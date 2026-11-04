@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain JS owner script without type declarations
-import { createAdmin } from "../../../../supabase/scripts/admin.mjs";
+import { createAdmin } from "../../../supabase/scripts/admin.mjs";
 import { DELETE_STEPS, type DeleteStep } from "../../src/admin/deleteAccount.js";
 import { BOB } from "../fixtures/users.js";
 
@@ -12,7 +12,7 @@ const STEP_OF: Array<[RegExp, DeleteStep]> = [
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("supabase/scripts/admin.mjs deleteUser", () => {
+describe("cloud/supabase/scripts/admin.mjs deleteUser", () => {
   it("deletes in the same order as the agent's deleteAccount", async () => {
     const calls: Array<{ line: string; params: URLSearchParams; body: unknown }> = [];
     let listed = 0;

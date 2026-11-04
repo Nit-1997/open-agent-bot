@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain JS owner script without type declarations
-import { countTestUsers, formatCounts } from "../../../../supabase/scripts/count-test-users.mjs";
+import { countTestUsers, formatCounts } from "../../../supabase/scripts/count-test-users.mjs";
 
 const URL_BASE = "https://stub.supabase.test";
 
@@ -25,7 +25,7 @@ function stubSupabase(authPages: string[][], tables: Record<string, number>, row
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("supabase/scripts/count-test-users.mjs", () => {
+describe("cloud/supabase/scripts/count-test-users.mjs", () => {
   it("counts only oab-e2e test users across auth and the email tables", async () => {
     const seen = stubSupabase(
       [["oab-e2e+shell@example.test", "owner@gmail.com", "oab-e2e+other@example.test", "x-oab-e2e+a@example.test"]],
