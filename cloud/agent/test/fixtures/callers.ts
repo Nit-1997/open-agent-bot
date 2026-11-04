@@ -56,6 +56,6 @@ export function matrixSeams(): IdentitySeams {
       if (id === DEACTIVATED.id) return "deactivated";
       return KNOWN.some((u) => u.id === id) ? "active" : undefined;
     },
-    isLiveAdmin: async (u) => (live.get(u.id) ?? (async () => u.capabilities.admin))(),
+    isLiveAdmin: async (id) => (live.get(id) ?? (async () => !!KNOWN.find((u) => u.id === id)?.capabilities.admin))(),
   };
 }

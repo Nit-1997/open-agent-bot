@@ -169,7 +169,8 @@ export class FakeAccounts {
 export type IdentitySeams = {
   verify?: Verifier;
   statusOf?: (id: string) => Promise<UserStatus | undefined>;
-  isLiveAdmin?: (u: Principal) => Promise<boolean>;
+  isLiveAdmin?: (userId: string) => Promise<boolean>;
+  onDemoted?: (userId: string) => Promise<void>;
 };
 
 export type HostedOverrides = Omit<AppOverrides, "identity" | "routes"> & {
@@ -193,8 +194,15 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
   };
   const verify = seams?.verify ?? fakeVerify;
   const status = new UserStatusCache(seams?.statusOf ?? ((id) => accounts.repo().users.status(id)));
-  const isLiveAdmin = seams?.isLiveAdmin ?? (async (u: Principal) => !!accounts.users.get(u.id)?.account.isAdmin);
-  const identity = createSupabaseIdentity({ serviceSecret: TEST_SECRET, verify, status });
+  const liveAdmin = seams?.isLiveAdmin ?? (async (id: string) => !!accounts.users.get(id)?.account.isAdmin);
+  const demoted: string[] = [];
+  const identity = createSupabaseIdentity({
+    serviceSecret: TEST_SECRET,
+    verify,
+    status,
+    liveAdmin,
+    onDemoted: seams?.onDemoted ?? (async (id) => void demoted.push(id)),
+  });
   const limiter = appOver.limiter ?? new RateLimiter();
   const admin = createAdminService({
     repo: accounts.repo(),
@@ -216,11 +224,11 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
   const routes = hostedRoutes({
     access: accessOver ?? access,
     admin,
-    adminGuard: createAdminGuard({ isLiveAdmin }),
+    adminGuard: createAdminGuard({ isLiveAdmin: (u) => liveAdmin(u.id), roleUnverified: identity.roleUnverified }),
     limiter,
     usage,
     adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users, signupMode),
   });
   const h = await makeApp({ ...appOver, limiter, identity, routes });
-  return { ...h, accounts, status, queue, usage };
+  return { ...h, accounts, status, queue, usage, demoted };
 }

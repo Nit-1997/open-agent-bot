@@ -6,10 +6,12 @@ import type { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import type { AgentDeps, CoreHandles } from "@oab/core/startAgent.js";
 import { createAccessService } from "./access/service.js";
 import { createAuthAdmin } from "./admin/authAdmin.js";
-import { type AccountHooks, createAdminService, createLiveAdminCheck } from "./admin/service.js";
+import { type AccountHooks, createAdminService } from "./admin/service.js";
 import type { HostedConfig } from "./config.js";
 import { hostedGateway } from "./gateway.js";
 import { createAdminGuard } from "./identity/adminGuard.js";
+import { createDemotionHook } from "./identity/demotion.js";
+import { LiveRoleCache } from "./identity/liveRole.js";
 import { UserStatusCache } from "./identity/status.js";
 import { createSupabaseIdentity } from "./identity/supabaseIdentity.js";
 import { createVerifier } from "./identity/verify.js";
@@ -35,7 +37,7 @@ export const adminHooks = (status: Pick<UserStatusCache, "invalidate">, core: Pi
   },
 });
 
-export type HostedSeams = { identity?: Identity; usage?: UsageRepo };
+export type HostedSeams = { identity?: Identity; usage?: UsageRepo; liveRole?: LiveRoleCache };
 
 export type HostedAgent = { deps: AgentDeps; status: UserStatusCache; usage: UsageRepo };
 
@@ -59,9 +61,18 @@ export function hostedAgentDeps(
 ): HostedAgent {
   const adminRepo = createAdminRepo(clients.db);
   const status = new UserStatusCache((id) => adminRepo.users.status(id));
-  const identity = seams.identity ?? createSupabaseIdentity({ serviceSecret: cfg.serviceSecret, verify: createVerifier(cfg), status });
-  if (identity.kind !== "hosted") throw new Error(`the hosted agent needs a hosted identity, got "${identity.kind}"`);
   const authAdmin = createAuthAdmin({ service: clients.db, anon: clients.anon, appOrigin: cfg.appOrigin });
+  const liveRole = seams.liveRole ?? new LiveRoleCache(authAdmin);
+  const demotion = createDemotionHook();
+  const hostedIdentity = createSupabaseIdentity({
+    serviceSecret: cfg.serviceSecret,
+    verify: createVerifier(cfg),
+    status,
+    liveAdmin: (id) => liveRole.isAdmin(id),
+    onDemoted: (id) => demotion.notify(id),
+  });
+  const identity = seams.identity ?? hostedIdentity;
+  if (identity.kind !== "hosted") throw new Error(`the hosted agent needs a hosted identity, got "${identity.kind}"`);
 
   const usage = seams.usage ?? createUsageRepo(clients.db, { caps: { perMonth: cfg.limits.perMonth, perHour: cfg.limits.perHour } });
   const humanCheck = humanCheckOff;
@@ -83,8 +94,10 @@ export function hostedAgentDeps(
     gateway: hostedGateway(cfg),
     host: "0.0.0.0",
     runPolicy: ({ limiter }) => policyFor(limiter),
-    routes: (core) =>
-      hostedRoutes({
+    routes: (core) => {
+      const hooks = adminHooks(status, core);
+      demotion.bind(hooks.onDisabled);
+      return hostedRoutes({
         access: createAccessService({
           pepper: cfg.accessRequestPepper,
           limiter: core.limiter,
@@ -95,8 +108,8 @@ export function hostedAgentDeps(
             return r.ok ? {} : { code: r.code };
           },
         }),
-        admin: createAdminService({ repo: adminRepo, auth: authAdmin, hooks: adminHooks(status, core) }),
-        adminGuard: createAdminGuard({ isLiveAdmin: createLiveAdminCheck(authAdmin) }),
+        admin: createAdminService({ repo: adminRepo, auth: authAdmin, hooks }),
+        adminGuard: createAdminGuard({ isLiveAdmin: (user) => liveRole.isAdmin(user.id), roleUnverified: hostedIdentity.roleUnverified }),
         limiter: core.limiter,
         usage: { usage, policy: policyFor(core.limiter), limits: cfg.limits, humanCheck, limiter: core.limiter },
         adminUsage: {
@@ -106,7 +119,8 @@ export function hostedAgentDeps(
           profiles: adminRepo.users,
           signupMode: async () => "waitlist",
         },
-      }),
+      });
+    },
   };
   return { deps, status, usage };
 }

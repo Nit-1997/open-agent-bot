@@ -44,6 +44,8 @@ async function capabilitiesFor(metadata: Record<string, unknown>) {
     serviceSecret: TEST_SECRET,
     verify: createVerifier({ supabaseUrl: URL_BASE }, { fetch: jwksFetch }),
     status: new UserStatusCache(async () => "active"),
+    liveAdmin: async () => true,
+    onDemoted: async () => {},
   });
   const outcome = await identity.authenticate(
     new Request("http://agent/chats", { headers: { authorization: `Bearer ${await sign(metadata)}` } }),
@@ -53,7 +55,7 @@ async function capabilitiesFor(metadata: Record<string, unknown>) {
 }
 
 describe("hostedCapabilities", () => {
-  it("grants all three to an admin claim and none otherwise", () => {
+  it("grants all three to an effective admin and none otherwise", () => {
     expect(hostedCapabilities(true)).toEqual(ALL);
     expect(hostedCapabilities(false)).toEqual(NO_CAPABILITIES);
   });
@@ -66,7 +68,7 @@ describe("hostedCapabilities", () => {
   });
 });
 
-describe("hosted identity capabilities from the access token", () => {
+describe("hosted identity capabilities from the access token and a passing live check", () => {
   it("grants all three for app_metadata.role admin", async () => {
     const caps = await capabilitiesFor({ app_metadata: { role: "admin" } });
     expect(caps).toEqual(ALL);

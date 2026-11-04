@@ -1,21 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthAccount, AuthAdmin } from "../../src/admin/authAdmin.js";
+import type { AuthAdmin } from "../../src/admin/authAdmin.js";
 import { createAuthAdmin } from "../../src/admin/authAdmin.js";
 import { DELETE_STEPS, deleteAccount } from "../../src/admin/deleteAccount.js";
-import { createAdminService, createLiveAdminCheck } from "../../src/admin/service.js";
+import { createAdminService } from "../../src/admin/service.js";
 import { createAnonClient, createServiceClient } from "../../src/store/client.js";
 import { FakeAccounts } from "../fixtures/hostedApp.js";
 import { ADMIN, ALICE, BOB } from "../fixtures/users.js";
-
-const account = (over: Partial<AuthAccount> = {}): AuthAccount => ({
-  id: ADMIN.id,
-  email: ADMIN.email,
-  isAdmin: true,
-  bannedUntil: null,
-  lastSignInAt: null,
-  providers: ["google"],
-  ...over,
-});
 
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -23,35 +13,6 @@ beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
 afterEach(() => vi.restoreAllMocks());
-
-describe("createLiveAdminCheck", () => {
-  it("caches the answer per user for 30 s, then asks again", async () => {
-    let now = 1_000_000;
-    const getUser = vi.fn(async () => account());
-    const check = createLiveAdminCheck({ getUser }, () => now);
-    expect(await check(ADMIN)).toBe(true);
-    now += 29_999;
-    expect(await check(ADMIN)).toBe(true);
-    expect(getUser).toHaveBeenCalledTimes(1);
-    now += 1;
-    getUser.mockResolvedValueOnce(account({ isAdmin: false }));
-    expect(await check(ADMIN)).toBe(false);
-    expect(getUser).toHaveBeenCalledTimes(2);
-    expect(await check(ALICE)).toBe(true);
-    expect(getUser).toHaveBeenCalledTimes(3);
-  });
-
-  it("denies a banned admin until the ban runs out, and missing or member accounts", async () => {
-    let now = Date.parse("2026-11-01T00:00:00Z");
-    const getUser = vi.fn(async () => account({ bannedUntil: "2026-11-01T01:00:00Z" }));
-    const check = createLiveAdminCheck({ getUser }, () => now);
-    expect(await check(ADMIN)).toBe(false);
-    now = Date.parse("2026-11-01T01:00:00Z");
-    expect(await check(ADMIN)).toBe(true);
-    expect(await createLiveAdminCheck({ getUser: async () => undefined })(ADMIN)).toBe(false);
-    expect(await createLiveAdminCheck({ getUser: async () => account({ isAdmin: false }) })(ADMIN)).toBe(false);
-  });
-});
 
 function authWith(reply: (url: URL, init: RequestInit) => Response) {
   const calls: string[] = [];
