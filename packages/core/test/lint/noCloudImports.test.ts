@@ -11,6 +11,8 @@ const blocked = [
   'export * from "../cloud/x";\n',
   'import x from "@oab/cloud";\nexport default x;\n',
   'import x from "@oab/cloud/agent";\nexport default x;\n',
+  'import x from "@oab/cloud-web";\nexport default x;\n',
+  'export const load = () => import("@oab/cloud-agent/store.js");\n',
 ];
 
 const allowed = [
@@ -18,6 +20,7 @@ const allowed = [
   'import x from "./cloudinary.ts";\nexport default x;\n',
   'import x from "../clouds/x";\nexport default x;\n',
   'export const load = () => import("@google-cloud/storage");\n',
+  'import x from "@oab/cloudy";\nexport default x;\n',
 ];
 
 describe("no imports from cloud/", () => {

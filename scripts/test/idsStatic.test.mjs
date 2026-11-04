@@ -52,6 +52,19 @@ describe("static ids", () => {
     }
   });
 
+  it("skips a root that does not exist (cloud roots leave in M6)", () => {
+    const repo = mkdtempSync(join(tmpdir(), "ids-static-missing-"));
+    try {
+      mkdirSync(join(repo, "a"), { recursive: true });
+      writeFileSync(join(repo, "a/One.tsx"), `export const One = () => <div id="one" />;`);
+      const scan = scanIds({ repo, roots: ["a", "no-such-root"], allowlist: [] });
+      assert.equal(scan.elements.length, 1);
+      assert.deepEqual(scan.missing, []);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it("gives every intrinsic JSX element in the ui and web sources an id", () => {
     const { elements, missing } = scanIds({ repo: REPO, roots: ID_ROOTS, allowlist: ALLOWLIST });
     assert.deepEqual(missing, []);
