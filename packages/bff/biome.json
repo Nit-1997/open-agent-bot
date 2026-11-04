@@ -57,7 +57,9 @@
                       "**/cloud",
                       "**/cloud/**",
                       "@oab/cloud",
-                      "@oab/cloud/**"
+                      "@oab/cloud/**",
+                      "@oab/cloud-*",
+                      "@oab/cloud-*/**"
                     ],
                     "message": "packages/bff must stay framework-free: no Next, React, Supabase, ui, core, CopilotKit, Node, web or cloud imports."
                   }

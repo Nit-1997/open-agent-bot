@@ -65,7 +65,7 @@ describe("scripts lint wiring", () => {
   it("root lint and format:check run the scripts checks", () => {
     assert.equal(pkg.scripts["lint:scripts"], "biome check --config-path scripts/biome.json scripts");
     assert.equal(pkg.scripts["format:check:scripts"], "biome format --config-path scripts/biome.json scripts");
-    assert.match(pkg.scripts.lint, /&& npm run lint:scripts$/);
+    assert.match(pkg.scripts.lint, /&& npm run lint:scripts && npm run lint:boundary$/);
     assert.match(pkg.scripts["format:check"], /&& npm run format:check:scripts$/);
   });
 

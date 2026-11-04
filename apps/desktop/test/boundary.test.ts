@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ const APP = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(APP, "../..");
 
 const files = (dir: string, ext: RegExp): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : []).flatMap((e) => {
     const p = join(dir, e.name);
     if (e.isDirectory()) return e.name === "node_modules" || e.name === "dist" || e.name === ".next" ? [] : files(p, ext);
     return ext.test(e.name) ? [p] : [];

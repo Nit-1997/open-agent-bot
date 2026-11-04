@@ -23,7 +23,7 @@
           "options": {
             "patterns": [
               {
-                "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
                 "message": "Nothing outside cloud/ may import from cloud/."
               }
             ]
@@ -57,7 +57,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
                     "message": "Nothing outside cloud/ may import from cloud/."
                   },
                   {
@@ -89,7 +89,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
                     "message": "Nothing outside cloud/ may import from cloud/."
                   },
                   {
@@ -113,7 +113,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
                     "message": "Nothing outside cloud/ may import from cloud/."
                   },
                   {
@@ -141,7 +141,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
+                    "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
                     "message": "Nothing outside cloud/ may import from cloud/."
                   },
                   {

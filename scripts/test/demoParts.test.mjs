@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -163,6 +163,7 @@ describe("demo part scripts", () => {
     const demo = `.factory/m5/test-recall-${process.pid}`;
     const repo = join(PARTS_DIR, "../../..");
     const tmp = mkdtempSync(join(tmpdir(), "tmp."));
+    mkdirSync(join(repo, ".factory/m5"), { recursive: true });
     const outside = mkdtempSync(join(repo, ".factory/m5/outside-"));
     const recall = (path) =>
       spawnSync("bash", ["-c", `. scripts/demo/m5/lib.sh; printf '%s\\n' "$1" > "$DEMO_DIR/x.path"; recall x`, "part-test", path], {

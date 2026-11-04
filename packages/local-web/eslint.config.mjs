@@ -20,6 +20,10 @@ const BLOCKED = [
   "**/web",
   "**/cloud/**",
   "**/cloud",
+  "@oab/cloud",
+  "@oab/cloud/**",
+  "@oab/cloud-*",
+  "@oab/cloud-*/**",
 ];
 
 export default defineConfig([
@@ -33,7 +37,7 @@ export default defineConfig([
       "no-restricted-syntax": [
         "error",
         {
-          selector: "ImportExpression[source.value=/^(next|@supabase\\/|@oab\\/(core|bff)(\\/|$)|node:)|(^|\\/)(web|cloud)(\\/|$)/]",
+          selector: "ImportExpression[source.value=/^(next|@supabase\\/|@oab\\/(core|bff|cloud(-[\\w-]+)?)(\\/|$)|node:)|(^|\\/)(web|cloud)(\\/|$)/]",
           message: BOUNDARY,
         },
       ],

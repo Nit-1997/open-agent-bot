@@ -22,6 +22,8 @@ const BLOCKED = [
   "**/cloud",
   "@oab/cloud",
   "@oab/cloud/**",
+  "@oab/cloud-*",
+  "@oab/cloud-*/**",
   "@/*",
   "@/**",
 ];
@@ -50,7 +52,7 @@ export default defineConfig([
         "error",
         {
           selector:
-            "ImportExpression[source.value=/^(next|next\\/.*|@supabase\\/.*|@oab\\/(bff|core|cloud)(\\/.*)?|@copilotkit\\/runtime(\\/.*)?|hono(\\/.*)?|node:.*|@\\/.*)$|(^|\\/)(web|cloud)(\\/|$)/]",
+            "ImportExpression[source.value=/^(next|next\\/.*|@supabase\\/.*|@oab\\/(bff|core|cloud(-[\\w-]+)?)(\\/.*)?|@copilotkit\\/runtime(\\/.*)?|hono(\\/.*)?|node:.*|@\\/.*)$|(^|\\/)(web|cloud)(\\/|$)/]",
           message: BOUNDARY,
         },
       ],

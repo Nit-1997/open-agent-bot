@@ -89,6 +89,36 @@ jobs:
       - name: actionlint on every workflow (pinned image)
         run: npm run lint:workflows
 
+  standalone:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      TMPDIR: /home/runner/oab-tmp
+      OAB_STANDALONE_ALLOW_DELETE: "1"
+      OAB_STANDALONE_PROJECT: oab-ci-oss
+      OPEN_AGENT_PORT: "18331"
+      APP_ORIGIN: http://127.0.0.1:18331
+      OPEN_AGENT_DATA_VOLUME: oab-ci-oss-data
+      OPEN_AGENT_KEYS_VOLUME: oab-ci-oss-keys
+      OPEN_AGENT_IMAGE: oab-ci-oss-agent:dev
+      OPEN_AGENT_SEARCH_IMAGE: oab-ci-oss-search:dev
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: A private 0700 temp dir, as the desktop jobs use
+        run: mkdir -m 700 "$TMPDIR"
+      - name: Remove cloud/, then install, lint, type-check, test and build the rest; build and start the local stack; build the Mac app
+        run: bash scripts/ci/standalone.sh --docker
+
   local-stack:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04

@@ -52,6 +52,10 @@
                       "**/packages/**",
                       "**/web/**",
                       "**/cloud/**",
+                      "@oab/cloud",
+                      "@oab/cloud/**",
+                      "@oab/cloud-*",
+                      "@oab/cloud-*/**",
                       "**/e2e/**",
                       "**/node_modules/**"
                     ],
