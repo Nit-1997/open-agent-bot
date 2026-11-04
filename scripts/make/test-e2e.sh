@@ -6,7 +6,7 @@ set -euo pipefail
 PARENT="${OAB_E2E_TMP_PARENT:-${TMPDIR:-/tmp}}"
 PARENT="${PARENT%/}"
 [ -d "$PARENT" ] || { echo "make test-e2e: $PARENT does not exist; set OAB_E2E_TMP_PARENT to a private folder" >&2; exit 1; }
-if [ -n "$(find "$PARENT" -maxdepth 0 -perm -0002)" ]; then
+if [ -n "$(find -H "$PARENT" -maxdepth 0 -perm -0002)" ]; then
   echo "make test-e2e: $PARENT is writable by others (the shell refuses a docker CLI there); set OAB_E2E_TMP_PARENT to a private folder" >&2
   exit 1
 fi

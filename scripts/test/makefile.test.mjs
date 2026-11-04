@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -89,19 +89,25 @@ describe("Makefile", () => {
   });
 
   it("test-e2e refuses a world-writable temp parent before it runs npm or docker", () => {
-    const f = fakeBin();
+    const f = fakeBin({ dockerInfo: 1 });
     const open = join(WORK, `open-${n++}`);
     mkdirSync(open);
     chmodSync(open, 0o777);
-    const r = make(["test-e2e"], { bin: f.bin, env: { OAB_E2E_TMP_PARENT: open } });
-    assert.notEqual(r.status, 0, r.out);
-    assert.match(r.out, /make test-e2e: .* is writable by others/);
+    const link = join(WORK, `link-${n++}`);
+    symlinkSync(open, link);
+    for (const parent of [open, link]) {
+      const r = make(["test-e2e"], { bin: f.bin, env: { OAB_E2E_TMP_PARENT: parent } });
+      assert.notEqual(r.status, 0, r.out);
+      assert.match(r.out, /make test-e2e: .* is writable by others/);
+    }
     assert.equal(f.calls(), "");
   });
 
   it("test-e2e stops before npm with a clear error when Docker is not running", () => {
     const f = fakeBin({ dockerInfo: 1 });
-    const r = make(["test-e2e"], { bin: f.bin });
+    const parent = join(WORK, `private-${n++}`);
+    mkdirSync(parent, { mode: 0o700 });
+    const r = make(["test-e2e"], { bin: f.bin, env: { OAB_E2E_TMP_PARENT: parent } });
     assert.notEqual(r.status, 0, r.out);
     assert.match(r.out, /make test-e2e: Docker is not running/);
     assert.equal(f.calls().includes("npm"), false, f.calls());
