@@ -6,6 +6,7 @@ import type { Admission, RunTicket } from "@oab/core/policy/types.js";
 import type { HumanCheckState, Limits } from "@oab/shared/usage";
 import type { HumanCheckGate } from "../../src/signup/humanCheck.js";
 import { humanCheckOff } from "../fixtures/humanCheck.js";
+import { DeletingUsers } from "../../src/account/deleting.js";
 import { HostedRunPolicy } from "../../src/limits/policy.js";
 import { RunSlots } from "../../src/limits/slots.js";
 import { type UsageRepo, UsageRepoError } from "../../src/limits/usageRepo.js";
@@ -15,7 +16,7 @@ import { FakeUsageStore } from "./fakeUsage.js";
 const T0 = Date.parse("2026-11-04T10:00:00.000Z");
 const DEFAULTS: Limits = { runningPerUser: 1, perHour: 10, perMonth: 50, runningServer: 8 };
 
-type Setup = { limits?: Partial<Limits>; humanCheck?: HumanCheckGate; usage?: (inner: UsageRepo) => UsageRepo };
+type Setup = { limits?: Partial<Limits>; humanCheck?: HumanCheckGate; usage?: (inner: UsageRepo) => UsageRepo; deleting?: DeletingUsers };
 
 function setup(over: Setup = {}) {
   const clock = { now: T0 };
@@ -26,7 +27,15 @@ function setup(over: Setup = {}) {
   const usage = over.usage ? over.usage(repo) : repo;
   const slots = new RunSlots({ staleAfterMs: 340_000, now });
   const limiter = new RateLimiter({ now });
-  const policy = new HostedRunPolicy({ limits, usage, slots, humanCheck: over.humanCheck ?? humanCheckOff, limiter, now });
+  const policy = new HostedRunPolicy({
+    limits,
+    usage,
+    slots,
+    humanCheck: over.humanCheck ?? humanCheckOff,
+    limiter,
+    now,
+    ...(over.deleting && { deleting: over.deleting }),
+  });
   const user = (): Principal => ({ ...store.newUser(), capabilities: NO_CAPABILITIES });
   const admit = (principal: Principal, chatId = CHAT_1, runId = `r-${Math.random().toString(36).slice(2, 8)}`) =>
     policy.admit({ principal, chatId, runId });
@@ -199,6 +208,23 @@ describe("HostedRunPolicy admission", () => {
 });
 
 describe("HostedRunPolicy cheap checks before the database", () => {
+  it("refuses a user whose account is being deleted with 403 account_disabled before every other check, and others run", async () => {
+    const deleting = new DeletingUsers();
+    const human = gate("required");
+    const s = setup({ deleting, humanCheck: human });
+    const alice = s.user();
+    deleting.add(alice.id);
+    const r = refusal(await s.admit(alice));
+    expect(r.status).toBe(403);
+    expect(r.body).toMatchObject({ error: "account_disabled" });
+    expect(s.repo.calls).toBe(0);
+    expect(human.calls).toBe(0);
+    expect(s.limiter.take(`admit:${alice.id}`, { max: 60, windowMs: 600_000 })).toMatchObject({ ok: true });
+    expect(s.policy.snapshot().running).toBe(0);
+    deleting.delete(alice.id);
+    expect(codeOf(await s.admit(alice))).toBe("human_check_required");
+  });
+
   it("answers the 61st admit attempt in 10 minutes with limit_attempts and no database call", async () => {
     const s = setup({ limits: { perHour: 1000, perMonth: 1000 } });
     const alice = s.user();

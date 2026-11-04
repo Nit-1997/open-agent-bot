@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@oab/ui/components/AccountMenu.tsx";
 import { ProfileDrawer } from "@oab/ui/components/profile/ProfileDrawer.tsx";
 import { RUN_REFUSAL_CODES } from "@oab/shared/runRefusals";
+import { DeleteAccount } from "@/components/account/DeleteAccountDialog";
 import { RefusalNotice } from "@/components/usage/RefusalNotice";
 import { UsageMeter } from "@/components/usage/UsageMeter";
 import { hostedPlatform, nextRouter } from "@/lib/platform/hosted";
@@ -76,7 +77,7 @@ describe("hosted platform", () => {
     expectUniqueIds(container);
   });
 
-  it("uses native history, the given user and the hosted slots with the usage meter and the refusal notice", () => {
+  it("uses native history, the given user and the hosted slots with the usage meter, the refusal notice and the account delete", () => {
     const platform = hostedPlatform({ email: "a@b.test", name: "A", isAdmin: true });
     expect(platform.router).toBe(nextRouter);
     expect(platform.router.history).toBe(nativeHistory);
@@ -84,6 +85,7 @@ describe("hosted platform", () => {
     expect(Object.keys(platform.slots).sort()).toEqual([
       "accessDisabledNotice",
       "accountMenuExtra",
+      "profileDanger",
       "runRefusal",
       "signOut",
       "signOutEverywhere",
@@ -97,6 +99,8 @@ describe("hosted platform", () => {
     expect(member.slots.usageMeter).toBe(UsageMeter);
     expect(member.slots.runRefusal).toBe(platform.slots.runRefusal);
     expect(member.slots.accountMenuExtra).toBeUndefined();
+    expect(platform.slots.profileDanger).toBe(DeleteAccount);
+    expect(member.slots.profileDanger).toBe(DeleteAccount);
   });
 
   it("configures the API client for /api once", () => {

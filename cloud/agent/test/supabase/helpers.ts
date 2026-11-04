@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readEnvFile } from "../../evals/auth/hosted.js";
 import { createAuthAdmin } from "../../src/admin/authAdmin.js";
 import { deleteAccount } from "../../src/admin/deleteAccount.js";
+import { createUsageRepo } from "../../src/limits/usageRepo.js";
 import { createAdminRepo } from "../../src/store/admin.js";
 import { createAnonClient, createServiceClient } from "../../src/store/client.js";
 
@@ -68,7 +69,8 @@ export async function createTestUser(): Promise<TestUser> {
 }
 
 export async function deleteUser(id: string, email: string): Promise<void> {
-  await deleteAccount({ repo: adminRepo(), auth: authAdmin() }, { id, email });
+  const usage = createUsageRepo(service(), { caps: { perMonth: 1, perHour: 1 } });
+  await deleteAccount({ repo: adminRepo(), auth: authAdmin(), usage }, { id, email });
 }
 
 export function track(id: string, email: string): void {

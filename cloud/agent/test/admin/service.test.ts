@@ -4,7 +4,8 @@ import { createAuthAdmin } from "../../src/admin/authAdmin.js";
 import { DELETE_STEPS, deleteAccount } from "../../src/admin/deleteAccount.js";
 import { createAdminService } from "../../src/admin/service.js";
 import { createAnonClient, createServiceClient } from "../../src/store/client.js";
-import { FakeAccounts } from "../fixtures/hostedApp.js";
+import { DeletingUsers } from "../../src/account/deleting.js";
+import { FakeAccounts, fakeAdminService } from "../fixtures/hostedApp.js";
 import { ADMIN, ALICE, BOB } from "../fixtures/users.js";
 
 beforeEach(() => {
@@ -111,32 +112,34 @@ function recordingRemoval(failAt?: string) {
         invited: { remove: step("invited.remove") },
       },
       auth: { deleteUser: step("auth.deleteUser") },
+      usage: { tombstone: step("usage.tombstone") },
     } as unknown as Parameters<typeof deleteAccount>[0],
   };
 }
 
 describe("deleteAccount", () => {
-  it("removes files, then requests and invites, then the auth user", async () => {
+  it("writes the usage tombstone first, then removes files, requests and invites, then the auth user", async () => {
     const { order, deps } = recordingRemoval();
     const steps: string[] = [];
     await deleteAccount(deps, { id: BOB.id, email: BOB.email }, async (name, fn) => {
       steps.push(name);
       await fn();
     });
-    expect(order).toEqual(["storage", "requests.deleteByEmail", "invited.remove", "auth.deleteUser"]);
+    expect(order).toEqual(["usage.tombstone", "storage", "requests.deleteByEmail", "invited.remove", "auth.deleteUser"]);
     expect(steps).toEqual([...DELETE_STEPS]);
   });
 
   it("stops at the first failing step", async () => {
     const { order, deps } = recordingRemoval("requests.deleteByEmail");
     await expect(deleteAccount(deps, { id: BOB.id, email: BOB.email })).rejects.toThrow("requests.deleteByEmail failed");
-    expect(order).toEqual(["storage", "requests.deleteByEmail"]);
+    expect(order).toEqual(["usage.tombstone", "storage", "requests.deleteByEmail"]);
   });
 });
 
 describe("admin service remove", () => {
-  it("turns access off before deleting and names the step that failed", async () => {
+  it("marks the user deleting and turns access off, then writes the tombstone, and names the step that failed", async () => {
     const accounts = new FakeAccounts();
+    const deleting = new DeletingUsers();
     for (const u of [ADMIN, BOB]) accounts.add(u);
     const order: string[] = [];
     const repo = accounts.repo();
@@ -165,29 +168,32 @@ describe("admin service remove", () => {
         },
       },
       hooks: {
-        onDisabled: async () => {
-          order.push("disabled");
+        onDisabled: async (id) => {
+          order.push(`disabled:deleting=${deleting.has(id)}`);
         },
         onEnabled: () => {},
       },
+      usage: {
+        tombstone: async () => {
+          order.push("usage");
+        },
+      },
+      deleting,
     });
     await expect(service.remove(ADMIN, BOB.id, ` ${BOB.email.toUpperCase()} `)).rejects.toMatchObject({
       kind: "internal",
       code: "delete_failed",
       opts: { details: { step: "requests" } },
     });
-    expect(order).toEqual(["ban:true", "disabled", "storage", "invited"]);
+    expect(order).toEqual(["ban:true", "disabled:deleting=true", "usage", "storage", "invited"]);
     expect(accounts.users.has(BOB.id)).toBe(true);
+    expect(deleting.has(BOB.id)).toBe(false);
   });
 
   it("refuses a wrong confirmation and self-deletion before touching anything", async () => {
     const accounts = new FakeAccounts();
     for (const u of [ADMIN, BOB]) accounts.add(u);
-    const service = createAdminService({
-      repo: accounts.repo(),
-      auth: accounts.auth(),
-      hooks: { onDisabled: async () => {}, onEnabled: () => {} },
-    });
+    const service = fakeAdminService(accounts);
     await expect(service.remove(ADMIN, BOB.id, "someone@example.test")).rejects.toMatchObject({ kind: "unprocessable" });
     await expect(service.remove(ADMIN, ADMIN.id, ADMIN.email)).rejects.toMatchObject({ code: "self_action" });
     expect(accounts.users.get(BOB.id)?.status).toBe("active");

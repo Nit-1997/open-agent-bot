@@ -18,6 +18,13 @@ describe("landing page", () => {
     expect(container.querySelector("#landing-nav a[href='/request-access']")).toBeNull();
   });
 
+  it("links Terms and Privacy from the footer", () => {
+    const { container } = render(<LandingPage />);
+    expect(container.querySelector("#landing-footer-terms")?.getAttribute("href")).toBe("/terms");
+    expect(container.querySelector("#landing-footer-privacy")?.getAttribute("href")).toBe("/privacy");
+    expect(container.querySelector("#landing-footer-signin")?.getAttribute("href")).toBe("/login");
+  });
+
   it("starts on the finished first run so the demo reads without animation", () => {
     render(<LandingPage />);
     expect(screen.getByText(RUNS[0].question)).toBeTruthy();
