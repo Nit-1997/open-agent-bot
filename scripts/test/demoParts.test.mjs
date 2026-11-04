@@ -184,6 +184,56 @@ describe("demo part scripts", () => {
     }
   });
 
+  it("need and exits record the real reason, not a generic UNEXPECTED", () => {
+    const demo = `.factory/m5/test-need-${process.pid}`;
+    const repo = join(PARTS_DIR, "../../..");
+    const sh = (body) =>
+      spawnSync("bash", ["-c", `. scripts/demo/m5/lib.sh; ${body}`, "part-test"], {
+        cwd: repo,
+        encoding: "utf8",
+        env: { ...process.env, DEMO_DIR: demo },
+      });
+    const codes = () => read(join(repo, demo, "exit-codes.txt"));
+    try {
+      assert.equal(sh(`need fresh "DEMO_STATE is not fresh" "true"`).status, 0);
+      const refused = sh(`need fresh "DEMO_STATE is not fresh" "false"; echo after`);
+      assert.equal(refused.status, 1);
+      assert.doesNotMatch(refused.stdout, /after/);
+      assert.match(codes(), /\tfresh\t1\tREFUSED: DEMO_STATE is not fresh; part-test stopped\n/);
+      assert.equal(sh(`exits tamper 1 "tampered copy FAILED (expected)" "false"`).status, 0);
+      assert.match(codes(), /\ttamper\t1\ttampered copy FAILED \(expected\)\n/);
+      assert.equal(sh(`exits tamper 1 "tampered copy FAILED (expected)" "true"`).status, 1);
+      assert.match(codes(), /\ttamper\t0\tUNEXPECTED: tamper exited 0, expected 1; part-test stopped\n/);
+      assert.doesNotMatch(codes(), /\tfresh\t1\tUNEXPECTED/);
+    } finally {
+      rmSync(join(repo, demo), { recursive: true, force: true });
+    }
+  });
+
+  it("part 7 refuses a used state folder, present images or demo volumes before the app test, and starts a fresh mock.log", () => {
+    const p7 = read(join(PARTS_DIR, "part-7.sh"));
+    const at = (re) => p7.search(re);
+    for (const re of [/^need state-fresh /m, /^need images-absent /m, /^need demo-volumes-absent /m, /^run mock-log-reset ": > \\"\$DEMO_DIR\/mock\.log\\""/m])
+      assert.ok(at(re) >= 0 && at(re) < at(/^run playwright-app /m), String(re));
+    assert.ok(at(/^run mock-log-reset /m) < at(/mockReleasesCli\.mts/));
+  });
+
+  it("part 3 shows one tamper refusal on screen and the notes change lines", () => {
+    const p3 = read(join(PARTS_DIR, "part-3.sh"));
+    assert.match(p3, /^exits tamper-shasum 1 "[^"]*FAILED[^"]*" "\(cd \\"\$TD\\" && shasum -a 256 -c SHA256SUMS\)"$/m);
+    assert.match(p3, /^run tamper-clean "rm -rf \\"\$TD\\""$/m);
+    assert.match(p3, /^run notes-changes .*## Changes.*\$A\/release\/notes\.md"$/m);
+  });
+
+  it("parts 0 and 9 check networks and the open-agent project", () => {
+    const p0 = read(join(PARTS_DIR, "part-0.sh"));
+    const p9 = read(join(PARTS_DIR, "part-9.sh"));
+    for (const t of [p0, p9]) assert.match(t, /^no_open_agent_project$/m);
+    assert.match(p0, /docker network ls --format '\{\{\.Name\}\}';.*grep -E '\^oab-\(factory-\)\?m5'/);
+    assert.match(p9, /^absent no-m5-networks "[^"]+" "docker network ls --format '\{\{\.Name\}\}' \| grep -E 'oab-\(factory-\)\?m5'"$/m);
+    assert.ok(p9.search(/^no_open_agent_project$/m) > p9.search(/^absent no-m5-images /m));
+  });
+
   it("ignores comments", () => {
     assert.deepEqual(partProblems(good("# docker compose up -d on port 3000"), "x.sh"), []);
   });
