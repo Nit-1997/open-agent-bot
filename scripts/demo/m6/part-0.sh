@@ -14,8 +14,8 @@ absent no-m6-leftovers "no M6 containers, volumes, networks or images left from 
   "{ docker ps -a --format '{{.Names}}'; docker volume ls --format '{{.Name}}'; docker network ls --format '{{.Name}}'; docker image ls --format '{{.Repository}}'; } | grep -E '^oab-factory-m6-'"
 
 step "0. the .env guards: unqualified compose commands here resolve to an oab- project (A38)"
-run root-guard "docker compose config --format json | jq -r .name"
-run hosted-guard "docker compose -f cloud/deploy/compose.hosted.yml config --format json | jq -r .name"
+run root-guard "docker compose config --format json --no-env-resolution | jq -r .name"
+run hosted-guard "docker compose -f cloud/deploy/compose.hosted.yml config --format json --no-env-resolution | jq -r .name"
 need guards-oab "an unqualified compose command here would reach a non-oab project" \
-  "docker compose config --format json | jq -r .name | grep -q '^oab-' && docker compose -f cloud/deploy/compose.hosted.yml config --format json | jq -r .name | grep -q '^oab-'"
+  "docker compose config --format json --no-env-resolution | jq -r .name | grep -q '^oab-' && docker compose -f cloud/deploy/compose.hosted.yml config --format json --no-env-resolution | jq -r .name | grep -q '^oab-'"
 run head "git log --oneline -1"

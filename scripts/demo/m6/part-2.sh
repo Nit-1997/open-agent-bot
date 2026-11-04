@@ -5,7 +5,7 @@ set -u
 step "2. standalone.sh refuses before deleting anything (AC 6)"
 exits sa-worktree 2 "refused: this linked worktree is not a fresh clone (expected)" \
   "OAB_STANDALONE_ALLOW_DELETE=1 bash scripts/ci/standalone.sh"
-SA="$(scratch standalone)"
+SA="$(scratch standalone)" || exit 1
 run sa-clone "git clone -q \"file://$REPO\" \"$SA/oss\" && git -C \"$SA/oss\" log --oneline -1"
 exits sa-noflag 2 "refused: OAB_STANDALONE_ALLOW_DELETE=1 is not set (expected)" "(cd \"$SA/oss\" && bash scripts/ci/standalone.sh)"
 run sa-ignored-clone "git clone -q \"file://$REPO\" \"$SA/ignored\" && : > \"$SA/ignored/cloud/deploy/.env-dummy\" && git -C \"$SA/ignored\" status --porcelain --ignored -- cloud"

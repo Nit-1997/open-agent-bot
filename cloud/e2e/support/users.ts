@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { Browser } from "@playwright/test";
 import { isTestEmail } from "../../supabase/scripts/test-users.mjs";
 import { admin } from "./admin";
+import { deletedCount, lockFile } from "./authFiles";
 import { AUTH_DIR, env, ROOT, scriptEnv } from "./env";
 
 export const DEMO_USER = "oab-e2e+shell@example.test";
@@ -32,8 +33,8 @@ export async function createUser(email: string): Promise<void> {
   await assertNotAdmin(email);
 }
 
-export function cleanupE2e(): void {
-  script("cleanup-e2e.mjs", []);
+export function cleanupE2e(): number {
+  return deletedCount(script("cleanup-e2e.mjs", []));
 }
 
 export function signInLink(email: string): string {
@@ -50,6 +51,7 @@ export async function signIn(browser: Browser, email: string): Promise<string> {
   await page.waitForURL((url) => !url.pathname.startsWith("/auth"));
   const path = storageFor(email);
   await context.storageState({ path });
+  lockFile(path);
   await context.close();
   return path;
 }

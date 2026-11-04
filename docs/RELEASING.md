@@ -2,8 +2,6 @@
 
 This is the owner's runbook. A `v*` tag on `main` runs `.github/workflows/release.yml` (`gate → push → merge → lock → desktop → verify-dmgs → attest → release`). One run builds and attests both images for `linux/amd64` and `linux/arm64`, writes the services lock from the digests it just pushed, builds both DMGs with that lock, checks them, and ends with a **draft** release holding exactly four files: `Open-Agent-<v>-arm64.dmg`, `Open-Agent-<v>-x64.dmg`, `open-agent-services.json` and `SHA256SUMS`. Nothing is public until you make the two GHCR packages public and publish the draft.
 
-Design: `docs/superpowers/specs/2026-11-04-m5-distribution-design.md` (D2, D16).
-
 Homebrew tap: not built (deferred, spec A13).
 
 ## Prerequisites

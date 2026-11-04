@@ -4,6 +4,11 @@
 deploy-config/.env*
 *.pem
 *.key
+*.crt
+*.p12
+.vercel/
+cloud/supabase/.temp/
+cloud/supabase/.branches/
 node_modules/
 .next/
 dist/
@@ -41,3 +46,6 @@ e2e/.local/
 # Mac app build outputs
 apps/desktop/build/
 apps/desktop/release/
+
+# Planning specs stay out of the public repo
+docs/superpowers/

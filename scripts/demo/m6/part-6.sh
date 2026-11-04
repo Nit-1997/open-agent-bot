@@ -3,7 +3,7 @@ set -u
 . "$(dirname "$0")/lib.sh"
 
 step "6. the Vercel-equivalent build (AC 12): a clean clone, install from Root Directory cloud/web, build there"
-VB="$(scratch vercel)"
+VB="$(scratch vercel)" || exit 1
 run vercel-clone "git clone -q \"file://$REPO\" \"$VB/repo\" && git -C \"$VB/repo\" log --oneline -1"
 run no-web "test ! -e \"$VB/repo/web\" && echo 'no web/ folder'"
 run install "(cd \"$VB/repo/cloud/web\" && npm install > \"$REPO/$DEMO_DIR/vercel-install.log\" 2>&1); rc=\$?; tail -n 3 \"$DEMO_DIR/vercel-install.log\"; exit \$rc"

@@ -10,7 +10,7 @@ const E2E = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PLAYWRIGHT = createRequire(import.meta.url).resolve("@playwright/test/cli");
 const LIVE = "https://app.localhost";
 const PREVIEW = "http://localhost:18300";
-const PROJECTS = ["desktop", "tablet", "phone", "smoke", "preview-m1", "preview-m2"];
+const PROJECTS = ["desktop", "tablet", "phone", "smoke", "compat", "preview-m1", "preview-m2"];
 
 describe("playwright config", () => {
   const list = (project: string, origin: string | undefined, extra: NodeJS.ProcessEnv = {}) => {

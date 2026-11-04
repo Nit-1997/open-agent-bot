@@ -279,6 +279,7 @@ describe("ci.yml cloud job (M6 D14)", () => {
     assert.deepEqual(runs(), [
       "npm ci",
       "npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
+      "npm run lint:boundary && npm run lint:scripts && npm run format:check:scripts",
       "npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
       "npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e",
       "npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
@@ -296,6 +297,15 @@ describe("ci.yml cloud job (M6 D14)", () => {
   it("replaces the web job (6.5)", () => {
     assert.equal(doc("ci.yml").jobs.web, undefined);
     assert.match(JSON.stringify(job.steps.at(-1)), /COPILOTKIT_TELEMETRY_DISABLED/);
+  });
+});
+
+describe("ci.yml checkouts", () => {
+  it("every checkout in ci.yml leaves no credentials behind", () => {
+    for (const [name, job] of Object.entries(doc("ci.yml").jobs)) {
+      const checkout = (job.steps ?? []).find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+      if (checkout) assert.equal(checkout.with?.["persist-credentials"], false, name);
+    }
   });
 });
 

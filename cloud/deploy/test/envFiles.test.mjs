@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { AUTH_DIR, ENV_FILES } from "../../e2e/support/env.ts";
-import { dirProblem, KNOWN, run } from "../scripts/env-files.mjs";
+import { dirProblem, KNOWN, MAX_BYTES, run } from "../scripts/env-files.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const SCRIPT = join(ROOT, "cloud/deploy/scripts/env-files.mjs");
@@ -125,6 +125,60 @@ describe("env-files.mjs", () => {
     assert.equal(lines.join("\n").includes(SECRET), false);
   });
 
+  it("removes a partly written target when the write fails, and refuses", () => {
+    const r0 = repo({ files: { ".env-agent": 0o600 } });
+    const lines = [];
+    const code = run(
+      { from: r0.from, to: r0.to, action: "copy", dryRun: false },
+      {
+        log: (l) => lines.push(l),
+        write: (fd) => {
+          writeFileSync(fd, "KEY=");
+          throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+        },
+      },
+    );
+    assert.equal(code, 1, lines.join("\n"));
+    assert.equal(existsSync(join(r0.to, ".env-agent")), false);
+    assert.ok(existsSync(join(r0.from, ".env-agent")));
+    assert.match(lines.join("\n"), /refused: \.env-agent could not be written \(ENOSPC\); nothing left behind/);
+  });
+
+  it("accepts an env-files/ folder that appears between the check and mkdir, then checks it again", () => {
+    const r0 = repo({ files: { "env-files/.env-e2e": 0o600 } });
+    const lines = [];
+    const code = run(
+      { from: r0.from, to: r0.to, action: "copy", dryRun: false },
+      {
+        log: (l) => lines.push(l),
+        mkdir: (path, opts) => {
+          mkdirSync(path, opts);
+          throw Object.assign(new Error("exists"), { code: "EEXIST" });
+        },
+      },
+    );
+    assert.equal(code, 0, lines.join("\n"));
+    assert.ok(existsSync(join(r0.to, "env-files/.env-e2e")));
+  });
+
+  it("refuses an env-files/ folder that appears as a symlink between the check and mkdir", () => {
+    const r0 = repo({ files: { "env-files/.env-e2e": 0o600 } });
+    mkdirSync(join(r0.root, "elsewhere"));
+    const lines = [];
+    const code = run(
+      { from: r0.from, to: r0.to, action: "copy", dryRun: false },
+      {
+        log: (l) => lines.push(l),
+        mkdir: (path) => {
+          symlinkSync(join(r0.root, "elsewhere"), path);
+          throw Object.assign(new Error("exists"), { code: "EEXIST" });
+        },
+      },
+    );
+    assert.equal(code, 1, lines.join("\n"));
+    assert.match(lines.join("\n"), /--to env-files is a symlink/);
+  });
+
   it("lists any other .env* file as unknown, does not move it, and exits 2", () => {
     const r0 = repo({ files: { ".env-agent": 0o600, ".env-x": 0o600, "env-files/.env-old": 0o600 } });
     const r = cli(["--from", r0.from, "--to", r0.to, "--copy"]);
@@ -213,6 +267,18 @@ describe("env-files.mjs", () => {
       const r0 = repo({ files: { ".env-agent": 0o600 } });
       linkSync(join(r0.from, ".env-agent"), join(r0.root, "second-name"));
       refused(r0, undefined, ".env-agent has 2 links");
+    });
+
+    it("a FIFO source file, without blocking on it", () => {
+      const r0 = repo({ files: {} });
+      execFileSync("mkfifo", [join(r0.from, ".env-agent")]);
+      refused(r0, undefined, ".env-agent is not a regular file");
+    });
+
+    it("a source file larger than the size cap", () => {
+      const r0 = repo({ files: {} });
+      writeFileSync(join(r0.from, ".env-agent"), Buffer.alloc(MAX_BYTES + 1, 0x61), { mode: 0o600 });
+      refused(r0, undefined, `.env-agent is larger than ${MAX_BYTES} bytes`);
     });
 
     it("a target that git would not ignore", () => {

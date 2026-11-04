@@ -11,15 +11,21 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "OLD=<old checkout>",
+      "command": "OLD=\"<path of the old checkout>\"",
       "mode": "owner",
-      "reason": "Gate 7 (owner): names the live checkout, which the factory never touches; a variable assignment"
+      "reason": "Gate 7 (owner): names the live checkout, which the factory never touches; a variable assignment with a placeholder"
     },
     {
       "file": "cloud/README.md",
       "command": "NEW=\"$HOME/open-agent-hosted\"",
       "mode": "owner",
       "reason": "Gate 7 (owner): the new hosted checkout in the owner's real home folder; a variable assignment"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "AGENT_HOST=\"<public agent host>\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): names the live agent's public host; a variable assignment with a placeholder"
     },
     {
       "file": "cloud/README.md",
@@ -101,7 +107,7 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json | jq '{name, volumes: [.volumes[].name]}'",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json --no-env-resolution | jq '{name, volumes: [.volumes[].name]}'",
       "mode": "owner",
       "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
     },
@@ -155,9 +161,9 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "curl -fsS https://<public agent host>/health",
+      "command": "curl -fsS \"https://$AGENT_HOST/health\"",
       "mode": "owner",
-      "reason": "Gate 7 (owner): the live agent through the Cloudflare tunnel"
+      "reason": "Gate 7 (owner): reaches the live agent through its public host"
     },
     {
       "file": "cloud/README.md",
@@ -182,6 +188,36 @@
       "command": "while read -r svc img tag; do docker image rm \"$tag\"; done < \"$HOME/open-agent-rollback.txt\"",
       "mode": "owner",
       "reason": "Gate 7 burn-in (owner): removes the live rollback tags"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "git -C \"$OLD\" status --porcelain --ignored -- \"$OLD/deploy-config\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): lists the live checkout's ignored settings file names (names only); the factory never touches that checkout"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "test -f \"$OLD/.env\" && grep -oE '^(CADDYFILE|CADDY_BIND|COMPOSE_PROFILES)=' \"$OLD/.env\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): reads variable names (never values) from the live checkout's .env; rehearsed as old-interp in demo part 4"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Label \"com.docker.compose.service\"}}' | sort",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): lists the live project's services; rehearsed on oab-factory-m6-hosted in demo part 4"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "want=2; [ -n \"$(docker ps -q --filter label=com.docker.compose.project=open-agent-bot --filter label=com.docker.compose.service=web)\" ] && want=3",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): reads the live project's container list; the rehearsal's retag_rollback applies the same count"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "test \"$(wc -l < \"$HOME/open-agent-rollback.txt\")\" -eq \"$want\" && echo \"rollback tags: $want\" || echo \"STOP: expected $want rollback tags\"",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): checks the owner's rollback note in the real home folder"
     }
   ]
 }

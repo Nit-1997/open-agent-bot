@@ -25,7 +25,7 @@ The image digests are `images.agent` and `images.search` in the release's `open-
 
 ## Local stack
 
-The root `docker-compose.yml` runs Open Agent for one person on their own computer: no accounts, one fixed local user, and data in SQLite on a Docker volume. The design is `docs/superpowers/specs/2026-11-03-m3-local-stack-design.md` (D7, D10, D11, D14).
+The root `docker-compose.yml` runs Open Agent for one person on their own computer: no accounts, one fixed local user, and data in SQLite on a Docker volume.
 
 - **Port.** Compose publishes the agent's port on `127.0.0.1` only, so other computers can't connect.
 - **Host allowlist.** Every request except `GET /health` must name `127.0.0.1:<port>` or `localhost:<port>` as its `Host`, where `<port>` is the published `OPEN_AGENT_PORT`. The set is derived from the port and can't be configured any other way (`hostGuard` in `packages/core/src/local/hosts.ts`; `@oab/bff` checks the same set). Anything else answers 421 `misdirected`, which refuses DNS rebinding.
@@ -40,7 +40,7 @@ The root `docker-compose.yml` runs Open Agent for one person on their own comput
 
 ## Mac app
 
-`Open Agent.app` (`apps/desktop`) is a thin Electron shell that runs the local stack above in the user's own Docker and shows its UI from `127.0.0.1`. The agent never runs inside Electron. The design is `docs/superpowers/specs/2026-11-03-m4-mac-shell-design.md`.
+`Open Agent.app` (`apps/desktop`) is a thin Electron shell that runs the local stack above in the user's own Docker and shows its UI from `127.0.0.1`. The agent never runs inside Electron.
 
 - **Launch token and cookie.** The shell creates a fresh 64-hex token for every recreate, passes it to compose as `OPEN_AGENT_LAUNCH_TOKEN`, keeps it in `stack.json` (0600, in a 0700 state dir) and installs it only as the host-only cookie `oa_launch` (`HttpOnly`, `SameSite=Strict`) for `http://127.0.0.1:<port>` in the app window's own session. The cookie is removed whenever the app view is hidden. `status.json` never holds it, and the shell log and saved logs replace it with `[token]`.
 - **Docker discovery fails closed.** The `docker` CLI is used only from fixed locations, and only if the file, its symlink target and every parent folder are owned by root or the user and not writable by others (group-writable only for `admin`). The engine socket must be a `unix://` socket owned by the user; a remote or other-user engine gets its own screen and no compose call. CLI plugins are checked the same way before any docker call: `~/.docker/cli-plugins`, the `cliPluginsExtraDirs` in `~/.docker/config.json`, the system plugin folders, and every plugin path `docker info` reports. Each docker call gets an environment built from scratch (no `COMPOSE_*`, no `DOCKER_CONFIG`, a `PATH` of trusted folders only).

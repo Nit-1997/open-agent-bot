@@ -11,8 +11,7 @@ DEMO_DIR="${DEMO_DIR:-.factory/m6/demo}"
 EXITS="$DEMO_DIR/exit-codes.txt"
 BUSYBOX="busybox:1.37@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"
 LIVE_SHA=c1c0f4e
-M3_SHA=4879d41
-export COPILOTKIT_TELEMETRY_DISABLED=true ELECTRON_SKIP_BINARY_DOWNLOAD=1
+export COPILOTKIT_TELEMETRY_DISABLED=true ELECTRON_SKIP_BINARY_DOWNLOAD=1 GIT_PAGER=cat PAGER=cat
 
 require_oab() {
   local n
@@ -34,6 +33,14 @@ require_under_factory() {
     esac
   done
 }
+commit_of() {
+  local subject hits
+  subject="$(jq -er --arg r "$1" '.[$r] // empty' "$REPO/scripts/demo/m6/commits.json")" || { echo "ABORT: unknown commit role '$1'" >&2; return 1; }
+  hits="$(git -C "$REPO" log --format='%h%x09%s' HEAD | awk -F '\t' -v s="$subject" 'substr($0, index($0, "\t") + 1) == s { print $1 }')"
+  [ "$(printf '%s' "$hits" | grep -c .)" = 1 ] || { echo "ABORT: commit role '$1' matches $(printf '%s' "$hits" | grep -c .) commits, expected 1" >&2; return 1; }
+  printf '%s\n' "$hits"
+}
+PRE_M6="$(commit_of pre-m6)" || exit 1
 require_oab oab-factory-m6-oss oab-factory-m6-hosted oab-factory-m6-gate7 oab-factory-m6-ctx
 require_under_factory "$DEMO_DIR"
 mkdir -p "$DEMO_DIR"
@@ -150,6 +157,7 @@ forget_scratch() {
 }
 clone_at() { git clone -q --no-checkout "file://$REPO" "$2" && git -C "$2" checkout -q "$1" && git -C "$2" log --oneline -1; }
 
+redact_build() { sed -E 's/(\] RUN ).*/\1(command line not saved)/; s/(process "\/bin\/sh -c ).*/\1(command line not saved)/'; }
 jq_names() { jq '{name, volumes: [.volumes[].name]}'; }
 jq_names_ports() { jq '{name, volumes: [.volumes[].name], ports: [.services[].ports[]? | "\(.host_ip):\(.published)"]}'; }
 
@@ -196,6 +204,16 @@ place_old_env() {
   stat -f '%Sp %N' "$old"/deploy-config/.env-* | sed "s|$old/||"
 }
 
+interp_names() {
+  local old="$1"
+  if [ -f "$old/.env" ]; then
+    printf '.env in the old tree sets: %s\n' "$(grep -oE '^(CADDYFILE|CADDY_BIND|COMPOSE_PROFILES)=' "$old/.env" | tr '\n' ' ')"
+  else
+    echo "no .env in the old tree"
+  fi
+  printf 'running services: %s\n' "$(docker ps --filter label=com.docker.compose.project=oab-factory-m6-hosted --format '{{.Label "com.docker.compose.service"}}' | sort | tr '\n' ' ')"
+}
+
 hosted_facts() {
   local tag="$1" c svc
   hosted_containers > "$DEMO_DIR/$tag-names.txt"
@@ -218,7 +236,7 @@ hosted_facts() {
 
 compare_facts() {
   local a="$1" b="$2" moved="$3" same_images="$4"
-  diff "$DEMO_DIR/$a-names.txt" "$DEMO_DIR/$b-names.txt" && note "same containers"
+  diff "$DEMO_DIR/$a-names.txt" "$DEMO_DIR/$b-names.txt" && note "same containers" || return 1
   diff "$DEMO_DIR/$a-volumes.txt" "$DEMO_DIR/$b-volumes.txt" && note "same volumes" || return 1
   diff "$DEMO_DIR/$a-secret.txt" "$DEMO_DIR/$b-secret.txt" && note "same SearXNG secret file hash" || return 1
   join <(awk '{print $1, $3, $4}' "$DEMO_DIR/$a-containers.txt") <(awk '{print $1, $3, $4}' "$DEMO_DIR/$b-containers.txt") \
@@ -241,7 +259,9 @@ retag_rollback() {
     printf '%s %s %s:rollback-%s\n' "$svc" "$img" "${img%:*}" "$sha" | tee -a "$DEMO_DIR/rollback-$sha.txt"
     n=$((n + 1))
   done < <(docker ps --filter label=com.docker.compose.project=oab-factory-m6-hosted --format '{{.Label "com.docker.compose.service"}} {{.Image}}')
-  [ "$n" -eq 3 ] || { echo "expected 3 built services, tagged $n" >&2; return 1; }
+  local want=2
+  [ -n "$(docker ps -q --filter label=com.docker.compose.project=oab-factory-m6-hosted --filter label=com.docker.compose.service=web)" ] && want=3
+  [ "$n" -eq "$want" ] || { echo "expected $want built services, tagged $n" >&2; return 1; }
 }
 retag_back() {
   local svc img tag

@@ -70,7 +70,7 @@ Open issue: the identical malformed-JSON error across two different models point
 
 All v2 feature flags were removed on 2026-10-30 once every milestone had shipped: the new behavior is the only code path, the old paths (legacy prompt, fixed store list, per-tool call counter, in-memory carts, session-expired restarts, non-RPIV research) are deleted, and codemode follows the `codemode` model tag. The table below records the on/off measurements that justified each switch.
 
-Spec: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`. Eval runs write their reports to `packages/core/evals/results/` (not committed); baselines are in `packages/core/evals/baseline/`.
+Eval runs write their reports to `packages/core/evals/results/` (not committed); baselines are in `packages/core/evals/baseline/`.
 
 Baselines (pre-v2 build): Sonnet 5.5 passed 18 of 24 runs, and its two runs agreed on every scenario. Qwen 3.5 passed 4 of 24 runs, and its two runs differed on 2 of 12 scenarios. Qwen's recipe-cart run looped through 71 tool calls.
 

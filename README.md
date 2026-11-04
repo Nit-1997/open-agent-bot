@@ -29,7 +29,6 @@ browser or Mac app → agent on 127.0.0.1:<port> (UI + /api + chat stream; Node 
 
 The Mac app (`apps/desktop`) is a thin shell: it starts this stack in your own Docker and shows the UI from 127.0.0.1. The agent never runs inside the app. Chats, reports and settings live in SQLite on a Docker volume.
 
-- Design: `docs/superpowers/specs/2026-10-27-open-agent-bot-design.md`; the local stack: `docs/superpowers/specs/2026-11-03-m3-local-stack-design.md`; the Mac app: `docs/superpowers/specs/2026-11-03-m4-mac-shell-design.md`
 - What we learned about the stack: `docs/findings.md`
 
 ## Run it on your computer
@@ -92,7 +91,7 @@ When the agent can't start safely it prints one line, `[startup] refused code=<c
 - **Workspace and chats**: Chats and their messages are saved in the local database, and a chat continues after a restart. Carts, trips, events and shortlists are working state for the conversation: they live in the agent's session only. Cards from earlier sessions stay in the chat, read-only and dated; ask again for fresh prices. The app shell has a sidebar of chats (Today, This week, Earlier), and its own views for **Reports** (every report, with PDF download) and **Search** (chat titles, message text and report titles). Every view has a URL. A report shows in the chat as a card with a thumbnail and opens in a resizable panel beside the chat (an overlay on tablets, a full-screen viewer on phones), with previous/next, PDF and a new-tab link; the open report is in the URL, and the agent knows which report is open, so "what's the cheapest option in this report?" just works.
 - **Your agent**: users name their agent, pick its look and how it talks (brief, warm or thorough) in the first onboarding step or the profile drawer. The name and tone go into the system prompt as a quoted name under the hard rules.
 
-Design and results: `docs/superpowers/specs/2026-10-29-open-agent-v2-design.md`, `docs/findings.md`.
+Results: `docs/findings.md`.
 
 ## Develop
 
