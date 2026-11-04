@@ -147,6 +147,10 @@
       {
         "file": "cloud/README.md",
         "reason": "the Gate 6/7 switch-over names the old checkout's web/Dockerfile and the old Vercel Root Directory"
+      },
+      {
+        "file": "cloud/deploy/test/fixtures/**",
+        "reason": "the pre-M6 hosted compose file kept verbatim as the equivalence baseline"
       }
     ]
   },
@@ -254,6 +258,10 @@
       {
         "file": "scripts/demo/m6/**",
         "reason": "the M6 demo checks that the old paths are gone (git ls-files) and rehearses the c1c0f4e and pre-M6 (M3) layouts that still use them"
+      },
+      {
+        "file": "cloud/deploy/test/fixtures/**",
+        "reason": "the pre-M6 hosted compose file kept verbatim as the equivalence baseline"
       }
     ]
   },
