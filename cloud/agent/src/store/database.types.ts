@@ -177,6 +177,21 @@ export type Database = {
         }
         Relationships: []
       }
+      human_checks: {
+        Row: {
+          checked_at: string
+          user_id: string
+        }
+        Insert: {
+          checked_at?: string
+          user_id: string
+        }
+        Update: {
+          checked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       invited_emails: {
         Row: {
           created_at: string
@@ -299,6 +314,45 @@ export type Database = {
         }
         Relationships: []
       }
+      request_log: {
+        Row: {
+          at: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          at: string
+          id?: never
+          user_id: string
+        }
+        Update: {
+          at?: string
+          id?: never
+          user_id?: string
+        }
+        Relationships: []
+      }
+      request_usage: {
+        Row: {
+          count: number
+          last_at: string | null
+          month: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          last_at?: string | null
+          month: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          last_at?: string | null
+          month?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -313,6 +367,54 @@ export type Database = {
         }
         Returns: string
       }
+      human_check_get: { Args: { p_user: string }; Returns: boolean }
+      human_check_set: { Args: { p_user: string }; Returns: undefined }
+      request_admit: {
+        Args: {
+          p_hour_cap: number
+          p_month_cap: number
+          p_now?: string
+          p_user: string
+        }
+        Returns: {
+          hour_used: number
+          log_id: number
+          month_used: number
+          ok: boolean
+          reason: string
+          retry_at: string
+        }[]
+      }
+      request_log_prune: { Args: { p_now?: string }; Returns: undefined }
+      request_refund: {
+        Args: { p_log_id: number; p_user: string }
+        Returns: boolean
+      }
+      request_usage_get: {
+        Args: { p_now?: string; p_user: string }
+        Returns: {
+          hour_retry_at: string
+          hour_used: number
+          month_used: number
+        }[]
+      }
+      request_usage_page: {
+        Args: {
+          p_at_least: number
+          p_limit: number
+          p_now?: string
+          p_offset: number
+          p_query: string
+        }
+        Returns: Json
+      }
+      request_usage_summary: {
+        Args: { p_now?: string }
+        Returns: {
+          active_users: number
+          month_total: number
+        }[]
+      }
       search_user_content: {
         Args: {
           p_limit: number
@@ -322,6 +424,10 @@ export type Database = {
           p_user: string
         }
         Returns: Json
+      }
+      usage_tombstone: {
+        Args: { p_now?: string; p_user: string }
+        Returns: boolean
       }
     }
     Enums: {
@@ -341,12 +447,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -370,11 +476,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -395,11 +501,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -420,11 +526,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -437,11 +543,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -455,3 +561,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
