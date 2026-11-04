@@ -21,7 +21,7 @@ function fail(message) {
 
 function env(name, { optional = false } = {}) {
   const v = process.env[name]?.trim();
-  if (!v && !optional) fail(`missing ${name} (load deploy-config/env-files/.env-supabase-admin)`);
+  if (!v && !optional) fail(`missing ${name} (load cloud/deploy/env-files/.env-supabase-admin)`);
   return v ?? "";
 }
 

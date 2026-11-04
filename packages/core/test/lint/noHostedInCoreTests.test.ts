@@ -26,16 +26,6 @@ const EXEMPT: Exemption[] = [
     reason: "a test name says --target local never loads @supabase/supabase-js",
   },
   { file: "test/evals/moduleGraph.ts", allow: ["string"], reason: "the probe that proves --target local never loads @supabase/*" },
-  {
-    file: "test/deploy/copilotTelemetry.test.ts",
-    allow: ["string:deploy-config"],
-    reason: "reads deploy-config/env.examples; moves to cloud/deploy/test in 6.6 (D3)",
-  },
-  {
-    file: "test/deploy/localConfigParity.test.ts",
-    allow: ["string:deploy-config"],
-    reason: "compares local/ twins with deploy-config/; moves to cloud/deploy/test in 6.6 (D3)",
-  },
 ];
 
 const resolveFrom = (file: string, specifier: string) => posix.normalize(posix.join(posix.dirname(file), specifier));

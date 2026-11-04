@@ -10,8 +10,8 @@ import { createAnonClient, createServiceClient } from "../../src/store/client.js
 const ROOT = resolve(new URL(".", import.meta.url).pathname, "../../../..");
 
 export const env: Record<string, string> = {
-  ...readEnvFile(resolve(ROOT, "deploy-config/.env-agent")),
-  ...readEnvFile(resolve(ROOT, "deploy-config/env-files/.env-supabase-admin")),
+  ...readEnvFile(resolve(ROOT, "cloud/deploy/.env-agent")),
+  ...readEnvFile(resolve(ROOT, "cloud/deploy/env-files/.env-supabase-admin")),
 };
 
 export const enabled = process.env.SUPABASE_INTEGRATION === "1";
@@ -28,7 +28,7 @@ export const service = () => createServiceClient(cfg());
 export const anon = () => createAnonClient(cfg());
 export const adminRepo = () => createAdminRepo(service());
 export function appOrigin(): string {
-  if (!env.APP_ORIGIN) throw new Error("APP_ORIGIN is missing from deploy-config/.env-agent");
+  if (!env.APP_ORIGIN) throw new Error("APP_ORIGIN is missing from cloud/deploy/.env-agent");
   return env.APP_ORIGIN;
 }
 

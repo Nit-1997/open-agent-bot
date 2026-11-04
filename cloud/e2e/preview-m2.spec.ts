@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { type APIResponse, expect, type Frame, type Page, type Request, request, type TestInfo, test } from "@playwright/test";
-import { completeOnboardingIfShown } from "./support/onboarding";
+import { completeOnboardingIfShown } from "../../e2e/support/onboarding";
 import { BIG_SUR_REPORT, SECOND_REPORT } from "./support/seed";
 import { seeded } from "./support/state";
 

@@ -278,18 +278,37 @@ describe("ci.yml cloud job (M6 D14)", () => {
   it("lints, format-checks, type-checks, unit-tests and builds the cloud workspaces only", () => {
     assert.deepEqual(runs(), [
       "npm ci",
-      "npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy",
-      "npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy",
-      "npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web",
-      "npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy",
+      "npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
+      "npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
+      "npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e",
+      "npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy",
       "npm run build -w @oab/cloud-agent -w @oab/cloud-web",
     ]);
-    assert.doesNotMatch(runs().join("\n"), /test:supabase|playwright|smoke|e2e/);
+    assert.doesNotMatch(runs().join("\n"), /test:supabase|playwright|smoke/);
+    assert.equal(runs().join("\n").replaceAll("@oab/cloud-e2e", "").includes("e2e"), false);
+  });
+
+  it("checks out full history for the hosted compose baseline and the migrations pin (6.6)", () => {
+    const checkout = job.steps.find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+    assert.equal(checkout.with["fetch-depth"], 0);
   });
 
   it("replaces the web job (6.5)", () => {
     assert.equal(doc("ci.yml").jobs.web, undefined);
     assert.match(JSON.stringify(job.steps.at(-1)), /COPILOTKIT_TELEMETRY_DISABLED/);
+  });
+});
+
+describe("ci.yml compose job (M6 D14)", () => {
+  const job = doc("ci.yml").jobs.compose;
+  const runs = () => job.steps.map((s) => s.run ?? "").filter(Boolean);
+
+  it("runs the local compose tests and the hosted deploy tests from full history (6.6)", () => {
+    const checkout = job.steps.find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+    assert.equal(checkout.with["fetch-depth"], 0);
+    assert.ok(runs().includes("node --test scripts/test/composeLayout.test.mjs scripts/test/preflight.test.mjs"));
+    assert.ok(runs().includes("npm test -w @oab/cloud-deploy"));
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
   });
 });
 

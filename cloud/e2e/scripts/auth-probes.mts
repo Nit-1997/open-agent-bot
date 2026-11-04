@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { previewOriginProblem } from "../support/origin.ts";
+import { previewOriginProblem } from "../../../e2e/support/origin.ts";
 
 type Env = Readonly<Record<string, string | undefined>>;
 type Fetch = (url: string, init: RequestInit) => Promise<Response>;
@@ -26,7 +26,7 @@ type Probe = {
   header?: [string, string];
 };
 
-const ROOT = resolve(fileURLToPath(import.meta.url), "../../..");
+const ROOT = resolve(fileURLToPath(import.meta.url), "../../../..");
 const EVIL = "https://evil.example";
 const RUN = "/copilotkit/agent/openagent/run";
 
@@ -225,14 +225,14 @@ function accessToken(state: StorageState): string {
 const cookieHeader = (state: StorageState) => state.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
 
 function agentSecret(): string {
-  const line = readFileSync(resolve(ROOT, "deploy-config/.env-agent"), "utf8")
+  const line = readFileSync(resolve(ROOT, "cloud/deploy/.env-agent"), "utf8")
     .split("\n")
     .find((l) => l.trim().startsWith("AGENT_SERVICE_SECRET="));
   const secret = line
     ?.slice(line.indexOf("=") + 1)
     .trim()
     .replace(/^["']|["']$/g, "");
-  if (!secret) throw new Error("AGENT_SERVICE_SECRET missing in deploy-config/.env-agent");
+  if (!secret) throw new Error("AGENT_SERVICE_SECRET missing in cloud/deploy/.env-agent");
   return secret;
 }
 

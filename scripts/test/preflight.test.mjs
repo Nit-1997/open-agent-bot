@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, describe, it } from "node:test";
+import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -73,29 +71,6 @@ describe("preflight on the local stack", () => {
     expectAbort(
       preflight("docker compose --env-file /dev/null -f docker-compose.yml", { ...TEST_VOLUMES, OPEN_AGENT_PORT: "18330" }),
       "project 'open-agent'",
-    );
-  });
-});
-
-describe("preflight on the hosted stack", () => {
-  const HOSTED = mkdtempSync(join(tmpdir(), "preflight-hosted-"));
-  mkdirSync(join(HOSTED, "deploy-config"));
-  copyFileSync(join(ROOT, "compose.hosted.yml"), join(HOSTED, "compose.hosted.yml"));
-  copyFileSync(join(ROOT, "deploy-config/compose.preview.yml"), join(HOSTED, "deploy-config/compose.preview.yml"));
-  for (const f of [".env-agent", ".env-renderer", ".env-nextjs"]) writeFileSync(join(HOSTED, "deploy-config", f), "", { mode: 0o600 });
-  after(() => rmSync(HOSTED, { recursive: true, force: true }));
-
-  it("aborts on the pinned live project name", () => {
-    expectAbort(preflight("docker compose --env-file /dev/null -f compose.hosted.yml", {}, HOSTED), "project 'open-agent-bot'");
-  });
-
-  it("passes the hosted preview under an oab- project", () => {
-    expectOk(
-      preflight(
-        "docker compose -p oab-factory-m3-5-hosted --env-file /dev/null -f compose.hosted.yml -f deploy-config/compose.preview.yml --profile local",
-        {},
-        HOSTED,
-      ),
     );
   });
 });

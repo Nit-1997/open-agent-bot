@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 import type { Browser } from "@playwright/test";
 import { isTestEmail } from "../../supabase/scripts/test-users.mjs";
 import { admin } from "./admin";
-import { AUTH_DIR, env, ROOT, scriptEnv } from "./hostedEnv";
+import { AUTH_DIR, env, ROOT, scriptEnv } from "./env";
 
 export const DEMO_USER = "oab-e2e+shell@example.test";
 export const OTHER_USER = "oab-e2e+other@example.test";
 
 const script = (name: string, args: string[]) =>
-  execFileSync("node", [resolve(ROOT, "supabase/scripts", name), ...args], { env: scriptEnv(), encoding: "utf8" });
+  execFileSync("node", [resolve(ROOT, "cloud/supabase/scripts", name), ...args], { env: scriptEnv(), encoding: "utf8" });
 
 export const storageFor = (email: string) => resolve(AUTH_DIR, `${email.replace(/[^a-z0-9]/gi, "_")}.json`);
 

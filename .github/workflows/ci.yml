@@ -37,6 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -44,10 +45,10 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy
-      - run: npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy
-      - run: npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web
-      - run: npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy
+      - run: npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
+      - run: npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
+      - run: npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e
+      - run: npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-e2e -w @oab/cloud-deploy
       - run: npm run build -w @oab/cloud-agent -w @oab/cloud-web
         env:
           COPILOTKIT_TELEMETRY_DISABLED: "true"
@@ -63,19 +64,19 @@ jobs:
           node-version-file: .nvmrc
       - name: Both stacks resolve from a fresh clone; the local one needs no env files
         run: |
-          ls deploy-config/.env-* 2>/dev/null && exit 1
+          ls cloud/deploy/.env-* 2>/dev/null && exit 1
           docker compose --env-file /dev/null config --quiet
-          touch deploy-config/.env-agent deploy-config/.env-renderer deploy-config/.env-nextjs
-          docker compose -f compose.hosted.yml config --quiet
-          docker compose -f compose.hosted.yml --profile litellm --profile ollama config --quiet
-          sh deploy-config/searxng/entrypoint.sh true
+          touch cloud/deploy/.env-agent cloud/deploy/.env-renderer cloud/deploy/.env-nextjs
+          docker compose -f cloud/deploy/compose.hosted.yml config --quiet
+          docker compose -f cloud/deploy/compose.hosted.yml --profile litellm --profile ollama config --quiet
+          sh cloud/deploy/searxng/entrypoint.sh true
         env:
           SEARXNG_SECRET_FILE: /tmp/searxng-secret/secret
       - name: Project names are pinned; the preview override is named and bound to 127.0.0.1
         run: |
           test "$(docker compose --env-file /dev/null config --format json | jq -r .name)" = open-agent
-          test "$(docker compose --env-file /dev/null -f compose.hosted.yml config --format json | jq -r .name)" = open-agent-bot
-          preview="docker compose --env-file /dev/null --profile local -f compose.hosted.yml -f deploy-config/compose.preview.yml config --format json"
+          test "$(docker compose --env-file /dev/null -f cloud/deploy/compose.hosted.yml config --format json | jq -r .name)" = open-agent-bot
+          preview="docker compose --env-file /dev/null --profile local -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml config --format json"
           test "$($preview | jq -r .name)" = oab-preview
           test "$($preview | jq '[.services[].ports[]? | .host_ip] | all(. == "127.0.0.1")')" = true
           test "$($preview | jq '[.services[].ports[]? | .published | tonumber] | all(. >= 18000)')" = true
@@ -88,8 +89,10 @@ jobs:
           test "$($local | jq -r '.volumes.data.name')" = open-agent-data
           test "$($local | jq -r '.volumes.keys.name')" = open-agent-keys
           test "$($local | jq '[.services[].volumes[]? | select(.type == "bind")] | length')" = 0
-      - name: Compose layout, hosted config equivalence with 6986a4c, and preflight
+      - name: Local compose layout and preflight
         run: node --test scripts/test/composeLayout.test.mjs scripts/test/preflight.test.mjs
+      - name: Hosted deploy checks (config equivalence with 6986a4c, preview, preflight, twins, migrations, docs, env-files helper)
+        run: npm test -w @oab/cloud-deploy
       - name: actionlint on every workflow (pinned image)
         run: npm run lint:workflows
 

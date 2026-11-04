@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { completeOnboardingIfShown } from "./support/onboarding";
+import { completeOnboardingIfShown } from "../../e2e/support/onboarding";
 
 const composer = (page: Page) => page.locator("main [id$='-composer-input']:visible");
 const status = (page: Page) => page.locator("[id$='-header-status']:visible");

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain JS owner script without type declarations
-import { createAdmin } from "../../../../supabase/scripts/admin.mjs";
+import { createAdmin } from "../../../supabase/scripts/admin.mjs";
 
 const admin = () => createAdmin({ url: "https://stub.supabase.test", key: "sb_secret_test" });
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("supabase/scripts/admin.mjs queries", () => {
+describe("cloud/supabase/scripts/admin.mjs queries", () => {
   it("lists one page of auth users", async () => {
     const seen: string[] = [];
     vi.stubGlobal("fetch", async (input: string) => {

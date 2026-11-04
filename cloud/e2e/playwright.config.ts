@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { allowLive, appOrigin } from "./support/origin";
+import { allowLive, appOrigin } from "../../e2e/support/origin";
 import { DEMO_USER, storageFor } from "./support/users";
 
 const desktop = { width: 1440, height: 900 };

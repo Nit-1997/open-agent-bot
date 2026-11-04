@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { completeOnboardingIfShown } from "./support/onboarding";
+import { completeOnboardingIfShown } from "../../e2e/support/onboarding";
 import { BIG_SUR } from "./support/seed";
 import { seeded } from "./support/state";
 

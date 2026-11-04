@@ -2,7 +2,7 @@ const PAGE_SIZE = 1000;
 
 const required = (name) => {
   const v = process.env[name]?.trim();
-  if (!v) throw new Error(`missing ${name} (load deploy-config/env-files/.env-supabase-admin)`);
+  if (!v) throw new Error(`missing ${name} (load cloud/deploy/env-files/.env-supabase-admin)`);
   return v;
 };
 
