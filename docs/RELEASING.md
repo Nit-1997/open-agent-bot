@@ -4,6 +4,8 @@ This is the owner's runbook. A `v*` tag on `main` runs `.github/workflows/releas
 
 Design: `docs/superpowers/specs/2026-11-04-m5-distribution-design.md` (D2, D16).
 
+Homebrew tap: not built (deferred, spec A13).
+
 ## Prerequisites
 
 On your Mac:
@@ -15,7 +17,7 @@ gh auth status
 gh auth refresh -s read:packages
 ```
 
-- `gh` must be current: the attestation checks below use `--signer-workflow`, `--source-ref` and `--deny-self-hosted-runners`, which need a recent release (2.49 or later). Write the version you used in the checklist.
+- `gh` must be current: the attestation checks below use `--signer-workflow`, `--source-ref` and `--deny-self-hosted-runners`. Current `gh` releases have all three; at Gate 5a, confirm with `gh attestation verify --help` that each one is listed before you rely on those lines. Write the version you used in the checklist.
 - The factory checked the `gh run`, `gh release` and `gh api` commands below against gh 2.44.1 (the version on the factory Mac). It could not run the attestation checks for real: no attestation exists before the first release, so Gate 5a is the first real run of those lines.
 - `gh auth status` must show you signed in with the `repo` and `read:packages` scopes; `gh auth refresh -s read:packages` adds the second.
 - `jq`, Docker, and a clone of the repository with `origin` pointing at `Nit-1997/open-agent-bot`.
@@ -89,7 +91,7 @@ gh api "repos/Nit-1997/open-agent-bot/actions/runs/$id/pending_deployments" --jq
 
 2. Watch and approve (above). In the `desktop` job log both apps print `kind=release version=1.0.0-rc.1`, and `verify-dmgs` is green.
 3. `gh release view "$TAG"` shows Draft, Pre-release and four assets. Draft assets download only when you are signed in: use `gh release download`, or a browser signed in to GitHub as you.
-4. Download and verify the checksums and the attestations:
+4. Run `gh attestation verify --help` and check that it lists `--signer-workflow`, `--source-ref` and `--deny-self-hosted-runners`. Then download and verify the checksums and the attestations:
 
    ```bash
    mkdir -p /tmp/oa-rc1 && gh release download "$TAG" -D /tmp/oa-rc1 && (cd /tmp/oa-rc1 && shasum -a 256 -c SHA256SUMS && for f in Open-Agent-*.dmg open-agent-services.json; do gh attestation verify "$f" --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref "refs/tags/$TAG" --deny-self-hosted-runners; done)
@@ -164,14 +166,16 @@ gh api "repos/Nit-1997/open-agent-bot/actions/runs/$id/pending_deployments" --jq
 
 ## Rollback
 
-- **The workflow failed and no release exists for the tag.** First try `gh run rerun "$id" --failed`. If the code needs a fix, delete the tag (the ruleset lets only you do it), merge the fix to `main`, and use the **next** rc number for rehearsals:
+**The tag rule.** An rc tag is never pushed twice: after a fix, the next rehearsal uses the next rc number (`v1.0.0-rc.1` → `v1.0.0-rc.2`). A final tag such as `v1.0.0` may be pushed again on the fixed commit only while no release (draft or published) was ever created for it; once any draft existed for it, the fix ships as the next patch, `v1.0.1`.
+
+- **The workflow failed and no release exists for the tag.** First try `gh run rerun "$id" --failed`. If the code needs a fix, delete the tag (the ruleset lets only you do it), merge the fix to `main`, and tag again by the tag rule:
 
   ```bash
   git push origin :refs/tags/$TAG && git tag -d "$TAG"
   ```
 
-  For `v1.0.0` itself the same tag may be pushed again on the fixed commit only while no release (draft or published) was ever created for it: nothing public references it, and the GHCR `:1.0.0` tag moves to the new index. Once a draft existed, use `v1.0.1`.
-- **A bad draft.** Delete it with its tag, then tag again as above:
+  Nothing public references a tag without a release, and for a final tag the GHCR `:<version>` tag moves to the new index.
+- **A bad draft.** Delete the draft and its tag, merge the fix to `main`, and tag by the tag rule (a draft existed, so a final becomes `v1.0.1`):
 
   ```bash
   gh release delete "$TAG" --yes --cleanup-tag

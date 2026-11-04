@@ -49,12 +49,12 @@ It copies the source without `node_modules` and runs `npm ci` inside the contain
 
 The owner makes releases from a `v*` tag with `.github/workflows/release.yml`; every step, the GitHub settings and the rollback are in [docs/RELEASING.md](docs/RELEASING.md).
 
-- Release logic lives in `scripts/release/`, one script per step, and is tested by `scripts/test/release.test.mjs`, `scripts/test/releaseWorkflow.test.mjs` and `scripts/test/workflowPins.test.mjs`. The workflow only calls those scripts (plus `gh` and `docker`); don't add release logic inline in a `run:` step. `npm run lint:workflows` runs actionlint from a pinned image over every workflow.
-- `.github/CODEOWNERS` names the owner for the workflows, `scripts/release/` and `apps/desktop/release-policy.json` (the `minShellVersion` every release manifest carries).
-- **Dry run.** It runs every workflow step that doesn't need GitHub on this Mac: builds and pushes both images for both platforms to a local registry, writes the release lock and manifest, builds and checks both DMGs, and writes `SHA256SUMS`, the notes and the draft release. It needs test mode, a `0.0.0-dryrun.<n>` version, a registry on `127.0.0.1:18xxx` and an `oab-` builder:
+- Release logic lives in `scripts/release/`, one script per step, and is tested by `scripts/test/release.test.mjs`, `scripts/test/releaseWorkflow.test.mjs`, `scripts/test/dryRunWorkflow.test.mjs` and `scripts/test/workflowPins.test.mjs`. The workflow only calls those scripts (plus `gh` and `docker`); don't add release logic inline in a `run:` step. `npm run lint:workflows` runs actionlint from a pinned image over every workflow.
+- `.github/CODEOWNERS` names the owner for the workflows, `scripts/release/`, `scripts/docs/`, `scripts/demo/`, `docs/INSTALL.md`, `README.md` and `apps/desktop/release-policy.json` (the `minShellVersion` every release manifest carries).
+- **Dry run.** It runs every workflow step that doesn't need GitHub on this Mac: builds and pushes both images for both platforms to a local registry, writes the release lock and manifest, builds and checks both DMGs, and writes `SHA256SUMS`, the notes and the draft release. The DMG checks and the `SHA256SUMS` line are `release.yml`'s own `verify-dmgs` and `attest` run blocks, read from the workflow and run verbatim, so the dry run tests what a release runs. It needs test mode, a `0.0.0-dryrun.<n>` version, a registry on `127.0.0.1:18xxx` and an `oab-` builder:
 
 ```bash
-docker run -d --name oab-factory-m5-registry -p 127.0.0.1:18501:5000 registry:2
+docker run -d --name oab-factory-m5-registry -p 127.0.0.1:18501:5000 registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 printf '[registry."127.0.0.1:18501"]\n  http = true\n  insecure = true\n' > /tmp/oab-buildkitd.toml
 docker buildx create --name oab-factory-m5-builder --driver docker-container --driver-opt network=host --buildkitd-config /tmp/oab-buildkitd.toml
 OPEN_AGENT_SHELL_TEST=1 npm run release:dry-run -- --version 0.0.0-dryrun.1 --registry 127.0.0.1:18501 --builder oab-factory-m5-builder --out .factory/m5/release-dry-run/0.0.0-dryrun.1

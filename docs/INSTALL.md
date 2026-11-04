@@ -63,7 +63,7 @@ shasum -a 256 -c SHA256SUMS --ignore-missing
 
 You should see `Open-Agent-1.0.0-arm64.dmg: OK` (or the `-x64` name). This only catches a broken or incomplete download. `SHA256SUMS` sits next to the files it lists, so it doesn't prove who made them.
 
-To check that the file really was built by this project's release workflow, use the GitHub CLI. You need a current version (install it, or update the one you have) and you must be signed in:
+To check that the file really was built by this project's release workflow, use the GitHub CLI (`gh`). The commands below install it with [Homebrew](https://brew.sh/), so you need Homebrew first. Install or upgrade `gh` to the current version, then sign in:
 
 ```bash
 brew install gh
@@ -148,7 +148,7 @@ The app checks GitHub for a new version once a day. To turn this off, open Open 
 
 1. Open "Services & data…" → "Delete all data…". Type `delete` and click "Delete all data". This removes your chats, reports and saved keys.
 2. Quit Open Agent.
-3. Drag "Open Agent" from Applications to the Bin.
+3. Drag "Open Agent" from Applications to the Trash.
 4. Remove the app's settings and logs. In Terminal:
 
 ```bash
@@ -218,6 +218,8 @@ docker compose down
 ```
 
 **Delete everything** (chats, reports and saved keys):
+
+Warning: the Mac app uses the same Docker volumes, so this also deletes the Mac app's chats, reports and saved keys on this computer.
 
 ```bash
 docker compose down -v
