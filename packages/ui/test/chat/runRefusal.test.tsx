@@ -4,8 +4,9 @@ import type { RunRefusal } from "@oab/shared/runRefusals";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { EMPTY, type Observable } from "rxjs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatSession } from "../../src/components/chat/ChatSession.tsx";
+import { resetAuthState, useAuthState } from "../../src/lib/authState.ts";
 import { type Platform, PlatformProvider, type PlatformSlots, type RunRefusalNoticeProps } from "../../src/platform/index.ts";
 import { navRouter } from "../support/navigation.tsx";
 import { expectUniqueIds } from "../support/ids.ts";
@@ -86,10 +87,27 @@ function session() {
   );
 }
 
+function AuthProbe() {
+  return <span id="refused-auth-state">{useAuthState()}</span>;
+}
+
+const currentAuthState = () => el("refused-auth-state")?.textContent;
+
 function mount(slots?: PlatformSlots) {
-  if (!slots) return render(session());
+  if (!slots)
+    return render(
+      <>
+        {session()}
+        <AuthProbe />
+      </>,
+    );
   const platform: Platform = { router: navRouter, user: { email: "ntn@example.test", name: "Nitin" }, slots };
-  return render(<PlatformProvider platform={platform}>{session()}</PlatformProvider>);
+  return render(
+    <PlatformProvider platform={platform}>
+      {session()}
+      <AuthProbe />
+    </PlatformProvider>,
+  );
 }
 
 async function send(text = "Plan a weekend in Lisbon.") {
@@ -112,6 +130,8 @@ async function endRun(outcome: "resolve" | Error) {
     else run.reject(outcome);
   });
 }
+
+afterEach(() => resetAuthState());
 
 beforeEach(() => {
   runs.length = 0;
@@ -241,6 +261,25 @@ describe("run refusals through the runRefusal slot", () => {
     await endRun("resolve");
     await waitFor(() => expect(notice()).not.toBeNull());
     await send("Try again please.");
+    expect(runAgent).toHaveBeenCalledTimes(2);
     expect(notice()).toBeNull();
+  });
+
+  it("switches the app to the access-disabled notice when a run is refused with account_disabled", async () => {
+    mount(SLOT);
+    await send();
+    expect(currentAuthState()).toBe("active");
+    await runErrorEvent(httpRefusal({ error: "account_disabled", message: "This account is being deleted." }, 403));
+    await endRun("resolve");
+    expect(notice()).toBeNull();
+    expect(currentAuthState()).toBe("account_disabled");
+  });
+
+  it("switches to the access-disabled notice when the refused run ends with a thrown account_disabled error", async () => {
+    mount(SLOT);
+    await send();
+    await endRun(new Error(httpRefusal({ error: "account_disabled", message: "Your access has been turned off." }, 403)));
+    expect(notice()).toBeNull();
+    expect(currentAuthState()).toBe("account_disabled");
   });
 });
