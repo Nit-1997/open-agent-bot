@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,11 +9,23 @@ export const M7_MIGRATIONS = Object.freeze(["20261104092535_request_usage.sql", 
 const USAGE =
   "usage: <the CLI's dry-run output> | check-push-plan.mjs [--applied]\n       check-push-plan.mjs --pre-m7-versions | --pre-m7-query";
 
-export const preM7Migrations = (dir = MIGRATIONS_DIR) =>
-  readdirSync(dir)
-    .filter((f) => f.endsWith(".sql") && !M7_MIGRATIONS.includes(f))
-    .sort();
-export const preM7Versions = (dir = MIGRATIONS_DIR) => preM7Migrations(dir).map((f) => f.split("_")[0]);
+export const PRE_M7_MIGRATIONS = Object.freeze([
+  "20261101060613_foundation.sql",
+  "20261101060619_profiles.sql",
+  "20261101060633_access.sql",
+  "20261101060645_chats_workspace.sql",
+  "20261101060651_artifacts.sql",
+  "20261101060659_providers.sql",
+  "20261101073603_no_password_tokens.sql",
+  "20261101214044_app_shell_search.sql",
+  "20261101225832_workspace_counts.sql",
+  "20261101235026_chat_message_parts.sql",
+  "20261102000914_artifact_thumbnails.sql",
+  "20261102034812_drop_workspace_entities.sql",
+]);
+
+export const preM7Migrations = () => [...PRE_M7_MIGRATIONS];
+export const preM7Versions = () => PRE_M7_MIGRATIONS.map((f) => f.split("_")[0]);
 
 export const PRE_M7_CHECKS = Object.freeze([
   ["public.profiles", "to_regclass('public.profiles') is null"],

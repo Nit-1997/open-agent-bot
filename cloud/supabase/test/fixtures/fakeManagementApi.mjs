@@ -37,12 +37,17 @@ function answer(db, query, log) {
     log.push(`SQL update mode=${db.mode}`);
     return [];
   }
+  if (query === "select to_regclass('public.signup_settings') is not null as ok") {
+    if (db.regclassFails) throw Object.assign(new Error("connection reset"), { status: 503 });
+    return [{ ok: db.settingsRows !== 0 }];
+  }
   if (query.startsWith("select obj_description")) return [{ v: db.hookVersion }];
   if (query.includes("to_regprocedure('public.request_admit")) return [{ ok: db.m7Functions }];
   if (query.includes("to_regprocedure('private.")) return [{ ok: db.hooks }];
   if (query.startsWith("select mode from public.signup_settings")) {
     if (db.settingsRows === 0) throw Object.assign(new Error("relation missing"), { status: 400 });
-    return [{ mode: db.mode }];
+    if (db.modeReadFails) throw Object.assign(new Error("statement timeout"), { status: 503 });
+    return Array.from({ length: db.settingsRows }, () => ({ mode: db.mode }));
   }
   if (query.startsWith("select count(*)::int as n from public.signup_settings")) {
     if (db.settingsRows === 0) throw Object.assign(new Error("relation missing"), { status: 400 });
@@ -53,7 +58,7 @@ function answer(db, query, log) {
 }
 
 export async function startFakeManagementApi({ auth = fakeAuthConfig(), db = fakeDatabase(), ports = [18730, 18739] } = {}) {
-  const state = { auth, db, log: [], hosts: new Set() };
+  const state = { auth, db, log: [], hosts: new Set(), paths: [], failFullPatch: false };
   const server = createServer((req, res) => {
     let text = "";
     req.on("data", (c) => {
@@ -61,6 +66,7 @@ export async function startFakeManagementApi({ auth = fakeAuthConfig(), db = fak
     });
     req.on("end", () => {
       state.hosts.add(req.headers.host);
+      state.paths.push(`${req.method} ${req.url}`);
       const send = (status, body) => {
         res.writeHead(status, { "content-type": "application/json" });
         res.end(body === undefined ? "" : JSON.stringify(body));
@@ -72,6 +78,11 @@ export async function startFakeManagementApi({ auth = fakeAuthConfig(), db = fak
       try {
         if (req.method === "GET" && path === "/config/auth") return send(200, state.auth);
         if (req.method === "PATCH" && path === "/config/auth") {
+          const minimal = Object.keys(body).length === 1 && "disable_signup" in body;
+          if (state.failFullPatch && !minimal) {
+            state.log.push("PATCH auth full refused 400");
+            return send(400, { message: "invalid smtp_admin_email" });
+          }
           state.log.push(
             `PATCH auth ${Object.keys(body).sort().join(",")}${"disable_signup" in body ? ` disable_signup=${body.disable_signup}` : ""}`,
           );

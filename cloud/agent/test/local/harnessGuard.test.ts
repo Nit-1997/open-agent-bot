@@ -75,6 +75,25 @@ describe("local harness guard (Security M1)", () => {
     expect(refusal({ ...GOOD, OAB_SB_DB_URL: "nope" })).toMatch(/not a URL/);
   });
 
+  it("refuses query parameters that would move the connection off 127.0.0.1 (node-pg reads them)", () => {
+    const base = "postgresql://postgres:postgres@127.0.0.1:18742/postgres";
+    for (const [q, name] of [
+      ["?host=db.example.com", "host"],
+      ["?hostaddr=10.0.0.1", "hostaddr"],
+      ["?port=5432", "port"],
+      ["?sslmode=disable&host=db.example.com", "host"],
+    ])
+      expect(refusal({ ...GOOD, OAB_SB_DB_URL: `${base}${q}` }), q).toMatch(
+        new RegExp(`OAB_SB_DB_URL may carry no query parameter but sslmode=disable \\(got ${name}\\)`),
+      );
+    expect(refusal({ ...GOOD, OAB_SB_DB_URL: `${base}?sslmode=require` })).toMatch(/sslmode must be disable/);
+    expect(guardLocalEnv({ ...GOOD, OAB_SB_DB_URL: `${base}?sslmode=disable` })?.dbUrl).toBe(`${base}?sslmode=disable`);
+  });
+
+  it("refuses every variable of the shared forbidden list, including the database password", () => {
+    expect(LIVE_ENV).toEqual(expect.arrayContaining(["SUPABASE_DB_PASSWORD", "LIVE_DB_URL", "SUPABASE_DB_URL"]));
+  });
+
   it("refuses an API URL that isn't http://127.0.0.1:<18700-18749>", () => {
     for (const url of [
       "https://abcdefghijklmnopqrst.supabase.co",

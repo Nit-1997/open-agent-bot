@@ -6,6 +6,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { FORBIDDEN_ENV, forbiddenEnvSet, localDbUrlProblem, PORT_MAX, PORT_MIN, REFUSAL_CODE } from "./localGuard.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const CLOUD_DIR = resolve(HERE, "..", "..");
@@ -14,17 +15,13 @@ export const TEMPLATE = join(CLOUD_DIR, "supabase", "local", "config.template.to
 export const PLATFORM = join(CLOUD_DIR, "supabase", "local", "platform.sql");
 
 export const NAME_RE = /^oab-m7-[a-z0-9-]{1,20}$/;
-export const PORT_MIN = 18700;
-export const PORT_MAX = 18749;
+export { FORBIDDEN_ENV, PORT_MAX, PORT_MIN, REFUSAL_CODE };
 export const PORT_SPAN = 5;
-export const FORBIDDEN_ENV = ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_PASSWORD", "SUPABASE_DB_URL"];
 export const LINKED_STATE = ["project-ref", "pooler-url", "postgres-version", "rest-version", "gotrue-version", "storage-version"];
 export const COMMANDS = ["start", "stop", "status", "reset", "env", "push-dry-run", "push"];
 export const DEFAULT_SITE_URL = "http://localhost:18721";
 const SITE_RE = /^http:\/\/(localhost|127\.0\.0\.1):(\d{5})$/;
 const VALUE_RE = /^[A-Za-z0-9_.:/@=+-]+$/;
-
-export const REFUSAL_CODE = "local_stack_only";
 
 export class Refusal extends Error {
   constructor(message) {
@@ -59,20 +56,13 @@ export function checkSiteUrl(raw) {
 }
 
 export function checkDbUrl(raw) {
-  let u;
-  try {
-    u = new URL(raw);
-  } catch {
-    throw new Refusal("--db-url is not a URL");
-  }
-  if (!/^postgres(ql)?:$/.test(u.protocol)) throw new Refusal("--db-url must be a postgresql:// URL");
-  if (u.hostname !== "127.0.0.1") throw new Refusal(`refusing --db-url: the host must be 127.0.0.1 (got ${u.hostname || "none"})`);
-  if (!inRange(Number(u.port))) throw new Refusal(`refusing --db-url: the port must be ${PORT_MIN}-${PORT_MAX}`);
+  const problem = localDbUrlProblem(raw, "--db-url");
+  if (problem) throw new Refusal(`refusing ${problem}`);
   return raw;
 }
 
 export function refuseEnv(env) {
-  const set = FORBIDDEN_ENV.filter((k) => env[k] !== undefined && env[k] !== "");
+  const set = forbiddenEnvSet(env);
   if (set.length) throw new Refusal(`refusing to run with ${set.join(", ")} set: this script only drives a local stack (unset them first)`);
 }
 
@@ -337,7 +327,14 @@ export async function main(argv, deps = {}) {
   };
 
   const stop = async (o) => {
+    if (!leftovers(o.name, list).length) {
+      rmSync(work, { recursive: true, force: true });
+      out(`[local-stack] ${o.name} is not running; no containers, volumes or networks remain`);
+      return 0;
+    }
     if (!existsSync(join(work, "supabase", "config.toml"))) prepare(work, o, []);
+    const keyFile = join(work, "supabase", "signing_keys.json");
+    if (!existsSync(keyFile)) writeFileSync(keyFile, "[]\n", { mode: 0o600 });
     must(await cli([...wd, "stop", "--no-backup"]), "supabase stop");
     rmSync(work, { recursive: true, force: true });
     const left = leftovers(o.name, list);

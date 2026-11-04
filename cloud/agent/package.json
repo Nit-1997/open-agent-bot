@@ -9,9 +9,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "biome lint && biome lint --config-path ../supabase ../supabase/scripts/local-stack.mjs ../supabase/scripts/gen-types.mjs ../supabase/scripts/blocked-domains.mjs ../supabase/scripts/managementApi.mjs ../supabase/scripts/configure-auth.mjs ../supabase/scripts/test-users.mjs ../supabase/scripts/check-push-plan.mjs ../supabase/scripts/check-old-bodies.mjs ../supabase/test",
+    "lint": "biome lint && biome lint --config-path ../supabase ../supabase/scripts/localGuard.mjs ../supabase/scripts/local-stack.mjs ../supabase/scripts/gen-types.mjs ../supabase/scripts/blocked-domains.mjs ../supabase/scripts/managementApi.mjs ../supabase/scripts/configure-auth.mjs ../supabase/scripts/test-users.mjs ../supabase/scripts/check-push-plan.mjs ../supabase/scripts/check-old-bodies.mjs ../supabase/test",
     "format": "biome format --write",
-    "format:check": "biome format && biome format --config-path ../supabase ../supabase/scripts/local-stack.mjs ../supabase/scripts/gen-types.mjs ../supabase/scripts/blocked-domains.mjs ../supabase/scripts/managementApi.mjs ../supabase/scripts/configure-auth.mjs ../supabase/scripts/test-users.mjs ../supabase/scripts/check-push-plan.mjs ../supabase/scripts/check-old-bodies.mjs ../supabase/test",
+    "format:check": "biome format && biome format --config-path ../supabase ../supabase/scripts/localGuard.mjs ../supabase/scripts/local-stack.mjs ../supabase/scripts/gen-types.mjs ../supabase/scripts/blocked-domains.mjs ../supabase/scripts/managementApi.mjs ../supabase/scripts/configure-auth.mjs ../supabase/scripts/test-users.mjs ../supabase/scripts/check-push-plan.mjs ../supabase/scripts/check-old-bodies.mjs ../supabase/test",
     "typecheck": "tsc -b && tsc -p tsconfig.evals.json && tsc -p tsconfig.test.json",
     "test": "vitest run && npm run test:scripts",
     "test:scripts": "node --test --disable-warning=ExperimentalWarning ../supabase/test/*.test.mjs",

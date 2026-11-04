@@ -332,6 +332,17 @@ describe("ci.yml cloud-supabase job (M7 D19)", () => {
     assert.equal(teardown.run, "node cloud/supabase/scripts/local-stack.mjs stop --name oab-m7-ci --ports 18740");
     assert.doesNotMatch(JSON.stringify(job), /--linked|supabase link|config push|supabase\.co|SUPABASE_ACCESS_TOKEN|SUPABASE_PROJECT_REF/);
   });
+
+  it("on failure lists the stack's containers and prints auth, db and kong logs with key lines dropped, before the teardown", () => {
+    const i = job.steps.findIndex((s) => s.if === "failure()");
+    assert.equal(i, job.steps.length - 2);
+    const diag = job.steps[i].run;
+    assert.match(diag, /docker ps -a --filter name=_oab-m7-ci/);
+    assert.match(diag, /for svc in auth db kong; do/);
+    assert.match(diag, /docker logs --tail 200 "supabase_\$\{svc\}_oab-m7-ci"/);
+    assert.match(diag, /grep -viE 'sb_secret_\|sb_publishable_\|eyJ\|apikey\|authorization\|password' \|\| true/);
+    assert.doesNotMatch(diag, /secrets\.|local-stack\.mjs env|printenv|\benv\b/);
+  });
 });
 
 describe("ci.yml checkouts", () => {
