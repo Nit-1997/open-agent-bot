@@ -80,4 +80,16 @@ describe("request limit config", () => {
     );
     expect(listed).toEqual(Object.fromEntries(Object.entries(LIMIT_RANGES).map(([k, r]) => [k, String(r.fallback)])));
   });
+
+  it("says in the env example header that only the fixed telemetry setting and the LIMIT_* defaults carry values", () => {
+    const example = readFileSync(new URL("../../../deploy/env.examples/agent.env.example", import.meta.url), "utf8");
+    const header = example.split("\n")[0];
+    expect(header).not.toContain("Names only;");
+    expect(header).toContain("LIMIT_*");
+    const valued = example
+      .split("\n")
+      .filter((l) => /^[A-Z_]+=.+/.test(l))
+      .map((l) => l.split("=")[0]);
+    expect(valued.every((k) => k === "COPILOTKIT_TELEMETRY_DISABLED" || k.startsWith("LIMIT_"))).toBe(true);
+  });
 });

@@ -50,10 +50,7 @@ export type HostedSeams = {
 };
 
 export function humanVerifierFor(cfg: Pick<HostedConfig, "turnstile" | "appOrigin" | "localStack">): HumanVerifier | undefined {
-  if (!cfg.turnstile) {
-    log.warn("[signup] open mode needs TURNSTILE_SECRET_KEY");
-    return undefined;
-  }
+  if (!cfg.turnstile) return undefined;
   const { secret, verifyUrl } = cfg.turnstile;
   return createTurnstileVerifier({
     secret,
@@ -63,7 +60,14 @@ export function humanVerifierFor(cfg: Pick<HostedConfig, "turnstile" | "appOrigi
   });
 }
 
-export type HostedAgent = { deps: AgentDeps; status: UserStatusCache; usage: UsageRepo; deleting: DeletingUsers };
+export type HostedAgent = {
+  deps: AgentDeps;
+  status: UserStatusCache;
+  usage: UsageRepo;
+  deleting: DeletingUsers;
+  signup: SignupSettings;
+  verifierConfigured: boolean;
+};
 
 export function startLimitTimers(policy: Pick<HostedRunPolicy, "sweep">, usage: Pick<UsageRepo, "prune">): () => void {
   const timers = [
@@ -162,5 +166,5 @@ export function hostedAgentDeps(
       });
     },
   };
-  return { deps, status, usage, deleting };
+  return { deps, status, usage, deleting, signup, verifierConfigured: !!verifier };
 }

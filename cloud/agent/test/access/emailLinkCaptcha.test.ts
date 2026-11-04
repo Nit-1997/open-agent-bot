@@ -4,6 +4,7 @@ import { UserError } from "@oab/core/lib/errors.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { type AccessDeps, createAccessService, type EmailLinkCaptcha } from "../../src/access/service.js";
 import type { HumanVerifier, VerifyOutcome } from "../../src/captcha/turnstile.js";
+import { EMAIL_LINK_CAPTCHA_ATTEMPTS } from "../../src/limits/config.js";
 import { makeHostedApp } from "../fixtures/hostedApp.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -75,6 +76,17 @@ describe("email-link captcha", () => {
       });
       expect(sendMagicLink).not.toHaveBeenCalled();
     }
+  });
+
+  it("limits captcha attempts per IP before calling Cloudflare, answering 429 rate_limited", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const v = verifier("failed");
+    const { svc } = service({ required: async () => true, verifier: v });
+    for (let i = 0; i < EMAIL_LINK_CAPTCHA_ATTEMPTS.max; i++)
+      expect(await refusal(svc.emailLink(`u${i}@example.test`, "203.0.113.7", "bad"))).toMatchObject({ code: "human_check_failed" });
+    expect(await refusal(svc.emailLink("z@example.test", "203.0.113.7", "bad"))).toEqual({ status: "rate_limited", code: "rate_limited" });
+    expect(v.calls).toHaveLength(EMAIL_LINK_CAPTCHA_ATTEMPTS.max);
+    expect(await refusal(svc.emailLink("z@example.test", "198.51.100.2", "bad"))).toMatchObject({ code: "human_check_failed" });
   });
 
   it("ignores the token when the check doesn't apply", async () => {

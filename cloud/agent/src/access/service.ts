@@ -3,10 +3,11 @@ import type { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import { ipKey } from "@oab/core/lib/ipKey.js";
 import { log } from "@oab/core/lib/log.js";
-import { LIMITS, type RateLimiter } from "@oab/core/lib/rateLimit.js";
+import { LIMITS, type RateLimiter, rateLimitError } from "@oab/core/lib/rateLimit.js";
 import { normalizeEmail as parseEmail } from "@oab/shared/email";
 import { humanCheckUnavailable, refusalOf } from "../captcha/refusals.js";
 import type { HumanVerifier } from "../captcha/turnstile.js";
+import { EMAIL_LINK_CAPTCHA_ATTEMPTS } from "../limits/config.js";
 import type { SubmitOutcome } from "../store/admin.js";
 
 export type EmailLinkCaptcha = { required: () => Promise<boolean>; verifier?: HumanVerifier };
@@ -86,7 +87,13 @@ export function createAccessService(deps: AccessDeps) {
     async emailLink(email: string, ip: string, captchaToken?: unknown): Promise<void> {
       const ipHash = hashIp(deps.pepper, ip);
       const tag = tagOf(ipHash);
+      const ipHex = ipHash.toString("hex");
       if (deps.captcha && (await deps.captcha.required())) {
+        const attempt = deps.limiter.take(`email-link-captcha:${ipHex}`, EMAIL_LINK_CAPTCHA_ATTEMPTS);
+        if (!attempt.ok) {
+          log.warn(`[access] email link rate_limited_captcha ip=${tag}`);
+          throw rateLimitError(attempt.retryAfter);
+        }
         const refusal = deps.captcha.verifier
           ? refusalOf(await deps.captcha.verifier.verify(captchaToken, { action: "email_link", remoteIp: ip }))
           : humanCheckUnavailable();
@@ -95,7 +102,6 @@ export function createAccessService(deps: AccessDeps) {
           throw refusal;
         }
       }
-      const ipHex = ipHash.toString("hex");
       const addr = createHash("sha256").update(email, "utf8").digest("hex");
       if (!deps.limiter.take(`email-link-ip:${ipHex}`, LIMITS.emailLinkIp).ok) {
         log.warn(`[access] email link rate_limited_ip ip=${tag}`);

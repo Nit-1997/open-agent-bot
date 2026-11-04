@@ -9,7 +9,7 @@ import { humanCheckUnavailable, refusalOf } from "../captcha/refusals.js";
 import type { HumanVerifier } from "../captcha/turnstile.js";
 import { clientIp } from "../http/clientIp.js";
 import { HUMAN_CHECK_ROUTE } from "../limits/config.js";
-import type { LiveHumanCheckGate } from "./humanCheck.js";
+import { gateApplies, type LiveHumanCheckGate } from "./humanCheck.js";
 
 export type SignupRouteDeps = {
   mode: () => Promise<SignupMode | "unknown">;
@@ -22,7 +22,7 @@ export function signupModeRoutes(deps: Pick<SignupRouteDeps, "mode">): Hono {
   const app = new Hono();
   app.get("/signup", async (c) => {
     const mode = await deps.mode();
-    return c.json({ mode: mode === "unknown" ? "waitlist" : mode }, 200, { "cache-control": "no-store" });
+    return c.json({ mode: mode === "unknown" ? "waitlist" : mode, captcha: gateApplies(mode) }, 200, { "cache-control": "no-store" });
   });
   return app;
 }

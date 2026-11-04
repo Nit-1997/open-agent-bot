@@ -9,6 +9,7 @@ export const SIGNUP_TIMEOUT_MS = 3000;
 
 export interface SignupSettings {
   mode(): Promise<SignupMode | "unknown">;
+  probe(): Promise<SignupMode>;
   stats(): Promise<SignupStats>;
 }
 
@@ -60,15 +61,24 @@ export function createSignupSettings(db: Db, opts: SignupSettingsOptions = {}): 
   let cached: { mode: SignupMode; at: number } | undefined;
   let pending: Promise<SignupMode | "unknown"> | undefined;
 
+  async function read(): Promise<SignupMode> {
+    const data = await rpc("settings", ms, (s) => db.rpc("signup_settings_get").abortSignal(s));
+    if (!Value.Check(ModeRows, data)) throw new SignupLookupError("settings", "invalid_row");
+    return data[0].mode as SignupMode;
+  }
+
   async function lookup(): Promise<SignupMode | "unknown"> {
     try {
-      const data = await rpc("settings", ms, (s) => db.rpc("signup_settings_get").abortSignal(s));
-      if (!Value.Check(ModeRows, data)) throw new SignupLookupError("settings", "invalid_row");
-      const mode = data[0].mode as SignupMode;
+      const mode = await read();
       cached = { mode, at: now() };
       return mode;
     } catch (err) {
-      log.warn("[signup] mode lookup failed, treating the mode as unknown", err instanceof Error ? err.message : err);
+      const why = err instanceof Error ? err.message : err;
+      if (cached) {
+        log.warn(`[signup] mode lookup failed, serving the last known mode ${cached.mode}`, why);
+        return cached.mode;
+      }
+      log.warn("[signup] mode lookup failed, treating the mode as unknown", why);
       return "unknown";
     }
   }
@@ -81,6 +91,7 @@ export function createSignupSettings(db: Db, opts: SignupSettingsOptions = {}): 
       });
       return pending;
     },
+    probe: read,
     async stats() {
       const data = await rpc("stats", ms, (s) => db.rpc("signup_stats").abortSignal(s));
       if (!Value.Check(StatsRows, data)) throw new SignupLookupError("stats", "invalid_row");
