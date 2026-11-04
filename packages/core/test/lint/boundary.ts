@@ -17,7 +17,7 @@ const REGEX_AFTER = new Set(["return", "typeof", "case", "do", "else", "in", "of
 
 type Token = { kind: "word" | "string" | "punct"; value: string };
 
-function tokenize(code: string): Token[] {
+function tokenize(code: string, texts: string[] = []): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   const regexAllowed = () => {
@@ -39,15 +39,21 @@ function tokenize(code: string): Token[] {
     return value;
   };
   const skipTemplate = () => {
+    let text = "";
     i++;
     while (i < code.length && code[i] !== "`") {
-      if (code[i] === "\\") i += 2;
-      else if (code[i] === "$" && code[i + 1] === "{") {
+      if (code[i] === "\\") {
+        text += code[i + 1] ?? "";
+        i += 2;
+      } else if (code[i] === "$" && code[i + 1] === "{") {
+        texts.push(text);
+        text = "";
         i += 2;
         scan("}");
         i++;
-      } else i++;
+      } else text += code[i++];
     }
+    texts.push(text);
     i++;
   };
   const skipRegex = () => {
@@ -105,6 +111,14 @@ export function importSpecifiers(code: string): string[] {
     else if (t.value === "from" && next?.kind === "string") found.push(next.value);
   });
   return found;
+}
+
+export function stringLiterals(code: string): string[] {
+  const texts: string[] = [];
+  const strings = tokenize(code, texts)
+    .filter((t) => t.kind === "string")
+    .map((t) => t.value);
+  return [...strings, ...texts];
 }
 
 const isHosted = (file: string) => file.startsWith(HOSTED);
