@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -54,7 +54,7 @@ function intrinsicElements(repo, path) {
 
 export function scanIds({ repo, roots, allowlist }) {
   const elements = roots
-    .flatMap((root) => sourceFiles(join(repo, root)))
+    .flatMap((root) => (existsSync(join(repo, root)) ? sourceFiles(join(repo, root)) : []))
     .flatMap((path) => (path.endsWith(".html") ? htmlElements(repo, path) : intrinsicElements(repo, path)));
   const allowed = (e) => e.spread && allowlist.some((a) => a.file === e.file && a.tag === e.tag);
   const unusedAllowlist = allowlist.filter((a) => !elements.some((e) => e.file === a.file && e.tag === a.tag && e.spread && !e.id));

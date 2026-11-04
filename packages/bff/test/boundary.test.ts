@@ -19,6 +19,7 @@ const FORBIDDEN: ReadonlyArray<readonly [string, RegExp]> = [
   ["node:*", /^node:/],
   ["**/web/**", /(^|\/)web(\/|$)/],
   ["**/cloud/**", /(^|\/)cloud(\/|$)/],
+  ["@oab/cloud*", /^@oab\/cloud(-[^/]+)?(\/.*)?$/],
 ];
 
 const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'`]([^"'`]+)["'`]/g;
@@ -61,6 +62,7 @@ const INJECTED = [
   'import { CopilotRuntime } from "@copilotkit/runtime/v2";\nexport default CopilotRuntime;\n',
   'import { requireUser } from "../../../web/lib/auth";\nexport default requireUser;\n',
   'export const load = () => import("next/headers");\n',
+  'import { hostedRoutes } from "@oab/cloud-agent/routes.js";\nexport default hostedRoutes;\n',
 ];
 
 const ALLOWED = [
@@ -89,6 +91,7 @@ describe("packages/bff boundary", { timeout: 60000 }, () => {
       "node:buffer",
       "../../web/lib/auth",
       "../cloud/x",
+      "@oab/cloud-agent/routes.js",
     ])
       expect(
         FORBIDDEN.some(([, re]) => re.test(spec)),

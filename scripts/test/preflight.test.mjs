@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -9,9 +11,9 @@ const PASS_ENV = ["PATH", "HOME", "DOCKER_HOST", "DOCKER_CONFIG", "DOCKER_CONTEX
 const LOCAL = "docker compose -p oab-factory-m3-5 --env-file /dev/null -f docker-compose.yml";
 const TEST_VOLUMES = { OPEN_AGENT_DATA_VOLUME: "oab-factory-m3-data", OPEN_AGENT_KEYS_VOLUME: "oab-factory-m3-keys" };
 
-function preflight(command, env) {
-  const res = spawnSync("bash", ["-c", `. scripts/preview-preflight.sh; preflight ${command} || exit 1; echo AFTER`], {
-    cwd: ROOT,
+function preflight(command, env, cwd = ROOT) {
+  const res = spawnSync("bash", ["-c", `. "$0"; preflight ${command} || exit 1; echo AFTER`, join(ROOT, "scripts/preview-preflight.sh")], {
+    cwd,
     env: { ...Object.fromEntries(PASS_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]])), ...env },
     encoding: "utf8",
   });
@@ -76,8 +78,15 @@ describe("preflight on the local stack", () => {
 });
 
 describe("preflight on the hosted stack", () => {
+  const HOSTED = mkdtempSync(join(tmpdir(), "preflight-hosted-"));
+  mkdirSync(join(HOSTED, "deploy-config"));
+  copyFileSync(join(ROOT, "compose.hosted.yml"), join(HOSTED, "compose.hosted.yml"));
+  copyFileSync(join(ROOT, "deploy-config/compose.preview.yml"), join(HOSTED, "deploy-config/compose.preview.yml"));
+  for (const f of [".env-agent", ".env-renderer", ".env-nextjs"]) writeFileSync(join(HOSTED, "deploy-config", f), "", { mode: 0o600 });
+  after(() => rmSync(HOSTED, { recursive: true, force: true }));
+
   it("aborts on the pinned live project name", () => {
-    expectAbort(preflight("docker compose --env-file /dev/null -f compose.hosted.yml", {}), "project 'open-agent-bot'");
+    expectAbort(preflight("docker compose --env-file /dev/null -f compose.hosted.yml", {}, HOSTED), "project 'open-agent-bot'");
   });
 
   it("passes the hosted preview under an oab- project", () => {
@@ -85,6 +94,7 @@ describe("preflight on the hosted stack", () => {
       preflight(
         "docker compose -p oab-factory-m3-5-hosted --env-file /dev/null -f compose.hosted.yml -f deploy-config/compose.preview.yml --profile local",
         {},
+        HOSTED,
       ),
     );
   });

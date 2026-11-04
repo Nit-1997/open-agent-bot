@@ -16,6 +16,7 @@ const FORBIDDEN: ReadonlyArray<readonly [string, RegExp]> = [
   ["node:*", /^node:/],
   ["**/web/**", /(^|\/)web(\/|$)/],
   ["**/cloud/**", /(^|\/)cloud(\/|$)/],
+  ["@oab/cloud*", /^@oab\/cloud(-[^/]+)?(\/.*)?$/],
   ["@/", /^@\//],
 ];
 
@@ -55,6 +56,7 @@ const INJECTED = [
   importing("{ requireUser }", "../../../web/lib/auth"),
   importing("x", "@/lib/x"),
   importing("{ readFileSync }", "node:fs"),
+  importing("{ AdminPage }", "@oab/cloud-web/components/admin"),
 ];
 
 const ALLOWED = [
@@ -84,6 +86,7 @@ describe("packages/ui boundary", { timeout: 30000 }, () => {
       "node:fs",
       "../../../web/lib/auth",
       "../../cloud/x",
+      "@oab/cloud-web/components/admin",
       "@/lib/x",
     ];
     for (const spec of specs)
@@ -117,6 +120,11 @@ describe("packages/ui boundary", { timeout: 30000 }, () => {
 
   it("lint blocks a dynamic import of a forbidden module", async () => {
     const messages = await restricted('export const load = () => import("next/navigation");\n');
+    expect(messages).toHaveLength(1);
+  });
+
+  it("lint blocks a dynamic import of a cloud package", async () => {
+    const messages = await restricted('export const load = () => import("@oab/cloud-web/components/admin");\n');
     expect(messages).toHaveLength(1);
   });
 });

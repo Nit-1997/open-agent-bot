@@ -620,9 +620,15 @@ describe("dry-run.mjs guards", () => {
       assert.match(problems(swap("--registry", r)).join(), /--registry/);
   });
   it("refuses an --out outside .factory/ or the temp dir", () => {
-    for (const o of ["/Users/x/out", join(ROOT, "apps/desktop/release"), join(ROOT, ".factory"), join(ROOT, ".factory/../x")])
-      assert.match(problems(swap("--out", o)).join(), /--out must be under/, o);
-    assert.deepEqual(problems(swap("--out", join(tmpdir(), "oab-m5-dry"))), []);
+    const tmp = mkdtempSync(join(tmpdir(), "oab-m5-out-"));
+    try {
+      const inTmp = (argv) => problems(argv, TEST_ENV, { tmp });
+      for (const o of ["/Users/x/out", join(ROOT, "apps/desktop/release"), join(ROOT, ".factory"), join(ROOT, ".factory/../x")])
+        assert.match(inTmp(swap("--out", o)).join(), /--out must be under/, o);
+      assert.deepEqual(inTmp(swap("--out", join(tmp, "oab-m5-dry"))), []);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
   it("refuses a missing or non-oab builder", () => {
     assert.match(problems(good.slice(0, 4).concat(good.slice(6))).join(), /--builder/);

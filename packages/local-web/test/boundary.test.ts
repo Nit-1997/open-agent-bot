@@ -14,6 +14,7 @@ const FORBIDDEN: ReadonlyArray<readonly [string, RegExp]> = [
   ["@oab/bff*", /^@oab\/bff(\/.*)?$/],
   ["**/web/**", /(^|\/)web(\/|$)/],
   ["**/cloud/**", /(^|\/)cloud(\/|$)/],
+  ["@oab/cloud*", /^@oab\/cloud(-[^/]+)?(\/.*)?$/],
   ["node:*", /^node:/],
 ];
 
@@ -57,6 +58,8 @@ const FORBIDDEN_SPECS = [
   "@oab/bff/index.js",
   "../../../web/lib/auth",
   "../../cloud/x",
+  "@oab/cloud-web",
+  "@oab/cloud-web/components/admin",
   "node:fs",
 ];
 

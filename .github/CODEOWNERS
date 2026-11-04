@@ -6,3 +6,12 @@
 /scripts/demo/ @Nit-1997
 /docs/INSTALL.md @Nit-1997
 /README.md @Nit-1997
+/cloud/deploy/ @Nit-1997
+/cloud/agent/Dockerfile @Nit-1997
+/cloud/web/Dockerfile @Nit-1997
+/cloud/e2e/support/ @Nit-1997
+/scripts/ci/ @Nit-1997
+/scripts/boundary/ @Nit-1997
+/scripts/move/ @Nit-1997
+/.gitignore @Nit-1997
+/.dockerignore @Nit-1997

@@ -214,6 +214,54 @@ describe("ci.yml desktop jobs", () => {
   });
 });
 
+describe("ci.yml standalone job (M6 D13)", () => {
+  const wf = doc("ci.yml");
+  const job = wf.jobs.standalone;
+  const runs = () => job.steps.map((s) => s.run ?? "").join("\n");
+  const usesStep = (prefix) => job.steps.find((s) => String(s.uses ?? "").startsWith(prefix));
+
+  it("runs on pull requests and main: no if, Ubuntu 24.04, 45 minutes, contents: read, no environment, no secrets", () => {
+    assert.ok(job);
+    assert.equal(job.if, undefined);
+    assert.equal(job["runs-on"], "ubuntu-24.04");
+    assert.equal(Number(job["timeout-minutes"]), 45);
+    assert.deepEqual(job.permissions, { contents: "read" });
+    assert.equal(job.environment, undefined);
+    assert.equal(JSON.stringify(job).includes("secrets."), false);
+  });
+
+  it("checks out full history without persisted credentials and sets up Node from .nvmrc with the npm cache", () => {
+    const checkout = usesStep("actions/checkout@");
+    assert.equal(Number(checkout.with["fetch-depth"]), 0);
+    assert.equal(checkout.with["persist-credentials"], false);
+    const node = usesStep("actions/setup-node@");
+    assert.equal(node.with["node-version-file"], ".nvmrc");
+    assert.equal(node.with.cache, "npm");
+  });
+
+  it("uses a private 0700 TMPDIR and the oab-ci-oss project, port, volumes, images and APP_ORIGIN", () => {
+    assert.deepEqual(job.env, {
+      TMPDIR: "/home/runner/oab-tmp",
+      OAB_STANDALONE_ALLOW_DELETE: "1",
+      OAB_STANDALONE_PROJECT: "oab-ci-oss",
+      OPEN_AGENT_PORT: "18331",
+      APP_ORIGIN: "http://127.0.0.1:18331",
+      OPEN_AGENT_DATA_VOLUME: "oab-ci-oss-data",
+      OPEN_AGENT_KEYS_VOLUME: "oab-ci-oss-keys",
+      OPEN_AGENT_IMAGE: "oab-ci-oss-agent:dev",
+      OPEN_AGENT_SEARCH_IMAGE: "oab-ci-oss-search:dev",
+    });
+    assert.match(runs(), /^mkdir -m 700 "\$TMPDIR"$/m);
+  });
+
+  it("leaves npm ci and the Playwright install to the script (lockfile-pinned browser) and runs it with --docker only (6.2)", () => {
+    const text = runs();
+    assert.doesNotMatch(text, /npm ci|playwright install|npm install|npm prune/);
+    assert.equal(job.steps.at(-1).run.trim(), "bash scripts/ci/standalone.sh --docker");
+    assert.doesNotMatch(text, /--hosted-free/);
+  });
+});
+
 describe("release.yml", () => {
   const text = read("release.yml");
   const wf = doc("release.yml");

@@ -53,8 +53,8 @@ describe("hosted compose (compose.hosted.yml)", () => {
     let hosted;
     let before;
     try {
-      hosted = config(["-f", "compose.hosted.yml", ...HOSTED_PROFILES]);
-      before = config(["-p", "open-agent-bot", "-f", tmp, ...HOSTED_PROFILES]);
+      hosted = config(["-f", "compose.hosted.yml", ...HOSTED_PROFILES], {}, ["--no-env-resolution"]);
+      before = config(["-p", "open-agent-bot", "-f", tmp, ...HOSTED_PROFILES], {}, ["--no-env-resolution"]);
     } finally {
       rmSync(tmp, { force: true });
     }
@@ -191,7 +191,7 @@ describe("local compose (docker-compose.yml)", () => {
 
 describe("local SearXNG image (local/searxng/Dockerfile)", () => {
   const dockerfile = read("local/searxng/Dockerfile");
-  const hosted = config(["-f", "compose.hosted.yml"]).services.search;
+  const hosted = config(["-f", "compose.hosted.yml"], {}, ["--no-env-resolution"]).services.search;
 
   it("builds FROM the SearXNG digest the hosted stack pins", () => {
     assert.match(hosted.image, /@sha256:[0-9a-f]{64}$/);

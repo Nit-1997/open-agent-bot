@@ -31,6 +31,19 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**", "@oab/cloud-*", "@oab/cloud-*/**"],
+                "message": "Nothing outside cloud/ may import from cloud/."
+              }
+            ]
+          }
+        }
+      },
       "performance": {
         "useDomNodeTextContent": "off"
       }

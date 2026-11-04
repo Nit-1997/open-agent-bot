@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
-    "lint": "npm run lint --workspaces --if-present && npm run lint:scripts",
+    "lint": "npm run lint --workspaces --if-present && npm run lint:scripts && npm run lint:boundary",
+    "lint:boundary": "node scripts/boundary/cloud-boundary.mjs",
     "lint:scripts": "biome check --config-path scripts/biome.json scripts",
     "format:check": "npm run format:check --workspaces --if-present && npm run format:check:scripts",
     "format:check:scripts": "biome format --config-path scripts/biome.json scripts",

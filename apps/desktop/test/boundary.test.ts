@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ const APP = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(APP, "../..");
 
 const files = (dir: string, ext: RegExp): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : []).flatMap((e) => {
     const p = join(dir, e.name);
     if (e.isDirectory()) return e.name === "node_modules" || e.name === "dist" || e.name === ".next" ? [] : files(p, ext);
     return ext.test(e.name) ? [p] : [];
@@ -69,6 +69,22 @@ describe("B11 import boundary", () => {
         importSpecifiers(readFileSync(f, "utf8")).some((s) => s.startsWith("@oab/desktop") || /(^|\/)apps\/desktop(\/|$)/.test(s)),
       );
     expect(hits.map((f) => relative(REPO, f))).toEqual([]);
+  });
+
+  it("the folder walk skips a missing root (web/ leaves in M6)", () => {
+    expect(files(join(REPO, "no-such-root"), /\.ts$/)).toEqual([]);
+  });
+
+  it("the Biome rule rejects an injected @oab/cloud-web import in src", () => {
+    const probe = join(APP, "src/main/boundary-cloud-probe.ts");
+    writeFileSync(probe, 'import "@oab/cloud-web";\nexport const probe = 1;\n');
+    try {
+      const run = spawnSync(join(REPO, "node_modules/.bin/biome"), ["lint", relative(APP, probe)], { cwd: APP, encoding: "utf8" });
+      expect(run.status).not.toBe(0);
+      expect(`${run.stdout}${run.stderr}`).toContain("B11");
+    } finally {
+      rmSync(probe, { force: true });
+    }
   });
 
   it("the Biome rule rejects an injected @oab/core import in src", () => {

@@ -162,13 +162,14 @@ describe("demo part scripts", () => {
   it("recall only returns an existing folder under $TMPDIR or the demo dir, never one with ..", () => {
     const demo = `.factory/m5/test-recall-${process.pid}`;
     const repo = join(PARTS_DIR, "../../..");
-    const tmp = mkdtempSync(join(tmpdir(), "tmp."));
-    const outside = mkdtempSync(join(repo, ".factory/m5/outside-"));
+    const base = realpathSync(mkdtempSync("/var/tmp/oab-recall-tmpdir-"));
+    const tmp = mkdtempSync(join(base, "tmp."));
+    const outside = mkdtempSync("/var/tmp/oab-recall-outside-");
     const recall = (path) =>
       spawnSync("bash", ["-c", `. scripts/demo/m5/lib.sh; printf '%s\\n' "$1" > "$DEMO_DIR/x.path"; recall x`, "part-test", path], {
         cwd: repo,
         encoding: "utf8",
-        env: { ...process.env, DEMO_DIR: demo, TMPDIR: tmpdir() },
+        env: { ...process.env, DEMO_DIR: demo, TMPDIR: base },
       });
     try {
       const ok = recall(tmp);
@@ -179,7 +180,7 @@ describe("demo part scripts", () => {
         [join(tmp, "missing"), /not a directory/],
         [outside, /outside/],
         ["/", /outside/],
-        [realpathSync(tmpdir()), /outside/],
+        [base, /outside/],
       ]) {
         const r = recall(path);
         assert.equal(r.status, 1, path);
@@ -188,7 +189,7 @@ describe("demo part scripts", () => {
       symlinkSync(outside, join(tmp, "link"));
       assert.match(recall(join(tmp, "link")).stderr, /outside/);
     } finally {
-      rmSync(tmp, { recursive: true, force: true });
+      rmSync(base, { recursive: true, force: true });
       rmSync(outside, { recursive: true, force: true });
       rmSync(join(repo, demo), { recursive: true, force: true });
     }
