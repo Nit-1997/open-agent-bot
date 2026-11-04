@@ -40,7 +40,7 @@ function local(env, run) {
 async function hosted(env) {
   const need = (name) => {
     const v = env[name]?.trim();
-    if (!v) throw new Error(`missing ${name} (load cloud/deploy/env-files/.env-supabase-admin)`);
+    if (!v) throw new Error(`missing ${name} (load cloud/deploy-config/env-files/ops/.env)`);
     return v;
   };
   const res = await fetch(`https://api.supabase.com/v1/projects/${need("SUPABASE_PROJECT_REF")}/types/typescript?included_schemas=public`, {

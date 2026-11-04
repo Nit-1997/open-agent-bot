@@ -47,19 +47,25 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "node cloud/deploy/scripts/env-files.mjs --from \"$OLD/deploy-config\" --to cloud/deploy --copy --dry-run",
+      "command": "node cloud/deploy/scripts/env-files.mjs --from \"$OLD/deploy-config\" --to cloud/deploy-config/env-files --copy --dry-run",
       "mode": "owner",
       "reason": "Gate 7 (owner): reads the live checkout's settings files; rehearsed on oab- trees in demo part 4, unit-tested in cloud/deploy/test/envFiles.test.mjs"
     },
     {
       "file": "cloud/README.md",
-      "command": "node cloud/deploy/scripts/env-files.mjs --from \"$OLD/deploy-config\" --to cloud/deploy --copy",
+      "command": "node cloud/deploy/scripts/env-files.mjs --from \"$OLD/deploy-config\" --to cloud/deploy-config/env-files --copy",
       "mode": "owner",
       "reason": "Gate 7 (owner): copies the live checkout's settings files; rehearsed on oab- trees in demo part 4"
     },
     {
       "file": "cloud/README.md",
-      "command": "docker compose -p oab-gate7 -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local run --rm --no-deps --build agent node -e \"import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})\"",
+      "command": "node cloud/deploy/scripts/env-check.mjs",
+      "mode": "owner",
+      "reason": "Gate 7 (owner): checks the merged env files of the new hosted checkout (names only); make web runs the same check in the factory tests with dummy files"
+    },
+    {
+      "file": "cloud/README.md",
+      "command": "docker compose -p oab-gate7 -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env --env-file cloud/deploy-config/env-files/frontend/.env --profile local run --rm --no-deps --build agent node -e \"import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})\"",
       "mode": "owner",
       "reason": "Gate 7 (owner): loads the owner's real settings files into the new agent image; rehearsed as gate7_config_check in demo part 4"
     },
@@ -71,7 +77,7 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "P=\"docker compose -p oab-gate7 --env-file cloud/deploy/.env-nextjs -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local\"",
+      "command": "P=\"docker compose -p oab-gate7 --env-file cloud/deploy-config/env-files/backend/.env --env-file cloud/deploy-config/env-files/frontend/.env -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local\"",
       "mode": "owner",
       "reason": "Gate 7 (owner): a variable assignment for the owner's preview"
     },
@@ -107,7 +113,7 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local config --format json --no-env-resolution | jq '{name, volumes: [.volumes[].name]}'",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env --env-file cloud/deploy-config/env-files/frontend/.env --profile local config --format json --no-env-resolution | jq '{name, volumes: [.volumes[].name]}'",
       "mode": "owner",
       "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
     },
@@ -137,13 +143,13 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local up -d --build",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env --env-file cloud/deploy-config/env-files/frontend/.env --profile local up -d --build",
       "mode": "owner",
       "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
     },
     {
       "file": "cloud/README.md",
-      "command": "docker compose -f cloud/deploy/compose.hosted.yml ps",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env ps",
       "mode": "owner",
       "reason": "Gate 7 (owner): acts on or reads the live open-agent-bot project; the factory runs the same step only on oab- projects (demo part 4)"
     },
@@ -221,7 +227,7 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "set -a; . cloud/deploy/env-files/.env-supabase-admin; set +a",
+      "command": "set -a; . cloud/deploy-config/env-files/ops/.env; set +a",
       "mode": "owner",
       "reason": "Gates 8 and 9 (owner): loads the owner's Management API token and production keys; builders and verifiers never read this file in M7"
     },
@@ -293,13 +299,13 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "docker compose -f cloud/deploy/compose.hosted.yml logs --tail 50 agent | grep -E '\\[limits\\]|refusing to start'",
+      "command": "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env logs --tail 50 agent | grep -E '\\[limits\\]|refusing to start'",
       "mode": "owner",
       "reason": "Gate 8 (owner): reads the live agent's log; the factory never reads live container logs"
     },
     {
       "file": "cloud/README.md",
-      "command": "P=\"docker compose -p oab-preview --env-file .env --env-file cloud/deploy/.env-nextjs -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local\"",
+      "command": "P=\"docker compose -p oab-preview --env-file .env --env-file cloud/deploy-config/env-files/backend/.env --env-file cloud/deploy-config/env-files/frontend/.env -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local\"",
       "mode": "owner",
       "reason": "Gate 8 (owner): the hosted preview against the production project, which can start on M7 code only after the push; a variable assignment"
     },
@@ -317,25 +323,25 @@
     },
     {
       "file": "cloud/README.md",
-      "command": "grep -cE '^TURNSTILE_SECRET_KEY=[0-9]x0{30,}[A-Z]{2}$' cloud/deploy/.env-agent",
+      "command": "grep -cE '^TURNSTILE_SECRET_KEY=[0-9]x0{30,}[A-Z]{2}$' cloud/deploy-config/env-files/backend/.env",
       "mode": "owner",
-      "reason": "Gate 9 (owner): pattern check on the owner's production settings file (count only); the factory never reads .env-agent in M7"
+      "reason": "Gate 9 (owner): pattern check on the owner's production settings file (count only); the factory never reads the backend .env in M7"
     },
     {
       "file": "cloud/README.md",
-      "command": "grep -cE '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=[0-9]x0{20}[A-Z]{2}$' cloud/deploy/.env-nextjs",
+      "command": "grep -cE '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=[0-9]x0{20}[A-Z]{2}$' cloud/deploy-config/env-files/frontend/.env",
       "mode": "owner",
       "reason": "Gate 9 (owner): pattern check on the owner's production settings file (count only)"
     },
     {
       "file": "cloud/README.md",
-      "command": "grep -c '^TURNSTILE_SECRET_KEY=.' cloud/deploy/.env-agent",
+      "command": "grep -c '^TURNSTILE_SECRET_KEY=.' cloud/deploy-config/env-files/backend/.env",
       "mode": "owner",
       "reason": "Gate 9 (owner): checks the owner's real Turnstile secret is set (count only)"
     },
     {
       "file": "cloud/README.md",
-      "command": "grep -c '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=.' cloud/deploy/.env-nextjs",
+      "command": "grep -c '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=.' cloud/deploy-config/env-files/frontend/.env",
       "mode": "owner",
       "reason": "Gate 9 (owner): checks the owner's real Turnstile site key is set (count only)"
     },

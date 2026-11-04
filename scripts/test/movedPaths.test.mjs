@@ -125,7 +125,11 @@ describe("the stale-path guard", () => {
     assert.deepEqual(rowProblems([ROW]), []);
     assert.deepEqual(rowProblems({}), ["moved-paths.json must be an array"]);
     const bad = rowProblems([{ old: "", new: "cloud/x", pr: "7.1", allow: [{ file: "a" }] }]);
-    assert.deepEqual(bad, ["row 0: old must be a non-empty string", "row 0: pr must look like 6.<n>", "row 0 allow 0: needs a reason"]);
+    assert.deepEqual(bad, [
+      "row 0: old must be a non-empty string",
+      "row 0: pr must look like 6.<n> or name the change (words joined by -)",
+      "row 0 allow 0: needs a reason",
+    ]);
   });
 
   it("the CLI prints the count and exits 1 on a stale token", () => {

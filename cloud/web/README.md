@@ -10,7 +10,7 @@ npm run dev -w @oab/cloud-web   # needs the env vars below; sign-in cookies are 
 npm run lint -w @oab/cloud-web && npm run format:check -w @oab/cloud-web && npm run typecheck -w @oab/cloud-web && npm test -w @oab/cloud-web && npm run build -w @oab/cloud-web
 ```
 
-Every variable is required and checked on first use; nothing falls back to a default. For the hosted stack they live in `cloud/deploy/.env-nextjs` (names in `cloud/deploy/env.examples/nextjs.env.example`).
+Every variable is required and checked on first use; nothing falls back to a default. For the hosted stack they live in `cloud/deploy-config/env-files/frontend/.env` (names in the `.env.example` beside it).
 
 | Env var | Purpose |
 | --- | --- |

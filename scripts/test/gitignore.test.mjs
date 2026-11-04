@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { NEW_RULES, SECRET_PATHS } from "./secretPaths.mjs";
+import { ENV_EXAMPLES, NEW_RULES, SECRET_PATHS } from "./secretPaths.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const RULES = readFileSync(join(ROOT, ".gitignore"), "utf8")
@@ -32,14 +32,20 @@ describe(".gitignore", () => {
     it(`ignores ${name}`, () => assert.equal(checkIgnore(name), 0));
   }
 
-  for (const rule of [...NEW_RULES, "cloud/deploy/.env*", ...LEGACY_RULES]) {
+  for (const rule of [
+    ...NEW_RULES,
+    "!cloud/deploy-config/env-files/*/",
+    "!cloud/deploy-config/env-files/*/.env.example",
+    "cloud/deploy/.env*",
+    ...LEGACY_RULES,
+  ]) {
     it(`lists ${rule}`, () => assert.ok(RULES.includes(rule), rule));
   }
 
   for (const name of [
     ".env.example",
     "deploy-config/env.examples/agent.env.example",
-    "cloud/deploy/env.examples/agent.env.example",
+    ...ENV_EXAMPLES,
     "cloud/deploy/compose.hosted.yml",
     "cloud/e2e/support/env.ts",
     "e2e/support/env.ts",

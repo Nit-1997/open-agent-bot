@@ -225,14 +225,14 @@ function accessToken(state: StorageState): string {
 const cookieHeader = (state: StorageState) => state.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
 
 function agentSecret(): string {
-  const line = readFileSync(resolve(ROOT, "cloud/deploy/.env-agent"), "utf8")
+  const line = readFileSync(resolve(ROOT, "cloud/deploy-config/env-files/backend/.env"), "utf8")
     .split("\n")
     .find((l) => l.trim().startsWith("AGENT_SERVICE_SECRET="));
   const secret = line
     ?.slice(line.indexOf("=") + 1)
     .trim()
     .replace(/^["']|["']$/g, "");
-  if (!secret) throw new Error("AGENT_SERVICE_SECRET missing in cloud/deploy/.env-agent");
+  if (!secret) throw new Error("AGENT_SERVICE_SECRET missing in cloud/deploy-config/env-files/backend/.env");
   return secret;
 }
 

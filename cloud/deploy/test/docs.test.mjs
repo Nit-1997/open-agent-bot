@@ -29,7 +29,9 @@ const OLD_COMMANDS = [
   'docker compose --project-directory "$OLD" -f "$OLD/docker-compose.yml" --env-file "$OLD/deploy-config/.env-nextjs" --profile local up -d',
   'docker compose -f "$OLD/compose.hosted.yml" --env-file "$OLD/deploy-config/.env-nextjs" --profile local up -d',
 ];
-const LIVE_UP = "docker compose -f cloud/deploy/compose.hosted.yml --env-file cloud/deploy/.env-nextjs --profile local up -d --build";
+const BACKEND = "--env-file cloud/deploy-config/env-files/backend/.env";
+const BOTH = `${BACKEND} --env-file cloud/deploy-config/env-files/frontend/.env`;
+const LIVE_UP = `docker compose -f cloud/deploy/compose.hosted.yml ${BOTH} --profile local up -d --build`;
 
 describe("hosted docs moved out of the README", () => {
   const moved = [
@@ -58,16 +60,17 @@ describe("hosted docs moved out of the README", () => {
   it("keeps the hosted text verbatim, with the cloud/ paths", () => {
     for (const s of [
       `Every hosted command needs \`${COMPOSE}\``,
-      `\`docker compose ${COMPOSE} --env-file cloud/deploy/.env-nextjs --profile local up -d --build\``,
-      `\`docker compose ${COMPOSE} cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt`,
-      `\`CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose ${COMPOSE} up -d --build\``,
-      `\`docker compose ${COMPOSE} --profile ollama up -d\``,
-      `\`docker compose ${COMPOSE} exec agent node dist/scripts/rotateCredentials.js\``,
+      `\`docker compose ${COMPOSE} ${BOTH} --profile local up -d --build\``,
+      `\`docker compose ${COMPOSE} ${BACKEND} cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt`,
+      `\`CADDYFILE=Caddyfile.ec2 CADDY_BIND=0.0.0.0 docker compose ${COMPOSE} ${BACKEND} up -d --build\``,
+      `\`docker compose ${COMPOSE} ${BACKEND} --profile ollama up -d\``,
+      `\`docker compose ${COMPOSE} ${BACKEND} exec agent node dist/scripts/rotateCredentials.js\``,
       "npm ci && APP_ORIGIN=http://localhost:18300 npm run demo -w @oab/cloud-e2e",
       "`cd cloud/agent && COPILOTKIT_TELEMETRY_DISABLED=true npm run eval -- --model openrouter/anthropic/claude-sonnet-5.5`",
       "`supabase --workdir cloud …`",
       "Root Directory `cloud/web`",
-      "`cloud/deploy/.env-agent`",
+      "`cloud/deploy-config/env-files/backend/.env`",
+      "`make web`",
       "`APP_ORIGIN=http://localhost:18300 npm run smoke -w @oab/cloud-e2e`",
     ])
       assert.ok(HOSTED.includes(s), `cloud/README.md lacks ${s}`);
@@ -96,10 +99,14 @@ describe("hosted docs moved out of the README", () => {
     const current = before(HOSTED, SWITCH);
     for (const s of ["-f compose.hosted.yml", "-w e2e", "(docs/hosted.md)", "`supabase/", " supabase/scripts/"])
       assert.ok(!current.includes(s), `cloud/README.md still names ${s}`);
-    for (const l of linesOf(current).filter((x) => x.includes("deploy-config/")))
-      assert.match(l, /env-files\.mjs --from <that checkout>\/deploy-config --to cloud\/deploy/, l);
+    for (const l of linesOf(current).filter((x) => /(?<![\w./-])deploy-config\//.test(x)))
+      assert.match(
+        l,
+        /env-files\.mjs --from <that checkout>\/cloud\/deploy --to cloud\/deploy-config\/env-files .*`--from <that checkout>\/deploy-config`/,
+        l,
+      );
     for (const l of linesOf(HOSTED.slice(HOSTED.indexOf(SWITCH))).filter((x) =>
-      /deploy-config|compose\.hosted\.yml`|-f compose\.hosted/.test(x),
+      /(?<![\w./-])deploy-config|compose\.hosted\.yml`|-f compose\.hosted/.test(x),
     ))
       assert.match(l, /\$OLD|old checkout/, l);
   });
@@ -187,16 +194,17 @@ describe("switch-over runbook (Gates 6 and 7)", () => {
       'git clone https://github.com/Nit-1997/open-agent-bot "$NEW"',
       "git checkout <main commit after M6>",
       'git -C "$OLD" status --porcelain --ignored -- "$OLD/deploy-config"',
-      'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy --copy --dry-run',
-      'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy --copy',
-      `docker compose -p oab-gate7 ${COMPOSE} --env-file cloud/deploy/.env-nextjs --profile local run --rm --no-deps --build agent node -e "import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})"`,
+      'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy-config/env-files --copy --dry-run',
+      'node cloud/deploy/scripts/env-files.mjs --from "$OLD/deploy-config" --to cloud/deploy-config/env-files --copy',
+      "node cloud/deploy/scripts/env-check.mjs",
+      `docker compose -p oab-gate7 ${COMPOSE} ${BOTH} --profile local run --rm --no-deps --build agent node -e "import('./dist/config.js').then(m=>{try{m.loadHostedConfig(process.env);console.log('hosted config ok')}catch(e){console.log(e.name==='ConfigError'?e.message:e.name+' '+(e.code??''));process.exit(1)}})"`,
       ". scripts/preview-preflight.sh",
-      'P="docker compose -p oab-gate7 --env-file cloud/deploy/.env-nextjs -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local"',
+      `P="docker compose -p oab-gate7 ${BOTH} -f cloud/deploy/compose.hosted.yml -f cloud/deploy/compose.preview.yml --profile local"`,
       "preflight $P && $P up -d --build search renderer agent web",
       "http://localhost:18300",
       "$P down",
       "docker volume rm $(docker volume ls -q --filter label=com.docker.compose.project=oab-gate7)",
-      `docker compose ${COMPOSE} --env-file cloud/deploy/.env-nextjs --profile local config --format json --no-env-resolution | jq '{name, volumes: [.volumes[].name]}'`,
+      `docker compose ${COMPOSE} ${BOTH} --profile local config --format json --no-env-resolution | jq '{name, volumes: [.volumes[].name]}'`,
       `test -f "$OLD/.env" && grep -oE '^(CADDYFILE|CADDY_BIND|COMPOSE_PROFILES)=' "$OLD/.env"`,
       'git -C "$OLD" rev-parse HEAD',
       "docker ps --filter label=com.docker.compose.project=open-agent-bot --format '{{.Names}} {{.Image}} {{.CreatedAt}}'",
@@ -260,7 +268,7 @@ describe("M7 runbooks (Gates 8 and 9)", () => {
   const LIVE = '"$LIVE_DB_URL"';
   const PLAN = "node cloud/supabase/scripts/check-push-plan.mjs";
   const BODIES = "node cloud/supabase/scripts/check-old-bodies.mjs";
-  const ADMIN_ENV = "set -a; . cloud/deploy/env-files/.env-supabase-admin; set +a";
+  const ADMIN_ENV = "set -a; . cloud/deploy-config/env-files/ops/.env; set +a";
 
   it("documents the request limits, the single-process slots and the three signup modes", () => {
     const limits = section("## Request limits", "## Signup modes");
@@ -343,8 +351,8 @@ describe("M7 runbooks (Gates 8 and 9)", () => {
         "`NEXT_PUBLIC_TURNSTILE_SITE_KEY`",
         "redeploy the web app on Vercel",
         "redeploy the agent",
-        "grep -cE '^TURNSTILE_SECRET_KEY=[0-9]x0{30,}[A-Z]{2}$' cloud/deploy/.env-agent",
-        "grep -cE '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=[0-9]x0{20}[A-Z]{2}$' cloud/deploy/.env-nextjs",
+        "grep -cE '^TURNSTILE_SECRET_KEY=[0-9]x0{30,}[A-Z]{2}$' cloud/deploy-config/env-files/backend/.env",
+        "grep -cE '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=[0-9]x0{20}[A-Z]{2}$' cloud/deploy-config/env-files/frontend/.env",
         ADMIN_ENV,
         "node cloud/supabase/scripts/blocked-domains.mjs --apply",
         "node cloud/supabase/scripts/blocked-domains.mjs --check",

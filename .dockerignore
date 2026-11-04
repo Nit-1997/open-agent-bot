@@ -13,7 +13,7 @@ e2e/.auth
 e2e/test-results
 e2e/playwright-report
 **/.env-*
-**/env-files/
+**/env-files/**
 **/.auth/
 cloud/e2e/test-results/
 cloud/e2e/playwright-report/

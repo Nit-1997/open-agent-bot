@@ -79,7 +79,7 @@ function remoteDb(env, argv) {
   const ref = env.SUPABASE_PROJECT_REF?.trim();
   const token = env.SUPABASE_ACCESS_TOKEN?.trim();
   if (!ref || !token)
-    throw new Error("missing SUPABASE_PROJECT_REF or SUPABASE_ACCESS_TOKEN (load cloud/deploy/env-files/.env-supabase-admin)");
+    throw new Error("missing SUPABASE_PROJECT_REF or SUPABASE_ACCESS_TOKEN (load cloud/deploy-config/env-files/ops/.env)");
   const m = managementApi({ base: apiBaseFrom(argv).base, ref, token });
   return {
     stored: async () => ((await m.read("select domain from public.blocked_email_domains")) ?? []).map((r) => r.domain),

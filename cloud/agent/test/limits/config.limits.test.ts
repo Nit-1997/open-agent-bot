@@ -70,8 +70,8 @@ describe("request limit config", () => {
     expect(limitsLine(testConfig().limits)).toBe("[limits] running/user=1 hour=10 month=50 running/server=8");
   });
 
-  it("lists the four variables with their defaults in the agent env example", () => {
-    const example = readFileSync(new URL("../../../deploy/env.examples/agent.env.example", import.meta.url), "utf8");
+  it("lists the four variables with their defaults in the backend env example", () => {
+    const example = readFileSync(new URL("../../../deploy-config/env-files/backend/.env.example", import.meta.url), "utf8");
     const listed = Object.fromEntries(
       example
         .split("\n")
@@ -82,7 +82,7 @@ describe("request limit config", () => {
   });
 
   it("says in the env example header that only the fixed telemetry setting and the LIMIT_* defaults carry values", () => {
-    const example = readFileSync(new URL("../../../deploy/env.examples/agent.env.example", import.meta.url), "utf8");
+    const example = readFileSync(new URL("../../../deploy-config/env-files/backend/.env.example", import.meta.url), "utf8");
     const header = example.split("\n")[0];
     expect(header).not.toContain("Names only;");
     expect(header).toContain("LIMIT_*");

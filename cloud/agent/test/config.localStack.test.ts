@@ -112,9 +112,9 @@ describe("loadHostedConfig local-stack mode", () => {
       ...readdirSync(join(ROOT, "cloud/deploy"))
         .filter((f) => /^compose\..*\.ya?ml$/.test(f))
         .map((f) => `cloud/deploy/${f}`),
-      ...readdirSync(join(ROOT, "cloud/deploy/env.examples")).map((f) => `cloud/deploy/env.examples/${f}`),
+      ...["backend", "frontend", "ops"].map((g) => `cloud/deploy-config/env-files/${g}/.env.example`),
     ];
-    expect(files.length).toBeGreaterThanOrEqual(9);
+    expect(files.length).toBeGreaterThanOrEqual(8);
     for (const f of files) expect(readFileSync(join(ROOT, f), "utf8"), f).not.toMatch(/SUPABASE_LOCAL_STACK|TURNSTILE_VERIFY_URL/);
   });
 });
