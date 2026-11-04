@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { vi } from "vitest";
-import { nav } from "../../../packages/ui/test/support/navigation.tsx";
+import { nav } from "../../../../packages/ui/test/support/navigation.tsx";
 
 export { nav };
 

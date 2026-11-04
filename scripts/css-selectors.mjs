@@ -144,7 +144,7 @@ export function selectorsOfDir(dir) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dir = process.argv[2];
   if (!dir || !existsSync(dir)) {
-    console.error("usage: node scripts/css-selectors.mjs <build dir: web/.next or a folder of css files>");
+    console.error("usage: node scripts/css-selectors.mjs <build dir: cloud/web/.next or a folder of css files>");
     process.exit(2);
   }
   const lines = selectorsOfDir(dir);

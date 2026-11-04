@@ -1,0 +1,20 @@
+{
+  "name": "@oab/cloud-deploy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open Agent hosted deployment checks",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "format:check": "biome format",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3"
+  }
+}

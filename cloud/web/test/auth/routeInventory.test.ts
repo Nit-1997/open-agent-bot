@@ -51,7 +51,7 @@ describe("route inventory", () => {
     expect(onDisk.length).toBeGreaterThanOrEqual(28);
   });
 
-  it("has a table row for every page and route under web/app, and no row for a missing file", () => {
+  it("has a table row for every page and route under cloud/web/app, and no row for a missing file", () => {
     expect([...new Set(table.map((r) => r.file))].sort()).toEqual(onDisk);
   });
 

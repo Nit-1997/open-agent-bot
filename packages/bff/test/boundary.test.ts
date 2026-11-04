@@ -61,6 +61,7 @@ const INJECTED = [
   'import { app } from "@oab/core/http/app.js";\nexport default app;\n',
   'import { CopilotRuntime } from "@copilotkit/runtime/v2";\nexport default CopilotRuntime;\n',
   'import { requireUser } from "../../../web/lib/auth";\nexport default requireUser;\n',
+  'import { requireUser } from "../../../cloud/web/lib/auth";\nexport default requireUser;\n',
   'export const load = () => import("next/headers");\n',
   'import { hostedRoutes } from "@oab/cloud-agent/routes.js";\nexport default hostedRoutes;\n',
 ];
@@ -90,6 +91,7 @@ describe("packages/bff boundary", { timeout: 60000 }, () => {
       "@copilotkit/runtime/v2",
       "node:buffer",
       "../../web/lib/auth",
+      "../../../cloud/web/lib/auth",
       "../cloud/x",
       "@oab/cloud-agent/routes.js",
     ])

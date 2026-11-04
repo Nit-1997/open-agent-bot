@@ -44,6 +44,7 @@ describe(".dockerignore", () => {
     "deploy-config/.env-renderer",
     "packages/core/.env",
     "web/.env.local",
+    "cloud/web/.env.local",
   ]) {
     it(`excludes ${name}`, () => assert.equal(ignored(name), true));
   }

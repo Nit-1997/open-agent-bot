@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import LandingPage from "@/app/landing/page";
 import { RUNS } from "@/components/landing/LiveRun";
-import { expectUniqueIds } from "../../packages/ui/test/support/ids.ts";
+import { expectUniqueIds } from "../../../packages/ui/test/support/ids.ts";
 
 describe("landing page", () => {
   it("gives every element a unique id", () => {

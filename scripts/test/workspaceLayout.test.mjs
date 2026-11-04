@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
@@ -6,7 +7,8 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const json = (path) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
-const DOCKERFILES = ["web/Dockerfile", "packages/core/Dockerfile"];
+const DOCKERFILES = ["packages/core/Dockerfile"];
+const tracked = () => execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
 const CHECKED_PACKAGES = ["packages/ui", "packages/bff"];
 const BUNDLED_APPS = ["packages/local-web", "apps/desktop"];
 
@@ -62,7 +64,7 @@ describe("workspace layout", () => {
 
   it("finds the workspaces", () => {
     assert.ok(all.includes("packages/ui"), "packages/ui is a workspace");
-    assert.ok(all.includes("web"));
+    assert.ok(all.includes("e2e"));
   });
 
   for (const dockerfile of DOCKERFILES) {
@@ -71,6 +73,12 @@ describe("workspace layout", () => {
       for (const ws of all) assert.ok(stage.includes(`COPY ${ws}/package.json ${ws}/`), `${dockerfile} misses COPY ${ws}/package.json`);
     });
   }
+
+  it("no Dockerfile outside cloud/ names a cloud/ path", () => {
+    const dockerfiles = tracked().filter((f) => /(^|\/)Dockerfile[^/]*$/.test(f) && !f.startsWith("cloud/"));
+    assert.ok(dockerfiles.includes("packages/core/Dockerfile"));
+    for (const f of dockerfiles) assert.doesNotMatch(readFileSync(join(ROOT, f), "utf8"), /(^|[\s./])cloud\//m, f);
+  });
 
   for (const ws of CHECKED_PACKAGES.filter((p) => existsSync(join(ROOT, p, "package.json")))) {
     it(`${ws} declares every bare import of its src`, () => {

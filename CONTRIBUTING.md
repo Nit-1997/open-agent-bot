@@ -4,7 +4,7 @@ Thanks for helping out. This guide covers local setup, where code lives, and wha
 
 ## Setup
 
-You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `web`, `e2e`) with a single root `package-lock.json`; install from the root.
+You need Node 22 (see `.nvmrc`), Docker, and optionally Ollama for a local model. The repo is one npm workspace (`packages/shared`, `packages/core`, `packages/ui`, `packages/bff`, `packages/local-web`, `apps/desktop`, `e2e`, and the hosted `cloud/agent`, `cloud/web`, `cloud/deploy`) with a single root `package-lock.json`; install from the root.
 
 ```bash
 npm ci && npx playwright install chromium
@@ -13,7 +13,7 @@ npm ci && npx playwright install chromium
 To run the local stack, follow the [README](README.md); the hosted stack (Supabase, web app, Caddy) is in [docs/hosted.md](docs/hosted.md). To work on one side of the hosted stack, run the other in Docker and point at it:
 
 - Agent: `cd cloud/agent && npm run build && set -a && . ../../deploy-config/.env-agent && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table in docs/hosted.md). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval (`COPILOTKIT_TELEMETRY_DISABLED=true npx tsx evals/run.ts ...`). The agent image sets it already.
-- Web: `cd web && set -a && . ../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
+- Web: `cd cloud/web && set -a && . ../../deploy-config/.env-nextjs && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" in docs/hosted.md). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session.
 
@@ -29,8 +29,9 @@ CI runs these on every pull request. Run them from the repo root before you push
 | `@oab/bff` | `npm run lint -w @oab/bff && npm run format:check -w @oab/bff && npm run typecheck -w @oab/bff && npm test -w @oab/bff && npm run build -w @oab/bff` |
 | `@oab/local-web` | `npm run lint -w @oab/local-web && npm run format:check -w @oab/local-web && npm run typecheck -w @oab/local-web && npm test -w @oab/local-web && npm run build -w @oab/local-web` (the Vite build lands in `packages/local-web/dist/`, which the local agent serves) |
 | `@oab/cloud-agent` | `npm run lint -w @oab/cloud-agent && npm run format:check -w @oab/cloud-agent && npm run typecheck -w @oab/cloud-agent && npm test -w @oab/cloud-agent && npm run build -w @oab/cloud-agent` (the hosted agent; unit tests only) |
-| `web` | `npm run lint -w web && npm run format:check -w web && npm run typecheck -w web && npm test -w web && npm run build -w web` |
-| root | `npm run lint:scripts && npm run format:check:scripts` (Biome over `scripts/**/*.mjs`, also run by the root `lint` and `format:check`) and `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, and the unique-id scan over `packages/ui/src`, `packages/local-web/src`, `web/app` and `web/components`; `node scripts/ids-static.mjs` prints `ids: N/N`) |
+| `@oab/cloud-web` | `npm run lint -w @oab/cloud-web && npm run format:check -w @oab/cloud-web && npm run typecheck -w @oab/cloud-web && npm test -w @oab/cloud-web && npm run build -w @oab/cloud-web` (the hosted Next.js app; Vercel builds it from Root Directory `cloud/web`) |
+| `@oab/cloud-deploy` | `npm run lint -w @oab/cloud-deploy && npm run format:check -w @oab/cloud-deploy && npm test -w @oab/cloud-deploy` (hosted layout checks: cloud workspaces and Dockerfiles) |
+| root | `npm run lint:scripts && npm run format:check:scripts` (Biome over `scripts/**/*.mjs`, also run by the root `lint` and `format:check`) and `node --test scripts/test/*.test.mjs` (workspace layout, the CSS selector script, and the unique-id scan over `packages/ui/src`, `packages/local-web/src` and `apps/desktop/src/screens`; `node scripts/ids-static.mjs` prints `ids: N/N`; `cloud/web/test/idsStatic.test.ts` scans those plus `cloud/web/app` and `cloud/web/components`) |
 
 Agent tests marked `.int.test.ts` start a real Chromium against local fixture servers. Tests under `test/pi/` call a live model and are skipped unless `LLM_BASE_URL` is set. Tests under `cloud/agent/test/supabase/` run against the real Supabase project with `npm run test:supabase -w @oab/cloud-agent`; they create `oab-test+<uuid>@example.test` users with the admin API (no email is sent) and delete them afterwards.
 
@@ -253,7 +254,7 @@ packages/bff/src/      the @oab/bff package: the framework-free /api handler (cr
                        params (params.ts); built with `tsc -b` to dist
 packages/local-web/src/ the @oab/local-web package: the Vite app for the local UI (main.tsx, LocalApp.tsx,
                        theme.ts); @oab/ui with no login or cloud slots, built to dist/ and served by the local agent
-web/
+cloud/web/
   proxy.ts             session refresh, route rules and the nonce CSP on every request
   app/                 login, request-access, auth confirm/callback/signout, admin
   app/(app)/           the shell routes: /, /chats, /chats/[id], /reports, /reports/[id],
@@ -339,7 +340,7 @@ Onboarding chips come from `packages/shared/src/onboarding.ts`: one `CURATED` en
 
 - TypeScript strict mode everywhere. Prefer small pure functions; keep I/O at the edges.
 - Code explains itself through names. Add a comment only for a non-obvious reason.
-- Every rendered HTML element in `web/` and `packages/ui/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
+- Every rendered HTML element in `cloud/web/` and `packages/ui/` has a unique, stable `id` derived from its parent's id. Ids inside a chat pane start with `chat-pane-<threadId>-`, because up to three panes can be mounted.
 - Context for an agent run goes through `useThreadContext` (scoped to one chat's agent). `useAgentContext` is blocked by lint because it reaches every mounted chat.
 - Keys are added in the app and stored encrypted by the agent. Settings live in `deploy-config/.env-*` and `deploy-config/env-files/.env-*`, which are git-ignored; never commit them. Templates with names only are in `deploy-config/env.examples/`.
 - Every agent data access goes through `forUser(db, userId)` with the id from the verified token. Never read a user id from a body, a header or a thread id.

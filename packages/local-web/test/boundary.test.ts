@@ -57,6 +57,7 @@ const FORBIDDEN_SPECS = [
   "@oab/bff",
   "@oab/bff/index.js",
   "../../../web/lib/auth",
+  "../../../cloud/web/lib/auth",
   "../../cloud/x",
   "@oab/cloud-web",
   "@oab/cloud-web/components/admin",

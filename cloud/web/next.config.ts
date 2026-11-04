@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   transpilePackages: ["@oab/ui", "@oab/bff"],
-  outputFileTracingRoot: path.join(__dirname, ".."),
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },
@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
     ];
   },
   turbopack: {
-    root: path.join(__dirname, ".."),
+    root: path.join(__dirname, "../.."),
     resolveAlias: {
       typebox: resolveFromWeb("typebox"),
       "typebox/value": resolveFromWeb("typebox/value"),

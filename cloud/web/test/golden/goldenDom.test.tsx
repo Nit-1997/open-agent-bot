@@ -14,8 +14,8 @@ import { AppShell } from "@oab/ui/components/shell/AppShell.tsx";
 import { noteAuthFailure, resetAuthState } from "@oab/ui/lib/authState.ts";
 import { chatIndex } from "@oab/ui/lib/chatIndex.ts";
 import { resetProfileStore } from "@oab/ui/lib/profile.ts";
-import { copilot } from "../../../packages/ui/test/support/copilot.ts";
-import { mockViewport } from "../../../packages/ui/test/support/media.ts";
+import { copilot } from "../../../../packages/ui/test/support/copilot.ts";
+import { mockViewport } from "../../../../packages/ui/test/support/media.ts";
 import { nav } from "../support/navigation";
 import { pinEnvironment } from "./determinism";
 import { goldenHtml } from "./serialize";
@@ -23,7 +23,7 @@ import { wrapGolden } from "./wrap";
 
 vi.mock("next/navigation", async () => (await import("../support/navigation")).navigationMock());
 vi.mock("next/link", async () => (await import("../support/link")).linkMock());
-vi.mock("@copilotkit/react-core/v2", async () => (await import("../../../packages/ui/test/support/copilot.ts")).copilotMock());
+vi.mock("@copilotkit/react-core/v2", async () => (await import("../../../../packages/ui/test/support/copilot.ts")).copilotMock());
 
 const FIXTURES = join(import.meta.dirname, "../fixtures/golden-dom");
 const UPDATE = process.env.UPDATE_GOLDEN === "1";

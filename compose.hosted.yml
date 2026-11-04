@@ -111,7 +111,7 @@ services:
     profiles: ["local"]
     build:
       context: .
-      dockerfile: web/Dockerfile
+      dockerfile: cloud/web/Dockerfile
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
@@ -123,7 +123,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
-      - /app/web/.next/cache:size=256m,uid=1000,gid=1000,mode=0700
+      - /app/cloud/web/.next/cache:size=256m,uid=1000,gid=1000,mode=0700
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     depends_on:

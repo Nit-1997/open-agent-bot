@@ -17,19 +17,6 @@ const eslintConfig = defineConfig([
               message: "Context goes to every agent. Use useThreadContext so it reaches only this chat's runs.",
             },
           ],
-          patterns: [
-            {
-              group: ["**/cloud", "**/cloud/**", "@oab/cloud", "@oab/cloud/**"],
-              message: "Nothing outside cloud/ may import from cloud/.",
-            },
-          ],
-        },
-      ],
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "ImportExpression[source.value=/(^|\\/)cloud(\\/|$)/]",
-          message: "Nothing outside cloud/ may import from cloud/.",
         },
       ],
     },

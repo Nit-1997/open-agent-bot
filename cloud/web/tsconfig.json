@@ -28,16 +28,16 @@
         "./*"
       ],
       "@oab/shared/*": [
-        "../packages/shared/src/*"
+        "../../packages/shared/src/*"
       ],
       "@oab/bff": [
-        "../packages/bff/src/index.ts"
+        "../../packages/bff/src/index.ts"
       ],
       "typebox": [
-        "../node_modules/typebox"
+        "../../node_modules/typebox"
       ],
       "typebox/value": [
-        "../node_modules/typebox/build/value/index.d.mts"
+        "../../node_modules/typebox/build/value/index.d.mts"
       ]
     }
   },

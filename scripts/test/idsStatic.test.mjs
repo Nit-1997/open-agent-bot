@@ -65,15 +65,14 @@ describe("static ids", () => {
     }
   });
 
-  it("gives every intrinsic JSX element in the ui and web sources an id", () => {
+  it("gives every intrinsic JSX element in the ui, local-web and desktop screen sources an id", () => {
     const { elements, missing } = scanIds({ repo: REPO, roots: ID_ROOTS, allowlist: ALLOWLIST });
     assert.deepEqual(missing, []);
     assert.ok(elements.length >= BASE_COUNT, `${elements.length} elements, expected at least ${BASE_COUNT}`);
   });
 
-  it("scans the ui, web, local-web and desktop screen sources", () => {
-    for (const root of ["packages/ui/src", "packages/local-web/src", "web/app", "web/components", "apps/desktop/src/screens"])
-      assert.ok(ID_ROOTS.includes(root), root);
+  it("scans exactly the non-cloud roots: ui, local-web and desktop screen sources", () => {
+    assert.deepEqual(ID_ROOTS, ["packages/ui/src", "packages/local-web/src", "apps/desktop/src/screens"]);
   });
 
   it("keeps the spread allowlist short, justified and in use", () => {

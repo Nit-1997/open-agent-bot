@@ -137,8 +137,7 @@ describe("ci.yml desktop jobs", () => {
   }
 
   it("the jobs that never run Electron skip its binary download", () => {
-    for (const name of ["core", "web", "cloud", "local-stack"])
-      assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
+    for (const name of ["core", "cloud", "local-stack"]) assert.equal(String(jobs[name].env.ELECTRON_SKIP_BINARY_DOWNLOAD), "1", name);
   });
 
   it("desktop: Ubuntu, checks and unit tests for @oab/desktop, then the fake-docker e2e under xvfb", () => {
@@ -279,13 +278,18 @@ describe("ci.yml cloud job (M6 D14)", () => {
   it("lints, format-checks, type-checks, unit-tests and builds the cloud workspaces only", () => {
     assert.deepEqual(runs(), [
       "npm ci",
-      "npm run lint -w @oab/cloud-agent",
-      "npm run format:check -w @oab/cloud-agent",
-      "npm run typecheck -w @oab/cloud-agent",
-      "npm test -w @oab/cloud-agent",
-      "npm run build -w @oab/cloud-agent",
+      "npm run lint -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy",
+      "npm run format:check -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy",
+      "npm run typecheck -w @oab/cloud-agent -w @oab/cloud-web",
+      "npm test -w @oab/cloud-agent -w @oab/cloud-web -w @oab/cloud-deploy",
+      "npm run build -w @oab/cloud-agent -w @oab/cloud-web",
     ]);
     assert.doesNotMatch(runs().join("\n"), /test:supabase|playwright|smoke|e2e/);
+  });
+
+  it("replaces the web job (6.5)", () => {
+    assert.equal(doc("ci.yml").jobs.web, undefined);
+    assert.match(JSON.stringify(job.steps.at(-1)), /COPILOTKIT_TELEMETRY_DISABLED/);
   });
 });
 
