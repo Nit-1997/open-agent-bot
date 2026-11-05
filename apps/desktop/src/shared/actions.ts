@@ -99,6 +99,7 @@ export type ShellState = Readonly<{
   pull?: readonly PullRow[];
   services?: readonly ServiceRow[];
   refusal?: Readonly<{ code: string; line: string; exitCode: number; count?: number }>;
+  versionMismatch?: Readonly<{ expected: string; found?: string }>;
   failure?: Readonly<{ reason: string; step?: string; exitCode?: number; detail?: string; tail?: string }>;
   foreign?: Readonly<{
     workingDir: string;

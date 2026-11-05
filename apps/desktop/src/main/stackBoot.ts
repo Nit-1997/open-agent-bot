@@ -604,7 +604,11 @@ export function createBoot(rt: Runtime): Boot {
       check(signal);
       const h = await d.http.get(rt.port, t.healthGetMs);
       check(signal);
-      if (isOpenAgent(h) && versionMatches(pins, h.version)) break;
+      if (isOpenAgent(h)) {
+        if (versionMatches(pins, h.version)) break;
+        await refuseVersion(pins.version, h.version);
+        return;
+      }
       const ps = await compose().ps();
       if (ps) progress("waitingHealth", { services: rowsOf(ps) });
       const reading = await detect();
@@ -621,6 +625,15 @@ export function createBoot(rt: Runtime): Boot {
       await sleep(t.pollMs, signal);
     }
     await ready(signal);
+  }
+
+  async function refuseVersion(expected: string, reported: string | undefined): Promise<void> {
+    const found = reported?.slice(0, 64);
+    log.warn(`[stack] version mismatch expected=${expected} found=${found ?? "none"}`);
+    const stopped = await compose().stop("agent");
+    log.info(`[stack] agent stopped after version mismatch exit=${stopped.code}`);
+    await hideApp();
+    set({ phase: "refused", screen: "screen-version-mismatch", versionMismatch: { expected, ...(found ? { found } : {}) } });
   }
 
   async function ready(signal: AbortSignal): Promise<void> {
