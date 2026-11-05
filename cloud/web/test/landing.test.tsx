@@ -47,6 +47,7 @@ describe("landing page", () => {
     const logo = container.querySelector("#landing-nav-logo-image");
     expect(logo?.getAttribute("alt")).toBe("Open Agent");
     expect(logo?.getAttribute("src")).toContain("open-agent-logo-dark.svg");
+    expect(container.querySelector("#landing-nav-how")?.getAttribute("href")).toBe("#landing-demo");
   });
 
   it("says the project is open source", () => {

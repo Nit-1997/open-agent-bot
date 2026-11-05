@@ -25,6 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   return (
     <AuthCard
       id="login"
+      nav="none"
       title="Sign in"
       subtitle={open ? "Continue with Google to sign in or create an account." : "Open Agent is invite-only."}
     >

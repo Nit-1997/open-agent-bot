@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppleIcon, GitHubIcon } from "@/components/brand/BrandIcons";
 import { LiveRun } from "@/components/landing/LiveRun";
 import { TabletVideo } from "@/components/landing/TabletVideo";
+import { SiteNav } from "@/components/site/SiteNav";
 import { REPO_URL } from "@/lib/links";
 import { DESKTOP_URL } from "@/lib/usageCopy";
 
@@ -68,43 +68,7 @@ export default function LandingPage() {
         className="relative flex min-h-dvh flex-col overflow-hidden text-white"
         style={{ background: HERO_BACKGROUND }}
       >
-        <nav
-          id="landing-nav"
-          className={`absolute top-4 left-1/2 z-10 flex h-14 w-max -translate-x-1/2 items-center gap-3.5 rounded-full pr-2 pl-4 text-sm sm:gap-7 sm:pl-6 ${DARK_GLASS}`}
-        >
-          <Link id="landing-nav-logo" href="/" aria-label="Open Agent home" className="flex shrink-0 items-center">
-            <Image
-              id="landing-nav-logo-image"
-              src="/brand/open-agent-logo-dark.svg"
-              alt="Open Agent"
-              width={137}
-              height={26}
-              priority
-              className="h-[20px] w-auto sm:h-[26px]"
-            />
-          </Link>
-          <a id="landing-nav-how" href="#landing-demo" className="hidden whitespace-nowrap text-white/70 hover:text-white sm:inline">
-            How it works
-          </a>
-          <a id="landing-nav-try" href="#landing-ways" className="hidden whitespace-nowrap text-white/70 hover:text-white md:inline">
-            Try it
-          </a>
-          <a
-            id="landing-nav-github"
-            href={REPO_URL}
-            {...EXTERNAL}
-            aria-label="Open Agent on GitHub"
-            className="inline-flex items-center gap-1.5 whitespace-nowrap text-white/70 hover:text-white"
-          >
-            <GitHubIcon id="landing-nav-github-icon" className="h-4 w-4" />
-            <span id="landing-nav-github-text" className="hidden sm:inline">
-              GitHub
-            </span>
-          </a>
-          <Link id="landing-nav-signin" href="/login" className={`${LIGHT_PILL} h-[38px] px-[18px] text-sm whitespace-nowrap`}>
-            Sign in
-          </Link>
-        </nav>
+        <SiteNav id="landing-nav" onHome />
 
         <div
           id="landing-hero-inner"

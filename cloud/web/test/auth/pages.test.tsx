@@ -84,6 +84,24 @@ describe("/login", () => {
   });
 });
 
+describe("site nav on the sign-in pages", () => {
+  it("links /login back home and to the home page sections, with no Sign in button", async () => {
+    const { container } = render(await LoginPage(params({})));
+    expect(container.querySelector("#login-nav-logo")).toHaveAttribute("href", "/");
+    expect(container.querySelector("#login-nav-how")).toHaveAttribute("href", "/#landing-demo");
+    expect(container.querySelector("#login-nav-try")).toHaveAttribute("href", "/#landing-ways");
+    expect(container.querySelector("#login-nav-signin")).toBeNull();
+    expectUniqueIds(container);
+  });
+
+  it("links /request-access back home and offers Sign in", async () => {
+    const { container } = render(await RequestAccessPage());
+    expect(container.querySelector("#request-access-nav-logo")).toHaveAttribute("href", "/");
+    expect(container.querySelector("#request-access-nav-signin")).toHaveAttribute("href", "/login");
+    expectUniqueIds(container);
+  });
+});
+
 describe("/request-access", () => {
   it("renders the form with a hidden honeypot and a signed form time", async () => {
     const { container } = render(await RequestAccessPage());

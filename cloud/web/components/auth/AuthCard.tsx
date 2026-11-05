@@ -1,8 +1,22 @@
 import type { ReactNode } from "react";
+import { SiteNav, type SiteNavCta } from "@/components/site/SiteNav";
 
-export function AuthCard({ id, title, subtitle, children }: { id: string; title: string; subtitle?: string; children: ReactNode }) {
+export function AuthCard({
+  id,
+  title,
+  subtitle,
+  nav = "signin",
+  children,
+}: {
+  id: string;
+  title: string;
+  subtitle?: string;
+  nav?: SiteNavCta;
+  children: ReactNode;
+}) {
   return (
-    <main id={id} className="flex min-h-dvh w-full items-center justify-center px-4 py-10">
+    <main id={id} className="relative flex min-h-dvh w-full items-center justify-center px-4 pt-24 pb-10">
+      <SiteNav id={`${id}-nav`} cta={nav} tone="navy" />
       <section id={`${id}-card`} className="glass w-full max-w-[420px] space-y-5 rounded-[28px] p-6 sm:p-8">
         <header id={`${id}-header`} className="space-y-2">
           <span id={`${id}-orb`} aria-hidden="true" className="orb block h-8 w-8 shadow-float" />
