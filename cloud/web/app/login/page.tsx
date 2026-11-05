@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthCard, authPrimary, authSecondary } from "@/components/auth/AuthCard";
@@ -9,6 +10,8 @@ import { signupSettings } from "@/lib/signupMode";
 import { turnstileSiteKey } from "@/lib/turnstile";
 import { signInWithGoogle } from "./actions";
 import { EmailLinkForm } from "./EmailLinkForm";
+
+export const metadata: Metadata = { title: "Sign in · Open Agent" };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

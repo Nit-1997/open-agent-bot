@@ -7,11 +7,7 @@ import { TabletVideo } from "@/components/landing/TabletVideo";
 import { REPO_URL } from "@/lib/links";
 import { DESKTOP_URL } from "@/lib/usageCopy";
 
-export const metadata: Metadata = {
-  title: "Open Agent · A personal agent you can see think",
-  description:
-    "An open-source personal research agent that shows every source it reads and every claim it checks. Try the hosted sandbox or run it on your Mac.",
-};
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const GLASS = "border border-white/60 bg-white/55 shadow-[0_8px_32px_rgba(0,0,0,0.08)] backdrop-blur-xl";
 const LABEL = "font-mono text-[11px] uppercase tracking-[0.14em] text-[#888]";

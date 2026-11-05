@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import { originFrom, siteMetadata } from "@/lib/seo";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Open Agent",
-  description: "Personal research and planning agent",
-};
+export function generateMetadata(): Metadata {
+  return siteMetadata(originFrom(process.env.APP_ORIGIN));
+}
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 

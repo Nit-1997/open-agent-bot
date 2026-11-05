@@ -18,6 +18,8 @@ const PUBLIC_PATHS = new Set([
   "/terms",
   "/privacy",
   "/favicon.ico",
+  "/robots.txt",
+  "/sitemap.xml",
 ]);
 
 export const isPublicPath = (pathname: string) => PUBLIC_PATHS.has(pathname) || pathname.startsWith("/_next/");
