@@ -14,6 +14,16 @@ export const SIZE_BUDGET = Object.freeze({ dmg: 140_000_000, app: 320_000_000, a
 export const IDENTITY = Object.freeze({ CFBundleIdentifier: "ai.worksimulation.openagent", CFBundleName: "Open Agent" });
 
 /** @param {string} text */
+export const LAUNCH_TIMEOUT_S = Object.freeze({ native: 60, translated: 240, realDocker: 900 });
+
+/** @param {{ explicit?: string, realDocker: boolean, arch?: string, hostArch: string }} o */
+export function launchTimeoutMs({ explicit, realDocker, arch, hostArch }) {
+  if (explicit !== undefined) return Number(explicit) * 1000;
+  if (realDocker) return LAUNCH_TIMEOUT_S.realDocker * 1000;
+  const translated = arch === "x86_64" && hostArch === "arm64";
+  return (translated ? LAUNCH_TIMEOUT_S.translated : LAUNCH_TIMEOUT_S.native) * 1000;
+}
+
 export function parseFuses(text) {
   /** @type {Record<string, boolean>} */
   const out = {};

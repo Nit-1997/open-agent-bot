@@ -27,6 +27,7 @@ import {
   composeSubcommands,
   dmgNameProblems,
   launchTargetProblems,
+  launchTimeoutMs,
   licenseProblems,
   loggedPullProblems,
   loggedPulls,
@@ -202,7 +203,6 @@ const realStateBefore = existsSync(realState) ? String(statSync(realState).mtime
 const evidence = values.evidence ? resolve(values.evidence) : undefined;
 if (evidence) mkdirSync(evidence, { recursive: true });
 const root = mkdtempSync(join(tmpdir(), "oab-smoke-"));
-const timeoutMs = Number(values.timeout ?? (realDocker ? 900 : 60)) * 1000;
 
 async function createFake(home, scenario = {}) {
   const bin = join(home, "bin");
@@ -301,6 +301,7 @@ async function launchOnce(appPath, label, target, fake) {
   const callsBefore = fake ? fake.calls() : "";
   const logBefore = readIf(join(target.stateDir, "logs/shell.log"));
   const log = () => readIf(join(target.stateDir, "logs/shell.log")).slice(logBefore.length);
+  const timeoutMs = launchTimeoutMs({ explicit: values.timeout, realDocker, arch: archOf.get(appPath), hostArch: process.arch });
   const started = Date.now();
   const child = spawn(binary, [], { env, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout.pipe(out);

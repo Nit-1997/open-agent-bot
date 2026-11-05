@@ -9,7 +9,9 @@ import {
   composeSubcommands,
   dmgNameProblems,
   EXPECTED_FUSES,
+  LAUNCH_TIMEOUT_S,
   launchTargetProblems,
+  launchTimeoutMs,
   licenseProblems,
   loggedPullProblems,
   parseFuses,
@@ -240,5 +242,19 @@ describe("packaged smoke --release (M5 D8)", () => {
   it("reads real-docker pulls from shell.log and refuses refs outside the lock", () => {
     const log = `[docker] pull ${lock.images.agent} env=PATH 0 ms=900\n[docker] pull ghcr.io/x/y@sha256:${"c".repeat(64)} env=PATH 0 ms=1\n`;
     expect(loggedPullProblems(log, lock)).toEqual([`shell.log pulled ghcr.io/x/y@sha256:${"c".repeat(64)}, which is not a bundled ref`]);
+  });
+});
+
+describe("launch timeout", () => {
+  it("gives an Intel app under Rosetta on an Apple silicon host longer than a native one", () => {
+    expect(launchTimeoutMs({ realDocker: false, arch: "arm64", hostArch: "arm64" })).toBe(LAUNCH_TIMEOUT_S.native * 1000);
+    expect(launchTimeoutMs({ realDocker: false, arch: "x86_64", hostArch: "arm64" })).toBe(LAUNCH_TIMEOUT_S.translated * 1000);
+    expect(launchTimeoutMs({ realDocker: false, arch: "x86_64", hostArch: "x64" })).toBe(LAUNCH_TIMEOUT_S.native * 1000);
+    expect(LAUNCH_TIMEOUT_S.translated).toBeGreaterThanOrEqual(180);
+  });
+
+  it("keeps --timeout and the real-docker limit", () => {
+    expect(launchTimeoutMs({ explicit: "30", realDocker: true, arch: "x86_64", hostArch: "arm64" })).toBe(30_000);
+    expect(launchTimeoutMs({ realDocker: true, arch: "arm64", hostArch: "arm64" })).toBe(900_000);
   });
 });
