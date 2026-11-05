@@ -498,6 +498,40 @@ describe("stackManager phases (D10)", () => {
     });
   });
 
+  it("services that answer healthy with another version → screen-version-mismatch at once, agent stopped, no view", async () => {
+    world.versions[PINS.images.agent] = "0.0.0-other";
+    const b = build({ timings: { healthTimeoutMs: 60_000 } });
+    const startedAt = Date.now();
+    await b.m.boot();
+    await b.m.idle();
+    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(b.m.state()).toMatchObject({
+      phase: "refused",
+      screen: "screen-version-mismatch",
+      versionMismatch: { expected: PINS.version, found: "0.0.0-other" },
+    });
+    expect(b.m.state().failure).toBeUndefined();
+    expect(world.calls.filter((c) => c.kind === "stop").map((c) => c.args)).toEqual([["agent"]]);
+    expect(b.views.filter((v) => v.startsWith("open"))).toEqual([]);
+  });
+
+  it("a healthy answer without a version is a mismatch too", async () => {
+    world.versions[PINS.images.agent] = "";
+    const b = build({ timings: { healthTimeoutMs: 60_000 } });
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state()).toMatchObject({ screen: "screen-version-mismatch", versionMismatch: { expected: PINS.version } });
+    expect(b.m.state().versionMismatch?.found).toBeUndefined();
+  });
+
+  it("a dev build accepts any reported version", async () => {
+    world.versions[PINS.images.agent] = "0.0.0-other";
+    const b = build({ pins: { ...PINS, version: "dev" } });
+    await b.m.boot();
+    await b.m.idle();
+    expect(b.m.state()).toMatchObject({ phase: "ready", screen: "app" });
+  });
+
   it("a port mismatch (compose port prints 0.0.0.0:<port>) → no cookie, failed port_mismatch", async () => {
     world.portPrint = "0.0.0.0:18421";
     const b = build();
@@ -939,7 +973,11 @@ describe("service update (D12, 4.4)", () => {
     await b.m.idle();
     await b.m.act({ type: "updateServices" });
     await b.m.idle();
-    expect(b.m.state()).toMatchObject({ screen: "screen-failed", failure: { reason: "health_timeout" } });
+    expect(b.m.state()).toMatchObject({
+      phase: "refused",
+      screen: "screen-version-mismatch",
+      versionMismatch: { expected: NEXT.version, found: PINS.version },
+    });
     expect(o.accepted).toEqual([]);
     expect(b.m.state().servicesVersion).toBe(PINS.version);
   });

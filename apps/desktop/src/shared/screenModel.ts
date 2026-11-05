@@ -196,6 +196,48 @@ function refusalModel(s: ShellState): ScreenModel {
   return { id, title: REFUSAL_TEXT[r.code] ?? "Open Agent couldn't start its services", blocks, buttons: [...buttons, QUIT] };
 }
 
+function versionMismatchModel(s: ShellState): ScreenModel {
+  const v = s.versionMismatch;
+  const expected = v?.expected ?? "unknown";
+  const blocks: Block[] = [
+    {
+      kind: "p",
+      key: "what",
+      text: "Open Agent's services answered, but they are not the version this app was built for, so the app stopped them instead of using them.",
+    },
+    {
+      kind: "rows",
+      key: "versions",
+      rows: [
+        { key: "expected", label: "This app expects", value: expected },
+        { key: "found", label: "The services report", value: v?.found ?? "no version" },
+      ],
+    },
+    {
+      kind: "p",
+      key: "how",
+      tone: "muted",
+      text: s.localBuild
+        ? "Rebuild this local build with npm run dist:local so its app and images match, then open it again."
+        : `Re-download the services to get version ${expected}. If that doesn't help, get the latest Open Agent.`,
+    },
+  ];
+  const buttons: Button[] = s.localBuild
+    ? [RESTART, EXPORT, LOGS]
+    : [
+        btn("update", "Re-download services", { type: "updateServices" }, "primary"),
+        btn("latest", "Get the latest version", { type: "openLink", link: "release-page" }),
+        EXPORT,
+        LOGS,
+      ];
+  return {
+    id: "screen-version-mismatch",
+    title: "The services don't match this version of Open Agent",
+    blocks,
+    buttons: [...buttons, QUIT],
+  };
+}
+
 const FAILURE_TEXT: Readonly<Record<string, string>> = {
   cancelled: "Download stopped",
   pull_failed: "Downloading the services failed",
@@ -475,6 +517,8 @@ function baseModel(s: ShellState): ScreenModel {
           btn("cancel", "Cancel", { type: "back" }),
         ],
       };
+    case "screen-version-mismatch":
+      return versionMismatchModel(s);
     case "screen-failed":
       return failureModel(s);
     case "screen-stopping":
