@@ -19,7 +19,12 @@ describe("electron-builder.yml", () => {
   const config = parse(readFileSync(join(APP, "electron-builder.yml"), "utf8")) as {
     extraResources: { from: string; to: string }[];
     dmg: { artifactName: string };
+    mac: { target: { target: string; arch: string[] }[] };
   };
+
+  it("builds the Mac DMG for Apple silicon only", () => {
+    expect(config.mac.target).toEqual([{ target: "dmg", arch: ["arm64"] }]);
+  });
 
   it("ships the MIT LICENSE inside the app", () => {
     expect(config.extraResources).toContainEqual({ from: "../../LICENSE", to: "LICENSE" });
@@ -34,17 +39,15 @@ describe("electron-builder.yml", () => {
 
 describe.skipIf(!enabled)("packaging (macOS, DESKTOP_PACKAGE=1)", () => {
   it(
-    "builds unpacked arm64 and x64 apps that pass the static packaged smoke",
+    "builds an unpacked arm64 app that passes the static packaged smoke",
     () => {
-      const dist = run("npm", ["run", "dist", "--", "--dir", "--arm64", "--x64"]);
+      const dist = run("npm", ["run", "dist", "--", "--dir", "--arm64"]);
       expect(dist.status, dist.stderr.slice(-4000)).toBe(0);
       const smoke = run(process.execPath, [
         "scripts/packagedSmoke.mjs",
         "--static",
         "--app",
         join(APP, "release/mac-arm64/Open Agent.app"),
-        "--app",
-        join(APP, "release/mac/Open Agent.app"),
       ]);
       expect(smoke.status, `${smoke.stdout}\n${smoke.stderr}`).toBe(0);
       expect(smoke.stdout).toContain("packaged smoke: ok");

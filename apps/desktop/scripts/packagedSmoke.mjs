@@ -98,8 +98,8 @@ const version = release ?? JSON.parse(readFileSync(join(APP_DIR, "package.json")
 const expectLock = values["expect-lock"] ? readFileSync(resolve(values["expect-lock"])) : undefined;
 const repoLicense = readFileSync(join(REPO, "LICENSE"));
 const bundledLocks = new Map();
-const EXPECTED_ARCH = { "mac-arm64": "arm64", mac: "x86_64" };
-const dmgFor = (arch) => (values.dmg ?? []).find((d) => d.endsWith(`-${arch === "x86_64" ? "x64" : arch}.dmg`));
+const EXPECTED_ARCH = "arm64";
+const dmgFor = (arch) => (values.dmg ?? []).find((d) => d.endsWith(`-${arch}.dmg`));
 const say = (m) => process.stdout.write(`${m}\n`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const readJson = (p) => {
@@ -133,9 +133,8 @@ for (const appPath of apps) {
   const lipo = run("lipo", ["-archs", join(appPath, "Contents/MacOS/Open Agent")]);
   const arch = lipo.stdout.trim();
   archOf.set(appPath, arch);
-  const want = EXPECTED_ARCH[dirname(appPath).split("/").pop()];
   if (lipo.status !== 0) p(`lipo exited ${lipo.status}`);
-  else if (want && arch !== want) p(`lipo -archs is ${arch}, expected ${want}`);
+  else if (arch !== EXPECTED_ARCH) p(`lipo -archs is ${arch}, expected ${EXPECTED_ARCH} (the Mac app is Apple silicon only)`);
 
   const sign = run("codesign", ["--verify", "--deep", "--strict", appPath]);
   if (sign.status !== 0) p(`codesign --verify --deep --strict exited ${sign.status}: ${sign.stderr.trim()}`);

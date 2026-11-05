@@ -54,7 +54,7 @@ The owner makes releases from a `v*` tag with `.github/workflows/release.yml`; e
 
 - Release logic lives in `scripts/release/`, one script per step, and is tested by `scripts/test/release.test.mjs`, `scripts/test/releaseWorkflow.test.mjs`, `scripts/test/dryRunWorkflow.test.mjs` and `scripts/test/workflowPins.test.mjs`. The workflow only calls those scripts (plus `gh` and `docker`); don't add release logic inline in a `run:` step. `npm run lint:workflows` runs actionlint from a pinned image over every workflow.
 - `.github/CODEOWNERS` names the owner for the workflows, `scripts/release/`, `scripts/docs/`, `scripts/demo/`, `docs/INSTALL.md`, `README.md` and `apps/desktop/release-policy.json` (the `minShellVersion` every release manifest carries).
-- **Dry run.** It runs every workflow step that doesn't need GitHub on this Mac: builds and pushes both images for both platforms to a local registry, writes the release lock and manifest, builds and checks both DMGs, and writes `SHA256SUMS`, the notes and the draft release. The DMG checks and the `SHA256SUMS` line are `release.yml`'s own `verify-dmgs` and `attest` run blocks, read from the workflow and run verbatim, so the dry run tests what a release runs. It needs test mode, a `0.0.0-dryrun.<n>` version, a registry on `127.0.0.1:18xxx` and an `oab-` builder:
+- **Dry run.** It runs every workflow step that doesn't need GitHub on this Mac: builds and pushes both images for both platforms to a local registry, writes the release lock and manifest, builds and checks the Apple silicon DMG, and writes `SHA256SUMS`, the notes and the draft release. The DMG checks and the `SHA256SUMS` line are `release.yml`'s own `verify-dmgs` and `attest` run blocks, read from the workflow and run verbatim, so the dry run tests what a release runs. It needs test mode, a `0.0.0-dryrun.<n>` version, a registry on `127.0.0.1:18xxx` and an `oab-` builder:
 
 ```bash
 docker run -d --name oab-factory-m5-registry -p 127.0.0.1:18501:5000 registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
@@ -63,7 +63,7 @@ docker buildx create --name oab-factory-m5-builder --driver docker-container --d
 OPEN_AGENT_SHELL_TEST=1 npm run release:dry-run -- --version 0.0.0-dryrun.1 --registry 127.0.0.1:18501 --builder oab-factory-m5-builder --out .factory/m5/release-dry-run/0.0.0-dryrun.1
 ```
 
-The output folder holds `lock/`, `dmgs/`, `release/` (the four release assets, `draft-release.json` and `notes.md`) and `mock-release/`. `--services-only` skips the DMGs, and `--platforms linux/arm64` builds one platform while you iterate (the lock step then refuses the index, as a release would). The amd64 agent image builds under emulation on an Apple silicon Mac and takes a while. Afterwards: `docker rm -f -v oab-factory-m5-registry && docker buildx rm oab-factory-m5-builder`.
+The output folder holds `lock/`, `dmgs/`, `release/` (the three release assets, `draft-release.json` and `notes.md`) and `mock-release/`. `--services-only` skips the DMGs, and `--platforms linux/arm64` builds one platform while you iterate (the lock step then refuses the index, as a release would). The amd64 agent image builds under emulation on an Apple silicon Mac and takes a while. Afterwards: `docker rm -f -v oab-factory-m5-registry && docker buildx rm oab-factory-m5-builder`.
 
 ## End-to-end tests and evals on the local stack
 
@@ -98,7 +98,7 @@ Remove the test stack and its volumes afterwards with `docker compose -p oab-e2e
 npm run electron:install -w @oab/desktop
 npm run build -w @oab/desktop && npm run stage -w @oab/desktop
 npm run lint -w @oab/desktop && npm run format:check -w @oab/desktop && npm run typecheck -w @oab/desktop && npm test -w @oab/desktop
-npm run dist -w @oab/desktop -- --arm64 --x64   # macOS only: both DMGs in apps/desktop/release/, ad-hoc signed, fuses flipped
+npm run dist -w @oab/desktop -- --arm64   # macOS on Apple silicon only: the DMG in apps/desktop/release/, ad-hoc signed, fuses flipped
 ```
 
 **Test mode.** Every test runs the app with `OPEN_AGENT_SHELL_TEST=1` and a separate state dir (`OPEN_AGENT_SHELL_STATE_DIR`), an `oab-…` project and volumes, and a port range inside 18000–19999. Test mode never touches `~/Library/Application Support/Open Agent` or the real `open-agent` project. The window title ends in " — test" and the window shows "TEST MODE". Two test-only knobs keep tests from sleeping or depending on this Mac: `OPEN_AGENT_SHELL_EXTERNAL_WINDOW_MS` (the external-link rate and de-duplication window) and `OPEN_AGENT_SHELL_FAKE_APPS` (`docker-desktop`, `orbstack`; which Docker apps the screens offer to open).
@@ -109,11 +109,11 @@ npm run dist -w @oab/desktop -- --arm64 --x64   # macOS only: both DMGs in apps/
 (cd e2e && npx playwright test -c playwright.desktop.config.ts --project desktop-fake)
 ```
 
-**Packaged smoke** (macOS, after `npm run dist`): fuses, `Info.plist`, `lipo -archs`, `codesign --verify --deep --strict`, the bundled stack hashes and the size budget, then a test-mode launch of each `.app` with the fake CLI (polls `status.json` for `app`, `curl`s `/health`, sends SIGTERM and checks the recorded `compose … stop`). No debugger is attached, so it works with the fuses on. The x64 app runs under Rosetta. `--moved` also copies each app to a second folder and checks the stack stays ours; `--static` skips the launches.
+**Packaged smoke** (macOS, after `npm run dist`): fuses, `Info.plist`, `lipo -archs`, `codesign --verify --deep --strict`, the bundled stack hashes and the size budget, then a test-mode launch of the `.app` with the fake CLI (polls `status.json` for `app`, `curl`s `/health`, sends SIGTERM and checks the recorded `compose … stop`). No debugger is attached, so it works with the fuses on. `--moved` also copies the app to a second folder and checks the stack stays ours; `--static` skips the launches.
 
 ```bash
-node apps/desktop/scripts/packagedSmoke.mjs --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" \
-  --dmg apps/desktop/release/Open-Agent-0.0.0-dev-arm64.dmg --dmg apps/desktop/release/Open-Agent-0.0.0-dev-x64.dmg --moved
+node apps/desktop/scripts/packagedSmoke.mjs --app "apps/desktop/release/mac-arm64/Open Agent.app" \
+  --dmg apps/desktop/release/Open-Agent-0.0.0-dev-arm64.dmg --moved
 ```
 
 **Real Docker smoke** (your own engine; `oab-` names and 184xx ports only). Build two dev images, describe them in a dev services file, then run the `desktop-real` project. It covers the lifecycle (stop on quit, token reuse, `kek_missing` reset, watchdog), a smoke with onboarding on the stub model and a streamed reply, Services & data, and the local build. Each spec removes its project and volumes when it ends.

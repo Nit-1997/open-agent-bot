@@ -349,8 +349,6 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run postinstall
       - run: npm run electron:install -w @oab/desktop
-      - name: Rosetta for the x64 smoke
-        run: /usr/bin/pgrep -q oahd || sudo softwareupdate --install-rosetta --agree-to-license
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-lock
@@ -359,19 +357,18 @@ jobs:
         run: node apps/desktop/scripts/stage-stack.mjs --lock "$RUNNER_TEMP/release-lock/services.lock.json"
       - name: Build the shell
         run: node apps/desktop/scripts/build.mjs
-      - name: Both DMGs, ad-hoc signed, fuses flipped, version from the tag
+      - name: The Apple silicon DMG, ad-hoc signed, fuses flipped, version from the tag
         working-directory: apps/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: ../../node_modules/.bin/electron-builder --mac --arm64 --x64 --publish never --config.extraMetadata.version="$VERSION"
+        run: ../../node_modules/.bin/electron-builder --mac --arm64 --publish never --config.extraMetadata.version="$VERSION"
       - name: Packaged smoke with the bundled release lock (asserts kind=release, this version, byte-equal to the lock job's)
-        run: node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg"
+        run: node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-dmgs
           path: |
             apps/desktop/release/Open-Agent-${{ needs.gate.outputs.version }}-arm64.dmg
-            apps/desktop/release/Open-Agent-${{ needs.gate.outputs.version }}-x64.dmg
           if-no-files-found: error
           retention-days: 7
 
@@ -398,7 +395,7 @@ jobs:
         run: |
           want="$(shasum -a 256 "$LOCK" | cut -d ' ' -f 1)"
           echo "release-lock services.lock.json sha256 $want"
-          for arch in arm64 x64; do
+          for arch in arm64; do
             dmg="$DMGS/Open-Agent-$VERSION-$arch.dmg"
             mnt="$RUNNER_TEMP/m-$arch"
             hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
@@ -438,12 +435,12 @@ jobs:
         with:
           name: release-dmgs
           path: ${{ runner.temp }}/assets
-      - name: SHA256SUMS of the two DMGs and the lock job's manifest
+      - name: SHA256SUMS of the DMG and the lock job's manifest
         working-directory: ${{ runner.temp }}/assets
         env:
           VERSION: ${{ needs.gate.outputs.version }}
         run: |
-          sha256sum "Open-Agent-$VERSION-arm64.dmg" "Open-Agent-$VERSION-x64.dmg" open-agent-services.json > SHA256SUMS
+          sha256sum "Open-Agent-$VERSION-arm64.dmg" open-agent-services.json > SHA256SUMS
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: ${{ runner.temp }}/assets/SHA256SUMS
@@ -466,7 +463,6 @@ jobs:
       VERSION: ${{ needs.gate.outputs.version }}
       GH_TOKEN: ${{ github.token }}
       ASSET_ARM64: Open-Agent-${{ needs.gate.outputs.version }}-arm64.dmg
-      ASSET_X64: Open-Agent-${{ needs.gate.outputs.version }}-x64.dmg
       ASSET_MANIFEST: open-agent-services.json
       ASSET_SUMS: SHA256SUMS
     steps:
@@ -487,14 +483,14 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | .id' > "$RUNNER_TEMP/existing-releases.txt"
           cat "$RUNNER_TEMP/existing-releases.txt"
           test ! -s "$RUNNER_TEMP/existing-releases.txt"
-      - name: Draft prerelease with the four assets
+      - name: Draft prerelease with the three assets
         if: needs.gate.outputs.prerelease == 'true'
-        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md" --prerelease "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-x64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"
-      - name: Draft release with the four assets
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md" --prerelease "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"
+      - name: Draft release with the three assets
         if: needs.gate.outputs.prerelease != 'true'
-        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-x64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"
-      - name: The draft holds exactly the four assets
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"
+      - name: The draft holds exactly the three assets
         run: |
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets --jq '.isDraft == true and ([.assets[].name] | sort) == ([env.ASSET_ARM64, env.ASSET_X64, env.ASSET_MANIFEST, env.ASSET_SUMS] | sort)' > "$RUNNER_TEMP/draft-check.txt"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets --jq '.isDraft == true and ([.assets[].name] | sort) == ([env.ASSET_ARM64, env.ASSET_MANIFEST, env.ASSET_SUMS] | sort)' > "$RUNNER_TEMP/draft-check.txt"
           cat "$RUNNER_TEMP/draft-check.txt"
           grep -qx true "$RUNNER_TEMP/draft-check.txt"

@@ -210,17 +210,12 @@ describe("release.yml script steps run in order against fixtures (push record â†
     );
   });
 
-  it("attest's sha256sum line lists exactly the two DMGs and the lock job's manifest, sorted, in sha256sum format", () => {
+  it("attest's sha256sum line lists exactly the Apple silicon DMG and the lock job's manifest, sorted, in sha256sum format", () => {
     mkdirSync(join(store, "release-dmgs"), { recursive: true });
-    for (const arch of ["arm64", "x64"])
-      writeFileSync(join(store, "release-dmgs", `Open-Agent-${VERSION}-${arch}.dmg`), `fake ${arch} dmg\n`);
+    writeFileSync(join(store, "release-dmgs", `Open-Agent-${VERSION}-arm64.dmg`), "fake arm64 dmg\n");
     const { ctx } = runJob("attest");
     const sums = readFileSync(join(ctx.temp, "assets/SHA256SUMS"), "utf8");
-    const want = [
-      join(store, "release-dmgs", `Open-Agent-${VERSION}-arm64.dmg`),
-      join(store, "release-dmgs", `Open-Agent-${VERSION}-x64.dmg`),
-      join(store, "release-lock/open-agent-services.json"),
-    ]
+    const want = [join(store, "release-dmgs", `Open-Agent-${VERSION}-arm64.dmg`), join(store, "release-lock/open-agent-services.json")]
       .map((f) => `${sha256Hex(readFileSync(f))}  ${basename(f)}\n`)
       .join("");
     assert.equal(sums, want);
@@ -233,13 +228,13 @@ describe("release.yml script steps run in order against fixtures (push record â†
     assert.ok(attestAssets, "the attest step ran");
     const copy = mkdtempSync(join(work, "flipped-"));
     cpSync(attestAssets, copy, { recursive: true });
-    const dmg = join(copy, `Open-Agent-${VERSION}-x64.dmg`);
+    const dmg = join(copy, `Open-Agent-${VERSION}-arm64.dmg`);
     const bytes = readFileSync(dmg);
     bytes[0] ^= 0x01;
     writeFileSync(dmg, bytes);
     const r = spawnSync("shasum", ["-a", "256", "-c", "SHA256SUMS"], { cwd: copy, encoding: "utf8" });
     assert.notEqual(r.status, 0);
-    assert.match(r.stdout, new RegExp(`Open-Agent-${VERSION.replace(/\./g, "\\.")}-x64\\.dmg: FAILED`));
-    assert.match(r.stdout, new RegExp(`Open-Agent-${VERSION.replace(/\./g, "\\.")}-arm64\\.dmg: OK`));
+    assert.match(r.stdout, new RegExp(`Open-Agent-${VERSION.replace(/\./g, "\\.")}-arm64\\.dmg: FAILED`));
+    assert.match(r.stdout, /open-agent-services\.json: OK/);
   });
 });

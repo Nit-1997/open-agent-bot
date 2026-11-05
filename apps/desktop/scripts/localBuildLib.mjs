@@ -77,6 +77,5 @@ export function localLock(o) {
 /** @param {string} arch */
 export function hostArchFlag(arch) {
   if (arch === "arm64") return "--arm64";
-  if (arch === "x64") return "--x64";
-  throw new Error(`dist:local packages for arm64 or x64, not ${arch}`);
+  throw new Error(`dist:local packages for arm64 only: the Mac app is Apple silicon only, not ${arch}`);
 }

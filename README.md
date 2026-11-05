@@ -4,7 +4,7 @@ Open Agent is a research and planning agent that runs on your computer. You chat
 
 **You see every step.** Every search, every page it reads, and every claim it checks shows up live in the chat, so you can tell where an answer came from. MIT licensed, no account, no telemetry.
 
-**Mac app.** Download `Open-Agent-1.0.0-arm64.dmg` (Apple silicon) or `Open-Agent-1.0.0-x64.dmg` (Intel) from the [latest release](https://github.com/Nit-1997/open-agent-bot/releases/latest), open it and drag "Open Agent" to Applications. It needs Docker Desktop, OrbStack or Colima. The app isn't signed with an Apple Developer ID, so macOS blocks the first open: click "Done", then System Settings → Privacy & Security → "Open Anyway". Every step, with download checks: [docs/INSTALL.md](docs/INSTALL.md).
+**Mac app.** Download `Open-Agent-1.0.0-arm64.dmg` (Apple silicon) from the [latest release](https://github.com/Nit-1997/open-agent-bot/releases/latest), open it and drag "Open Agent" to Applications. It needs Docker Desktop, OrbStack or Colima. The app isn't signed with an Apple Developer ID, so macOS blocks the first open: click "Done", then System Settings → Privacy & Security → "Open Anyway". Every step, with download checks: [docs/INSTALL.md](docs/INSTALL.md). Intel Macs aren't supported by the Mac app; use the Docker Compose path below.
 
 **No Mac app** (any computer with Docker and Git):
 

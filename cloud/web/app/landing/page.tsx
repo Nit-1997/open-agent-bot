@@ -185,7 +185,7 @@ export default function LandingPage() {
           ))}
         </ul>
         <p id="landing-ways-foot" className="mt-7 text-[13px] text-white/55">
-          Apple silicon and Intel · Linux and Windows: run it with Docker Compose
+          Apple silicon Macs · Intel Macs, Linux and Windows: run it with Docker Compose
         </p>
       </section>
 

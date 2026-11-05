@@ -514,9 +514,9 @@ describe("notes.mjs", () => {
       "- abc1234 `fix: a thing`",
       "## Changes since v0.9.0",
       "Open-Agent-1.0.0-arm64.dmg",
-      "Open-Agent-1.0.0-x64.dmg",
     ])
       assert.ok(text.includes(s), s);
+    assert.doesNotMatch(text, /x64|Intel/);
     assert.ok(text.includes(pinned("Open-Agent-1.0.0-arm64.dmg", "1.0.0")));
     assert.ok(text.includes(pinned(`oci://${PROD.agent}`, "1.0.0")));
     assert.ok(text.includes(pinned(`oci://${PROD.search}`, "1.0.0")));
