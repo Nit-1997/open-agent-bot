@@ -4,23 +4,40 @@ import Link from "next/link";
 import { useState } from "react";
 import type { AccessRequestView, AdminUser } from "@oab/shared/admin";
 import type { PageResponse } from "@oab/shared/pages";
-import type { ActionResult } from "@/lib/actionResult";
+import type { AdminUsageRow, AdminUsageSummary } from "@oab/shared/usage";
+import { listUsers } from "@/app/admin/actions";
+import { type ActionResult, runAction } from "@/lib/actionResult";
 import { RequestsList } from "./RequestsList";
+import { UsageTab } from "./UsageTab";
 import { UsersList } from "./UsersList";
 
-type Tab = "requests" | "users";
+type Tab = "requests" | "users" | "usage";
 const TABS: Array<[Tab, string]> = [
   ["requests", "Requests"],
   ["users", "Users"],
+  ["usage", "Usage"],
 ];
+
+type UsersView = { seq: number; query: string; initial: ActionResult<PageResponse<AdminUser>> };
 
 export function AdminView(props: {
   email: string;
   selfId: string;
   requests: ActionResult<PageResponse<AccessRequestView>>;
   users: ActionResult<PageResponse<AdminUser>>;
+  usageSummary: ActionResult<AdminUsageSummary>;
+  usage: ActionResult<PageResponse<AdminUsageRow>>;
 }) {
   const [tab, setTab] = useState<Tab>("requests");
+  const [users, setUsers] = useState<UsersView>({ seq: 0, query: "", initial: props.users });
+
+  const openUser = async (email: string) => {
+    const query = email.trim().toLowerCase();
+    const initial = await runAction(() => listUsers(1, query));
+    setUsers((u) => ({ seq: u.seq + 1, query, initial }));
+    setTab("users");
+  };
+
   return (
     <main id="admin-page" className="flex min-h-dvh w-full justify-center p-2 sm:p-4">
       <div id="admin-frame" className="glass flex w-full max-w-[920px] flex-col gap-4 rounded-[28px] p-4 sm:p-6">
@@ -63,7 +80,10 @@ export function AdminView(props: {
           <RequestsList initial={props.requests} />
         </div>
         <div id="admin-panel-users" role="tabpanel" aria-labelledby="admin-tab-users" hidden={tab !== "users"}>
-          <UsersList initial={props.users} selfId={props.selfId} />
+          <UsersList key={users.seq} initial={users.initial} initialQuery={users.query} selfId={props.selfId} />
+        </div>
+        <div id="admin-panel-usage" role="tabpanel" aria-labelledby="admin-tab-usage" hidden={tab !== "usage"}>
+          <UsageTab summary={props.usageSummary} users={props.usage} onOpenUser={(email) => void openUser(email)} />
         </div>
       </div>
     </main>

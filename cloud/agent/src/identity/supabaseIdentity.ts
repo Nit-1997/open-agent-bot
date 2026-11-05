@@ -18,12 +18,55 @@ const disabled = () => new UserError("Your access has been turned off.", "forbid
 
 const refuse = (error: UserError): AuthOutcome => ({ ok: false, error });
 
-export const principalOf = ({ id, email, isAdmin }: VerifiedUser): Principal =>
-  Object.freeze({ id, email, capabilities: hostedCapabilities(isAdmin) });
+export const principalOf = ({ id, email }: VerifiedUser, effectiveAdmin: boolean): Principal =>
+  Object.freeze({ id, email, capabilities: hostedCapabilities(effectiveAdmin) });
 
-export function createSupabaseIdentity(deps: { serviceSecret: string; verify: Verifier; status: UserStatusCache }): Identity {
+const REMEMBERED_ADMINS = 10_000;
+
+export type HostedIdentity = Identity & { roleUnverified(user: Principal): boolean };
+
+export type HostedIdentityDeps = {
+  serviceSecret: string;
+  verify: Verifier;
+  status: UserStatusCache;
+  liveAdmin: (userId: string) => Promise<boolean>;
+  onDemoted: (userId: string) => Promise<void>;
+};
+
+export function createSupabaseIdentity(deps: HostedIdentityDeps): HostedIdentity {
+  const admins = new Set<string>();
+  const unverified = new WeakSet<Principal>();
+
+  const effectiveAdmin = async (user: VerifiedUser): Promise<boolean | undefined> => {
+    if (!user.isAdmin) return false;
+    try {
+      return await deps.liveAdmin(user.id);
+    } catch (err) {
+      log.warn(`[auth] live admin check failed user=${user.id}`, err instanceof Error ? err.message : "error");
+      return undefined;
+    }
+  };
+
+  const remember = async (userId: string, admin: boolean) => {
+    if (admin) {
+      admins.delete(userId);
+      admins.add(userId);
+      if (admins.size > REMEMBERED_ADMINS) admins.delete(admins.values().next().value!);
+      return;
+    }
+    if (!admins.delete(userId)) return;
+    log.info(`[auth] admin role ended user=${userId}, dropping their sessions`);
+    try {
+      await deps.onDemoted(userId);
+    } catch (err) {
+      log.error(`[auth] demotion cleanup failed user=${userId}`, err instanceof Error ? err.message : err);
+    }
+  };
+
   return {
     kind: "hosted",
+
+    roleUnverified: (user) => unverified.has(user),
 
     admitCaller(req) {
       return serviceSecretMatches(req.headers.get("x-agent-secret") ?? undefined, deps.serviceSecret) ? undefined : unauthorized();
@@ -47,7 +90,11 @@ export function createSupabaseIdentity(deps: { serviceSecret: string; verify: Ve
         return refuse(authUnavailable());
       }
       if (!active) return refuse(disabled());
-      return { ok: true, principal: principalOf(user) };
+      const admin = await effectiveAdmin(user);
+      if (admin !== undefined) await remember(user.id, admin);
+      const principal = principalOf(user, admin === true);
+      if (admin === undefined) unverified.add(principal);
+      return { ok: true, principal };
     },
   };
 }

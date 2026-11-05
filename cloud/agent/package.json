@@ -9,11 +9,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "biome lint",
+    "lint": "biome lint && biome lint --config-path ../supabase ../supabase/scripts/localGuard.mjs ../supabase/scripts/local-stack.mjs ../supabase/scripts/gen-types.mjs ../supabase/scripts/blocked-domains.mjs ../supabase/scripts/managementApi.mjs ../supabase/scripts/configure-auth.mjs ../supabase/scripts/test-users.mjs ../supabase/scripts/check-push-plan.mjs ../supabase/scripts/check-old-bodies.mjs ../supabase/test",
     "format": "biome format --write",
-    "format:check": "biome format",
+    "format:check": "biome format && biome format --config-path ../supabase ../supabase/scripts/localGuard.mjs ../supabase/scripts/local-stack.mjs ../supabase/scripts/gen-types.mjs ../supabase/scripts/blocked-domains.mjs ../supabase/scripts/managementApi.mjs ../supabase/scripts/configure-auth.mjs ../supabase/scripts/test-users.mjs ../supabase/scripts/check-push-plan.mjs ../supabase/scripts/check-old-bodies.mjs ../supabase/test",
     "typecheck": "tsc -b && tsc -p tsconfig.evals.json && tsc -p tsconfig.test.json",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:scripts",
+    "test:scripts": "node --test --disable-warning=ExperimentalWarning ../supabase/test/*.test.mjs",
+    "test:local": "vitest run -c vitest.local.config.ts",
     "test:supabase": "SUPABASE_INTEGRATION=1 vitest run test/supabase",
     "build": "tsc -b",
     "start": "node dist/server.js",
@@ -31,6 +33,8 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
     "@types/node": "^26.6.5",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
     "tsx": "4.20.6",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

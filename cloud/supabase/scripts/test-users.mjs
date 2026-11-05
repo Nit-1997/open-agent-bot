@@ -1,3 +1,6 @@
+import { pathToFileURL } from "node:url";
+import { adminEnv, createAdmin, run } from "./admin.mjs";
+
 export const TEST_EMAIL_PATTERN = "oab-e2e+%@example.test";
 export const INTEGRATION_EMAIL_PATTERN = "oab-test+%@example.test";
 export const EMAIL_TABLES = ["profiles", "invited_emails", "access_requests"];
@@ -45,4 +48,29 @@ export function emailRows({ url, key }) {
       await rest("DELETE", `${table}?email=eq.${encodeURIComponent(email)}`, "return=minimal");
     },
   };
+}
+
+export async function markHumanChecked({ url, key }, userIds) {
+  if (!userIds.length) return 0;
+  const res = await fetch(`${url}/rest/v1/human_checks?on_conflict=user_id`, {
+    method: "POST",
+    headers: { apikey: key, "content-type": "application/json", prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify(userIds.map((user_id) => ({ user_id }))),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`human_checks upsert failed: HTTP ${res.status}`);
+  return userIds.length;
+}
+
+export async function humanCheckTestUsers(admin, env) {
+  const users = [...(await testAuthUsers(admin)), ...(await testAuthUsers(admin, isIntegrationEmail))];
+  return markHumanChecked(env, [...new Set(users.map((u) => u.id))]);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  run(async () => {
+    if (!process.argv.includes("--human-checked")) throw new Error("usage: test-users.mjs --human-checked");
+    const env = adminEnv();
+    console.log(`human-checked test users: ${await humanCheckTestUsers(createAdmin(env), env)}`);
+  });
 }

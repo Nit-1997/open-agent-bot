@@ -8,10 +8,13 @@ export type AdminCheck = (principal: Principal) => Promise<boolean>;
 
 const notFound = () => new UserError("Not found.", "not_found");
 
-export function createAdminGuard(deps: { isLiveAdmin: AdminCheck }): MiddlewareHandler<AuthEnv> {
+export function createAdminGuard(deps: {
+  isLiveAdmin: AdminCheck;
+  roleUnverified?: (user: Principal) => boolean;
+}): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
     const user = c.get("user");
-    if (!user?.capabilities.admin) return errorResponse(c, notFound());
+    if (!user?.capabilities.admin) return errorResponse(c, user && deps.roleUnverified?.(user) ? authUnavailable() : notFound());
     let live: boolean;
     try {
       live = await deps.isLiveAdmin(user);

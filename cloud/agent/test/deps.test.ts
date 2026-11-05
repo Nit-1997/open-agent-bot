@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import { adminHooks, hostedAgentDeps } from "../src/deps.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { adminHooks, hostedAgentDeps, humanVerifierFor, startLimitTimers } from "../src/deps.js";
+import { HostedRunPolicy } from "../src/limits/policy.js";
+import { FakeUsageStore } from "./limits/fakeUsage.js";
 import { hostedGateway } from "../src/gateway.js";
 import type { Db } from "../src/store/client.js";
 import type { Identity } from "@oab/core/identity/types.js";
@@ -25,6 +27,9 @@ describe("hostedAgentDeps", () => {
     expect(mounts.map((m) => [m.stage, m.basePath])).toEqual([
       ["public", "/"],
       ["protected", "/admin"],
+      ["protected", "/usage"],
+      ["protected", "/human-check"],
+      ["protected", "/account"],
     ]);
   });
 
@@ -43,6 +48,73 @@ describe("hostedAgentDeps", () => {
       apiKey: "k",
       models: [{ id: "m1", label: "Model One" }],
     });
+  });
+});
+
+describe("hostedAgentDeps request limits", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("builds one HostedRunPolicy on the shared limiter for runs and the usage route, over the seamed usage repo", async () => {
+    const usage = new FakeUsageStore().repo({ caps: { perMonth: 50, perHour: 10 } });
+    const { deps, usage: shown } = hostedAgentDeps(testConfig(), clients, { usage });
+    expect(shown).toBe(usage);
+    const core = handles();
+    deps.routes!(core);
+    const policy = deps.runPolicy!({ limiter: core.limiter });
+    expect(policy).toBeInstanceOf(HostedRunPolicy);
+    expect(deps.runPolicy!({ limiter: core.limiter })).toBe(policy);
+  });
+
+  it("sweeps stale slots every 30 s and prunes the usage log every hour, logging a failed prune", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const policy = { sweep: vi.fn() };
+    const usage = { prune: vi.fn(async () => Promise.reject(new Error("down"))) };
+    const stop = startLimitTimers(policy, usage);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(policy.sweep).toHaveBeenCalledTimes(2);
+    expect(usage.prune).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(3_540_000);
+    expect(usage.prune).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls.flat().join(" ")).toContain("[limits] usage prune failed");
+    stop();
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    expect(usage.prune).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("humanVerifierFor", () => {
+  it("builds no verifier without a secret and logs nothing (the startup check warns only in open mode)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(humanVerifierFor({ appOrigin: "https://app.example" })).toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("checks APP_ORIGIN's hostname without the port, and accepts the recorded test response only for a test secret in local-stack mode", async () => {
+    const reply = (body: object) => vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(body)));
+    const ok = { success: true, hostname: "localhost", action: "human_check" };
+    const test = { success: true, hostname: "example.com", metadata: { result_with_testing_key: true } };
+    const pass = "1x0000000000000000000000000000000AA";
+    reply(ok);
+    expect(
+      await humanVerifierFor({ appOrigin: "http://localhost:18721", turnstile: { secret: pass }, localStack: true })!.verify("t", {
+        action: "human_check",
+      }),
+    ).toBe("ok");
+    reply(test);
+    expect(
+      await humanVerifierFor({ appOrigin: "http://localhost:18721", turnstile: { secret: pass }, localStack: true })!.verify("t", {
+        action: "human_check",
+      }),
+    ).toBe("ok");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    reply(test);
+    expect(
+      await humanVerifierFor({ appOrigin: "http://localhost:18721", turnstile: { secret: pass } })!.verify("t", { action: "human_check" }),
+    ).toBe("failed");
   });
 });
 

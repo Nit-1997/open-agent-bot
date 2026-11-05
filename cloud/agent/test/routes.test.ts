@@ -1,18 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAccessService } from "../src/access/service.js";
-import { createAdminService } from "../src/admin/service.js";
 import { createAdminGuard } from "../src/identity/adminGuard.js";
 import { hostedRoutes } from "../src/routes.js";
 import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { checkMounts } from "@oab/core/startAgent.js";
-import { FakeAccounts, makeHostedApp } from "./fixtures/hostedApp.js";
+import { FakeAccounts, fakeAccountDeps, fakeAdminService, makeHostedApp } from "./fixtures/hostedApp.js";
 import { TEST_SECRET } from "./fixtures/config.js";
+import { waitlistSignup } from "./fixtures/humanCheck.js";
+import { fakeAdminUsageDeps, fakeUsageDeps } from "./fixtures/usage.js";
 import { ADMIN, ALICE } from "./fixtures/users.js";
 
 function mounts() {
   const accounts = new FakeAccounts();
   const limiter = new RateLimiter();
+  const usage = fakeUsageDeps(limiter);
   const adminGuard = createAdminGuard({ isLiveAdmin: async () => true });
   const list = hostedRoutes({
     access: createAccessService({
@@ -22,19 +24,26 @@ function mounts() {
       submit: async () => "inserted",
       sendMagicLink: async () => ({}),
     }),
-    admin: createAdminService({ repo: accounts.repo(), auth: accounts.auth(), hooks: { onDisabled: async () => {}, onEnabled: () => {} } }),
+    admin: fakeAdminService(accounts, usage.usage),
     adminGuard,
     limiter,
+    usage,
+    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users),
+    signup: waitlistSignup(limiter),
+    account: fakeAccountDeps(accounts, usage.usage, limiter),
   });
   return { list, adminGuard };
 }
 
 describe("hostedRoutes", () => {
-  it("mounts access as public at / and admin as protected at /admin, and passes the mount checks", () => {
+  it("mounts access and the signup mode as public at /, admin, usage, the human check and the account as protected, and passes the mount checks", () => {
     const { list } = mounts();
     expect(list.map((m) => [m.stage, m.basePath])).toEqual([
       ["public", "/"],
       ["protected", "/admin"],
+      ["protected", "/usage"],
+      ["protected", "/human-check"],
+      ["protected", "/account"],
     ]);
     expect(() => checkMounts(list)).not.toThrow();
   });
@@ -49,7 +58,11 @@ describe("hostedRoutes", () => {
     ]);
     const firstRoute = routes.findIndex((r) => r.method !== "ALL");
     expect(routes.findLastIndex((r) => r.handler === adminGuard)).toBeLessThan(firstRoute);
-    expect(list[0]!.routes.routes.map((r) => `${r.method} ${r.path}`)).toEqual(["POST /access-requests", "POST /auth/email-link"]);
+    expect(list[0]!.routes.routes.map((r) => `${r.method} ${r.path}`)).toEqual([
+      "POST /access-requests",
+      "POST /auth/email-link",
+      "GET /signup",
+    ]);
   });
 
   it("hides admin routes from a non-admin and lets the admin list users and requests", async () => {

@@ -53,6 +53,11 @@ services:
       - RENDERER_URL
       - COPILOT_CONNECTS_PER_USER
       - COPILOT_CONNECT_MAX_MS
+      - LIMIT_RUNNING_PER_USER
+      - LIMIT_REQUESTS_PER_HOUR
+      - LIMIT_REQUESTS_PER_MONTH
+      - LIMIT_RUNNING_SERVER
+      - TURNSTILE_SECRET_KEY
       - RENDERER_SECRET
     read_only: true
     tmpfs:
@@ -130,6 +135,7 @@ services:
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
     env_file:
       - path: ./env-files/frontend/.env
         required: true

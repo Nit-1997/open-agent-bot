@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSupabaseIdentity, serviceSecretMatches } from "../src/identity/supabaseIdentity.js";
 import { UserStatusCache } from "../src/identity/status.js";
 import { AuthError, type VerifiedUser } from "../src/identity/verify.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import { TEST_SECRET } from "./fixtures/config.js";
+import { NO_CAPABILITIES } from "@oab/core/identity/types.js";
 import { ALL_CAPABILITIES } from "./fixtures/users.js";
 
 const VERIFIED: VerifiedUser = {
@@ -14,11 +15,19 @@ const VERIFIED: VerifiedUser = {
 };
 
 function identity(
-  opts: { verify?: (t: string) => Promise<VerifiedUser>; status?: () => Promise<"active" | "deactivated" | undefined> } = {},
+  opts: {
+    verify?: (t: string) => Promise<VerifiedUser>;
+    status?: () => Promise<"active" | "deactivated" | undefined>;
+    liveAdmin?: (userId: string) => Promise<boolean>;
+    onDemoted?: (userId: string) => Promise<void>;
+  } = {},
 ) {
   const verify = vi.fn(opts.verify ?? (async () => VERIFIED));
   const lookup = vi.fn(opts.status ?? (async () => "active" as const));
-  return { id: createSupabaseIdentity({ serviceSecret: TEST_SECRET, verify, status: new UserStatusCache(lookup) }), verify, lookup };
+  const liveAdmin = vi.fn(opts.liveAdmin ?? (async () => true));
+  const onDemoted = vi.fn(opts.onDemoted ?? (async () => {}));
+  const id = createSupabaseIdentity({ serviceSecret: TEST_SECRET, verify, status: new UserStatusCache(lookup), liveAdmin, onDemoted });
+  return { id, verify, lookup, liveAdmin, onDemoted };
 }
 
 const request = (headers: Record<string, string>) => new Request("http://agent/chats", { headers });
@@ -99,6 +108,143 @@ describe("createSupabaseIdentity", () => {
       const outcome = await identity({ status }).id.authenticate(request({ authorization: "Bearer tok" }));
       expect(!outcome.ok && outcome.error).toMatchObject({ kind: "forbidden", code: "account_disabled" });
     }
+  });
+});
+
+const MEMBER: VerifiedUser = { ...VERIFIED, isAdmin: false };
+const bearer = () => request({ authorization: "Bearer tok.en.x" });
+
+async function principalOf(id: ReturnType<typeof identity>["id"]) {
+  const outcome = await id.authenticate(bearer());
+  if (!outcome.ok) throw outcome.error;
+  return outcome.principal;
+}
+
+describe("createSupabaseIdentity live admin check", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("grants the admin capabilities only when the claim and the live check both say admin", async () => {
+    const both = identity();
+    const admin = await principalOf(both.id);
+    expect(admin.capabilities).toEqual(ALL_CAPABILITIES);
+    expect(both.liveAdmin).toHaveBeenCalledWith(VERIFIED.id);
+    expect(both.id.roleUnverified(admin)).toBe(false);
+    const denied = identity({ liveAdmin: async () => false });
+    expect((await principalOf(denied.id)).capabilities).toEqual(NO_CAPABILITIES);
+  });
+
+  it("never looks a member up", async () => {
+    const { id, liveAdmin, onDemoted } = identity({ verify: async () => MEMBER });
+    for (let i = 0; i < 3; i++) expect((await principalOf(id)).capabilities).toEqual(NO_CAPABILITIES);
+    expect(liveAdmin).not.toHaveBeenCalled();
+    expect(onDemoted).not.toHaveBeenCalled();
+  });
+
+  it("serves the request without privileges when the live lookup fails, and marks only that principal unverified", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let down = true;
+    const { id, onDemoted } = identity({ liveAdmin: async () => (down ? Promise.reject(new Error("auth admin down")) : true) });
+    const blip = await principalOf(id);
+    expect(blip).toEqual({ id: VERIFIED.id, email: VERIFIED.email, capabilities: NO_CAPABILITIES });
+    expect(id.roleUnverified(blip)).toBe(true);
+    expect(warn.mock.calls.flat().join(" ")).toContain(`[auth] live admin check failed user=${VERIFIED.id}`);
+    down = false;
+    const back = await principalOf(id);
+    expect(back.capabilities).toEqual(ALL_CAPABILITIES);
+    expect(id.roleUnverified(back)).toBe(false);
+    expect(onDemoted).not.toHaveBeenCalled();
+  });
+
+  it("treats a lookup error as no transition: an admin who hits a blip is not demoted", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let live: () => Promise<boolean> = async () => true;
+    const { id, onDemoted } = identity({ liveAdmin: () => live() });
+    await principalOf(id);
+    live = async () => Promise.reject(new Error("auth admin down"));
+    await principalOf(id);
+    await principalOf(id);
+    expect(onDemoted).not.toHaveBeenCalled();
+    live = async () => false;
+    await principalOf(id);
+    expect(onDemoted).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onDemoted once when the live check turns an admin into a member, and waits for it", async () => {
+    const info = vi.spyOn(console, "log").mockImplementation(() => {});
+    let live = true;
+    const order: string[] = [];
+    const { id, onDemoted } = identity({
+      liveAdmin: async () => live,
+      onDemoted: async (userId) => {
+        await new Promise((r) => setTimeout(r, 5));
+        order.push(`demoted ${userId}`);
+      },
+    });
+    await principalOf(id);
+    live = false;
+    const after = await principalOf(id);
+    order.push("served");
+    expect(after.capabilities).toEqual(NO_CAPABILITIES);
+    expect(order).toEqual([`demoted ${VERIFIED.id}`, "served"]);
+    await principalOf(id);
+    expect(onDemoted).toHaveBeenCalledTimes(1);
+    expect(info.mock.calls.flat().join(" ")).toContain(`[auth] admin role ended user=${VERIFIED.id}, dropping their sessions`);
+  });
+
+  it("calls onDemoted exactly once when a refreshed token drops the admin claim, without a lookup", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    let user = VERIFIED;
+    const { id, liveAdmin, onDemoted } = identity({ verify: async () => user });
+    await principalOf(id);
+    expect(liveAdmin).toHaveBeenCalledTimes(1);
+    user = MEMBER;
+    await Promise.all([principalOf(id), principalOf(id)]);
+    await principalOf(id);
+    expect(liveAdmin).toHaveBeenCalledTimes(1);
+    expect(onDemoted.mock.calls).toEqual([[VERIFIED.id]]);
+  });
+
+  it("calls onDemoted again after a re-promotion and a second demotion", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    let live = true;
+    const { id, onDemoted } = identity({ liveAdmin: async () => live });
+    for (const step of [true, false, true, false]) {
+      live = step;
+      await principalOf(id);
+    }
+    expect(onDemoted).toHaveBeenCalledTimes(2);
+  });
+
+  it("never demotes a user it never saw as an admin", async () => {
+    const { id, onDemoted } = identity({ liveAdmin: async () => false });
+    await principalOf(id);
+    await principalOf(id);
+    expect(onDemoted).not.toHaveBeenCalled();
+  });
+
+  it("still serves the request when onDemoted fails, logging the failure", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    let live = true;
+    const { id } = identity({ liveAdmin: async () => live, onDemoted: async () => Promise.reject(new Error("forget failed")) });
+    await principalOf(id);
+    live = false;
+    expect((await principalOf(id)).capabilities).toEqual(NO_CAPABILITIES);
+    expect(error.mock.calls.flat().join(" ")).toContain(`[auth] demotion cleanup failed user=${VERIFIED.id}`);
+  });
+
+  it("forgets the oldest remembered admin after 10,000", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    let n = 0;
+    let live = true;
+    const { id, onDemoted } = identity({ verify: async () => ({ ...VERIFIED, id: `admin-${n}` }), liveAdmin: async () => live });
+    for (n = 0; n <= 10_000; n++) await principalOf(id);
+    live = false;
+    n = 0;
+    await principalOf(id);
+    n = 10_000;
+    await principalOf(id);
+    expect(onDemoted.mock.calls).toEqual([["admin-10000"]]);
   });
 });
 

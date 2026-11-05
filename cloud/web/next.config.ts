@@ -1,12 +1,16 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { NextConfig } from "next";
+import { envSiteKeyProblem } from "./lib/turnstileKey";
 
 const require = createRequire(import.meta.url);
 const resolveFromWeb = (specifier: string) => {
   const relative = path.relative(__dirname, require.resolve(specifier));
   return relative.startsWith(".") ? relative : `./${relative}`;
 };
+
+const siteKeyError = envSiteKeyProblem(process.env);
+if (siteKeyError) throw new Error(siteKeyError);
 
 const SECURITY_HEADERS = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
@@ -20,6 +24,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["@oab/ui", "@oab/bff"],
   outputFileTracingRoot: path.join(__dirname, "../.."),
+  outputFileTracingIncludes: { "/terms": ["./content/terms.md"], "/privacy": ["./content/privacy.md"] },
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },

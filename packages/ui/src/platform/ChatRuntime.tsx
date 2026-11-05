@@ -14,7 +14,7 @@ export function ChatRuntime({ children }: { children: React.ReactNode }) {
   );
   if (!mounted) return null;
   return (
-    <CopilotKit runtimeUrl={api().url("/copilotkit")} useSingleEndpoint={false}>
+    <CopilotKit runtimeUrl={api().url("/copilotkit")} useSingleEndpoint={false} showDevConsole={false}>
       {children}
     </CopilotKit>
   );

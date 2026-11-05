@@ -53,6 +53,7 @@ const ROUTES: Probe[] = [
     body: { name: "A", email: "a@example.test", note: "", formToken: "" },
   },
   { route: "/auth/email-link", method: "POST", path: "/auth/email-link", body: { email: "a@example.test" } },
+  { route: "/signup", method: "GET", path: "/signup" },
   { route: "/agui", method: "POST", path: "/agui", body: { threadId: CHAT_1, runId: "run-1", messages: [] } },
   { route: "/chats", method: "GET", path: "/chats" },
   { route: "/chats/:id", method: "GET", path: `/chats/${CHAT_1}` },
@@ -80,6 +81,9 @@ const ROUTES: Probe[] = [
   { route: "/providers/:id/models", method: "GET", path: "/providers/openrouter/models" },
   { route: "/providers/:id/models", method: "PUT", path: "/providers/openrouter/models", body: { enabled: [] } },
   { route: "/artifacts/:file", method: "GET", path: `/artifacts/${ID}.pdf` },
+  { route: "/usage", method: "GET", path: "/usage" },
+  { route: "/human-check", method: "POST", path: "/human-check", body: { token: "t" } },
+  { route: "/account/delete", method: "POST", path: "/account/delete", body: { confirmEmail: "nobody@example.test" } },
   { route: "/admin/access-requests", method: "GET", path: "/admin/access-requests" },
   { route: "/admin/access-requests/:id/approve", method: "POST", path: `/admin/access-requests/${ID}/approve`, body: {} },
   { route: "/admin/access-requests/:id/reject", method: "POST", path: `/admin/access-requests/${ID}/reject`, body: {} },
@@ -88,6 +92,9 @@ const ROUTES: Probe[] = [
   { route: "/admin/users/:id/deactivate", method: "POST", path: `/admin/users/${BOB.id}/deactivate`, body: {} },
   { route: "/admin/users/:id/reactivate", method: "POST", path: `/admin/users/${BOB.id}/reactivate`, body: {} },
   { route: "/admin/users/:id", method: "DELETE", path: `/admin/users/${BOB.id}`, body: { confirmEmail: BOB.email } },
+  { route: "/admin/usage/summary", method: "GET", path: "/admin/usage/summary" },
+  { route: "/admin/usage/users", method: "GET", path: "/admin/usage/users" },
+  { route: "/admin/usage/users/:id", method: "GET", path: `/admin/usage/users/${ALICE.id}` },
 ];
 
 const EXTRAS: Probe[] = [
@@ -122,6 +129,9 @@ const USER_PATHS = [
   "/reports",
   "/reports/*",
   "/search",
+  "/usage",
+  "/human-check",
+  "/account/delete",
 ];
 
 const key = (p: Probe) => `${p.method} ${p.path}`;
@@ -148,7 +158,7 @@ async function harnessFor() {
         if (id === DEACTIVATED.id) return "deactivated";
         return KNOWN.some((u) => u.id === id) ? "active" : undefined;
       },
-      isLiveAdmin: async (u) => (live.get(u.id) ?? (async () => u.capabilities.admin))(),
+      isLiveAdmin: async (id) => (live.get(id) ?? (async () => !!KNOWN.find((u) => u.id === id)?.capabilities.admin))(),
     },
   });
   for (const u of [DEACTIVATED, STATUS_THROWS, ADMIN_NOT_LIVE, ADMIN_LIVE_THROWS]) h.accounts.add(u);

@@ -5,6 +5,7 @@ import { DELETE_STEPS, type DeleteStep } from "../../src/admin/deleteAccount.js"
 import { BOB } from "../fixtures/users.js";
 
 const STEP_OF: Array<[RegExp, DeleteStep]> = [
+  [/^POST \/rest\/v1\/rpc\/usage_tombstone$/, "usage"],
   [/^(POST|DELETE) \/storage\/v1\/object\//, "storage"],
   [/^DELETE \/rest\/v1\/(access_requests|invited_emails)$/, "requests"],
   [/^DELETE \/auth\/v1\/admin\/users\//, "auth_user"],
@@ -27,6 +28,7 @@ describe("cloud/supabase/scripts/admin.mjs deleteUser", () => {
     await admin.deleteUser(BOB.id, BOB.email);
 
     expect(calls.map((c) => c.line)).toEqual([
+      "POST /rest/v1/rpc/usage_tombstone",
       "POST /storage/v1/object/list/artifacts",
       "DELETE /storage/v1/object/artifacts",
       "POST /storage/v1/object/list/artifacts",
@@ -34,10 +36,11 @@ describe("cloud/supabase/scripts/admin.mjs deleteUser", () => {
       "DELETE /rest/v1/invited_emails",
       `DELETE /auth/v1/admin/users/${BOB.id}`,
     ]);
-    expect(calls[0].body).toMatchObject({ prefix: BOB.id });
-    expect(calls[1].body).toEqual({ prefixes: [`${BOB.id}/a.html`] });
-    expect(calls[3].params.get("email")).toBe(`eq.${BOB.email}`);
+    expect(calls[0].body).toEqual({ p_user: BOB.id });
+    expect(calls[1].body).toMatchObject({ prefix: BOB.id });
+    expect(calls[2].body).toEqual({ prefixes: [`${BOB.id}/a.html`] });
     expect(calls[4].params.get("email")).toBe(`eq.${BOB.email}`);
+    expect(calls[5].params.get("email")).toBe(`eq.${BOB.email}`);
 
     const steps = calls.map((c) => STEP_OF.find(([re]) => re.test(c.line))?.[1]);
     expect(steps.every(Boolean)).toBe(true);

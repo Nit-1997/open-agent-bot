@@ -1,14 +1,18 @@
 "use client";
 
+import { RUN_REFUSAL_CODES } from "@oab/shared/runRefusals";
 import { configureApi, createApiClient } from "@oab/ui/platform/api";
 import { type LinkProps, nativeHistory, type Platform, PlatformProvider, type PlatformRouter, type PlatformSlots } from "@oab/ui/platform";
 import NextLink from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useMemo } from "react";
+import { DeleteAccount } from "@/components/account/DeleteAccountDialog";
 import { AccessDisabled } from "@/components/session/AccessDisabled";
 import { AdminItem, SignOutItem } from "@/components/session/AccountSlots";
 import { SignedOutBanner } from "@/components/session/SignedOutBanner";
 import { SignOutEverywhere } from "@/components/session/SignOutEverywhere";
+import { RefusalNotice } from "@/components/usage/RefusalNotice";
+import { UsageMeter } from "@/components/usage/UsageMeter";
 import type { SessionUser } from "@/lib/sessionUser";
 
 configureApi(createApiClient({ baseUrl: "/api" }));
@@ -32,6 +36,9 @@ const MEMBER_SLOTS: PlatformSlots = Object.freeze({
   signOutEverywhere: SignOutEverywhere,
   signedOutNotice: SignedOutBanner,
   accessDisabledNotice: AccessDisabled,
+  usageMeter: UsageMeter,
+  runRefusal: Object.freeze({ codes: RUN_REFUSAL_CODES, Notice: RefusalNotice }),
+  profileDanger: DeleteAccount,
 });
 
 const ADMIN_SLOTS: PlatformSlots = Object.freeze({ ...MEMBER_SLOTS, accountMenuExtra: AdminItem });

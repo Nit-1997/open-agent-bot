@@ -15,6 +15,7 @@ export const MILESTONES = Object.freeze({
     ]),
     strict: true,
   }),
+  m7: Object.freeze({ dir: join(DEMO_ROOT, "m7"), parts: 9, ports: Object.freeze([[18700, 18749]]), strict: true, supabase: true }),
 });
 
 export const partsOf = (milestone) => Array.from({ length: MILESTONES[milestone].parts }, (_, n) => `part-${n}.sh`);
@@ -154,11 +155,38 @@ export function strictProblems(line, { inLib = false } = {}) {
     out.push("compose up --build output goes through redact_build before it is saved");
   if (/=\s*"?\$\(scratch\b/.test(line) && !/\|\|\s*exit 1\s*$/.test(line)) out.push("a scratch dir assignment needs || exit 1");
   if (/\bset\s+-[a-z]*x|\bset\s+-o\s+xtrace\b/.test(line)) out.push("no set -x");
-  if (/(?:^|[\s;&|(])(?:env|printenv)(?=$|[\s;&|)])/.test(line) || /\b(?:export|declare)\s+-p\b/.test(line))
+  if (
+    /(?:^|[\s;&|(])(?<!local-stack\.mjs )(?:env(?!\s+-i\b)|printenv)(?=$|[\s;&|)])/.test(line) ||
+    /\b(?:export|declare)\s+-p\b/.test(line)
+  )
     out.push("no env, printenv, export -p or declare -p");
   if (GITHUB_VARS.test(line) && !/^\s*unset\b/.test(line)) out.push("never set GITHUB_ACTIONS, RUNNER_TEMP or GITHUB_WORKSPACE");
   if (ENV_FILE_PATH.test(line) && CONTENT_TOOLS.test(line) && !/grep -F -c -f <\(/.test(line))
     out.push("env-file contents only feed grep -F -c -f <(…), never argv or the screen");
+  return out;
+}
+
+const SUPABASE_CLI = /(?:^|[\s;&|(])(?:npx\s+)?supabase\s+(?!--version\b)/;
+const LOCAL_REPAIR =
+  /\bsupabase --workdir cloud migration repair --status applied .*--db-url "postgresql:\/\/postgres:postgres@127\.0\.0\.1:187[0-4]\d\/postgres\?sslmode=disable"/;
+const PRODUCTION_ENV = /\.env-(?:agent|nextjs|renderer|caddy|llm|search|supabase-admin|e2e)\b|env-files\//;
+const STACK_NAME = /local-stack\.mjs\b.*?--name\s+\\?["']?([^\s"'\\]+)/;
+
+export function supabaseProblems(line, { inLib = false } = {}) {
+  const out = [];
+  if (SUPABASE_CLI.test(line) && !LOCAL_REPAIR.test(line))
+    out.push("run the Supabase CLI only through local-stack.mjs, or the migration repair rehearsal against a 127.0.0.1 --db-url");
+  if (PRODUCTION_ENV.test(line))
+    out.push("M7 never reads the production settings files (the old .env-* files, cloud/deploy-config/env-files/)");
+  const stack = STACK_NAME.exec(line)?.[1];
+  if (stack && !/^oab-m7-(?:demo|g8)$/.test(stack)) out.push(`local stacks are oab-m7-demo and oab-m7-g8 (got ${stack})`);
+  if (/\.supabase\.co\b/.test(line)) out.push("write the live host pattern as [.]supabase[.]co so the static safety scan stays at 0");
+  if (/\bpsql\b/.test(line) && !/^\s*psql_(?:demo|g8)\b/.test(line) && !/@127\.0\.0\.1:187[0-4]\d\//.test(line))
+    out.push("psql only through psql_demo/psql_g8 or a literal 127.0.0.1 URL");
+  if (/avfoundation|\bscreencapture\b/.test(line))
+    out.push("no screen capture: terminal parts are recorded with the pty recorder, browser parts with Playwright video");
+  if (!inLib && (/(?:^|[^&])&\s*$/.test(line) || /\bnohup\b/.test(line)))
+    out.push("start background processes only through lib.sh's start_bg");
   return out;
 }
 
@@ -181,6 +209,7 @@ export function partProblems(text, name, milestone = "m5", { inLib = false } = {
     ])
       if (p) out.push(`${at}: ${p}`);
     if (spec.strict) for (const p of strictProblems(l.text, { inLib })) out.push(`${at}: ${p}`);
+    if (spec.supabase) for (const p of supabaseProblems(l.text, { inLib })) out.push(`${at}: ${p}`);
   }
   return out;
 }
@@ -238,5 +267,24 @@ export function libProblems(text, milestone = "m5") {
   const prefix = 'set -u\n. "$(dirname "$0")/lib.sh"\n';
   for (const p of partProblems(prefix + text, "lib.sh", milestone, { inLib: true })) out.push(p);
   if (MILESTONES[milestone].strict) out.push(...strictLibProblems(text));
+  if (MILESTONES[milestone].supabase) out.push(...supabaseLibProblems(text));
+  return out;
+}
+
+function supabaseLibProblems(text) {
+  const out = [];
+  const fns = functionsOf(text);
+  const fn = (name) => fns.find((f) => f.name === name);
+  const bg = fn("start_bg");
+  if (!bg) out.push("lib.sh must start processes through start_bg");
+  else if (!bg.lines.some((l) => /\benv -i\b/.test(l.text))) out.push("start_bg must start every process under env -i");
+  const mem = fn("memory_check");
+  if (!mem) out.push("lib.sh must check Docker memory (memory_check)");
+  else {
+    const body = mem.lines.map((l) => l.text).join("\n");
+    if (!body.includes("docker info --format '{{.MemTotal}}'")) out.push("memory_check must read docker info --format '{{.MemTotal}}'");
+    if (!body.includes("M7_DEMO_SEQUENTIAL")) out.push("memory_check must honour M7_DEMO_SEQUENTIAL");
+  }
+  if (!fn("refuse_supabase_env")) out.push("lib.sh must refuse Supabase access env (refuse_supabase_env)");
   return out;
 }

@@ -3,14 +3,14 @@ import { UserError } from "@oab/core/lib/errors.js";
 import { log } from "@oab/core/lib/log.js";
 import type { AccessRequestView, AdminUser, ProfileView, RequestFilter } from "@oab/shared/admin";
 import type { Page } from "@oab/shared/pages";
+import type { DeletingUsers } from "../account/deleting.js";
+import type { UsageRepo } from "../limits/usageRepo.js";
 import type { AdminRepo } from "../store/admin.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "./authAdmin.js";
 import { deleteAccount } from "./deleteAccount.js";
 import { describeInviteFailure } from "./inviteCopy.js";
 
 export type AccountHooks = { onDisabled(userId: string): Promise<void>; onEnabled(userId: string): void };
-
-const ADMIN_TTL_MS = 30_000;
 
 const missingUser = () => new UserError("That user doesn't exist.", "not_found");
 const selfAction = () => new UserError("You can't do that to your own account.", "conflict", { code: "self_action" });
@@ -20,20 +20,16 @@ const inviteOutcome = (result: EmailResult) =>
     ? { inviteStatus: "sent" as const, inviteError: null }
     : { inviteStatus: "failed" as const, inviteError: describeInviteFailure(result.code) };
 
-export function createLiveAdminCheck(auth: Pick<AuthAdmin, "getUser">, now: () => number = Date.now) {
-  const cache = new Map<string, { ok: boolean; at: number }>();
-  return async (user: Principal): Promise<boolean> => {
-    const hit = cache.get(user.id);
-    if (hit && now() - hit.at < ADMIN_TTL_MS) return hit.ok;
-    const account = await auth.getUser(user.id);
-    const ok = !!account?.isAdmin && (!account.bannedUntil || Date.parse(account.bannedUntil) <= now());
-    cache.set(user.id, { ok, at: now() });
-    return ok;
-  };
-}
+export type AdminServiceDeps = {
+  repo: AdminRepo;
+  auth: AuthAdmin;
+  hooks: AccountHooks;
+  usage: Pick<UsageRepo, "tombstone">;
+  deleting: DeletingUsers;
+};
 
-export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hooks: AccountHooks }) {
-  const { repo, auth, hooks } = deps;
+export function createAdminService(deps: AdminServiceDeps) {
+  const { repo, auth, hooks, usage, deleting } = deps;
 
   const request = async (id: string) => {
     const r = await repo.accessRequests.get(id);
@@ -141,8 +137,14 @@ export function createAdminService(deps: { repo: AdminRepo; auth: AuthAdmin; hoo
           });
         }
       };
-      await step("deactivate", () => disable(id));
-      await deleteAccount({ repo, auth }, profile, step);
+      deleting.add(id);
+      try {
+        await step("deactivate", () => disable(id));
+        await deleteAccount({ repo, auth, usage }, profile, step);
+      } catch (err) {
+        deleting.delete(id);
+        throw err;
+      }
       log.info(`[admin] deleted user=${id} by=${admin.id}`);
     },
   };

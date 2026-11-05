@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAccessService } from "../src/access/service.js";
-import { createAdminService } from "../src/admin/service.js";
 import { createAdminGuard } from "../src/identity/adminGuard.js";
 import { hostedRoutes } from "../src/routes.js";
 import type { RouteMount } from "@oab/core/identity/types.js";
@@ -8,7 +7,9 @@ import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { type AgentDeps, type RunningAgent, startAgent } from "@oab/core/startAgent.js";
 import { coreDeps } from "../../../packages/core/test/fixtures/agent.js";
-import { FakeAccounts } from "./fixtures/hostedApp.js";
+import { waitlistSignup } from "./fixtures/humanCheck.js";
+import { fakeAdminUsageDeps, fakeUsageDeps } from "./fixtures/usage.js";
+import { FakeAccounts, fakeAccountDeps, fakeAdminService } from "./fixtures/hostedApp.js";
 
 const running: RunningAgent[] = [];
 afterEach(async () => {
@@ -24,6 +25,7 @@ async function start(over: Partial<AgentDeps> = {}) {
 
 function hostedMounts(limiter = new RateLimiter()): RouteMount[] {
   const accounts = new FakeAccounts();
+  const usage = fakeUsageDeps(limiter);
   return hostedRoutes({
     access: createAccessService({
       pepper: Buffer.alloc(32, 9),
@@ -32,13 +34,13 @@ function hostedMounts(limiter = new RateLimiter()): RouteMount[] {
       submit: async () => "inserted",
       sendMagicLink: async () => ({}),
     }),
-    admin: createAdminService({
-      repo: accounts.repo(),
-      auth: accounts.auth(),
-      hooks: { onDisabled: async () => {}, onEnabled: () => {} },
-    }),
+    admin: fakeAdminService(accounts, usage.usage),
     adminGuard: createAdminGuard({ isLiveAdmin: async () => true }),
     limiter,
+    usage,
+    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users),
+    signup: waitlistSignup(limiter),
+    account: fakeAccountDeps(accounts, usage.usage, limiter),
   });
 }
 

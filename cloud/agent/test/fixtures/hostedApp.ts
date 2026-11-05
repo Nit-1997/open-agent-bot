@@ -1,20 +1,28 @@
 import type { AccessRequestView, ProfileView, UserStatus } from "@oab/shared/admin";
+import type { SignupMode, SignupStats } from "@oab/shared/usage";
 import { PAGE_SIZE } from "@oab/shared/pages";
 import type { Principal } from "@oab/core/identity/types.js";
 import { BackgroundQueue } from "@oab/core/lib/backgroundQueue.js";
 import { UserError } from "@oab/core/lib/errors.js";
 import { RateLimiter } from "@oab/core/lib/rateLimit.js";
 import { type AccessService, createAccessService } from "../../src/access/service.js";
+import { DeletingUsers } from "../../src/account/deleting.js";
+import type { AccountRouteDeps } from "../../src/account/routes.js";
+import { createSelfDelete } from "../../src/account/selfDelete.js";
 import type { AuthAccount, AuthAdmin, EmailResult } from "../../src/admin/authAdmin.js";
 import { createAdminService } from "../../src/admin/service.js";
 import { createAdminGuard } from "../../src/identity/adminGuard.js";
 import { UserStatusCache } from "../../src/identity/status.js";
 import { createSupabaseIdentity } from "../../src/identity/supabaseIdentity.js";
 import { AuthError, type Verifier } from "../../src/identity/verify.js";
+import type { HumanVerifier } from "../../src/captcha/turnstile.js";
 import { hostedRoutes } from "../../src/routes.js";
+import { gateApplies, LiveHumanCheckGate } from "../../src/signup/humanCheck.js";
+import type { UsageRepo } from "../../src/limits/usageRepo.js";
 import type { AdminRepo } from "../../src/store/admin.js";
 import { type AppOverrides, makeApp, tokenFor } from "../../../../packages/core/test/fixtures/app.js";
 import { TEST_SECRET } from "./config.js";
+import { type FakeUsageDeps, fakeAdminUsageDeps, fakeUsageDeps } from "./usage.js";
 import { ADMIN, ALICE, BOB, verified } from "./users.js";
 
 export { tokenFor, wrapper } from "../../../../packages/core/test/fixtures/app.js";
@@ -164,18 +172,45 @@ export class FakeAccounts {
   }
 }
 
+export function fakeAccountDeps(accounts: FakeAccounts, usage: Pick<UsageRepo, "tombstone">, limiter: RateLimiter): AccountRouteDeps {
+  return {
+    selfDelete: createSelfDelete({
+      profiles: accounts.repo().users,
+      removal: { repo: accounts.repo(), auth: accounts.auth(), usage },
+      deleting: new DeletingUsers(),
+      forget: async () => {},
+      invalidate: () => {},
+    }),
+    limiter,
+  };
+}
+
+export const quietAdminHooks = { onDisabled: async () => {}, onEnabled: () => {} };
+
+export function fakeAdminService(accounts: FakeAccounts, usage: Pick<UsageRepo, "tombstone"> = { tombstone: async () => {} }) {
+  return createAdminService({ repo: accounts.repo(), auth: accounts.auth(), hooks: quietAdminHooks, usage, deleting: new DeletingUsers() });
+}
+
 export type IdentitySeams = {
   verify?: Verifier;
   statusOf?: (id: string) => Promise<UserStatus | undefined>;
-  isLiveAdmin?: (u: Principal) => Promise<boolean>;
+  isLiveAdmin?: (userId: string) => Promise<boolean>;
+  onDemoted?: (userId: string) => Promise<void>;
 };
 
-export type HostedOverrides = Omit<AppOverrides, "identity" | "routes"> & { seams?: IdentitySeams; access?: AccessService };
+export type HostedOverrides = Omit<AppOverrides, "identity" | "routes"> & {
+  seams?: IdentitySeams;
+  access?: AccessService;
+  usage?: (limiter: RateLimiter, deleting: DeletingUsers) => FakeUsageDeps;
+  signupMode?: () => Promise<SignupMode | "unknown">;
+  signupStats?: () => Promise<SignupStats>;
+  verifier?: HumanVerifier;
+};
 
 export type HostedHarness = Awaited<ReturnType<typeof makeHostedApp>>;
 
 export async function makeHostedApp(over: HostedOverrides = {}) {
-  const { seams, access: accessOver, ...appOver } = over;
+  const { seams, access: accessOver, usage: usageOver, signupMode, signupStats, verifier, ...appOver } = over;
   const accounts = new FakeAccounts();
   for (const u of [ALICE, BOB, ADMIN]) accounts.add(u);
   const users = new Map([ALICE, BOB, ADMIN].map((u) => [tokenFor(u), u]));
@@ -186,15 +221,29 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
   };
   const verify = seams?.verify ?? fakeVerify;
   const status = new UserStatusCache(seams?.statusOf ?? ((id) => accounts.repo().users.status(id)));
-  const isLiveAdmin = seams?.isLiveAdmin ?? (async (u: Principal) => !!accounts.users.get(u.id)?.account.isAdmin);
-  const identity = createSupabaseIdentity({ serviceSecret: TEST_SECRET, verify, status });
-  const limiter = appOver.limiter ?? new RateLimiter();
-  const admin = createAdminService({
-    repo: accounts.repo(),
-    auth: accounts.auth(),
-    hooks: { onDisabled: async (id) => status.invalidate(id), onEnabled: (id) => status.invalidate(id) },
+  const liveAdmin = seams?.isLiveAdmin ?? (async (id: string) => !!accounts.users.get(id)?.account.isAdmin);
+  const demoted: string[] = [];
+  const identity = createSupabaseIdentity({
+    serviceSecret: TEST_SECRET,
+    verify,
+    status,
+    liveAdmin,
+    onDemoted: seams?.onDemoted ?? (async (id) => void demoted.push(id)),
   });
+  const limiter = appOver.limiter ?? new RateLimiter();
+  const deleting = new DeletingUsers();
+  const forgotten: string[] = [];
+  const usage = (usageOver ?? ((l: RateLimiter, d: DeletingUsers) => fakeUsageDeps(l, undefined, undefined, d)))(limiter, deleting);
+  const hooks = {
+    onDisabled: async (id: string) => {
+      forgotten.push(id);
+      status.invalidate(id);
+    },
+    onEnabled: (id: string) => status.invalidate(id),
+  };
+  const admin = createAdminService({ repo: accounts.repo(), auth: accounts.auth(), hooks, usage: usage.usage, deleting });
   const queue = new BackgroundQueue({ name: "access", max: 50, concurrency: 2 });
+  const mode = signupMode ?? (async () => "waitlist" as const);
   const access = createAccessService({
     pepper: Buffer.alloc(32, 9),
     limiter,
@@ -204,8 +253,28 @@ export async function makeHostedApp(over: HostedOverrides = {}) {
       accounts.sent.push({ kind: "magic", email });
       return {};
     },
+    captcha: { required: async () => gateApplies(await mode()), verifier },
   });
-  const routes = hostedRoutes({ access: accessOver ?? access, admin, adminGuard: createAdminGuard({ isLiveAdmin }), limiter });
+  const gate = new LiveHumanCheckGate({ mode, checks: usage.usage.humanCheck, verifierConfigured: !!verifier });
+  const routes = hostedRoutes({
+    access: accessOver ?? access,
+    admin,
+    adminGuard: createAdminGuard({ isLiveAdmin: (u) => liveAdmin(u.id), roleUnverified: identity.roleUnverified }),
+    limiter,
+    usage: { ...usage, humanCheck: gate },
+    adminUsage: fakeAdminUsageDeps(usage, accounts.repo().users, mode, signupStats),
+    signup: { mode, gate, verifier, limiter },
+    account: {
+      selfDelete: createSelfDelete({
+        profiles: accounts.repo().users,
+        removal: { repo: accounts.repo(), auth: accounts.auth(), usage: usage.usage },
+        deleting,
+        forget: hooks.onDisabled,
+        invalidate: (id) => status.invalidate(id),
+      }),
+      limiter,
+    },
+  });
   const h = await makeApp({ ...appOver, limiter, identity, routes });
-  return { ...h, accounts, status, queue };
+  return { ...h, accounts, status, queue, usage, demoted, gate, deleting, forgotten };
 }

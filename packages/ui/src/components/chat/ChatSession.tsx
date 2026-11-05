@@ -3,8 +3,11 @@
 import { EventType } from "@ag-ui/client";
 import { useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
 import type { AgentPersona } from "@oab/shared/profile";
+import { parseRunRefusal, type RunRefusal } from "@oab/shared/runRefusals";
 import { ArrowDown } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePlatformSlots } from "../../platform/PlatformProvider.tsx";
+import { noteRunSettled } from "../../platform/runSettled.ts";
 import { ErrorBanner } from "../ErrorBanner.tsx";
 import { errorCodeIn, noteRunFailure } from "../../lib/authState.ts";
 import type { HistoryMessage } from "../../lib/chats.ts";
@@ -58,6 +61,21 @@ export function ChatSession(props: ChatSessionProps) {
   const { copilotkit } = useCopilotKit();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ kind: RunErrorKind; message?: string } | null>(null);
+  const refusalSlot = usePlatformSlots().runRefusal;
+  const [refusal, setRefusal] = useState<{ value: RunRefusal; at: number } | null>(null);
+  const refusalSlotRef = useRef(refusalSlot);
+  const refused = useRef(false);
+  useEffect(() => {
+    refusalSlotRef.current = refusalSlot;
+  }, [refusalSlot]);
+  const takeRefusal = useCallback((text: string) => {
+    if (refused.current) return true;
+    const found = parseRunRefusal(text);
+    if (!found || !refusalSlotRef.current?.codes.includes(found.code)) return false;
+    refused.current = true;
+    setRefusal({ value: found, at: Date.now() });
+    return true;
+  }, []);
   const [unsaved, setUnsaved] = useState<string | null>(null);
   const [timing, setTiming] = useState<Record<string, { start: number; end?: number }>>({});
   const [now, setNow] = useState(() => Date.now());
@@ -152,13 +170,14 @@ export function ChatSession(props: ChatSessionProps) {
       },
       onRunErrorEvent: ({ event }) => {
         if (isUserStop(stopRequested.current, event)) return;
+        if (takeRefusal(event.message ?? "")) return;
         const message = `${event.code ?? ""} ${event.message ?? ""}`.trim();
-        noteRunFailure(event.code);
+        noteRunFailure(event.code ?? errorCodeIn(event.message ?? ""));
         setError({ kind: classifyRunError({ error: new Error(message) }), message: event.message });
       },
     });
     return () => sub.unsubscribe();
-  }, [agent, onClaimed, onReportReady]);
+  }, [agent, onClaimed, onReportReady, takeRefusal]);
 
   useEffect(() => {
     if (!running) return;
@@ -182,6 +201,7 @@ export function ChatSession(props: ChatSessionProps) {
   }, [turns, measure, props.id]);
 
   const run = useCallback(async () => {
+    refused.current = false;
     setSending(true);
     try {
       await copilotkit.runAgent({ agent });
@@ -189,20 +209,23 @@ export function ChatSession(props: ChatSessionProps) {
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       if (isUserStop(stopRequested.current, e)) return;
+      if (takeRefusal(e.message)) return;
       noteRunFailure(errorCodeIn(e.message));
       setError((prev) => prev ?? { kind: classifyRunError({ error: e }), message: e.message });
     } finally {
       setSending(false);
       onRunEnd();
+      noteRunSettled();
       const id = lastRef.current;
       if (id) setTiming((t) => (t[id] && !t[id].end ? { ...t, [id]: { ...t[id], end: Date.now() } } : t));
     }
-  }, [agent, copilotkit, onRunEnd]);
+  }, [agent, copilotkit, onRunEnd, takeRefusal]);
 
   const send = useCallback(
     (text: string, quiet = false) => {
       stopRequested.current = false;
       setError(null);
+      setRefusal(null);
       setUnsaved(null);
       const id = `${quiet ? QUIET_ANSWER : ""}${crypto.randomUUID()}`;
       if (!quiet) reveal.current = id;
@@ -220,6 +243,13 @@ export function ChatSession(props: ChatSessionProps) {
   }, [agent, copilotkit]);
 
   const sid = props.id;
+  const retry = () => {
+    stopRequested.current = false;
+    setError(null);
+    setRefusal(null);
+    void run();
+  };
+  const Notice = refusal ? refusalSlot?.Notice : undefined;
   return (
     <div id={`${sid}-session`} className="flex min-h-0 flex-1 flex-col">
       <div id={`${sid}-scroller`} ref={scroller} onScroll={measure} className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -290,18 +320,12 @@ export function ChatSession(props: ChatSessionProps) {
             </button>
           </p>
         )}
-        {error && (
-          <ErrorBanner
-            id={`${sid}-error`}
-            kind={error.kind}
-            message={error.message}
-            onRetry={() => {
-              stopRequested.current = false;
-              setError(null);
-              void run();
-            }}
-            onDismiss={() => setError(null)}
-          />
+        {refusal && Notice ? (
+          <Notice key={refusal.at} id={`${sid}-refusal`} refusal={refusal.value} onRetry={retry} onDismiss={() => setRefusal(null)} />
+        ) : (
+          error && (
+            <ErrorBanner id={`${sid}-error`} kind={error.kind} message={error.message} onRetry={retry} onDismiss={() => setError(null)} />
+          )
         )}
         <Composer
           id={`${sid}-composer`}

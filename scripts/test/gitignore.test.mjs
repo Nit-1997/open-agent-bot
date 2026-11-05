@@ -54,6 +54,10 @@ describe(".gitignore", () => {
     it(`keeps ${name}`, () => assert.equal(checkIgnore(name), 1));
   }
 
+  it("ignores the local e2e marker files", () => {
+    assert.equal(checkIgnore("e2e/.local/app-18740.json"), 0);
+  });
+
   it("ignores the planning specs, which stay out of the public repo", () => {
     assert.equal(checkIgnore("docs/superpowers/specs/x-design.md"), 0);
     assert.equal(checkIgnore("docs/superpowers/plans/x.md"), 0);

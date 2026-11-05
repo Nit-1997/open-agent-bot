@@ -6,7 +6,7 @@ The invite-only hosted deployment. Everything in `cloud/` is hosted-only; the op
 
 > **Warning.** The root `docker-compose.yml` is the local stack (project `open-agent`). Every hosted command needs `-f cloud/deploy-config/compose.hosted.yml`: bare `docker compose ps`, `logs`, `down`, `restart` and `up` target the local project, not the hosted one. `cloud/deploy-config/compose.hosted.yml` pins the project name `open-agent-bot`, so the existing containers and volumes are reused.
 
-Open Agent is invite-only. Accounts, sessions and every user's data live in one Supabase project; the agent and the web app keep nothing on disk.
+Open Agent is invite-only until Gate 9 opens signups (see "Signup modes"). Accounts, sessions and every user's data live in one Supabase project; the agent and the web app keep nothing on disk.
 
 1. Install Docker, Node 22 and `jq` (the preview preflight uses it).
 2. Fill in the three env files. Each folder in `cloud/deploy-config/env-files/` holds a tracked `.env.example` with the names only; copy it to `.env` in the same folder (git-ignored) and fill in the values:
@@ -66,6 +66,11 @@ Agent settings live in `cloud/deploy-config/env-files/backend/.env` (git-ignored
 | `COPILOTKIT_TELEMETRY_DISABLED` | required, `true` | The agent refuses to start without it, so CopilotKit never sends telemetry. The agent image sets it; set it for a host-run agent, scripts and evals |
 | `COPILOT_CONNECTS_PER_USER` | `8` | Open `/copilotkit` connect streams per user (1–100); over the cap answers 429 `too_many_connections` |
 | `COPILOT_CONNECT_MAX_MS` | `1800000` (30 min) | Longest a connect stream stays open (60000–86400000 ms) |
+| `LIMIT_RUNNING_PER_USER` | `1` | Runs one user may have open at once, across all chats (1–10); over it a run answers 429 `limit_running` |
+| `LIMIT_REQUESTS_PER_HOUR` | `10` | Counted runs per user in any rolling hour (1–1000); 429 `limit_hourly` |
+| `LIMIT_REQUESTS_PER_MONTH` | `50` | Counted runs per user per UTC calendar month (1–100000); 429 `limit_monthly` |
+| `LIMIT_RUNNING_SERVER` | `8` | Runs open at once on the whole agent (1–200, at least `LIMIT_RUNNING_PER_USER`); 429 `server_busy` |
+| `TURNSTILE_SECRET_KEY` | unset | Cloudflare Turnstile secret for the one-time human check in `open` signup mode; without it `open` mode answers 503 `human_check_unavailable` (Gate 9) |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. `debug` also logs prompts, tool arguments and the profile |
 
 ## Develop the hosted stack
@@ -75,7 +80,18 @@ To work on one side of the hosted stack, run the other in Docker and point at it
 - Agent: `cd cloud/agent && npm run build && set -a && . ../deploy-config/env-files/backend/.env && set +a && COPILOTKIT_TELEMETRY_DISABLED=true npm start` (`tsc -b` builds `@oab/shared`, `@oab/bff` and `@oab/core` and then the hosted agent into `cloud/agent/dist/`; settings in the reference table above). The agent refuses to start unless `COPILOTKIT_TELEMETRY_DISABLED=true`; set it for every host-run agent, script and eval. The agent image sets it already. Sourcing the whole backend file also loads the gateway's keys if you set them; leave those out of a host-run agent's shell, or it refuses to start.
 - Web: `cd cloud/web && set -a && . ../deploy-config/env-files/frontend/.env && set +a && AGENT_URL=http://localhost:8000 npm run dev`
 
+The request limits (`LIMIT_*`) count runs in the database, so the agent refuses to start until the M7 usage functions exist there (`refusing to start: the M7 usage functions are missing or not executable (apply the migrations first: Gate 8)`). Until the owner runs Gate 8, a hosted preview or the hosted e2e against the production project can't start on M7 code; the preview override (`compose.preview.yml`) sets high limits (4 running per user, 1000 per hour, 100000 per month, 50 on the server) so test runs are never throttled once it can.
+
 Both need the same `AGENT_SERVICE_SECRET` and a Supabase project (see "Run the hosted stack" above). Sign-in cookies are `Secure`, so use the Caddy stack at https://app.localhost for anything that needs a session. The checks for the cloud workspaces are in CONTRIBUTING's checks table; the cloud boundary (nothing outside `cloud/` imports or builds from it) is in CONTRIBUTING's "Cloud boundary".
+
+## Run M7 locally
+
+`make run web-local` (or `make web-local`) runs the hosted app with the request limits, usage meter, Usage tab and signup modes on your machine, with no env files and no Supabase project. It needs Docker running, the Supabase CLI (it prints the install command if the CLI is missing) and `npm ci`. It starts a local Supabase stack `oab-m7-dev` on 127.0.0.1:18700–18704 with every migration in `cloud/supabase/migrations/`, writes a fresh 0600 env to `.web-local/env` (git-ignored: the local stack's keys, new secrets, Cloudflare's always-pass Turnstile test keys and the `LIMIT_*` defaults from `cloud/deploy-config/env-files/backend/.env.example`), creates the admin `owner@local.test` and the member `member@local.test`, builds `cloud/agent` and `cloud/web`, and runs the agent on 18720, the web app at http://localhost:18721 and the demos' stub model on 18722 in the background (pid files and logs in `.web-local/`). It prints a one-click sign-in link for each user and the Mailpit inbox (http://127.0.0.1:18704) for email-link sign-in.
+
+- Limits: set any `LIMIT_*` on the command, e.g. `LIMIT_REQUESTS_PER_MONTH=5 make run web-local`.
+- Model: as the admin, pick Custom server in onboarding or Settings → Models with URL `http://127.0.0.1:18722/v1`, key `oab-e2e-stub-key` and model `stub-1`. Private-network servers are admin-only, so the member needs a real provider key (Settings → Models; it stays in the local stack). `WEB_LOCAL_STUB=0` skips the stub.
+- Signup mode: `bash scripts/make/web-local.sh mode open` (or `invite`, `waitlist`; the agent and web cache it 60 s). `configure-auth.mjs` is for production only. New sign-in links: `bash scripts/make/web-local.sh links`.
+- Stop: `make stop` stops the processes, removes `oab-m7-dev` with its volumes, and deletes `.web-local/`. Web search and report cards are off (no SearXNG or renderer).
 
 ## End-to-end demo
 
@@ -97,6 +113,24 @@ The `smoke` project (`cloud/e2e/preview-smoke.spec.ts`) runs on its own against 
 - `npx tsx evals/run.ts --target local --origin http://127.0.0.1:3000 --openrouter-key-env OPENROUTER_API_KEY --model openrouter/deepseek/deepseek-v4-flash` (from `packages/core`, where `local` is the default and only target) runs the same scenarios against the local stack with no Supabase: it saves the key from the named variable through the app, then posts each run to `/api/copilotkit/agent/openagent/run`. The signed-in path above runs from `cloud/agent`, whose `evals/run.ts` registers `--target hosted` (its default) on top of core's runner.
 - `npm run eval:rank` scores shop ranking on the ESCI grocery slice (Exact@1, NDCG@3); add `-- --judge` with an OpenRouter key to score the Jev re-rank.
 - `npx tsx evals/run.ts --rescore <results dir>` re-grades saved runs after assertions change.
+
+## Request limits
+
+Every run is admitted once before it starts, and the same limits apply to every account, admins included. The agent holds the running caps in its own process (`LIMIT_RUNNING_PER_USER`, `LIMIT_RUNNING_SERVER`); Postgres counts the hourly and monthly runs per user (`LIMIT_REQUESTS_PER_HOUR`, `LIMIT_REQUESTS_PER_MONTH`, UTC calendar month) through `public.request_admit`. The defaults are in the settings reference above. A refused run answers 429 with a code (`limit_running`, `server_busy`, `limit_hourly`, `limit_attempts`, `limit_monthly`) and the web app shows a notice instead of the red error banner; a database error answers 503 `usage_unavailable` and admits nothing. A run the agent refuses before it starts is refunded; a run that fails after it started stays counted. Each user sees their month in the sidebar meter, and the admin's Usage tab (`/admin`) shows the totals, the running count and the users nearest their limit.
+
+The running slots live in one agent process, which is right for the one hosted agent container. Running more than one agent would need database leases with a heartbeat instead.
+
+## Signup modes
+
+`public.signup_settings` holds one mode, changed only with `configure-auth.mjs` (`SIGNUP_MODE`, default `waitlist`):
+
+| Mode | Who can create an account |
+| --- | --- |
+| `invite` | Only invited emails; `/request-access` says it isn't taking requests |
+| `waitlist` | Only invited emails; visitors ask at `/request-access` and the admin approves them |
+| `open` | Anyone with a Google account whose email domain isn't on the throwaway list, within the signup caps (`signups_per_hour`, `signups_per_day`, `signups_per_ip_day` in the same row); email links stay sign-in only |
+
+In `open` mode every account, invited ones included, passes a one-time Cloudflare Turnstile check before its first counted run, and the email-link form needs it too. If a mode lookup fails the agent keeps the last mode it read; if it has never read one it treats the mode as `open` for the check, and the web app shows `waitlist` with the check on the email-link form, so neither side fails open. The email-link check guards the app's own form only: GoTrue's `/auth/v1/otp` endpoint can be called directly with the publishable key and no captcha (see [SECURITY.md](SECURITY.md#accepted-risks)). Deleting an account keeps a peppered hash of the email with that month's count and the human check for up to two months, so deleting and signing up again doesn't reset either.
 
 ## Switch-over after M6 (owner only)
 
@@ -242,3 +276,142 @@ The factory rehearsed these steps on `oab-` projects beside the live stack (M6 d
 ### Old web app against the new agent
 
 Between Gate 7 step 6 and Gate 6 step 5 the `c1c0f4e` web app talks to the new agent. Every agent call it makes (`/agui` through its `/api/copilotkit` route; `/chats`, `/chats/:id`, `/chats/:id/messages`; `/reports`, `/reports/:id`; `/search`, `/places`, `/models`, `/onboarding/options`; `/profile`; `/settings/brave-search[/key]`; `/providers` and its `local`, `test`, `logins/:flow[/answer]`, `:id`, `:id/key`, `:id/models` and `:id/login` subpaths; `/artifacts/:file` for HTML, `.pdf` and `.jpg`; `/auth/email-link`; `/access-requests`; and the admin `/admin/access-requests[/:id/(approve|reject|resend)]` and `/admin/users[/:id[/(deactivate|reactivate)]]` calls) maps onto a route of the new agent with the same method; the two agents register the same 38 method and path pairs, `/health` included. Demo part 4 switches `search renderer agent` first and runs the old web container's sign-in, chat, Stop, artifact (HTML and PDF) and request-access flows against the new agent (`npm run compat -w @oab/cloud-e2e`) before it switches the web app. After Stop, the old web app shows "Something went wrong talking to the agent. This operation was aborted": that's a known `c1c0f4e` bug (the post-revamp web app fixes it), not an incompatibility, and the live web app does the same today.
+
+## Apply the M7 migrations (Gate 8)
+
+M7 adds two migrations, `20261104092535_request_usage.sql` (the usage tables and functions, and a new `private.handle_new_user`) and `20261104113650_signup_modes.sql` (the signup modes, the throwaway list table and a new `private.before_user_created`). Until they are on the production database, an M7 agent refuses to start there. Gate 8 applies them with `supabase db push`, redeploys the agent, and only then merges the web app. Nothing else changes: the mode stays `waitlist`, so signups work as today.
+
+Work from a checkout of the M7 commit you will deploy, with Supabase CLI 2.111.0 and `psql` 17. Never paste the M7 SQL into the dashboard's editor and never mix it with `db push`, and don't use `supabase link` (nothing needs unlinking). `db push --db-url` needs no `config.toml`: the factory rehearsed every step below on a local stack started at the last pre-M7 migration (demo part 2).
+
+1. Check the auth config and read the database URL. The check must report no drift and the note that `public.signup_settings` is missing (a pre-M7 database whose hook is invite-only). For the URL, open the dashboard's Connect dialog and copy the **session pooler** string (`…pooler.supabase.com:5432`; the direct `db.<ref>` host is IPv6-only), with the password filled in and `?sslmode=require` appended. Paste it at the silent prompt: `read -s` keeps it out of the shell history and the screen, and the variable is not exported, so only the commands below see it.
+
+   ```bash
+   set -a; . cloud/deploy-config/env-files/ops/.env; set +a
+   node cloud/supabase/scripts/configure-auth.mjs --check
+   read -s LIVE_DB_URL
+   case "$LIVE_DB_URL" in *pooler.supabase.com:5432/*sslmode=require*) echo "session pooler URL" ;; *) echo "STOP: not a session pooler URL with sslmode=require"; unset LIVE_DB_URL ;; esac
+   ```
+
+   On any stop below, run `unset LIVE_DB_URL` before you leave the shell.
+
+   While a `psql` or Supabase CLI command below runs, its URL argument, password included, shows in the process list (`ps`) to every user of the machine, so run Gates 8 and 9 on a machine only you use. For the `psql` steps you can keep the password out of the arguments: write it to `~/.pgpass` (mode `0600`, one line `<pooler host>:5432:postgres:<user>:<password>`), paste the URL without the password, and delete the file when you finish. The Supabase CLI's `--db-url` still carries it. Never export the URL or the password, and never leave either in a file after the gate.
+
+2. Save the old function bodies, then check that live still runs the ones `cloud/supabase/rollback/m7.sql` restores. `check-old-bodies.mjs` compares each body (`prosrc`) and its `security definer`, volatility and `set` settings with the rollback file and prints only function names; exit 0 means both match, exit 1 means one differs (stop: live was changed by hand, and the rollback file would not restore it).
+
+   ```bash
+   psql "$LIVE_DB_URL" -XAtc "select pg_get_functiondef('private.before_user_created(jsonb)'::regprocedure) union all select pg_get_functiondef('private.handle_new_user()'::regprocedure)" > "$HOME/open-agent-m7-old-functions.sql"
+   psql "$LIVE_DB_URL" -XAtc "$(node cloud/supabase/scripts/check-old-bodies.mjs --query)" | node cloud/supabase/scripts/check-old-bodies.mjs
+   ```
+
+3. Dry run. `check-push-plan.mjs` reads the CLI's plan and exits 0 only when it lists exactly the two M7 files, in order; exit 1 (another list) is a stop, and exit 3 means the history needs repair (step 4).
+
+   ```bash
+   supabase --workdir cloud db push --db-url "$LIVE_DB_URL" --dry-run | node cloud/supabase/scripts/check-push-plan.mjs
+   ```
+
+4. History repair, only after exit 3. The earlier migrations were applied by pasting their SQL, so the live `supabase_migrations.schema_migrations` may be empty and the dry run then lists every migration. First confirm the pre-M7 objects exist on live: the check must print `pre-M7 objects present` (anything else names what's missing; stop). Then mark the 12 pre-M7 versions as applied, without running them, and repeat step 3, which must now exit 0.
+
+   ```bash
+   psql "$LIVE_DB_URL" -XAtc "$(node cloud/supabase/scripts/check-push-plan.mjs --pre-m7-query)"
+   supabase --workdir cloud migration repair --status applied $(node cloud/supabase/scripts/check-push-plan.mjs --pre-m7-versions) --db-url "$LIVE_DB_URL"
+   ```
+
+5. Push, check that nothing is left to push (`--applied` expects the "up to date" plan), and forget the URL.
+
+   ```bash
+   supabase --workdir cloud db push --db-url "$LIVE_DB_URL"
+   supabase --workdir cloud db push --db-url "$LIVE_DB_URL" --dry-run | node cloud/supabase/scripts/check-push-plan.mjs --applied
+   unset LIVE_DB_URL
+   ```
+
+6. Check the auth config again: expect `signup mode: waitlist, no drift` and no other drift line.
+
+   ```bash
+   node cloud/supabase/scripts/configure-auth.mjs --check
+   ```
+
+7. Redeploy the agent from the M7 checkout with the Gate 7 command (Gate 7 step 6), and check that it started: the health check answers and the startup log shows the `[limits]` line with your numbers, not the Gate 8 refusal.
+
+   ```bash
+   docker compose -f cloud/deploy-config/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env --env-file cloud/deploy-config/env-files/frontend/.env --profile local up -d --build
+   curl -fsS http://127.0.0.1:8000/health
+   docker compose -f cloud/deploy-config/compose.hosted.yml --env-file cloud/deploy-config/env-files/backend/.env logs --tail 50 agent | grep -E '\[limits\]|refusing to start'
+   ```
+
+8. Merge `revamp/m7` into `main`; Vercel builds and deploys the web app. Sign in on the live app, send a chat and check that the sidebar shows the usage meter.
+
+9. Re-run the hosted smoke on a preview from a second checkout or worktree with the `.env` guard (see "Run the hosted stack"), which sets high limits (4 running per user, 1000 per hour, 100000 per month, 50 on the server) so the tests are never throttled. The e2e marks its `oab-e2e+` and `oab-test+` users as human-checked (`test-users.mjs --human-checked`), so the suites keep working after Gate 9. Then remove the preview.
+
+   ```bash
+   . scripts/preview-preflight.sh
+   P="docker compose -p oab-preview --env-file .env --env-file cloud/deploy-config/env-files/backend/.env --env-file cloud/deploy-config/env-files/frontend/.env -f cloud/deploy-config/compose.hosted.yml -f cloud/deploy-config/compose.preview.yml --profile local"
+   preflight $P && $P up -d --build search renderer agent web
+   APP_ORIGIN=http://localhost:18300 npm run smoke -w @oab/cloud-e2e
+   $P down
+   ```
+
+**Rollback.** Redeploy the previous agent first (Gate 7 step 8's retag, or its commit with the Gate 7 command), roll the web app back on Vercel (Instant Rollback), then restore the two old function bodies and clear the hook's mode comment. The M7 tables and functions stay, unused, and the migration history still lists both M7 versions: going forward again needs a new migration that re-creates the two functions, never a hand paste.
+
+```bash
+read -s LIVE_DB_URL
+psql "$LIVE_DB_URL" -v ON_ERROR_STOP=1 -f cloud/supabase/rollback/m7.sql
+psql "$LIVE_DB_URL" -XAtc "$(node cloud/supabase/scripts/check-old-bodies.mjs --query)" | node cloud/supabase/scripts/check-old-bodies.mjs
+unset LIVE_DB_URL
+```
+
+## Open signups (Gate 9)
+
+Gate 9 turns on `open` mode after Gate 8 has run and been burnt in. Do the steps in order; the last one opens signups, and `configure-auth.mjs` refuses it until steps 4 to 6 are done.
+
+1. **Numbers.** Confirm the request limits in `cloud/deploy-config/env-files/backend/.env` (`LIMIT_RUNNING_PER_USER`, `LIMIT_REQUESTS_PER_HOUR`, `LIMIT_REQUESTS_PER_MONTH`, `LIMIT_RUNNING_SERVER`; defaults 1, 10, 50 and 8) and the signup caps in `public.signup_settings` (defaults 20 per hour, 100 per day, 3 per IP per day). Change the caps in the dashboard's SQL editor, for example `update public.signup_settings set signups_per_hour = 20, signups_per_day = 100, signups_per_ip_day = 3, updated_at = now() where id;`.
+2. **Turnstile.** In the Cloudflare dashboard, Turnstile → Add widget (mode Managed). Its hostnames are the app's domain (`<APP_HOST>`) plus every Vercel preview hostname you test on (`<preview host>`); the widget refuses any other host. Copy its site key and secret key.
+3. **Keys and redeploy.** Put the secret in `cloud/deploy-config/env-files/backend/.env` as `TURNSTILE_SECRET_KEY` (in an editor; never echo it), and the site key as `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in `cloud/deploy-config/env-files/frontend/.env` and in Vercel (Settings → Environment Variables, Production). The site key is read at build time, so redeploy the web app on Vercel (Deployments → Redeploy), and redeploy the agent with the Gate 7 command. The agent log must not show `[signup] open mode needs TURNSTILE_SECRET_KEY`.
+4. **Dummy-key check.** Neither file may hold one of Cloudflare's test keys (the agent refuses a test secret outside the local stack, and the web app a test site key outside a local Supabase, but check before you open). Each `grep -c` must print `0` (it exits 1 when nothing matches); the last two lines must each print `1`, proving the keys are set.
+
+   ```bash
+   grep -cE '^TURNSTILE_SECRET_KEY=[0-9]x0{30,}[A-Z]{2}$' cloud/deploy-config/env-files/backend/.env
+   grep -cE '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=[0-9]x0{20}[A-Z]{2}$' cloud/deploy-config/env-files/frontend/.env
+   grep -c '^TURNSTILE_SECRET_KEY=.' cloud/deploy-config/env-files/backend/.env
+   grep -c '^NEXT_PUBLIC_TURNSTILE_SITE_KEY=.' cloud/deploy-config/env-files/frontend/.env
+   ```
+
+5. **Throwaway domains.** Load `cloud/supabase/data/disposable-domains.txt` into `public.blocked_email_domains` and check it (`0 missing, 0 extra`).
+
+   ```bash
+   set -a; . cloud/deploy-config/env-files/ops/.env; set +a
+   node cloud/supabase/scripts/blocked-domains.mjs --apply
+   node cloud/supabase/scripts/blocked-domains.mjs --check
+   ```
+
+6. **Terms and Privacy.** Replace or approve `cloud/web/content/terms.md` and `cloud/web/content/privacy.md`, remove their `<!-- DRAFT-NOT-REVIEWED -->` line, and merge; `/terms` and `/privacy` then show no draft banner. Both counts must print `0`:
+
+   ```bash
+   grep -c DRAFT-NOT-REVIEWED cloud/web/content/terms.md cloud/web/content/privacy.md
+   ```
+
+7. **Edge limits and email.** In Vercel → Firewall, add rate-limit rules (per IP, deny over the limit) for `/login`, `/auth/*` and `/api/human-check`. The Cloudflare tunnel exposes only the agent's host, and the agent answers 401 without the service secret (the first command prints `401`). Check the client IP forwarding: two access requests sent from two different networks get different IP-hash tags in the admin Requests list. In Resend, verify your sending domain (Domains → Add, then the DNS records), and set `SMTP_SENDER_EMAIL` in `cloud/deploy-config/env-files/ops/.env` to an address on it; step 10's `--apply` writes it to Supabase.
+
+   ```bash
+   AGENT_HOST="<public agent host>"
+   curl -s -o /dev/null -w '%{http_code}\n' "https://$AGENT_HOST/profile"
+   ```
+
+8. **Required check.** On the `main` ruleset's required status checks, add `cloud-supabase` (the local Supabase stack job).
+9. **Accept the risks.** Read "Accepted risks" in [SECURITY.md](SECURITY.md) and accept them: open signups let anyone drive the agent's browser tool from your egress IP (the private-network guard stays on for everyone but the admin); an attacker can fill the global signup caps and pause signups for real users; bots can drive Google's sign-in flow directly; the per-IP cap is best effort.
+10. **Open.** The `--apply` refuses, listing each missing precondition, unless the M7 functions and the signup row exist, the hook carries the M7 marker, the throwaway list holds at least 1000 domains and the legal pages have no draft marker; it writes the mode before it turns GoTrue's signups on. Then check it.
+
+    ```bash
+    SIGNUP_MODE=open node cloud/supabase/scripts/configure-auth.mjs --apply --i-confirm-open-signups
+    SIGNUP_MODE=open node cloud/supabase/scripts/configure-auth.mjs --check
+    ```
+
+11. **Watch.** For the first week, check the admin Usage tab daily: the signup counts for the last hour and day against the caps, the month's total and the running count.
+
+### Emergency close
+
+To stop new signups at once, go back to `waitlist`. `--close` needs only `SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN`: it turns GoTrue's signups off first, on their own (`disable_signup: true`, nothing else), checks that they are off, then writes the mode, so a key-drift or settings problem can't block it; existing accounts keep working, and their limits and human checks stay. Open again with step 10.
+
+```bash
+set -a; . cloud/deploy-config/env-files/ops/.env; set +a
+SIGNUP_MODE=waitlist node cloud/supabase/scripts/configure-auth.mjs --close
+```

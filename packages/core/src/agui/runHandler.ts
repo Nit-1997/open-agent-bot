@@ -8,6 +8,7 @@ import { UserError } from "../lib/errors.js";
 import { log } from "../lib/log.js";
 import { agentPersona, type Profile } from "@oab/shared/profile";
 import { chatTitleFrom } from "@oab/shared/chats";
+import type { RefundLatch } from "../policy/types.js";
 import type { ProfileStore } from "../profile/store.js";
 import type { UserContext } from "../prompt/userContext.js";
 import {
@@ -39,6 +40,7 @@ export type RunContext = {
   profiles?: ProfileStore;
   openReport?: (id: string, cached?: OpenReport) => Promise<OpenReport | null>;
   timeLimitMs: number;
+  refund?: RefundLatch;
 };
 
 type AssistantEnd = {
@@ -153,6 +155,7 @@ export async function* handleRun(
   const last = input.messages.filter((m) => m.role === "user").at(-1);
   const prompt = last ? messageText(last) : "";
   if (!last || !prompt.trim()) {
+    ctx.refund?.close();
     yield runError("BAD_INPUT", "No user message in run input.");
     return;
   }
@@ -162,6 +165,7 @@ export async function* handleRun(
   const persona = agentPersona(stored);
   const denied = await claim(ctx, threadId, userContext?.model);
   if (denied) {
+    ctx.refund?.close();
     yield denied;
     return;
   }
@@ -177,21 +181,31 @@ export async function* handleRun(
     made = { error };
   }
   if ("error" in made) {
-    if (made.error instanceof SessionCapacityError) yield runError("BUSY", made.error.message);
-    else if (made.error instanceof UserError) yield runError("UNAVAILABLE", made.error.message);
+    if (made.error instanceof SessionCapacityError) {
+      ctx.refund?.refund();
+      yield runError("BUSY", made.error.message);
+      return;
+    }
+    ctx.refund?.close();
+    if (made.error instanceof UserError) yield runError("UNAVAILABLE", made.error.message);
     else yield runError("MODEL_ERROR", made.error instanceof Error ? made.error.message : String(made.error));
     return;
   }
   const { entry, history } = made;
   if (entry.busy) {
+    ctx.refund?.refund();
     yield runError("THREAD_BUSY", "Still working on the last message.");
     return;
   }
   if (entry.lastRunId === runId) {
+    ctx.refund?.refund();
     yield runError("DUPLICATE_RUN", "This message was already handled.");
     return;
   }
-  if (signal.aborted) return;
+  if (signal.aborted) {
+    ctx.refund?.refund();
+    return;
+  }
   const transcript = new Transcript();
   let saved = false;
   const saveReply = async (outcome: "complete" | "interrupted") => {
@@ -204,6 +218,7 @@ export async function* handleRun(
     ]);
   };
   entry.busy = true;
+  ctx.refund?.close();
   entry.lastRunId = runId;
   try {
     const openReport = await openReportFor(ctx, readOpenReport(input), entry.openReport);

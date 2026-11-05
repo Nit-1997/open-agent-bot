@@ -64,6 +64,7 @@ export function createAdmin({ url, key }) {
     updateUser: (id, attrs) => call("PUT", `/auth/v1/admin/users/${id}`, attrs),
     generateLink: (attrs) => call("POST", "/auth/v1/admin/generate_link", attrs),
     async deleteUser(id, email) {
+      await rest("POST", "rpc/usage_tombstone", { p_user: id });
       for (;;) {
         const objects = await call("POST", "/storage/v1/object/list/artifacts", { prefix: id, limit: 100, offset: 0 });
         if (!objects?.length) break;

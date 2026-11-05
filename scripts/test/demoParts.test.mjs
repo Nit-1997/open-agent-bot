@@ -592,6 +592,293 @@ describe("m6 demo part scripts", () => {
   });
 });
 
+describe("m7 demo part scripts", () => {
+  const M7 = MILESTONES.m7.dir;
+  const M7_LIB = libOf("m7");
+  const m7 = (body) => partProblems(good(body), "x.sh", "m7");
+  const refuses = (body, re) => assert.match(m7(body).join("\n"), re, body);
+  const passes = (body) => assert.deepEqual(m7(body), [], body);
+  const HELPERS = ["browser.mjs", "users.mjs"];
+  const repo = join(M7, "../../..");
+  const sh = (body, env = {}) =>
+    spawnSync("bash", ["-c", `. scripts/demo/m7/lib.sh\n${body}`, "part-test"], {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, DEMO_DIR: `.factory/m7/test-${process.pid}`, ...env },
+    });
+  const cleanup = () => rmSync(join(repo, `.factory/m7/test-${process.pid}`), { recursive: true, force: true });
+
+  it("has parts 0 to 8, the shared lib and the node helpers, and nothing else", () => {
+    assert.deepEqual(
+      partsOf("m7"),
+      [0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => `part-${n}.sh`),
+    );
+    assert.deepEqual(readdirSync(M7).sort(), ["lib.sh", ...partsOf("m7"), ...HELPERS].sort());
+  });
+
+  it("every committed m7 part and the lib pass the static checks and parse with bash -n", () => {
+    for (const p of partsOf("m7")) assert.deepEqual(partProblems(read(join(M7, p)), p, "m7"), [], p);
+    assert.deepEqual(libProblems(read(M7_LIB), "m7"), []);
+    for (const f of [M7_LIB, ...partsOf("m7").map((p) => join(M7, p))]) {
+      const r = spawnSync("bash", ["-n", f], { encoding: "utf8" });
+      assert.equal(r.status, 0, `${f}: ${r.stderr}`);
+    }
+  });
+
+  it("keeps the M7 port map: 18700-18749 only", () => {
+    for (const bad of [
+      "curl -fsS http://127.0.0.1:8000/health",
+      "APP_ORIGIN=http://localhost:18300 x",
+      "y --port 18750",
+      "z --ports 18600",
+    ])
+      refuses(bad, /port/);
+    for (const ok of ["APP_ORIGIN=http://localhost:18721 x", "STUB_PORT=18722 y", "curl -fsS http://127.0.0.1:18720/health"]) passes(ok);
+  });
+
+  it("runs the Supabase CLI only through local-stack.mjs or the 127.0.0.1 migration repair", () => {
+    for (const bad of [
+      "supabase db push",
+      'supabase --workdir cloud db push --db-url "$LIVE_DB_URL"',
+      "npx supabase link --project-ref abc",
+      "supabase start --workdir /tmp/x",
+      "x && supabase stop",
+      'supabase --workdir cloud migration repair --status applied 1 --db-url "$URL"',
+    ])
+      refuses(bad, /Supabase CLI/);
+    for (const ok of [
+      "node cloud/supabase/scripts/local-stack.mjs start --name oab-m7-demo --ports 18700",
+      "node cloud/supabase/scripts/local-stack.mjs push-dry-run --name oab-m7-g8 | node cloud/supabase/scripts/check-push-plan.mjs",
+      'supabase --workdir cloud migration repair --status applied "$@" --db-url "postgresql://postgres:postgres@127.0.0.1:18712/postgres?sslmode=disable"',
+      "supabase --version",
+    ])
+      passes(ok);
+    refuses("node cloud/supabase/scripts/local-stack.mjs start --name oab-m7-b --ports 18740", /oab-m7-demo and oab-m7-g8/);
+  });
+
+  it("never reads a production settings file, and writes the live host pattern without a literal .supabase.co", () => {
+    for (const bad of [
+      "ls -l cloud/deploy/.env-agent",
+      "set -a; . cloud/deploy/.env-nextjs; set +a",
+      "x --env-file cloud/deploy/env-files/.env-supabase-admin",
+      "grep -c E2E cloud/deploy/env-files/.env-e2e",
+    ])
+      refuses(bad, /production settings files/);
+    refuses("grep -c 'abc.supabase.co' x.log", /\[\.\]supabase\[\.\]co/);
+    passes("grep -E -c '[.]supabase[.]co|api[.]supabase[.]com' x.log");
+  });
+
+  it("starts background processes only through start_bg, runs psql only against 127.0.0.1, and never captures the screen", () => {
+    for (const bad of ["node scripts/demo/m7/agent.mjs &", "nohup next start -p 18721 > x.log", "sleep 5 &"]) refuses(bad, /start_bg/);
+    passes("start_bg stub 18722 ./node_modules/.bin/tsx e2e/support/stubModel.ts");
+    passes("a && b");
+    refuses('psql "$OAB_SB_DB_URL" -c "select 1"', /psql/);
+    passes('psql_demo -c "select 1"');
+    passes('psql "postgresql://postgres:postgres@127.0.0.1:18712/postgres" -XAtc "select 1"');
+    for (const bad of ["ffmpeg -f avfoundation -i 1 out.mp4", "screencapture -x a.png"]) refuses(bad, /screen capture/);
+  });
+
+  it("the lib needs start_bg under env -i, memory_check on docker info with M7_DEMO_SEQUENTIAL, and refuse_supabase_env", () => {
+    const base = `. "$REPO/scripts/preview-preflight.sh"\nrequire_oab oab-x\nEXITS=exit-codes.txt\n`;
+    const all = [
+      'start_bg() {\n  env -i PATH="$PATH" "$@"\n}',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: a shell parameter expansion in a lib.sh fixture
+      "memory_check() {\n  docker info --format '{{.MemTotal}}'\n  [ \"${M7_DEMO_SEQUENTIAL:-}\" = 1 ]\n}",
+      "refuse_supabase_env() {\n  :\n}",
+    ];
+    assert.deepEqual(libProblems(base + all.join("\n"), "m7"), []);
+    assert.match(libProblems(base + all.slice(1).join("\n"), "m7").join("\n"), /start_bg/);
+    assert.match(libProblems(base + ['start_bg() {\n  "$@"\n}', ...all.slice(1)].join("\n"), "m7").join("\n"), /env -i/);
+    assert.match(libProblems(base + [all[0], all[2]].join("\n"), "m7").join("\n"), /memory_check/);
+    assert.match(libProblems(base + all.slice(0, 2).join("\n"), "m7").join("\n"), /refuse_supabase_env/);
+  });
+
+  it("memory_check refuses below 6 GB unless M7_DEMO_SEQUENTIAL=1, which stops oab-m7-demo before oab-m7-g8", () => {
+    const bin = mkdtempSync(join(tmpdir(), "oab-m7-fake-docker-"));
+    const fake = (bytes) =>
+      spawnSync("bash", ["-c", `printf '#!/bin/sh\\necho ${bytes}\\n' > "${bin}/docker" && chmod +x "${bin}/docker"`], {
+        encoding: "utf8",
+      });
+    try {
+      fake(4 * 1024 ** 3);
+      const low = sh("memory_check; echo after", { PATH: `${bin}:${process.env.PATH}` });
+      assert.equal(low.status, 1, low.stdout);
+      assert.match(low.stdout, /M7_DEMO_SEQUENTIAL=1/);
+      assert.doesNotMatch(low.stdout, /after/);
+      const seq = sh('memory_check && echo "mode=$M7_MODE"', { PATH: `${bin}:${process.env.PATH}`, M7_DEMO_SEQUENTIAL: "1" });
+      assert.equal(seq.status, 0, seq.stderr);
+      assert.match(seq.stdout, /mode=sequential/);
+      fake(8 * 1024 ** 3);
+      const ok = sh('memory_check && echo "mode=$M7_MODE"', { PATH: `${bin}:${process.env.PATH}` });
+      assert.equal(ok.status, 0, ok.stderr);
+      assert.match(ok.stdout, /mode=together/);
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+      cleanup();
+    }
+    const p2 = read(join(M7, "part-2.sh"));
+    assert.ok(p2.search(/if \[ "\$M7_MODE" = sequential \]/) >= 0);
+    assert.ok(p2.indexOf("stack_stop oab-m7-demo") < p2.indexOf("stack_start oab-m7-g8"), "sequential mode stops the demo stack first");
+  });
+
+  it("refuse_supabase_env stops on any Supabase access variable or LIVE_DB_URL", () => {
+    try {
+      for (const name of ["SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF", "SUPABASE_DB_PASSWORD", "SUPABASE_DB_URL", "LIVE_DB_URL"]) {
+        const r = sh("refuse_supabase_env; echo after", { [name]: "x" });
+        assert.equal(r.status, 1, name);
+        assert.match(r.stdout, new RegExp(name));
+        assert.doesNotMatch(r.stdout, /after/);
+      }
+      assert.equal(sh("refuse_supabase_env").status, 0);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("demo_env writes the secrets into a 0700 run folder outside .factory, as a 0600 file, and prints none of them", () => {
+    try {
+      const r = sh(
+        'demo_env_secrets && d="$(recall run)" && stat -f "%Lp" "$d" "$d/secrets.env" && grep -c "^[A-Z_]*=" "$d/secrets.env" && rm -rf "$d"',
+      );
+      assert.equal(r.status, 0, r.stderr);
+      const [dirMode, fileMode, count] = r.stdout.trim().split("\n").slice(-3);
+      assert.equal(dirMode, "700");
+      assert.equal(fileMode, "600");
+      assert.equal(Number(count), 4, count);
+      assert.doesNotMatch(r.stdout, /[0-9a-f]{64}/);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("part 0 snapshots live first and starts oab-m7-demo; part 8 diffs live, scans secrets and supabase.co and checks leftovers", () => {
+    const p0 = read(join(M7, "part-0.sh"));
+    const at0 = (re) => p0.search(re);
+    assert.ok(at0(/live_snapshot before/) >= 0 && at0(/live_snapshot before/) < at0(/stack_start oab-m7-demo/));
+    assert.match(read(M7_LIB), /grep -E '\^open-agent-bot' \| sort > "\$DEMO_DIR\/live-\$1\.txt"/);
+    assert.ok(at0(/^refuse_supabase_env$/m) >= 0 && at0(/^refuse_supabase_env$/m) < at0(/stack_start oab-m7-demo/));
+    assert.match(p0, /^run bindings "stack_bindings"$/m);
+    assert.match(
+      read(M7_LIB),
+      /^stack_bindings\(\) \{ docker ps --filter name=_oab-m7- --format '\{\{\.Names\}\} \{\{\.Ports\}\}' \| sort; \}$/m,
+    );
+    const p8 = read(join(M7, "part-8.sh"));
+    for (const s of [
+      "stack_stop oab-m7-demo",
+      "stack_stop oab-m7-g8",
+      "live_snapshot after",
+      "live-after.txt",
+      "grep -F -c -f <(secret_patterns",
+      "supabase_hosts",
+      "m7_leftovers",
+    ])
+      assert.ok(p8.includes(s), s);
+    assert.ok(p8.indexOf("stop_all") < p8.indexOf("stack_stop oab-m7-demo"));
+    assert.match(read(M7_LIB), /grep -E '_oab-m7-\(demo\|g8\)\$'/);
+    assert.match(read(M7_LIB), /grep -E -c '\[\.\]supabase\[\.\]co/);
+    assert.match(p8, /^no_background$/m);
+  });
+
+  it("part 2 rehearses Gate 8 on oab-m7-g8: old bodies, plan 0 and 1, history repair 3 then 0, push, rollback", () => {
+    const p2 = read(join(M7, "part-2.sh"));
+    const steps = [
+      "stack_start oab-m7-g8",
+      "g8_bodies",
+      "--pre-m7-query",
+      "push-dry-run --name oab-m7-g8",
+      "repair_g8",
+      "local-stack.mjs push --name oab-m7-g8",
+      "--applied",
+      "rollback/m7.sql",
+      "stack_stop oab-m7-g8",
+    ];
+    let at = -1;
+    for (const s of steps) {
+      const i = p2.indexOf(s, at + 1);
+      assert.ok(i > at, `part 2 lacks (or misorders) ${s}`);
+      at = i;
+    }
+    assert.match(p2, /^exits plan-extra 1 /m);
+    assert.match(p2, /^exits plan-history 3 /m);
+    assert.match(p2, /^exits old-bodies-after-push 1 /m);
+  });
+
+  it("the node helpers refuse anything but the local stack and the factory origins", () => {
+    for (const f of HELPERS) {
+      const t = read(join(M7, f));
+      assert.doesNotMatch(t, /\.supabase\.co\b/, f);
+      assert.doesNotMatch(t, /\/Users\//, f);
+    }
+    assert.match(read(join(M7, "users.mjs")), /local_stack_only/);
+    assert.match(read(join(M7, "users.mjs")), /oab-m7\\\+/);
+    const b = read(join(M7, "browser.mjs"));
+    assert.match(b, /http:\/\/localhost:18721/);
+    assert.match(b, /recordVideo/);
+    assert.match(b, /recordHar/);
+    assert.match(b, /FORBIDDEN request/);
+  });
+
+  it("part 1 shows AC 2: the local paths unchanged since M7_BASE, the desktop and local e2e suites and the standalone job, then no leftovers", () => {
+    const p1 = read(join(M7, "part-1.sh"));
+    const steps = [
+      'git diff --stat --exit-code \\"$M7_BASE\\" HEAD -- docker-compose.yml local apps/desktop .github/workflows/release.yml',
+      "--project desktop-fake",
+      'run local-up "local_up"',
+      "npm run local -w e2e",
+      "down_local",
+      "rm -rf e2e/.local",
+      "scripts/ci/standalone.sh --docker --hosted-free",
+      "ac2_leftovers",
+    ];
+    let at = -1;
+    for (const s of steps) {
+      const i = p1.indexOf(s, at + 1);
+      assert.ok(i > at, `part 1 lacks (or misorders) ${s}`);
+      at = i;
+    }
+    assert.match(p1, /test\/copilot\/parity\.test\.ts --reporter=verbose/);
+    const lib = read(M7_LIB);
+    assert.match(lib, /^M7_BASE="\$\{M7_BASE:-revamp\/clean\}"$/m);
+    assert.match(lib, /^PORTS_USED="18720 18721 18722 18740 18741"$/m);
+    assert.match(lib, /grep -E '\^oab-m7-\(local\|oss\)'/);
+  });
+
+  it("part 3 shows the low and unavailable meter, the cleanup timestamps and N admitted after the server frees; part 2 drops the always-empty usage view", () => {
+    const p3 = read(join(M7, "part-3.sh"));
+    assert.match(p3, /^run agent "agent_up 1 1000 5 8"$/m);
+    assert.match(p3, /test\/limits\/lifecycle\.test\.ts --reporter=verbose/);
+    assert.match(p3, /test\/local\/policy\.local\.test\.ts --reporter=verbose/);
+    assert.doesNotMatch(read(join(M7, "part-2.sh")), /usage-tables/);
+    const b = read(join(M7, "browser.mjs"));
+    for (const needle of [
+      "#sidebar-usage-meter-low",
+      '"data-level", "low"',
+      "#sidebar-usage-meter-unavailable",
+      "#sidebar-usage-meter-retry",
+      "request_usage_get(uuid, timestamptz) from service_role",
+      "toBe(before + 1)",
+      "running.mine = 0; until then a send in B is refused limit_running",
+    ])
+      assert.ok(b.includes(needle), needle);
+  });
+
+  it("part 6 revokes the mode lookup only after the agent started, then shows the agent refusing to start while it is revoked", () => {
+    const p6 = read(join(M7, "part-6.sh"));
+    const unknown = p6.slice(p6.indexOf("the mode unknown"));
+    const at = (s) => unknown.indexOf(s);
+    assert.ok(at("agent_up 1 1000 1000 8 $TURNSTILE_PASS") >= 0 && at("agent_up 1 1000 1000 8 $TURNSTILE_PASS") < at("revoke execute"));
+    assert.ok(at("revoke execute") < at("browser pages-unknown"));
+    assert.ok(at("browser pages-unknown") < at("exits agent-refuses-signup 1 "));
+    assert.ok(at("exits agent-refuses-signup 1 ") < at("grant execute"));
+  });
+
+  it("names no revamp-only commit hash", () => {
+    for (const f of readdirSync(M7))
+      for (const h of read(join(M7, f)).match(/(?<![0-9A-Za-z])[0-9a-f]{7,40}(?![0-9A-Za-z])/g) ?? [])
+        assert.ok(/^0+$/.test(h), `${f} pins ${h}`);
+  });
+});
+
 describe("render-docs", () => {
   const FIXTURE = [
     "# Title",

@@ -5,6 +5,11 @@ services:
   agent:
     ports: !override
       - "127.0.0.1:${PREVIEW_AGENT_PORT:-18800}:8000"
+    environment:
+      LIMIT_RUNNING_PER_USER: "4"
+      LIMIT_REQUESTS_PER_HOUR: "1000"
+      LIMIT_REQUESTS_PER_MONTH: "100000"
+      LIMIT_RUNNING_SERVER: "50"
 
   web:
     ports:
