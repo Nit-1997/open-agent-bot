@@ -738,7 +738,7 @@ describe("m7 demo part scripts", () => {
   it("demo_env writes the secrets into a 0700 run folder outside .factory, as a 0600 file, and prints none of them", () => {
     try {
       const r = sh(
-        'demo_env_secrets && d="$(recall run)" && stat -f "%Lp" "$d" "$d/secrets.env" && grep -c "^[A-Z_]*=" "$d/secrets.env" && rm -rf "$d"',
+        'demo_env_secrets && d="$(recall run)" && node -e "const fs=require(\'node:fs\');for(const f of process.argv.slice(1))console.log((fs.statSync(f).mode&0o777).toString(8))" "$d" "$d/secrets.env" && grep -c "^[A-Z_]*=" "$d/secrets.env" && rm -rf "$d"',
       );
       assert.equal(r.status, 0, r.stderr);
       const [dirMode, fileMode, count] = r.stdout.trim().split("\n").slice(-3);
