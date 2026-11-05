@@ -139,7 +139,7 @@ jobs:
         run: node scripts/release/refs.mjs record --arch "$ARCH" --digest "$DIGEST" --dir "$RUNNER_TEMP/digests"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          name: digests-${{ matrix.arch }}-${{ matrix.image }}
           path: ${{ runner.temp }}/digests/${{ matrix.arch }}
           if-no-files-found: error
           retention-days: 1
@@ -170,7 +170,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-${{ matrix.image }}-*
+          pattern: digests-*-${{ matrix.image }}
           merge-multiple: true
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
