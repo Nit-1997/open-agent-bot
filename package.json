@@ -36,12 +36,15 @@
       "undici": "^8.12.3",
       "minimatch": "^11.0.3"
     },
-    "@ag-ui/proto@1.0.3": {
-      "zod": "^4.6.7"
-    },
     "@ai-sdk/provider-utils": {
       "undici": "^6.29.1"
     },
-    "graphql-scalars": "^2.0.1"
+    "@copilotkit/runtime": {
+      "@hono/node-server": "^2.1.6"
+    },
+    "minimatch@>=7.0.0 <11.0.1": "^11.0.3",
+    "@smithy/core": "^3.38.1",
+    "graphql-scalars": "^2.0.1",
+    "zod": "^4.6.7"
   }
 }
