@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthCard, authPrimary, authSecondary } from "@/components/auth/AuthCard";
+import { GoogleIcon } from "@/components/brand/BrandIcons";
 import { getClaimsOrNull, safeNext } from "@/lib/auth";
 import { authErrorCopy } from "@oab/ui/lib/authErrors.ts";
 import { firstParam } from "@/lib/authForms";
@@ -31,7 +32,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
       )}
       <form id="login-google-form" action={signInWithGoogle}>
         <input id="login-google-next" type="hidden" name="next" value={safeNext(firstParam(params.next))} />
-        <button id="login-google" type="submit" className={authPrimary}>
+        <button id="login-google" type="submit" className={`${authPrimary} flex items-center justify-center gap-2.5`}>
+          <GoogleIcon id="login-google-icon" />
           Continue with Google
         </button>
       </form>

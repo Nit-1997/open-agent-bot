@@ -18,6 +18,36 @@ describe("landing page", () => {
     expect(container.querySelector("#landing-nav a[href='/request-access']")).toBeNull();
   });
 
+  it("keeps every sandbox button on request access", () => {
+    const { container } = render(<LandingPage />);
+    expect(container.querySelector("#landing-way-sandbox-cta")?.getAttribute("href")).toBe("/request-access");
+  });
+
+  it("links the source code and the Mac download in a new tab", () => {
+    const { container } = render(<LandingPage />);
+    const repo = "https://github.com/Nit-1997/open-agent-bot";
+    for (const id of [
+      "landing-nav-github",
+      "landing-hero-source",
+      "landing-way-mac-source",
+      "landing-cta-source",
+      "landing-footer-github",
+    ]) {
+      const link = container.querySelector(`#${id}`);
+      expect(link?.getAttribute("href")).toBe(repo);
+      expect(link?.getAttribute("target")).toBe("_blank");
+      expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(link?.querySelector("svg")).toBeTruthy();
+    }
+    expect(container.querySelector("#landing-way-mac-download")?.getAttribute("href")).toBe(`${repo}/releases/latest`);
+  });
+
+  it("says the project is open source", () => {
+    const { container } = render(<LandingPage />);
+    expect(container.querySelector("#landing-hero-label")?.textContent).toBe("Open source · MIT");
+    expect(container.textContent).not.toMatch(/private beta|invite only/i);
+  });
+
   it("links Terms and Privacy from the footer", () => {
     const { container } = render(<LandingPage />);
     expect(container.querySelector("#landing-footer-terms")?.getAttribute("href")).toBe("/terms");

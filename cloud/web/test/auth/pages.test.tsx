@@ -47,6 +47,7 @@ describe("/login", () => {
     const { container } = render(await LoginPage(params({ error: "not_invited", next: "//evil.com" })));
     expect(screen.getByRole("alert")).toHaveTextContent(AUTH_ERROR_COPY.not_invited);
     expect(screen.getByRole("button", { name: "Continue with Google" })).toHaveAttribute("id", "login-google");
+    expect(document.querySelector("#login-google svg")).toBeTruthy();
     expect(container.querySelector<HTMLInputElement>("#login-google-next")?.value).toBe("/");
     expect(document.getElementById("login-email-input")).toHaveAttribute("type", "email");
     expect(document.getElementById("login-email-submit")).toHaveTextContent("Email me a sign-in link");
