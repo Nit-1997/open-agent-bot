@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import LandingPage from "@/app/landing/page";
 import { RUNS } from "@/components/landing/LiveRun";
@@ -48,6 +48,25 @@ describe("landing page", () => {
     expect(logo?.getAttribute("alt")).toBe("Open Agent");
     expect(logo?.getAttribute("src")).toContain("open-agent-logo-dark.svg");
     expect(container.querySelector("#landing-nav-how")?.getAttribute("href")).toBe("#landing-demo");
+  });
+
+  it("keeps the nav fixed and shrinks it to frosted glass once scrolled", () => {
+    const { container } = render(<LandingPage />);
+    const nav = container.querySelector("#landing-nav");
+    expect(nav?.className).toContain("fixed");
+    expect(nav?.getAttribute("data-scrolled")).toBe("false");
+    act(() => {
+      Object.defineProperty(window, "scrollY", { value: 400, configurable: true });
+      fireEvent.scroll(window);
+    });
+    expect(nav?.getAttribute("data-scrolled")).toBe("true");
+    expect(nav?.className).toContain("h-12");
+    expect(container.querySelector("#landing-nav-logo-image")?.getAttribute("src")).toContain("open-agent-logo-light.svg");
+    act(() => {
+      Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+      fireEvent.scroll(window);
+    });
+    expect(nav?.getAttribute("data-scrolled")).toBe("false");
   });
 
   it("says the project is open source", () => {

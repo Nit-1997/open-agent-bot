@@ -111,7 +111,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section id="landing-demo" className="mx-auto max-w-[1040px] px-6 pt-20 text-center">
+      <section id="landing-demo" className="mx-auto max-w-[1040px] scroll-mt-4 px-6 pt-20 text-center">
         <p id="landing-demo-label" className={LABEL}>
           Watch it work
         </p>
@@ -130,7 +130,7 @@ export default function LandingPage() {
 
       <section
         id="landing-ways"
-        className="mx-6 mt-24 overflow-hidden rounded-[28px] px-6 py-24 text-center text-white sm:py-28"
+        className="mx-6 mt-24 scroll-mt-20 overflow-hidden rounded-[28px] px-6 py-24 text-center text-white sm:py-28"
         style={{ background: HERO_BACKGROUND }}
       >
         <p id="landing-ways-label" className={DARK_LABEL}>
