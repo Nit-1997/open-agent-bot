@@ -238,14 +238,12 @@ function dmg(out, o = {}) {
 describe("release.yml's verify-dmgs block against real DMGs", { skip: process.platform !== "darwin" && "hdiutil is macOS only" }, () => {
   mkdirSync(join(work, "lock"), { recursive: true });
   writeFileSync(join(work, "lock/services.lock.json"), LOCK_TEXT);
-  const good = join(work, "good-arm64.dmg");
-  const run = (name, x64) => {
+  const run = (name, arm64) => {
     const ctx = ctxFor(name);
     mkdirSync(ctx.artifacts["release-dmgs"], { recursive: true });
     const plan = planJob(WF, "verify-dmgs", ctx);
     const exec = (_label, cmd, args, o) => spawnSync(cmd, args, { cwd: o.cwd, env: o.env, encoding: "utf8" });
-    writeFileSync(join(ctx.artifacts["release-dmgs"], `Open-Agent-${V}-arm64.dmg`), readFileSync(good));
-    writeFileSync(join(ctx.artifacts["release-dmgs"], `Open-Agent-${V}-x64.dmg`), readFileSync(x64));
+    writeFileSync(join(ctx.artifacts["release-dmgs"], `Open-Agent-${V}-arm64.dmg`), readFileSync(arm64));
     let r;
     try {
       r = runPlanned(plan, ctx, exec);
@@ -260,18 +258,17 @@ describe("release.yml's verify-dmgs block against real DMGs", { skip: process.pl
     return r;
   };
   const variant = (name, o) => {
-    const f = join(work, `${name}-x64.dmg`);
+    const f = join(work, `${name}-arm64.dmg`);
     dmg(f, o);
     return f;
   };
 
-  it("passes when both DMGs bundle the lock job's lock at the version", () => {
-    dmg(good);
+  it("passes when the DMG bundles the lock job's lock at the version", () => {
     const r = run("ok", variant("good", {}));
     assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
     const want = createHash("sha256").update(LOCK_TEXT).digest("hex");
-    assert.match(r.stdout, new RegExp(`x64: bundled services.lock.json sha256 ${want}`));
-    assert.match(r.stdout, new RegExp(`x64: CFBundleShortVersionString ${V.replace(/\./g, "\\.")}`));
+    assert.match(r.stdout, new RegExp(`arm64: bundled services.lock.json sha256 ${want}`));
+    assert.match(r.stdout, new RegExp(`arm64: CFBundleShortVersionString ${V.replace(/\./g, "\\.")}`));
   });
 
   for (const [name, o] of [
@@ -284,6 +281,6 @@ describe("release.yml's verify-dmgs block against real DMGs", { skip: process.pl
     it(`fails the job on a DMG with ${name}`, () => {
       const r = run(name, variant(name, o));
       assert.notEqual(r.status, 0, `${r.stdout}\n${r.stderr}`);
-      assert.match(r.stdout, /arm64: CFBundleShortVersionString/);
+      assert.doesNotMatch(r.stdout, new RegExp(`arm64: CFBundleShortVersionString ${V.replace(/\./g, "\\.")}`));
     });
 });

@@ -206,11 +206,13 @@ describe("packaged smoke --release (M5 D8)", () => {
 
   it("checks the DMG names for the version", () => {
     const v = "0.0.0-dryrun.1";
-    expect(dmgNameProblems([`/r/Open-Agent-${v}-arm64.dmg`, `/r/Open-Agent-${v}-x64.dmg`], v)).toEqual([]);
-    expect(dmgNameProblems(["/r/Open-Agent-0.0.0-dev-arm64.dmg", `/r/Open-Agent-${v}-x64.dmg`], v)).toEqual([
-      `DMG Open-Agent-0.0.0-dev-arm64.dmg is not named Open-Agent-${v}-arm64.dmg or Open-Agent-${v}-x64.dmg`,
+    expect(dmgNameProblems([`/r/Open-Agent-${v}-arm64.dmg`], v)).toEqual([]);
+    expect(dmgNameProblems(["/r/Open-Agent-0.0.0-dev-arm64.dmg"], v)).toEqual([
+      `DMG Open-Agent-0.0.0-dev-arm64.dmg is not named Open-Agent-${v}-arm64.dmg`,
     ]);
-    expect(dmgNameProblems([`/r/Open-Agent-${v}-arm64.dmg`], v)).toEqual([`no DMG named Open-Agent-${v}-x64.dmg`]);
+    expect(dmgNameProblems([`/r/Open-Agent-${v}-arm64.dmg`, `/r/Open-Agent-${v}-x64.dmg`], v)).toEqual([
+      `DMG Open-Agent-${v}-x64.dmg is not named Open-Agent-${v}-arm64.dmg`,
+    ]);
   });
 
   it("launches with the bundled lock: no services file, refVersions for the bundled refs", () => {

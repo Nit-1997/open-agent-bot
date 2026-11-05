@@ -141,7 +141,7 @@ export function releaseArgProblems(v) {
 
 /** @param {string[]} dmgs @param {string} version */
 export function dmgNameProblems(dmgs, version) {
-  const want = [`Open-Agent-${version}-arm64.dmg`, `Open-Agent-${version}-x64.dmg`];
+  const want = [`Open-Agent-${version}-arm64.dmg`];
   const names = dmgs.map((d) => d.split("/").pop() ?? "");
   const out = names.filter((n) => !want.includes(n)).map((n) => `DMG ${n} is not named ${want.join(" or ")}`);
   if (dmgs.length && out.length === 0) for (const w of want) if (!names.includes(w)) out.push(`no DMG named ${w}`);

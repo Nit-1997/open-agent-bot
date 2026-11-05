@@ -1,6 +1,6 @@
 # Releasing Open Agent
 
-This is the owner's runbook. A `v*` tag on `main` runs `.github/workflows/release.yml` (`gate → push → merge → lock → desktop → verify-dmgs → attest → release`). One run builds and attests both images for `linux/amd64` and `linux/arm64`, writes the services lock from the digests it just pushed, builds both DMGs with that lock, checks them, and ends with a **draft** release holding exactly four files: `Open-Agent-<v>-arm64.dmg`, `Open-Agent-<v>-x64.dmg`, `open-agent-services.json` and `SHA256SUMS`. Nothing is public until you make the two GHCR packages public and publish the draft.
+This is the owner's runbook. A `v*` tag on `main` runs `.github/workflows/release.yml` (`gate → push → merge → lock → desktop → verify-dmgs → attest → release`). One run builds and attests both images for `linux/amd64` and `linux/arm64`, writes the services lock from the digests it just pushed, builds the Apple silicon DMG with that lock, checks it, and ends with a **draft** release holding exactly three files: `Open-Agent-<v>-arm64.dmg`, `open-agent-services.json` and `SHA256SUMS`. Nothing is public until you make the two GHCR packages public and publish the draft.
 
 Homebrew tap: not built (deferred, spec A13).
 
@@ -87,8 +87,8 @@ gh api "repos/Nit-1997/open-agent-bot/actions/runs/$id/pending_deployments" --jq
    TAG=v1.0.0-rc.1; git fetch origin && git tag -a "$TAG" -m "Open Agent 1.0.0-rc.1" origin/main && git push origin "$TAG"
    ```
 
-2. Watch and approve (above). In the `desktop` job log both apps print `kind=release version=1.0.0-rc.1`, and `verify-dmgs` is green.
-3. `gh release view "$TAG"` shows Draft, Pre-release and four assets. Draft assets download only when you are signed in: use `gh release download`, or a browser signed in to GitHub as you.
+2. Watch and approve (above). In the `desktop` job log the app prints `kind=release version=1.0.0-rc.1`, and `verify-dmgs` is green.
+3. `gh release view "$TAG"` shows Draft, Pre-release and three assets. Draft assets download only when you are signed in: use `gh release download`, or a browser signed in to GitHub as you.
 4. Run `gh attestation verify --help` and check that it lists `--signer-workflow`, `--source-ref` and `--deny-self-hosted-runners`. Then download and verify the checksums and the attestations:
 
    ```bash
@@ -154,8 +154,8 @@ gh api "repos/Nit-1997/open-agent-bot/actions/runs/$id/pending_deployments" --jq
 - [ ] `Version in this guide` in INSTALL.md equals the tag, and `node --test scripts/test/docCommands.test.mjs` passes on `main`
 - [ ] Tag on `main`, annotated, pushed by you
 - [ ] Four environment approvals given; workflow green
-- [ ] `kind=release version=1.0.0` in the `desktop` log for both apps, and `verify-dmgs` green
-- [ ] The draft has exactly four assets
+- [ ] `kind=release version=1.0.0` in the `desktop` log for the app, and `verify-dmgs` green
+- [ ] The draft has exactly three assets
 - [ ] `SHA256SUMS` and the attestations verify, and again in Gate 5b step 4 just before publishing
 - [ ] Both packages public and pullable anonymously
 - [ ] Notes edited

@@ -65,10 +65,10 @@ describe("dist:local (D22)", () => {
     );
   });
 
-  it("packages for the host arch only", () => {
+  it("packages for Apple silicon only", () => {
     expect(hostArchFlag("arm64")).toBe("--arm64");
-    expect(hostArchFlag("x64")).toBe("--x64");
-    expect(() => hostArchFlag("ia32")).toThrow(/arm64 or x64/);
+    expect(() => hostArchFlag("x64")).toThrow(/Apple silicon only/);
+    expect(() => hostArchFlag("ia32")).toThrow(/arm64 only/);
   });
 
   it("is wired as npm run dist:local", () => {

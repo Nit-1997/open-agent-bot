@@ -246,7 +246,7 @@ export function assertReleaseLock(lock, o) {
 }
 
 export function releaseAssets(version) {
-  return [`Open-Agent-${version}-arm64.dmg`, `Open-Agent-${version}-x64.dmg`, MANIFEST_NAME, SUMS_NAME].sort();
+  return [`Open-Agent-${version}-arm64.dmg`, MANIFEST_NAME, SUMS_NAME].sort();
 }
 
 export function previousFinalTag(tags, tag) {
@@ -303,7 +303,6 @@ export function notes({ version, prerelease, digests, bases, changes, previousTa
     "## Install on a Mac",
     "",
     `- Apple silicon (M1 and later): \`Open-Agent-${version}-arm64.dmg\``,
-    `- Intel: \`Open-Agent-${version}-x64.dmg\``,
     "",
     "You need Docker (Docker Desktop, OrbStack or Colima). Open the DMG and drag Open Agent to Applications.",
     'The app is not signed with an Apple Developer ID, so macOS blocks the first open: use System Settings → Privacy & Security → "Open Anyway", or run:',

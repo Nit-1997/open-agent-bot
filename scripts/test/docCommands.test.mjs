@@ -810,7 +810,7 @@ describe("guide checks", () => {
   });
   it("fails on mixed versions", () => {
     const p = versionProblems([{ name: "mixed.md", text: fixture("mixed-version.md") }], "1.0.0");
-    assert.deepEqual(p, ["mixed.md: Open-Agent-1.0.1-x64.dmg uses 1.0.1, not 1.0.0"]);
+    assert.deepEqual(p, ["mixed.md: Open-Agent-1.0.1-arm64.dmg uses 1.0.1, not 1.0.0"]);
   });
   it("names images only by digest", () => {
     assert.deepEqual(imageTagProblems(INSTALL), []);
@@ -908,7 +908,6 @@ describe("INSTALL content", () => {
   it("covers download checks, Open Anyway and the xattr line", () => {
     for (const s of [
       "Open-Agent-1.0.0-arm64.dmg",
-      "Open-Agent-1.0.0-x64.dmg",
       '"About This Mac"',
       "shasum -a 256 -c SHA256SUMS --ignore-missing",
       "gh attestation verify Open-Agent-1.0.0-arm64.dmg --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref refs/tags/v1.0.0 --deny-self-hosted-runners",
@@ -996,17 +995,17 @@ describe("README first screen", () => {
     const what = linesOf(README).find((l) => l.startsWith(items[0]));
     for (const s of ["chat", "widgets", "reports", "model keys", "local model"]) assert.ok(what.includes(s), `lacks ${s}`);
   });
-  it("links the Mac app download, names both DMGs, Open Anyway and the install guide", () => {
+  it("links the Mac app download, names the Apple silicon DMG, Open Anyway and the install guide", () => {
     const mac = linesOf(README).find((l) => l.startsWith(items[1]));
     for (const s of [
       "https://github.com/Nit-1997/open-agent-bot/releases/latest",
       "`Open-Agent-1.0.0-arm64.dmg`",
-      "`Open-Agent-1.0.0-x64.dmg`",
       '"Open Anyway"',
       "(docs/INSTALL.md)",
       "Docker",
     ])
       assert.ok(mac.includes(s), `Mac app line lacks ${s}`);
+    assert.ok(!mac.includes("-x64.dmg"), "Mac app line names an Intel DMG");
   });
   it("gives the three browser-only lines and the local URL", () => {
     const first = linesOf(README).slice(0, 40).join("\n");

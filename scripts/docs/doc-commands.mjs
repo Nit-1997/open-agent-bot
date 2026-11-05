@@ -280,7 +280,7 @@ export function substitutionRules(ctx) {
       replace: () => ctx.refs.search,
     },
     dmg: {
-      pattern: new RegExp(`${BEFORE}Open-Agent-${v}-(arm64|x64)\\.dmg${AFTER}`, "g"),
+      pattern: new RegExp(`${BEFORE}Open-Agent-${v}-arm64\\.dmg${AFTER}`, "g"),
       replace: (text) => text.replace(`Open-Agent-${ctx.guideVersion}-`, `Open-Agent-${ctx.dryVersion}-`),
     },
   };
@@ -490,7 +490,7 @@ export function guideVersion(text) {
 }
 
 const VERSIONED = [
-  /Open-Agent-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)-(?:arm64|x64)\.dmg/g,
+  /Open-Agent-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)-arm64\.dmg/g,
   /--branch v(\d+\.\d+\.\d+(?:-rc\.\d+)?)/g,
   /refs\/tags\/v(\d+\.\d+\.\d+(?:-rc\.\d+)?)/g,
   /ghcr\.io\/nit-1997\/open-agent(?:-search)?:v?(\d+\.\d+\.\d+(?:-rc\.\d+)?)/g,

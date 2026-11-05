@@ -298,21 +298,19 @@ export async function dryRun(o) {
 
     const dmgDir = join(o.out, "dmgs");
     mkdirSync(dmgDir, { recursive: true });
-    const names = { arm64: `Open-Agent-${o.version}-arm64.dmg`, x64: `Open-Agent-${o.version}-x64.dmg` };
-    const builtDmg = (arch) => join(APP, "release", names[arch]);
-    for (const arch of ["arm64", "x64"]) rmSync(builtDmg(arch), { force: true });
+    const dmgName = `Open-Agent-${o.version}-arm64.dmg`;
+    const builtDmg = join(APP, "release", dmgName);
+    rmSync(builtDmg, { force: true });
     try {
       node("desktop/stage", join(APP, "scripts/stage-stack.mjs"), ["--lock", lockFile]);
       node("desktop/build", join(APP, "scripts/build.mjs"), []);
       step(
         "desktop/electron-builder",
         join(REPO, "node_modules/.bin/electron-builder"),
-        ["--mac", "--arm64", "--x64", "--publish", "never", `--config.extraMetadata.version=${o.version}`],
+        ["--mac", "--arm64", "--publish", "never", `--config.extraMetadata.version=${o.version}`],
         { cwd: APP, env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: "false" } },
       );
-      for (const arch of ["arm64", "x64"])
-        if (!existsSync(builtDmg(arch)))
-          throw new StepFailed(`electron-builder did not write ${rel(builtDmg(arch))} (artifactName vs extraMetadata)`);
+      if (!existsSync(builtDmg)) throw new StepFailed(`electron-builder did not write ${rel(builtDmg)} (artifactName vs extraMetadata)`);
       node("desktop/packaged-smoke", join(APP, "scripts/packagedSmoke.mjs"), [
         "--release",
         o.version,
@@ -320,16 +318,12 @@ export async function dryRun(o) {
         lockFile,
         "--app",
         join(APP, "release/mac-arm64/Open Agent.app"),
-        "--app",
-        join(APP, "release/mac/Open Agent.app"),
         "--dmg",
-        builtDmg("arm64"),
-        "--dmg",
-        builtDmg("x64"),
+        builtDmg,
         "--evidence",
         join(o.out, "smoke"),
       ]);
-      for (const arch of ["arm64", "x64"]) copyFileSync(builtDmg(arch), join(dmgDir, names[arch]));
+      copyFileSync(builtDmg, join(dmgDir, dmgName));
     } finally {
       node("desktop/restage", join(APP, "scripts/stage-stack.mjs"), [], { allowFail: true });
     }
@@ -361,7 +355,7 @@ export async function dryRun(o) {
     const releaseDir = join(o.out, "release");
     mkdirSync(releaseDir, { recursive: true });
     copyFileSync(manifestFile, join(releaseDir, MANIFEST_NAME));
-    for (const arch of ["arm64", "x64"]) copyFileSync(join(dmgDir, names[arch]), join(releaseDir, names[arch]));
+    copyFileSync(join(dmgDir, dmgName), join(releaseDir, dmgName));
     copyFileSync(sumsFile, join(releaseDir, SUMS_NAME));
     const assets = readdirSync(releaseDir).sort();
     if (JSON.stringify(assets) !== JSON.stringify(releaseAssets(o.version)))

@@ -46,7 +46,7 @@ const NEEDS = {
 
 const VERIFY_DMGS_RUN = `want="$(shasum -a 256 "$LOCK" | cut -d ' ' -f 1)"
 echo "release-lock services.lock.json sha256 $want"
-for arch in arm64 x64; do
+for arch in arm64; do
   dmg="$DMGS/Open-Agent-$VERSION-$arch.dmg"
   mnt="$RUNNER_TEMP/m-$arch"
   hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
@@ -68,22 +68,20 @@ for arch in arm64 x64; do
   hdiutil detach "$mnt"
 done
 `;
-const SUMS_RUN = `sha256sum "Open-Agent-$VERSION-arm64.dmg" "Open-Agent-$VERSION-x64.dmg" open-agent-services.json > SHA256SUMS\n`;
+const SUMS_RUN = `sha256sum "Open-Agent-$VERSION-arm64.dmg" open-agent-services.json > SHA256SUMS\n`;
 const RELEASE_EXISTING_RUN = `gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[] | select(.tag_name == env.TAG) | .id' > "$RUNNER_TEMP/existing-releases.txt"
 cat "$RUNNER_TEMP/existing-releases.txt"
 test ! -s "$RUNNER_TEMP/existing-releases.txt"
 `;
-const RELEASE_VIEW_RUN = `gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets --jq '.isDraft == true and ([.assets[].name] | sort) == ([env.ASSET_ARM64, env.ASSET_X64, env.ASSET_MANIFEST, env.ASSET_SUMS] | sort)' > "$RUNNER_TEMP/draft-check.txt"
+const RELEASE_VIEW_RUN = `gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets --jq '.isDraft == true and ([.assets[].name] | sort) == ([env.ASSET_ARM64, env.ASSET_MANIFEST, env.ASSET_SUMS] | sort)' > "$RUNNER_TEMP/draft-check.txt"
 cat "$RUNNER_TEMP/draft-check.txt"
 grep -qx true "$RUNNER_TEMP/draft-check.txt"
 `;
-const SMOKE_RUN = `node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --app "apps/desktop/release/mac/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg" --dmg "apps/desktop/release/Open-Agent-$VERSION-x64.dmg"`;
-const ROSETTA_RUN = "/usr/bin/pgrep -q oahd || sudo softwareupdate --install-rosetta --agree-to-license\n";
+const SMOKE_RUN = `node apps/desktop/scripts/packagedSmoke.mjs --release "$VERSION" --expect-lock "$RUNNER_TEMP/release-lock/services.lock.json" --app "apps/desktop/release/mac-arm64/Open Agent.app" --dmg "apps/desktop/release/Open-Agent-$VERSION-arm64.dmg"`;
 const PINNED = {
   "verify-dmgs": [VERIFY_DMGS_RUN],
   attest: [SUMS_RUN],
   release: [RELEASE_EXISTING_RUN, RELEASE_VIEW_RUN],
-  desktop: [ROSETTA_RUN],
 };
 
 const DESKTOP_NPM = [
@@ -95,7 +93,7 @@ const DESKTOP_NPM = [
 const DESKTOP_NODE = [
   /^node apps\/desktop\/scripts\/stage-stack\.mjs --lock "\$RUNNER_TEMP\/release-lock\/services\.lock\.json"$/,
   /^node apps\/desktop\/scripts\/build\.mjs$/,
-  /^\.\.\/\.\.\/node_modules\/\.bin\/electron-builder --mac --arm64 --x64 --publish never --config\.extraMetadata\.version="\$VERSION"$/,
+  /^\.\.\/\.\.\/node_modules\/\.bin\/electron-builder --mac --arm64 --publish never --config\.extraMetadata\.version="\$VERSION"$/,
 ];
 const DESKTOP_EXACT = [SMOKE_RUN];
 const SIMPLE = [/^node scripts\/release\/[a-z-]+\.mjs(?: |$)/, /^gh (?!release (?:edit|delete|upload))/, /^docker /];
@@ -562,7 +560,7 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     );
     const stage = runAt("desktop", /stage-stack\.mjs --lock "\$RUNNER_TEMP\/release-lock\/services\.lock\.json"/);
     const build = runAt("desktop", /^node apps\/desktop\/scripts\/build\.mjs$/);
-    const eb = runAt("desktop", /electron-builder --mac --arm64 --x64 --publish never --config\.extraMetadata\.version="\$VERSION"/);
+    const eb = runAt("desktop", /electron-builder --mac --arm64 --publish never --config\.extraMetadata\.version="\$VERSION"/);
     const smoke = at("desktop", (s) => s.run === SMOKE_RUN);
     const upload = at("desktop", (s) => String(s.uses ?? "").startsWith("actions/upload-artifact@"));
     const order = [stage, build, eb, smoke, upload];
@@ -586,13 +584,12 @@ describe("desktop: DMGs from the release lock with npm ci --ignore-scripts (AC 1
     assert.match(read("apps/desktop/scripts/packagedSmokeLib.mjs"), /not byte-equal to --expect-lock/);
   });
 
-  it("uploads release-dmgs: the two DMGs only", () => {
+  it("uploads release-dmgs: the Apple silicon DMG only", () => {
     const up = usesOf("desktop", "actions/upload-artifact@");
     assert.equal(up.length, 1);
     assert.equal(up[0].with.name, "release-dmgs");
     assert.deepEqual(String(up[0].with.path).trim().split("\n"), [
       `apps/desktop/release/Open-Agent-\${{ needs.gate.outputs.version }}-arm64.dmg`,
-      `apps/desktop/release/Open-Agent-\${{ needs.gate.outputs.version }}-x64.dmg`,
     ]);
     assert.equal(up[0].with["if-no-files-found"], "error");
     assert.equal(Number(up[0].with["retention-days"]), 7);
@@ -655,7 +652,7 @@ describe("attest: SHA256SUMS from the lock job's manifest and the DMGs (AC 12, 2
     assert.equal(r.length, 1);
     assert.equal(r[0].run, SUMS_RUN);
     assert.equal(r[0]["working-directory"], `\${{ runner.temp }}/assets`);
-    const names = ["Open-Agent-$VERSION-arm64.dmg", "Open-Agent-$VERSION-x64.dmg", "open-agent-services.json"];
+    const names = ["Open-Agent-$VERSION-arm64.dmg", "open-agent-services.json"];
     assert.deepEqual([...names].sort(), names);
     const attest = usesOf("attest", "actions/attest-build-provenance@");
     assert.equal(attest.length, 1);
@@ -667,10 +664,10 @@ describe("attest: SHA256SUMS from the lock job's manifest and the DMGs (AC 12, 2
   });
 });
 
-describe("release: a draft with exactly four assets (AC 13, 28)", () => {
+describe("release: a draft with exactly three assets (AC 13, 28)", () => {
   const creates = () => runsOf("release").filter((s) => s.run.startsWith("gh release create"));
   const ASSETS =
-    '"$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-x64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"';
+    '"$RUNNER_TEMP/release-dmgs/Open-Agent-$VERSION-arm64.dmg" "$RUNNER_TEMP/release-lock/open-agent-services.json" "$RUNNER_TEMP/release-sums/SHA256SUMS"';
   const CREATE = (pre) =>
     `gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Open Agent $VERSION" --notes-file "$RUNNER_TEMP/release-lock/notes.md"${pre ? " --prerelease" : ""} ${ASSETS}`;
 
@@ -687,7 +684,6 @@ describe("release: a draft with exactly four assets (AC 13, 28)", () => {
       VERSION: `\${{ needs.gate.outputs.version }}`,
       GH_TOKEN: `\${{ github.token }}`,
       ASSET_ARM64: `Open-Agent-\${{ needs.gate.outputs.version }}-arm64.dmg`,
-      ASSET_X64: `Open-Agent-\${{ needs.gate.outputs.version }}-x64.dmg`,
       ASSET_MANIFEST: "open-agent-services.json",
       ASSET_SUMS: "SHA256SUMS",
     });
@@ -708,7 +704,7 @@ describe("release: a draft with exactly four assets (AC 13, 28)", () => {
     assert.equal(final?.run.trim(), CREATE(false));
   });
 
-  it("checks the draft and its four asset names afterwards, and never publishes, edits or deletes", () => {
+  it("checks the draft and its three asset names afterwards, and never publishes, edits or deletes", () => {
     const view = at("release", (s) => s.run === RELEASE_VIEW_RUN);
     const last = Math.max(...creates().map((s) => steps("release").indexOf(s)));
     assert.ok(view > last);

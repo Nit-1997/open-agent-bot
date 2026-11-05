@@ -5,7 +5,7 @@ need_docker app
 [ -d node_modules ] || npm ci
 case "$(uname -m)" in
   arm64) arch=arm64; dir=mac-arm64 ;;
-  x86_64) arch=x64; dir=mac ;;
+  x86_64) echo "make app: the Mac app is Apple silicon only; on an Intel Mac run it with Docker Compose instead (docker compose up -d --build, see README.md)" >&2; exit 1 ;;
   *) echo "make app: unsupported machine $(uname -m)" >&2; exit 1 ;;
 esac
 version="$(node -p 'require("./apps/desktop/package.json").version')"

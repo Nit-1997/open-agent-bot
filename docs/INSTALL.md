@@ -8,7 +8,7 @@ Text in quotes is what you see on screen. The wording macOS and Docker use may d
 
 ## 1. What you need
 
-- A Mac with macOS 13 (Ventura) or later.
+- A Mac with Apple silicon (M1 or later) and macOS 13 (Ventura) or later. Intel Macs aren't supported by the Mac app; use [section 9](#9-no-mac-app-any-os-with-docker) (Docker).
 - About 3 GB of free disk space. The first start downloads about 2 GB.
 - One Docker engine. Open Agent runs its services in Docker. Pick one of the three below.
 
@@ -48,9 +48,7 @@ If the file already has settings, add only the `"cliPluginsExtraDirs"` line insi
 ## 2. Download
 
 1. Open the [latest release](https://github.com/Nit-1997/open-agent-bot/releases/latest).
-2. Pick the file for your Mac. To check which Mac you have, open the Apple menu → "About This Mac" and look at "Chip" (older Macs say "Processor"):
-   - "Apple M1" or later (Apple silicon): `Open-Agent-1.0.0-arm64.dmg`
-   - "Intel": `Open-Agent-1.0.0-x64.dmg`
+2. Download `Open-Agent-1.0.0-arm64.dmg`. It runs on Apple silicon only. To check your Mac, open the Apple menu → "About This Mac" and look at "Chip": it should say "Apple M1" or later. Intel Macs aren't supported by the Mac app; use [section 9](#9-no-mac-app-any-os-with-docker) (Docker).
 
 ### Check the download (optional)
 
@@ -61,7 +59,7 @@ cd ~/Downloads
 shasum -a 256 -c SHA256SUMS --ignore-missing
 ```
 
-You should see `Open-Agent-1.0.0-arm64.dmg: OK` (or the `-x64` name). This only catches a broken or incomplete download. `SHA256SUMS` sits next to the files it lists, so it doesn't prove who made them.
+You should see `Open-Agent-1.0.0-arm64.dmg: OK`. This only catches a broken or incomplete download. `SHA256SUMS` sits next to the files it lists, so it doesn't prove who made them.
 
 To check that the file really was built by this project's release workflow, use the GitHub CLI (`gh`). The commands below install it with [Homebrew](https://brew.sh/), so you need Homebrew first. Install or upgrade `gh` to the current version, then sign in:
 
@@ -78,7 +76,7 @@ Then, in the folder with the download:
 gh attestation verify Open-Agent-1.0.0-arm64.dmg --repo Nit-1997/open-agent-bot --signer-workflow Nit-1997/open-agent-bot/.github/workflows/release.yml --source-ref refs/tags/v1.0.0 --deny-self-hosted-runners
 ```
 
-For the Intel file, use `Open-Agent-1.0.0-x64.dmg` instead. The check ends with "Verification succeeded!". Any other result means: don't open the file.
+The check ends with "Verification succeeded!". Any other result means: don't open the file.
 
 ## 3. Install
 
@@ -241,4 +239,4 @@ Everything stays on your computer. The services listen on 127.0.0.1 only, so oth
 - **"Docker's disk is full" or "Not enough free space on this Mac":** free some space. In Docker Desktop you can also raise the disk limit in its settings under Resources.
 - **The app says it couldn't start its services, for example "Your database is damaged":** the [startup errors table](../README.md#startup-errors) explains each one.
 - **No "Open Anyway" button in Privacy & Security:** double-click the app in Applications once first, then look again.
-- **An Intel Mac won't open the app:** you downloaded the Apple silicon file. Download `Open-Agent-1.0.0-x64.dmg` instead.
+- **An Intel Mac won't open the app:** Intel Macs aren't supported by the Mac app; use [section 9](#9-no-mac-app-any-os-with-docker) (Docker).
