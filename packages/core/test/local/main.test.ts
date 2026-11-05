@@ -13,8 +13,20 @@ const LISTENING = /^\[local\] listening on 127\.0\.0\.1:(\d+)$/m;
 
 type Run = { child: ChildProcess; out: () => string; exit: Promise<number | null> };
 
-function launch(env: NodeJS.ProcessEnv): Run {
-  const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", MAIN], { env, stdio: ["ignore", "pipe", "pipe"] });
+const SIGTERM_ON_START_IMPORT = `data:text/javascript,${encodeURIComponent(
+  `import { register } from "node:module";
+register("data:text/javascript," + encodeURIComponent(\`export async function resolve(s, c, next) {
+  const r = await next(s, c);
+  if (r.url.endsWith("/dist/local/start.js")) process.kill(process.pid, "SIGTERM");
+  return r;
+}\`));`,
+)}`;
+
+function launch(env: NodeJS.ProcessEnv, flags: string[] = []): Run {
+  const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", ...flags, MAIN], {
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   let out = "";
   child.stdout?.on("data", (d) => {
     out += d;
@@ -89,6 +101,14 @@ describe("dist/local/main.js", () => {
     }
     expect(existsSync(join(r.data, "open-agent.db-wal"))).toBe(false);
     expect(run.out()).not.toContain(OPENROUTER_KEY);
+  });
+
+  it("finishes starting, then closes and exits 0, on a SIGTERM that arrives mid-startup", async () => {
+    const run = launch(localEnv(r), ["--import", SIGTERM_ON_START_IMPORT]);
+    const code = await run.exit;
+    expect({ code, signal: run.child.signalCode }, run.out()).toEqual({ code: 0, signal: null });
+    expect(run.out()).toMatch(LISTENING);
+    expect(existsSync(join(r.data, "open-agent.db-wal"))).toBe(false);
   });
 
   it("refuses hosted settings with config (78)", async () => {
