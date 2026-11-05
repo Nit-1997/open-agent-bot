@@ -7,7 +7,10 @@ import { isMain, main, spawnRunner, writeOutputs } from "./cli.mjs";
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const tail = (r) => (r.stderr || r.stdout).trim().split("\n").slice(-5).join("\n");
 
+const dropLocal = (docker, image) => docker(["image", "rm", "--force", image]);
+
 const pullFirst = (docker, image, platform) => {
+  if (platform) dropLocal(docker, image);
   const r = docker(["pull", "--quiet", ...(platform ? ["--platform", platform] : []), image]);
   if (r.status !== 0) throw new Error(`docker pull ${image} exited ${r.status}: ${tail(r)}`);
 };
@@ -50,6 +53,7 @@ export function labelsCheck({ docker, image, version, revision, platform, pull }
 }
 
 export function nodeCheck({ docker, image, platform }) {
+  dropLocal(docker, image);
   const r = docker(["run", "--rm", "--platform", platform, "--entrypoint", "node", image, "-p", "process.versions.node"]);
   if (r.status !== 0) return { ok: false, lines: [`node: docker run exited ${r.status}: ${tail(r)}`] };
   const v = r.stdout.trim();

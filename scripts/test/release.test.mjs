@@ -253,10 +253,33 @@ describe("image-checks.mjs", () => {
     assert.equal(labelsCheck({ docker: () => ok(labels), image: "i", version: "v1.0.0", revision: SHA }).ok, false);
     assert.equal(labelsCheck({ docker: () => ok(labels), image: "i", version: "1.0.0", revision: "x" }).ok, false);
   });
-  it("labels --pull pulls the platform first", () => {
+  it("labels --pull drops the local copy, then pulls the platform", () => {
     const { docker, calls } = recorder((a) => (a[0] === "pull" ? ok() : ok("{}")));
     labelsCheck({ docker, image: "i", version: "1", revision: "r", platform: "linux/arm64", pull: true });
-    assert.deepEqual(calls[0], ["pull", "--quiet", "--platform", "linux/arm64", "i"]);
+    assert.deepEqual(calls.slice(0, 2), [
+      ["image", "rm", "--force", "i"],
+      ["pull", "--quiet", "--platform", "linux/arm64", "i"],
+    ]);
+  });
+  it("node, node and labels on one index digest pass on a store that holds one platform per digest", () => {
+    const image = `ghcr.io/nit-1997/open-agent@sha256:${"a".repeat(64)}`;
+    let held;
+    const fetch = (platform) => {
+      if (held && held !== platform) return { status: 125, stdout: "", stderr: `docker: cannot overwrite digest ${image.split("@")[1]}` };
+      held = platform;
+      return null;
+    };
+    const docker = (a) => {
+      if (a[0] === "image" && a[1] === "rm") return ((held = undefined), ok());
+      if (a[0] === "pull") return fetch(a[a.indexOf("--platform") + 1]) ?? ok();
+      if (a[0] === "run") return fetch(a[a.indexOf("--platform") + 1]) ?? ok("24.22.1\n");
+      if (a[0] === "image" && a[1] === "inspect")
+        return ok(JSON.stringify({ "org.opencontainers.image.version": "1.0.0", "org.opencontainers.image.revision": SHA }));
+      return ok();
+    };
+    assert.equal(nodeCheck({ docker, image, platform: "linux/amd64" }).ok, true);
+    assert.equal(nodeCheck({ docker, image, platform: "linux/arm64" }).ok, true);
+    assert.equal(labelsCheck({ docker, image, version: "1.0.0", revision: SHA, platform: "linux/amd64", pull: true }).ok, true);
   });
   it("node: 22 fails, 24.x passes", () => {
     assert.equal(nodeCheck({ docker: () => ok("22.12.0\n"), image: "i", platform: "linux/amd64" }).ok, false);
