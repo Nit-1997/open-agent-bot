@@ -47,6 +47,7 @@ describe("/login", () => {
     const { container } = render(await LoginPage(params({ error: "not_invited", next: "//evil.com" })));
     expect(screen.getByRole("alert")).toHaveTextContent(AUTH_ERROR_COPY.not_invited);
     expect(screen.getByRole("button", { name: "Continue with Google" })).toHaveAttribute("id", "login-google");
+    expect(document.querySelector("#login-google svg")).toBeTruthy();
     expect(container.querySelector<HTMLInputElement>("#login-google-next")?.value).toBe("/");
     expect(document.getElementById("login-email-input")).toHaveAttribute("type", "email");
     expect(document.getElementById("login-email-submit")).toHaveTextContent("Email me a sign-in link");
@@ -80,6 +81,24 @@ describe("/login", () => {
   it("sends a signed-in visitor home", async () => {
     vi.mocked(getClaimsOrNull).mockResolvedValueOnce({ id: "u", email: "a@b.test", name: "", isAdmin: false });
     await expect(LoginPage(params({}))).rejects.toThrow("/");
+  });
+});
+
+describe("site nav on the sign-in pages", () => {
+  it("links /login back home and to the home page sections, with no Sign in button", async () => {
+    const { container } = render(await LoginPage(params({})));
+    expect(container.querySelector("#login-nav-logo")).toHaveAttribute("href", "/");
+    expect(container.querySelector("#login-nav-how")).toHaveAttribute("href", "/#landing-demo");
+    expect(container.querySelector("#login-nav-try")).toHaveAttribute("href", "/#landing-ways");
+    expect(container.querySelector("#login-nav-signin")).toBeNull();
+    expectUniqueIds(container);
+  });
+
+  it("links /request-access back home and offers Sign in", async () => {
+    const { container } = render(await RequestAccessPage());
+    expect(container.querySelector("#request-access-nav-logo")).toHaveAttribute("href", "/");
+    expect(container.querySelector("#request-access-nav-signin")).toHaveAttribute("href", "/login");
+    expectUniqueIds(container);
   });
 });
 

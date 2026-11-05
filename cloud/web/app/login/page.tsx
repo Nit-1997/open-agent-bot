@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthCard, authPrimary, authSecondary } from "@/components/auth/AuthCard";
+import { GoogleIcon } from "@/components/brand/BrandIcons";
 import { getClaimsOrNull, safeNext } from "@/lib/auth";
 import { authErrorCopy } from "@oab/ui/lib/authErrors.ts";
 import { firstParam } from "@/lib/authForms";
@@ -8,6 +10,8 @@ import { signupSettings } from "@/lib/signupMode";
 import { turnstileSiteKey } from "@/lib/turnstile";
 import { signInWithGoogle } from "./actions";
 import { EmailLinkForm } from "./EmailLinkForm";
+
+export const metadata: Metadata = { title: "Sign in · Open Agent" };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -21,6 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   return (
     <AuthCard
       id="login"
+      nav="none"
       title="Sign in"
       subtitle={open ? "Continue with Google to sign in or create an account." : "Open Agent is invite-only."}
     >
@@ -31,7 +36,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
       )}
       <form id="login-google-form" action={signInWithGoogle}>
         <input id="login-google-next" type="hidden" name="next" value={safeNext(firstParam(params.next))} />
-        <button id="login-google" type="submit" className={authPrimary}>
+        <button id="login-google" type="submit" className={`${authPrimary} flex items-center justify-center gap-2.5`}>
+          <GoogleIcon id="login-google-icon" />
           Continue with Google
         </button>
       </form>

@@ -5,3 +5,9 @@
 @source "../components";
 @source "../lib";
 @source "../../../packages/ui/src";
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(#landing) {
+    scroll-behavior: smooth;
+  }
+}

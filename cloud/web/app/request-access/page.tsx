@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -5,6 +6,8 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { signFormTs } from "@/lib/formToken";
 import { signupMode } from "@/lib/signupMode";
 import { RequestAccessForm } from "./RequestAccessForm";
+
+export const metadata: Metadata = { title: "Request access · Open Agent" };
 
 export default async function RequestAccessPage() {
   await connection();

@@ -12,7 +12,7 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Sear
   const input = parseConfirmInput(firstParam(params.type), firstParam(params.token_hash), firstParam(params.email));
   const fromThisBrowser = input?.type === "email" && isBoundTo((await cookies()).get(LINK_COOKIE)?.value, input.email);
   return (
-    <AuthCard id="auth-confirm" title="Welcome to Open Agent" subtitle="One more click to sign in.">
+    <AuthCard id="auth-confirm" nav="none" title="Welcome to Open Agent" subtitle="One more click to sign in.">
       {input ? (
         <form id="auth-confirm-form" action={confirmEmailLink} className="space-y-3">
           <p id="auth-confirm-account" className="text-sm text-text-secondary">

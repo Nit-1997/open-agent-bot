@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import LandingPage from "@/app/landing/page";
 import { RUNS } from "@/components/landing/LiveRun";
@@ -16,6 +16,63 @@ describe("landing page", () => {
     expect(container.querySelector("#landing-cta-button")?.getAttribute("href")).toBe("/request-access");
     expect(container.querySelector("#landing-nav-signin")?.getAttribute("href")).toBe("/login");
     expect(container.querySelector("#landing-nav a[href='/request-access']")).toBeNull();
+  });
+
+  it("keeps every sandbox button on request access", () => {
+    const { container } = render(<LandingPage />);
+    expect(container.querySelector("#landing-way-sandbox-cta")?.getAttribute("href")).toBe("/request-access");
+  });
+
+  it("links the source code and the Mac download in a new tab", () => {
+    const { container } = render(<LandingPage />);
+    const repo = "https://github.com/Nit-1997/open-agent-bot";
+    for (const id of [
+      "landing-nav-github",
+      "landing-hero-source",
+      "landing-way-mac-source",
+      "landing-cta-source",
+      "landing-footer-github",
+    ]) {
+      const link = container.querySelector(`#${id}`);
+      expect(link?.getAttribute("href")).toBe(repo);
+      expect(link?.getAttribute("target")).toBe("_blank");
+      expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(link?.querySelector("svg")).toBeTruthy();
+    }
+    expect(container.querySelector("#landing-way-mac-download")?.getAttribute("href")).toBe(`${repo}/releases/latest`);
+  });
+
+  it("shows the brand logo in the nav", () => {
+    const { container } = render(<LandingPage />);
+    const logo = container.querySelector("#landing-nav-logo-image");
+    expect(logo?.getAttribute("alt")).toBe("Open Agent");
+    expect(logo?.getAttribute("src")).toContain("open-agent-logo-dark.svg");
+    expect(container.querySelector("#landing-nav-how")?.getAttribute("href")).toBe("#landing-demo");
+  });
+
+  it("keeps the nav fixed and shrinks it to frosted glass once scrolled", () => {
+    const { container } = render(<LandingPage />);
+    const nav = container.querySelector("#landing-nav");
+    expect(nav?.className).toContain("fixed");
+    expect(nav?.getAttribute("data-scrolled")).toBe("false");
+    act(() => {
+      Object.defineProperty(window, "scrollY", { value: 400, configurable: true });
+      fireEvent.scroll(window);
+    });
+    expect(nav?.getAttribute("data-scrolled")).toBe("true");
+    expect(nav?.className).toContain("h-12");
+    expect(container.querySelector("#landing-nav-logo-image")?.getAttribute("src")).toContain("open-agent-logo-light.svg");
+    act(() => {
+      Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+      fireEvent.scroll(window);
+    });
+    expect(nav?.getAttribute("data-scrolled")).toBe("false");
+  });
+
+  it("says the project is open source", () => {
+    const { container } = render(<LandingPage />);
+    expect(container.querySelector("#landing-hero-label")?.textContent).toBe("Open source · MIT");
+    expect(container.textContent).not.toMatch(/private beta|invite only/i);
   });
 
   it("links Terms and Privacy from the footer", () => {

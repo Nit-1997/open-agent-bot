@@ -2,6 +2,8 @@
 
 Open Agent is a research and planning agent that runs on your computer. You chat with it; it searches the web, reads pages and answers with widgets and reports you can save as PDFs. It uses your own model keys, or a local model through Ollama or LM Studio.
 
+**You see every step.** Every search, every page it reads, and every claim it checks shows up live in the chat, so you can tell where an answer came from. MIT licensed, no account, no telemetry.
+
 **Mac app.** Download `Open-Agent-1.0.0-arm64.dmg` (Apple silicon) or `Open-Agent-1.0.0-x64.dmg` (Intel) from the [latest release](https://github.com/Nit-1997/open-agent-bot/releases/latest), open it and drag "Open Agent" to Applications. It needs Docker Desktop, OrbStack or Colima. The app isn't signed with an Apple Developer ID, so macOS blocks the first open: click "Done", then System Settings → Privacy & Security → "Open Anyway". Every step, with download checks: [docs/INSTALL.md](docs/INSTALL.md).
 
 **No Mac app** (any computer with Docker and Git):
@@ -18,7 +20,26 @@ Then open http://127.0.0.1:3000. Prebuilt images, updates and removal: [section 
 
 A hosted demo will be linked here later.
 
-## How it works
+## Start here
+
+| You are | You want | Go to |
+| --- | --- | --- |
+| **Someone who wants a research assistant** | Answers you can check, trip and shopping plans, one-page reports, on your own computer | [What it does](#what-it-does), then the Mac app above |
+| **Someone who cares where their data goes** | A local agent with no account, your own keys, or a model that never leaves your machine | [Run it on your computer](#run-it-on-your-computer) |
+| **An engineer building agents** | A working agent harness: tools, skills, a checked research workflow, live UI over AG-UI | [The agent harness](#the-agent-harness) and [Architecture](#architecture) |
+| **A contributor** | Add a tool, a skill or a store, run the tests and evals | [Develop](#develop) |
+
+## What it does
+
+- **Research with checked claims.** Ask a question that needs sources and it runs a research workflow: it searches, reads the best hits, writes a report, then checks every claim against the pages it read. Claims it can't support are removed or flagged, and the chat says how many ("Checked 32 claims · 30 supported · 2 removed").
+- **Reports you keep.** Reports open in a panel next to the chat, with thumbnails, previous/next, a PDF download and a link to open them in a new tab. A Reports view lists every report you've made.
+- **Plans, not just text.** Trips (flights, stays, weather, drive times), dinners out, parties, gifts, grocery runs and music picks come back as cards and widgets you can act on.
+- **Watch it work.** Searches, pages and tool calls stream into the chat as they happen.
+- **Any model.** A ChatGPT plan, API keys for OpenAI, Anthropic, OpenRouter, Google Gemini, Groq, Together AI or TypeSafe, or a local model through Ollama, LM Studio, llama.cpp, LiteLLM or any OpenAI-compatible server.
+- **Your agent.** Name it, pick its look and how it talks (brief, warm or thorough). Chats are saved and searchable, and continue after a restart.
+- **Read-only on the web.** The browser works as a guest and refuses checkout, payment, login, sign-up and booking steps: it hands you the link instead.
+
+## Architecture
 
 ```
 browser or Mac app → agent on 127.0.0.1:<port> (UI + /api + chat stream; Node + pi SDK) → model providers you add in the app
@@ -29,7 +50,58 @@ browser or Mac app → agent on 127.0.0.1:<port> (UI + /api + chat stream; Node 
 
 The Mac app (`apps/desktop`) is a thin shell: it starts this stack in your own Docker and shows the UI from 127.0.0.1. The agent never runs inside the app. Chats, reports and settings live in SQLite on a Docker volume.
 
-- What we learned about the stack: `docs/findings.md`
+Three containers, in the Docker project `open-agent`:
+
+| Container | Role |
+| --- | --- |
+| `agent` | The whole app on one port: the UI, the `/api` routes, the chat stream and the agent itself. Runs guest-mode Chromium for the browser tool. Holds the database and the encrypted model keys |
+| `search` | [SearXNG](https://github.com/searxng/searxng), a metasearch engine. No search API key needed |
+| `renderer` | Sandboxed Chromium that turns reports into thumbnails and PDFs. Holds no secrets and only the agent can reach it |
+
+The code is an npm workspace:
+
+| Path | What it is |
+| --- | --- |
+| `packages/core` | The agent: harness, tools, skills, research workflow, model providers, SQLite store, HTTP server |
+| `packages/ui` | The React chat UI: chats, cards and widgets, reports, models, onboarding |
+| `packages/bff` | The `/api` handlers and the chat stream proxy, shared by the local app and the hosted web app |
+| `packages/shared` | Types and rules shared by the agent and the UI |
+| `packages/local-web` | The Vite build of the UI that the agent serves on 127.0.0.1 |
+| `apps/desktop` | The Electron Mac shell |
+| `cloud/` | The hosted sandbox only. The local app never imports it |
+
+More on what we learned building it, with measurements: `docs/findings.md`.
+
+## The agent harness
+
+The agent runs on the [pi](https://github.com/earendil-works/pi) agent SDK (`@earendil-works/pi-coding-agent`) and streams to the UI over [AG-UI](https://docs.ag-ui.com/) through the [CopilotKit](https://www.copilotkit.ai/) runtime, which runs inside the agent at `/copilotkit`.
+
+**Tools.** The model calls these; each one has a per-reply budget so a single answer can't loop forever.
+
+| Tool | What it does |
+| --- | --- |
+| `web_search`, `image_search` | Search through SearXNG, with Brave Search as an optional fallback |
+| `fetch_page` | Read a page as clean text, with its images |
+| `browse` | Drive a guest-mode Chromium tab for pages that need clicking. Refuses checkout, login and booking |
+| `research` | The checked research workflow: search, read, write, verify every claim, publish a report |
+| `create_artifact` | Publish a report or page, shown sandboxed |
+| `show_ui` | Show a card or widget in the chat |
+| `shop`, `stays`, `flights` | Product, hotel and flight search across the sources registry |
+| `weather`, `wikipedia`, `music` | Forecasts, places and people, album and song art with Apple Music links |
+| `plan`, `ask_user` | Keep the chat's trips, events and shortlists; show a short form to confirm dates, guests or budget before searching |
+| `load_skill` | Load a skill's playbook when the task needs it |
+
+**Skills.** A skill is a folder, `packages/core/skills/<name>/SKILL.md`, with a `name`, a `description` and a playbook. The prompt lists them and the agent loads one with `load_skill`. Today: research, trip planning, dining out, party planning, gift ideas, grocery runs, music, and judging (maths and comparisons in codemode). A new use case is a new folder; no code change.
+
+**Codemode.** Claude Sonnet models (from any provider) can write one script that runs many lookups and does the maths in code, instead of one tool call at a time. On a 12-lookup fan-out test it got 8 of 8 right, about 30% cheaper and 3 seconds faster than one call at a time (`docs/findings.md`). A failed script turns codemode off for the rest of that chat.
+
+**Jev.** TypeSafe's calibrated classifier judges which search hits to read, research claims, product matches in `shop`, hotel wishes in `stays` and music cover art. It uses whichever key you added: TypeSafe first, then OpenRouter. If Jev is unreachable, every feature falls back to its non-Jev behaviour.
+
+**Follow-ups.** The model ends its answer with `<followups>a | b</followups>`; the agent turns that line into the buttons under the reply.
+
+**Workspace.** Chats and messages are saved in the local database. Carts, trips, events and shortlists are working state for the conversation and live in the agent's session only. Cards from earlier sessions stay in the chat, read-only and dated; ask again for fresh prices. The agent knows which report is open, so "what's the cheapest option in this report?" just works.
+
+**Your agent.** The name and tone you pick in onboarding go into the system prompt as a quoted name under the hard rules.
 
 ## Run it on your computer
 
@@ -40,6 +112,13 @@ The Mac app and the browser-only path above run the same stack in Docker: no acc
 - **Data.** Chats, reports and settings live in the Docker volume `open-agent-data` (a SQLite file plus a reports folder). The key that encrypts saved model keys lives in a second volume, `open-agent-keys`, mounted only into the agent. `docker compose down` keeps both; `docker compose down -v` deletes both, and with them everything.
 - **Back up the keys volume separately.** A backup of `open-agent-data` alone can't decrypt saved model keys, and a backup of both together holds everything needed to use them.
 - **Prebuilt images.** `OPEN_AGENT_IMAGE` and `OPEN_AGENT_SEARCH_IMAGE` select prebuilt images. Use them only with `docker compose up -d --no-build`: without `--no-build`, compose builds from source and tags the result with that name.
+
+### Search and pictures
+
+- Web search goes through SearXNG. Some engines rate-limit or CAPTCHA a home IP; Yahoo, Bing, Google, Qwant, Mojeek and Startpage are enabled so one working engine is enough.
+- Optional fallback: add a Brave Search API key in the app (Models → Web search; free tier at brave.com/search/api) and it is used whenever SearXNG returns nothing.
+- Pictures come from the pages the agent reads (`images:` section), `image_search` (SearXNG images), `music` (iTunes Search: album and song art, Apple Music links) and `wikipedia` (places, people, topics). No keys needed.
+- Cards show an image or link only if a tool returned it; otherwise the image is dropped and a placeholder is shown.
 
 ### Security of the local stack
 
@@ -75,37 +154,29 @@ When the agent can't start safely it prints one line, `[startup] refused code=<c
 | `identity` | 85 | Internal wiring error. Report it as a bug |
 | `listen` | 86 | Only when the entry runs outside compose (`OPEN_AGENT_LISTEN_PORT`, the Mac app): the port is in use or can't be opened. Free it or pick another. Under compose a busy host port fails earlier, when Docker publishes the port (`docker compose up` reports `port is already allocated` or `address already in use`), and the agent never starts; pick another `OPEN_AGENT_PORT` |
 
-## Search and pictures
-
-- Web search goes through SearXNG. Some engines rate-limit or CAPTCHA a home IP; Yahoo, Bing, Google, Qwant, Mojeek and Startpage are enabled so one working engine is enough.
-- Optional fallback: add a Brave Search API key in the app (Models → Web search; free tier at brave.com/search/api) and it is used whenever SearXNG returns nothing.
-- Pictures come from the pages the agent reads (`images:` section), `image_search` (SearXNG images), `music` (iTunes Search: album and song art, Apple Music links) and `wikipedia` (places, people, topics). No keys needed.
-- Cards show an image or link only if a tool returned it; otherwise the image is dropped and a placeholder is shown.
-
-## Skills, Jev and codemode
-
-- **Follow-ups**: the model ends its answer with `<followups>a | b</followups>`; the agent turns that line into the buttons under the reply.
-- **Skills** live in `packages/core/skills/<name>/SKILL.md` (frontmatter `name`, `description`, then a playbook). The core prompt lists them and the agent loads one with `load_skill`. A new use case is a new folder; no code change.
-- **Jev** (TypeSafe's calibrated classifier) judges product matches in `shop`, hotel brand/area/vibe wishes in `stays`, music cover art, which search hits to read, and research claims. It uses whichever key you added in the app: TypeSafe first, then OpenRouter. If Jev is unreachable, every feature falls back to its non-Jev behavior.
-- **Codemode**: Claude Sonnet models (from any provider) can write one script that runs many lookups and does the maths in code. A failed script turns codemode off for the rest of that chat.
-- **Workspace and chats**: Chats and their messages are saved in the local database, and a chat continues after a restart. Carts, trips, events and shortlists are working state for the conversation: they live in the agent's session only. Cards from earlier sessions stay in the chat, read-only and dated; ask again for fresh prices. The app shell has a sidebar of chats (Today, This week, Earlier), and its own views for **Reports** (every report, with PDF download) and **Search** (chat titles, message text and report titles). Every view has a URL. A report shows in the chat as a card with a thumbnail and opens in a resizable panel beside the chat (an overlay on tablets, a full-screen viewer on phones), with previous/next, PDF and a new-tab link; the open report is in the URL, and the agent knows which report is open, so "what's the cheapest option in this report?" just works.
-- **Your agent**: users name their agent, pick its look and how it talks (brief, warm or thorough) in the first onboarding step or the profile drawer. The name and tone go into the system prompt as a quoted name under the hard rules.
-
-Results: `docs/findings.md`.
-
-## Develop
-
-- [CONTRIBUTING.md](CONTRIBUTING.md): setup, checks, the code layout, the Mac app, tests and evals on the local stack, and how to add a tool.
-- [docs/RELEASING.md](docs/RELEASING.md): how a release is made (owner only).
-- `make run app` builds the Mac app from this checkout and opens it (Docker must be running); `make run web` runs the hosted stack on this machine at http://localhost:18300 (it needs the hosted env files described in cloud/README.md); `make stop` stops both; `make help` lists them.
-- [cloud/README.md](cloud/README.md): the invite-only hosted deployment (Supabase, Vercel, EC2), its end-to-end checks and evals.
-- Report security issues as described in [SECURITY.md](SECURITY.md).
-
 ## Safety rails
 
 - The browser tool works as a guest. Code refuses checkout, cart, payment, login, sign-up and booking steps and hands back the link.
 - Artifacts are served with `Content-Security-Policy: sandbox allow-scripts` and shown in a sandboxed iframe.
 - Thumbnails and PDFs are made by the `renderer` service: a non-root, read-only container with Chromium's sandbox on (Playwright's seccomp profile, `cap_drop: ALL` plus `SYS_CHROOT` for the sandbox), no secrets but `RENDERER_SECRET`, and only the agent can reach it (an internal `render` network). Its Chromium resolves only `fonts.googleapis.com` and `fonts.gstatic.com`, aborts every other request, and the report's resource hints, speculation rules and `meta refresh` are stripped first.
+
+## Develop
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): setup, checks, the code layout, the Mac app, tests and evals on the local stack, and how to add a tool, a skill or a source.
+- [docs/RELEASING.md](docs/RELEASING.md): how a release is made (owner only).
+- `make run app` builds the Mac app from this checkout and opens it (Docker must be running); `make run web` runs the hosted stack on this machine at http://localhost:18300 (it needs the hosted env files described in cloud/README.md); `make stop` stops both; `make help` lists them.
+- [cloud/README.md](cloud/README.md): the hosted sandbox (Supabase, Vercel, EC2), its limits, end-to-end checks and evals.
+- Report security issues as described in [SECURITY.md](SECURITY.md).
+
+## Documentation
+
+| Guide | Covers |
+| --- | --- |
+| [docs/INSTALL.md](docs/INSTALL.md) | Installing the Mac app or the Docker stack, checking downloads, updates and removal |
+| [SECURITY.md](SECURITY.md) | Reporting a vulnerability, verifying a download, what the local stack and the Mac app protect |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Layout, conventions, tests, evals, adding tools and sources |
+| [docs/findings.md](docs/findings.md) | What we measured and learned building the agent |
+| [docs/RELEASING.md](docs/RELEASING.md) | The release runbook |
 
 ## License
 
