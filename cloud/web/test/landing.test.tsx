@@ -42,6 +42,13 @@ describe("landing page", () => {
     expect(container.querySelector("#landing-way-mac-download")?.getAttribute("href")).toBe(`${repo}/releases/latest`);
   });
 
+  it("shows the brand logo in the nav", () => {
+    const { container } = render(<LandingPage />);
+    const logo = container.querySelector("#landing-nav-logo-image");
+    expect(logo?.getAttribute("alt")).toBe("Open Agent");
+    expect(logo?.getAttribute("src")).toContain("open-agent-logo-dark.svg");
+  });
+
   it("says the project is open source", () => {
     const { container } = render(<LandingPage />);
     expect(container.querySelector("#landing-hero-label")?.textContent).toBe("Open source · MIT");

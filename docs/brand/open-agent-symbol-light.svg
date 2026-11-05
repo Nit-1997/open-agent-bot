@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Open Agent — logomark</title>
+  <desc id="desc">Open Agent brand mark, an open letter O with a centered four-point clarity symbol, and a refined serif wordmark.</desc>
+  <g id="symbol">
+  <path d="M67.7 24.5 A32 32 0 1 0 80.5 59.5" fill="none"
+        stroke="#182941" stroke-width="6.2" stroke-linecap="round"/>
+  <path d="M47 35 C49.2 45.2 54.8 48.8 65 51
+           C54.8 53.2 49.2 56.8 47 67
+           C44.8 56.8 39.2 53.2 29 51
+           C39.2 48.8 44.8 45.2 47 35 Z" fill="#182941"/>
+  <circle cx="77" cy="26.5" r="3.5" fill="#7086AD"/>
+  </g>
+</svg>

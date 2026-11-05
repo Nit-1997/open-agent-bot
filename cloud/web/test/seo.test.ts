@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { generateMetadata } from "@/app/layout";
@@ -52,5 +52,26 @@ describe("site metadata", () => {
 
   it("ships the preview image", () => {
     expect(existsSync(resolve(__dirname, "../public/og.jpg"))).toBe(true);
+  });
+});
+
+describe("brand assets", () => {
+  const root = resolve(__dirname, "../../..");
+  it("ships the favicon set, the logos and the Mac app icon", () => {
+    for (const f of [
+      "cloud/web/app/favicon.ico",
+      "cloud/web/app/icon.svg",
+      "cloud/web/app/apple-icon.png",
+      "cloud/web/public/brand/open-agent-logo-dark.svg",
+      "cloud/web/public/brand/open-agent-logo-light.svg",
+      "packages/local-web/src/brand/favicon.svg",
+      "apps/desktop/build-resources/icon.icns",
+    ])
+      expect(existsSync(resolve(root, f)), f).toBe(true);
+  });
+
+  it("links the local app's favicon", () => {
+    const html = readFileSync(resolve(root, "packages/local-web/index.html"), "utf8");
+    expect(html).toContain('<link id="root-icon" rel="icon" type="image/svg+xml" href="/src/brand/favicon.svg" />');
   });
 });

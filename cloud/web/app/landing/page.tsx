@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppleIcon, GitHubIcon } from "@/components/brand/BrandIcons";
@@ -69,10 +70,18 @@ export default function LandingPage() {
       >
         <nav
           id="landing-nav"
-          className={`absolute top-4 left-1/2 z-10 flex h-14 -translate-x-1/2 items-center gap-4 rounded-full pr-2 pl-5 text-sm sm:gap-7 sm:pl-6 ${DARK_GLASS}`}
+          className={`absolute top-4 left-1/2 z-10 flex h-14 w-max -translate-x-1/2 items-center gap-3.5 rounded-full pr-2 pl-4 text-sm sm:gap-7 sm:pl-6 ${DARK_GLASS}`}
         >
-          <Link id="landing-nav-logo" href="/" className="font-display text-[22px] whitespace-nowrap">
-            Open Agent
+          <Link id="landing-nav-logo" href="/" aria-label="Open Agent home" className="flex shrink-0 items-center">
+            <Image
+              id="landing-nav-logo-image"
+              src="/brand/open-agent-logo-dark.svg"
+              alt="Open Agent"
+              width={137}
+              height={26}
+              priority
+              className="h-[20px] w-auto sm:h-[26px]"
+            />
           </Link>
           <a id="landing-nav-how" href="#landing-demo" className="hidden whitespace-nowrap text-white/70 hover:text-white sm:inline">
             How it works
