@@ -385,7 +385,7 @@ describe("push: build, check, push the same build, check again, attest (AC 4, 31
       "subject-digest": `\${{ steps.build.outputs.digest }}`,
       "push-to-registry": true,
     });
-    assert.equal(steps("push")[upload].with.name, `digests-\${{ matrix.image }}-\${{ matrix.arch }}`);
+    assert.equal(steps("push")[upload].with.name, `digests-\${{ matrix.arch }}-\${{ matrix.image }}`);
     assert.equal(Number(steps("push")[upload].with["retention-days"]), 1);
   });
 });
@@ -393,7 +393,7 @@ describe("push: build, check, push the same build, check again, attest (AC 4, 31
 describe("merge: index tags :<version> and :sha-<7> via scripts (AC 4)", () => {
   it("computes the inputs with refs.mjs, creates the index with --metadata-file, reads the digest with merge-digest, attests it", () => {
     const download = usesOf("merge", "actions/download-artifact@")[0];
-    assert.equal(download.with.pattern, `digests-\${{ matrix.image }}-*`);
+    assert.equal(download.with.pattern, `digests-*-\${{ matrix.image }}`);
     assert.equal(download.with["merge-multiple"], true);
     const inputs = runAt(
       "merge",

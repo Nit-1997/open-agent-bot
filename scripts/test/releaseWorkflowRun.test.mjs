@@ -142,7 +142,7 @@ function runJob(name, { matrix = {}, outputs = {}, only = () => true } = {}) {
 }
 
 describe("release.yml script steps run in order against fixtures (push record → merge → lock → attest)", () => {
-  it("push legs record per-arch digests into digests-<image>-<arch>", () => {
+  it("push legs record per-arch digests into digests-<arch>-<image>", () => {
     let n = 0;
     const only = (st) => st.run?.includes("refs.mjs record") || String(st.uses).startsWith("actions/upload-artifact@");
     for (const leg of wf.jobs.push.strategy.matrix.include) {
@@ -150,17 +150,20 @@ describe("release.yml script steps run in order against fixtures (push record �
       assert.ok(log.some((l) => l.startsWith("ran: node scripts/release/refs.mjs record")));
     }
     assert.deepEqual(readdirSync(store).sort(), [
-      "digests-open-agent-amd64",
-      "digests-open-agent-arm64",
-      "digests-open-agent-search-amd64",
-      "digests-open-agent-search-arm64",
+      "digests-amd64-open-agent",
+      "digests-amd64-open-agent-search",
+      "digests-arm64-open-agent",
+      "digests-arm64-open-agent-search",
     ]);
-    assert.equal(readFileSync(join(store, "digests-open-agent-search-arm64/arm64"), "utf8"), `sha256:${"4".repeat(64)}\n`);
+    assert.equal(readFileSync(join(store, "digests-arm64-open-agent-search/arm64"), "utf8"), `sha256:${"4".repeat(64)}\n`);
   });
 
   it("merge legs compute the tags with refs.mjs and write index-<image> with merge-digest --out", () => {
+    const pushed = wf.jobs.push.strategy.matrix.include.map((l, i) => ({ ...l, digest: `sha256:${String(i + 1).repeat(64)}` }));
     for (const leg of wf.jobs.merge.strategy.matrix.include) {
       const { ctx, log } = runJob("merge", { matrix: leg });
+      for (const p of pushed.filter((p) => p.image === leg.image))
+        assert.equal(ctx.outputs.inputs[p.arch], `${leg.name}@${p.digest}`, `${leg.image} ${p.arch} uses its own push digest`);
       assert.equal(ctx.outputs.inputs.version_tag, `${leg.name}:${VERSION}`);
       assert.equal(ctx.outputs.inputs.sha_tag, `${leg.name}:sha-${SHA.slice(0, 7)}`);
       assert.equal(ctx.outputs.merge.digest, INDEX);
