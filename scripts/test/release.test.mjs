@@ -270,7 +270,10 @@ describe("image-checks.mjs", () => {
       return null;
     };
     const docker = (a) => {
-      if (a[0] === "image" && a[1] === "rm") return ((held = undefined), ok());
+      if (a[0] === "image" && a[1] === "rm") {
+        held = undefined;
+        return ok();
+      }
       if (a[0] === "pull") return fetch(a[a.indexOf("--platform") + 1]) ?? ok();
       if (a[0] === "run") return fetch(a[a.indexOf("--platform") + 1]) ?? ok("24.22.1\n");
       if (a[0] === "image" && a[1] === "inspect")
